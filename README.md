@@ -1,1 +1,1 @@
-> Setup configs and scripts for our infrastructure
+> freeCodeCamp.org's infrastructure-as-code
