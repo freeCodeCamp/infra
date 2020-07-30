@@ -7,8 +7,8 @@ users:
     groups: sudo
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
-    ssh-authorized-keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDZ9F6Ygp5ggVkzycZbOCQ/TRL6ODhmDxWKiN3hKZ4GVxxAeSpn3uV0h+OFbZbQbHrBwGjavtgc6DbHMyO46Z2OXrsmKhLvWyMkph5N9IZ06xoaF18bmeezGYjdq8P/CwzxYMt9UhzKYbsR0+Ptxobf0HO8uz38t++H1IuE7DT46/4ibn8+NnGvv+iyQowpAh01ZPWCfKXuQw9YHnwyBFRakOAm8QWgeUowDLRju0dFTcPKevLzMDVO4jBAQR9c+KX+c0z2/ybDEpXaxYu9whgPPcuHh5a3Ztbk8r0jXwb67Au7HNaNuxMcydTqn8jbIPI9XW8mYZeUsiZ4sOig40MJARxGVF2WXyTO0CkPhFJ/JgIIeRQ43seaxpgVVoV/w4AosvWK7VqsJVbl45wygkpcNp9J5B4Hfkk/5xXorddI2FOjucgfbosLowT/mh+8H/ggbBZ9JlcBKkOp2dkx0BkP4u0B+2vKB5hZjYVzB6BrXeFqMSggIOLXYwfrl5b84hdUFpr7vZL+ufVeX2Mx87xt0Zreg1OXDf9dx/gWXCH6EJy+aOvWkxh5itZOY4G4ZRRw3Rkw0GL0eymRZKY+hn/pvqvIZvHv20p0fzlWGCkV+VbZMhMhX+7/6dsubnoE8dXueQxJ3BmfD/C97fm3Tpx7D/4tHRDK2uKe2VWsJsUqCw==
+    ssh_import_id:
+      - raisedadead
 runcmd:
   - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.2/install.sh | bash
   - export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
