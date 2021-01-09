@@ -1,8 +1,13 @@
 #cloud-config
+
+package_update: true
 package_upgrade: true
+package_reboot_if_required: true
+
 packages:
-  - nginx
   - unattended-upgrades
+  - software-properties-common
+
 users:
   - name: freecodecamp
     groups: sudo
@@ -10,7 +15,5 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_import_id:
       - raisedadead
-runcmd:
-  - rm -rf /etc/nginx
-  - git clone https://github.com/freecodecamp/nginx-config /etc/nginx
-  - git clone https://github.com/freeCodeCamp/error-pages /var/www/html/error-pages
+
+final_message: 'Setup complete'
