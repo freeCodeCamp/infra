@@ -2,7 +2,6 @@ import { Construct } from 'constructs';
 import { App, RemoteBackend, TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
-  BastionHost,
   Lb,
   LbBackendAddressPool,
   LbProbe,
@@ -56,28 +55,9 @@ class StagingStack extends TerraformStack {
       addressPrefixes: ['10.240.0.0/16']
     });
 
-    const stg_subnet_bh = new Subnet(this, 'stg_subnet_bh', {
-      // Name should be exactly AzureBastionSubnet - Azure limitation for having a Bastion
-      name: 'AzureBastionSubnet',
-      resourceGroupName: stg_rg.name,
-      virtualNetworkName: stg_vnet.name,
-      // Address Prefix needs to be greater than /27 at minimum for a Bastion
-      addressPrefixes: ['10.200.0.0/27']
-
-    });
-
     // ----------------------------------
     // Public IP Addresses
     // ----------------------------------
-
-    // Public IP Address for the BastionHost
-    const stg_public_ip_bh = new PublicIp(this, 'stg_public_ip_bh', {
-      name: 'stg_public_ip_bh',
-      resourceGroupName: stg_rg.name,
-      location: stg_rg.location,
-      allocationMethod: 'Static',
-      sku: 'Standard'
-    });
 
     // Public IP Address for the LoadBalancer (external)
     const stg_public_ip_lb = new PublicIp(this, 'stg_public_ip_lb', {
@@ -93,7 +73,7 @@ class StagingStack extends TerraformStack {
       resourceGroupName: stg_rg.name,
       location: stg_rg.location,
       allocationMethod: 'Static',
-      sku: 'Basic',
+      sku: 'Basic'
     });
 
     const stg_public_ip_api = new PublicIp(this, 'stg_public_ip_api', {
@@ -126,23 +106,6 @@ class StagingStack extends TerraformStack {
       location: stg_rg.location,
       allocationMethod: 'Static',
       sku: 'Basic'
-    });
-
-    // ----------------------------------
-    // Bastion Host
-    // ----------------------------------
-
-    new BastionHost(this, 'stg_bh', {
-      name: 'stg_bh',
-      resourceGroupName: stg_rg.name,
-      location: stg_rg.location,
-      ipConfiguration: [
-        {
-          name: 'stg_ipconf_bh',
-          subnetId: stg_subnet_bh.id,
-          publicIpAddressId: stg_public_ip_bh.id
-        }
-      ]
     });
 
     // ----------------------------------
