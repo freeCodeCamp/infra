@@ -108,6 +108,14 @@ class StagingStack extends TerraformStack {
       sku: 'Basic'
     });
 
+    const stg_public_ip_clt_cnt = new PublicIp(this, 'stg_public_ip_clt_cnt', {
+      name: 'stg_public_ip_clt_cnt',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      allocationMethod: 'Static',
+      sku: 'Basic'
+    });
+
     // ----------------------------------
     // Load Balancer - Web Proxy Nodes
     // ----------------------------------
@@ -560,6 +568,79 @@ class StagingStack extends TerraformStack {
       osDisk: [
         {
           name: 'stg_osdisk_clt_esp',
+          caching: 'ReadWrite',
+          storageAccountType: 'Standard_LRS'
+        }
+      ],
+      sourceImageReference: [
+        {
+          publisher: 'Canonical',
+          offer: 'UbuntuServer',
+          sku: '18.04-LTS',
+          version: 'latest'
+        }
+      ],
+      // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
+      customData: custom_data
+    });
+
+    // ----------------------------------
+    // Virtual Machine - Web Client (cnt)
+    // ----------------------------------
+
+    const stg_ni_clt_cnt = new NetworkInterface(this, 'stg_ni_clt_cnt', {
+      name: 'stg_ni_clt_cnt',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      ipConfiguration: [
+        {
+          name: 'stg_ipconf_clt_cnt',
+          primary: true,
+          subnetId: stg_subnet.id,
+          privateIpAddressAllocation: 'Static',
+          privateIpAddress: '10.240.0.60',
+          publicIpAddressId: stg_public_ip_clt_cnt.id
+        }
+      ]
+    });
+
+    const stg_nsg_clt_cnt = new NetworkSecurityGroup(this, 'stg_nsg_clt_cnt', {
+      name: 'stg_nsg_clt_cnt',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location
+    });
+
+    new NetworkSecurityRule(this, 'stg_nsg_rule_ssh_clt_cnt', {
+      name: 'SSH',
+      resourceGroupName: stg_rg.name,
+      networkSecurityGroupName: stg_nsg_clt_cnt.name,
+      direction: 'Inbound',
+      priority: 200,
+      access: 'Allow',
+      protocol: 'Tcp',
+      sourcePortRange: '*',
+      sourceAddressPrefix: '*',
+      destinationPortRange: '22',
+      destinationAddressPrefix: '*'
+    });
+
+    new LinuxVirtualMachine(this, 'stg_vm_clt_cnt', {
+      name: 'stg_vm_clt_cnt',
+      computerName: 'cltcnt',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      size: 'Standard_B2s',
+      adminUsername: 'freecodecamp',
+      adminSshKey: [
+        {
+          username: 'freecodecamp',
+          publicKey: ssh_public_key
+        }
+      ],
+      networkInterfaceIds: [stg_ni_clt_cnt.id],
+      osDisk: [
+        {
+          name: 'stg_osdisk_clt_cnt',
           caching: 'ReadWrite',
           storageAccountType: 'Standard_LRS'
         }
