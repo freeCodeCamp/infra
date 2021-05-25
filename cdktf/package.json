@@ -1,0 +1,28 @@
+{
+  "name": "staging-stack",
+  "version": "1.0.0",
+  "main": "main.js",
+  "types": "main.ts",
+  "license": "MPL-2.0",
+  "private": true,
+  "scripts": {
+    "compile": "tsc --pretty",
+    "watch": "tsc -w",
+    "test": "echo ok",
+    "upgrade": "npm i cdktf@latest cdktf-cli@latest"
+  },
+  "engines": {
+    "node": ">=10.12"
+  },
+  "dependencies": {
+    "@cdktf/provider-azurerm": "^0.1.74",
+    "cdktf": "^0.3.0",
+    "constructs": "^3.3.75",
+    "dotenv": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^15.0.2",
+    "cdktf-cli": "^0.3.0",
+    "typescript": "^4.2.4"
+  }
+}
