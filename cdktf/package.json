@@ -9,20 +9,21 @@
     "compile": "tsc --pretty",
     "watch": "tsc -w",
     "test": "echo ok",
-    "upgrade": "npm i cdktf@latest cdktf-cli@latest"
+    "upgrade": "npm i cdktf@latest cdktf-cli@latest",
+    "help": "echo https://github.com/hashicorp/terraform-cdk/blob/main/docs/cli-commands.md"
   },
   "engines": {
     "node": ">=10.12"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "^0.1.74",
-    "cdktf": "^0.3.0",
+    "@cdktf/provider-azurerm": "^0.1.83",
+    "cdktf": "^0.4.0",
     "constructs": "^3.3.75",
-    "dotenv": "^9.0.2"
+    "dotenv": "^10.0.0"
   },
   "devDependencies": {
-    "@types/node": "^15.0.2",
-    "cdktf-cli": "^0.3.0",
-    "typescript": "^4.2.4"
+    "@types/node": "^15.6.1",
+    "cdktf-cli": "^0.4.0",
+    "typescript": "^4.3.2"
   }
 }
