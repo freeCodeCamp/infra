@@ -116,6 +116,14 @@ class StagingStack extends TerraformStack {
       sku: 'Basic'
     });
 
+    const stg_public_ip_clt_ita = new PublicIp(this, 'stg_public_ip_clt_ita', {
+      name: 'stg_public_ip_clt_ita',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      allocationMethod: 'Static',
+      sku: 'Basic'
+    });
+
     // ----------------------------------
     // Load Balancer - Web Proxy Nodes
     // ----------------------------------
@@ -657,6 +665,78 @@ class StagingStack extends TerraformStack {
       customData: custom_data
     });
 
+    // ----------------------------------
+    // Virtual Machine - Web Client (ita)
+    // ----------------------------------
+
+    const stg_ni_clt_ita = new NetworkInterface(this, 'stg_ni_clt_ita', {
+      name: 'stg_ni_clt_ita',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      ipConfiguration: [
+        {
+          name: 'stg_ipconf_clt_ita',
+          primary: true,
+          subnetId: stg_subnet.id,
+          privateIpAddressAllocation: 'Static',
+          privateIpAddress: '10.240.0.70',
+          publicIpAddressId: stg_public_ip_clt_ita.id
+        }
+      ]
+    });
+
+    const stg_nsg_clt_ita = new NetworkSecurityGroup(this, 'stg_nsg_clt_ita', {
+      name: 'stg_nsg_clt_ita',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location
+    });
+
+    new NetworkSecurityRule(this, 'stg_nsg_rule_ssh_clt_ita', {
+      name: 'SSH',
+      resourceGroupName: stg_rg.name,
+      networkSecurityGroupName: stg_nsg_clt_ita.name,
+      direction: 'Inbound',
+      priority: 200,
+      access: 'Allow',
+      protocol: 'Tcp',
+      sourcePortRange: '*',
+      sourceAddressPrefix: '*',
+      destinationPortRange: '22',
+      destinationAddressPrefix: '*'
+    });
+
+    new LinuxVirtualMachine(this, 'stg_vm_clt_ita', {
+      name: 'stg_vm_clt_ita',
+      computerName: 'cltita',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      size: 'Standard_B2s',
+      adminUsername: 'freecodecamp',
+      adminSshKey: [
+        {
+          username: 'freecodecamp',
+          publicKey: ssh_public_key
+        }
+      ],
+      networkInterfaceIds: [stg_ni_clt_ita.id],
+      osDisk: [
+        {
+          name: 'stg_osdisk_clt_ita',
+          caching: 'ReadWrite',
+          storageAccountType: 'Standard_LRS'
+        }
+      ],
+      sourceImageReference: [
+        {
+          publisher: 'Canonical',
+          offer: 'UbuntuServer',
+          sku: '18.04-LTS',
+          version: 'latest'
+        }
+      ],
+      // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
+      customData: custom_data
+    });
     // End of Stack
   }
 }
