@@ -76,13 +76,29 @@ class StagingStack extends TerraformStack {
       sku: 'Basic'
     });
 
-    const stg_public_ip_api = new PublicIp(this, 'stg_public_ip_api', {
-      name: 'stg_public_ip_api',
-      resourceGroupName: stg_rg.name,
-      location: stg_rg.location,
-      allocationMethod: 'Static',
-      sku: 'Basic'
-    });
+    const stg_public_ip_api_alpha = new PublicIp(
+      this,
+      'stg_public_ip_api_alpha',
+      {
+        name: 'stg_public_ip_api_alpha',
+        resourceGroupName: stg_rg.name,
+        location: stg_rg.location,
+        allocationMethod: 'Static',
+        sku: 'Basic'
+      }
+    );
+
+    const stg_public_ip_api_bravo = new PublicIp(
+      this,
+      'stg_public_ip_api_bravo',
+      {
+        name: 'stg_public_ip_api_bravo',
+        resourceGroupName: stg_rg.name,
+        location: stg_rg.location,
+        allocationMethod: 'Static',
+        sku: 'Basic'
+      }
+    );
 
     const stg_public_ip_clt_eng = new PublicIp(this, 'stg_public_ip_clt_eng', {
       name: 'stg_public_ip_clt_eng',
@@ -309,35 +325,39 @@ class StagingStack extends TerraformStack {
     });
 
     // ----------------------------------
-    // Virtual Machine - API
+    // Virtual Machine - API Alpha
     // ----------------------------------
 
-    const stg_ni_api = new NetworkInterface(this, 'stg_ni_api', {
-      name: 'stg_ni_api',
+    const stg_ni_api_alpha = new NetworkInterface(this, 'stg_ni_api_alpha', {
+      name: 'stg_ni_api_alpha',
       resourceGroupName: stg_rg.name,
       location: stg_rg.location,
       ipConfiguration: [
         {
-          name: 'stg_ipconf_api',
+          name: 'stg_ipconf_api_alpha',
           primary: true,
           subnetId: stg_subnet.id,
           privateIpAddressAllocation: 'Static',
           privateIpAddress: '10.240.0.20',
-          publicIpAddressId: stg_public_ip_api.id
+          publicIpAddressId: stg_public_ip_api_alpha.id
         }
       ]
     });
 
-    const stg_nsg_api = new NetworkSecurityGroup(this, 'stg_nsg_api', {
-      name: 'stg_nsg_api',
-      resourceGroupName: stg_rg.name,
-      location: stg_rg.location
-    });
+    const stg_nsg_api_alpha = new NetworkSecurityGroup(
+      this,
+      'stg_nsg_api_alpha',
+      {
+        name: 'stg_nsg_api_alpha',
+        resourceGroupName: stg_rg.name,
+        location: stg_rg.location
+      }
+    );
 
-    new NetworkSecurityRule(this, 'stg_nsg_rule_ssh_api', {
+    new NetworkSecurityRule(this, 'stg_nsg_rule_ssh_api_alpha', {
       name: 'SSH',
       resourceGroupName: stg_rg.name,
-      networkSecurityGroupName: stg_nsg_api.name,
+      networkSecurityGroupName: stg_nsg_api_alpha.name,
       direction: 'Inbound',
       priority: 200,
       access: 'Allow',
@@ -348,9 +368,9 @@ class StagingStack extends TerraformStack {
       destinationAddressPrefix: '*'
     });
 
-    new LinuxVirtualMachine(this, 'stg_vm_api', {
-      name: 'stg_vm_api',
-      computerName: 'api',
+    new LinuxVirtualMachine(this, 'stg_vm_api_alpha', {
+      name: 'stg_vm_api_alpha',
+      computerName: 'apialpha',
       resourceGroupName: stg_rg.name,
       location: stg_rg.location,
       size: 'Standard_B2s',
@@ -361,10 +381,87 @@ class StagingStack extends TerraformStack {
           publicKey: ssh_public_key
         }
       ],
-      networkInterfaceIds: [stg_ni_api.id],
+      networkInterfaceIds: [stg_ni_api_alpha.id],
       osDisk: [
         {
-          name: 'stg_osdisk_api',
+          name: 'stg_osdisk_api_alpha',
+          caching: 'ReadWrite',
+          storageAccountType: 'Standard_LRS'
+        }
+      ],
+      sourceImageReference: [
+        {
+          publisher: 'Canonical',
+          offer: 'UbuntuServer',
+          sku: '18.04-LTS',
+          version: 'latest'
+        }
+      ],
+      // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
+      customData: custom_data
+    });
+
+    // ----------------------------------
+    // Virtual Machine - API Bravo
+    // ----------------------------------
+
+    const stg_ni_api_bravo = new NetworkInterface(this, 'stg_ni_api_bravo', {
+      name: 'stg_ni_api_bravo',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      ipConfiguration: [
+        {
+          name: 'stg_ipconf_api_bravo',
+          primary: true,
+          subnetId: stg_subnet.id,
+          privateIpAddressAllocation: 'Static',
+          privateIpAddress: '10.240.0.20',
+          publicIpAddressId: stg_public_ip_api_bravo.id
+        }
+      ]
+    });
+
+    const stg_nsg_api_bravo = new NetworkSecurityGroup(
+      this,
+      'stg_nsg_api_bravo',
+      {
+        name: 'stg_nsg_api_bravo',
+        resourceGroupName: stg_rg.name,
+        location: stg_rg.location
+      }
+    );
+
+    new NetworkSecurityRule(this, 'stg_nsg_rule_ssh_api_bravo', {
+      name: 'SSH',
+      resourceGroupName: stg_rg.name,
+      networkSecurityGroupName: stg_nsg_api_bravo.name,
+      direction: 'Inbound',
+      priority: 200,
+      access: 'Allow',
+      protocol: 'Tcp',
+      sourcePortRange: '*',
+      sourceAddressPrefix: '*',
+      destinationPortRange: '22',
+      destinationAddressPrefix: '*'
+    });
+
+    new LinuxVirtualMachine(this, 'stg_vm_api_bravo', {
+      name: 'stg_vm_api_bravo',
+      computerName: 'apibravo',
+      resourceGroupName: stg_rg.name,
+      location: stg_rg.location,
+      size: 'Standard_B2s',
+      adminUsername: 'freecodecamp',
+      adminSshKey: [
+        {
+          username: 'freecodecamp',
+          publicKey: ssh_public_key
+        }
+      ],
+      networkInterfaceIds: [stg_ni_api_bravo.id],
+      osDisk: [
+        {
+          name: 'stg_osdisk_api_bravo',
           caching: 'ReadWrite',
           storageAccountType: 'Standard_LRS'
         }
