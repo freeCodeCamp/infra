@@ -16,7 +16,7 @@
     "node": ">=10.12"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "0.1.113",
+    "@cdktf/provider-azurerm": "0.2.13",
     "cdktf": "0.4.1",
     "constructs": "3.3.92",
     "dotenv": "10.0.0"
