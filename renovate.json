@@ -10,5 +10,8 @@
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true
     }
+  ],
+  "ignorePaths": [
+    "scratchpad"
   ]
 }
