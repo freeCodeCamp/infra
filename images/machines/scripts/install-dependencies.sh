@@ -14,7 +14,7 @@ logger "Update the box"
 apt-get -y update
 apt-get -y upgrade
 
-logger "Install dependencies"
+logger "Install common dependencies"
 apt-get -y install build-essential 
 apt-get -y install curl 
 apt-get -y install git 

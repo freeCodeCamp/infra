@@ -12,7 +12,9 @@ DEBIAN_FRONTEND=noninteractive
 
 logger "Cleanup"
 apt-get -y autoremove
+apt-get -y autoclean
 apt-get -y clean
+apt-get -y purge
 
 rm -rf /tmp/*
 rm -rf /ops

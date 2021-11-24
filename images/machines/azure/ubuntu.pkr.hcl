@@ -1,8 +1,8 @@
 packer {
   required_plugins {
     azure = {
-      version = ">= 1.0.0"
-      source  = "github.com/hashicorp/azure"
+      version = ">= 1.0.4"
+      source  = "github.com/hashicorp/azure" # From: https://github.com/hashicorp/packer-plugin-azure
     }
   }
 }
@@ -57,8 +57,8 @@ variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "freecodecamp" }
 
 # TODO: These should be configurable via environment variables.
-variable "scripts_dir" { default = "machine-images/scripts" }
-variable "configs_dir" { default = "machine-images/configs" }
+variable "scripts_dir" { default = "images/machines/scripts" }
+variable "configs_dir" { default = "images/machines/configs" }
 
 locals {
   name_prefix = "Ubuntu"
