@@ -57,8 +57,8 @@ variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "freecodecamp" }
 
 # TODO: These should be configurable via environment variables.
-variable "scripts_dir" { default = "machine-images/scripts" }
-variable "configs_dir" { default = "machine-images/configs" }
+variable "scripts_dir" { default = "images/machine/scripts" }
+variable "configs_dir" { default = "images/machine/configs" }
 
 locals {
   name_prefix = "Ubuntu"
