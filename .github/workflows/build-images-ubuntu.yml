@@ -1,0 +1,29 @@
+name: Build Ubuntu Images
+
+on:
+  workflow_dispatch:
+
+jobs:      
+  build-images:
+    name: Build Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        location: [ "eastus", "westus" ]
+    env: 
+      AZURE_SERVICE_PRINCIPAL_CLIENT_ID: ${{ secrets.AZURE_SERVICE_PRINCIPAL_CLIENT_ID }}
+      AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET: ${{ secrets.AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET }}
+      AZURE_SERVICE_PRINCIPAL_TENANT_ID: ${{ secrets.AZURE_SERVICE_PRINCIPAL_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      # validate templates
+      - name: Validate Template
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: validate
+          arguments: -syntax-only -var location=${{ matrix.location }}
+          target: ./images/machines/azure/ubuntu.pkr.hcl
