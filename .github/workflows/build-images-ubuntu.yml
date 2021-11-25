@@ -20,10 +20,23 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v2
 
-      # validate templates
-      - name: Validate Template
+      - name: Validate
         uses: hashicorp/packer-github-actions@master
         with:
           command: validate
           arguments: -syntax-only -var location=${{ matrix.location }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
+      
+      - name: Build
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: build
+          arguments: -var location=${{ matrix.location }}
+          target: ./images/machines/azure/ubuntu.pkr.hcl
+      
+      - name: Upload manifest
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-manifest
+          path: manifest.json
+          retention-days: 7
