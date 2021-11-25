@@ -41,9 +41,9 @@ jobs:
           arguments: -var location=${{ matrix.location }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
       
-      - name: Upload manifest
-        uses: actions/upload-artifact@v2
-        with:
-          name: build-manifest
-          path: manifest.json
-          retention-days: 7
+      # - name: Upload manifest
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: build-manifest
+      #     path: manifest.json
+      #     retention-days: 7

@@ -61,8 +61,7 @@ variable "scripts_dir" { default = "images/machines/scripts" }
 variable "configs_dir" { default = "images/machines/configs" }
 
 locals {
-  name_prefix = "Ubuntu"
-  name_suffix = "${formatdate("YYMMDD-hhmm", timestamp())}"
+  artifact_name = "Ubuntu-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
 }
 
 source "azure-arm" "ubuntu" {
@@ -81,7 +80,7 @@ source "azure-arm" "ubuntu" {
   location = var.location
   os_type  = var.os_type
 
-  managed_image_name                = "${local.name_prefix}-${var.image_sku}-${local.name_suffix}"
+  managed_image_name                = local.artifact_name
   managed_image_resource_group_name = var.resource_group
 
   vm_size      = var.vm_size
