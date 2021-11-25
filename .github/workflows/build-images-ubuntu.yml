@@ -20,6 +20,13 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v2
 
+      - name: Init
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: init
+          arguments: -var location=${{ matrix.location }}
+          target: ./images/machines/azure/ubuntu.pkr.hcl
+
       - name: Validate
         uses: hashicorp/packer-github-actions@master
         with:
