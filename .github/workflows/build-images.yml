@@ -1,12 +1,18 @@
-name: Build Ubuntu Images
+name: Build Images
 
 on:
   workflow_dispatch:
+    inputs:
+      variables:
+        description: "Provide build variant variables: vm_size=Standard_D2s_v3 image_sku=18.04-LTS"
+        default: "vm_size=Standard_B2s image_sku=18.04-LTS"
+        required: false
+        
 
 jobs:      
   build-images:
     name: Build Images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     strategy:
       matrix:
         location: [ "eastus", "westus" ]
@@ -24,21 +30,27 @@ jobs:
         uses: hashicorp/packer-github-actions@master
         with:
           command: init
-          arguments: -var location=${{ matrix.location }}
+          # Pass the input variables to the packer build.
+          # Note: The build matrix can't be passed as input variables in GitHub Actions workflow_dispatch
+          arguments: -var location=${{ matrix.location }} -var ${{ github.event.inputs.variables }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
 
       - name: Validate
         uses: hashicorp/packer-github-actions@master
         with:
           command: validate
-          arguments: -syntax-only -var location=${{ matrix.location }}
+          # Pass the input variables to the packer build.
+          # Note: The build matrix can't be passed as input variables in GitHub Actions workflow_dispatch
+          arguments: -var location=${{ matrix.location }} -var ${{ github.event.inputs.variables }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
       
       - name: Build
         uses: hashicorp/packer-github-actions@master
         with:
           command: build
-          arguments: -var location=${{ matrix.location }}
+          # Pass the input variables to the packer build.
+          # Note: The build matrix can't be passed as input variables in GitHub Actions workflow_dispatch
+          arguments: -var location=${{ matrix.location }} -var ${{ github.event.inputs.variables }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
       
       # - name: Upload manifest

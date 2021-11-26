@@ -66,6 +66,7 @@ locals {
 
 source "azure-arm" "ubuntu" {
 
+  # AzureRM Parameters: https://www.packer.io/docs/builders/azure/arm
   async_resourcegroup_delete = true
 
   subscription_id = var.az_subscription_id
@@ -85,6 +86,14 @@ source "azure-arm" "ubuntu" {
 
   vm_size      = var.vm_size
   ssh_username = var.ssh_username
+
+  azure_tags = {
+    "ops-created-by" = "packer"
+    "ops-vm-size"   = var.vm_size
+    "ops-vm-location" = var.location
+    "ops-vm-sku" = var.image_sku
+  }
+
 }
 
 build {
