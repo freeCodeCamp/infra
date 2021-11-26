@@ -7,7 +7,6 @@ on:
         description: "Provide build variant variables: vm_size=Standard_D2s_v3 image_sku=18.04-LTS"
         default: "vm_size=Standard_B2s image_sku=18.04-LTS"
         required: false
-        
 
 jobs:      
   build-images:
@@ -27,29 +26,23 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Init
-        uses: hashicorp/packer-github-actions@master
+        uses: hashicorp/packer-github-actions@v0.2.0
         with:
           command: init
-          # Pass the input variables to the packer build.
-          # Note: The build matrix can't be passed as input variables in GitHub Actions workflow_dispatch
           arguments: -var location=${{ matrix.location }} -var ${{ github.event.inputs.variables }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
 
       - name: Validate
-        uses: hashicorp/packer-github-actions@master
+        uses: hashicorp/packer-github-actions@v0.2.0
         with:
           command: validate
-          # Pass the input variables to the packer build.
-          # Note: The build matrix can't be passed as input variables in GitHub Actions workflow_dispatch
           arguments: -var location=${{ matrix.location }} -var ${{ github.event.inputs.variables }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
       
       - name: Build
-        uses: hashicorp/packer-github-actions@master
+        uses: hashicorp/packer-github-actions@v0.2.0
         with:
           command: build
-          # Pass the input variables to the packer build.
-          # Note: The build matrix can't be passed as input variables in GitHub Actions workflow_dispatch
           arguments: -var location=${{ matrix.location }} -var ${{ github.event.inputs.variables }}
           target: ./images/machines/azure/ubuntu.pkr.hcl
       

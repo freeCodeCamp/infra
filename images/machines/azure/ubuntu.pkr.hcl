@@ -105,6 +105,7 @@ build {
       "SSH_PROVISIONED_USER=${var.ssh_username}"
     ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
+    # Wait for OS updates, cloud-init etc. to be completed. This is arbitrary and works quite well.
     pause_before    = "60s"
     scripts = [
       "${var.scripts_dir}/install-dependencies.sh",
