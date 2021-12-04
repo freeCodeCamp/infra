@@ -8,6 +8,8 @@ jobs:
     name: Build Images
     runs-on: ubuntu-18.04
     strategy:
+      fail-fast: false
+      max-parallel: 2
       matrix:
         location: [ "eastus", "westus" ]
     env: 
