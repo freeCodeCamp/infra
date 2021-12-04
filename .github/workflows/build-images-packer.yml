@@ -1,4 +1,4 @@
-name: Build Machine Images - Ubuntu
+name: Build Machine Images
 
 on:
   workflow_dispatch:
@@ -46,9 +46,9 @@ jobs:
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
 
-      # - name: Upload manifest
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: build-manifest
-      #     path: manifest.json
-      #     retention-days: 7
+      - name: Upload manifest
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-manifest-${{ matrix.location }}
+          path: manifest.json
+          retention-days: 7
