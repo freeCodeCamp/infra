@@ -26,31 +26,39 @@ jobs:
       - name: Use latest Packer
         uses: hashicorp-contrib/setup-packer@v1
       
-      - name: Packer Version
+      - name: Check Version
         run: |
           echo "Packer version: $(packer version)"
       
-      - name: Packer Init
+      - name: Build Images
         run: |
           packer init \
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
       
-      - name: Packer Validate
-        run: |
           packer validate \
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
       
-      - name: Packer Build
-        run: |
           packer build \
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
+          
+          UBUNTU_ARTIFACT_NAME=$(cat manifest.json | jq '.builds[].artifact_id' | sed -r 's|.*/(.*)"$|\1|')
+          echo Building the next image with: $UBUNTU_ARTIFACT_NAME
 
-      - name: Upload manifest
-        uses: actions/upload-artifact@v2
-        with:
-          name: build-manifest-${{ matrix.location }}
-          path: manifest.json
-          retention-days: 7
+          packer init \
+          -var location=${{ matrix.location }} \
+          -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
+          ./images/machines/azure/nginx.pkr.hcl
+      
+          packer validate \
+          -var location=${{ matrix.location }} \
+          -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
+          ./images/machines/azure/nginx.pkr.hcl
+
+          packer build \
+          -var location=${{ matrix.location }} \
+          -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
+          ./images/machines/azure/nginx.pkr.hcl
+      

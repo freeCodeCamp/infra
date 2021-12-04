@@ -47,9 +47,14 @@ variable "az_subscription_id" {
   }
 }
 
-variable "image_offer" { default = "UbuntuServer" }
-variable "image_publisher" { default = "Canonical" }
-variable "image_sku" { default = "18.04-LTS" }
+variable "custom_managed_image_resource_group_name" { default = "ops-rg-azure-machine-images" }
+variable "custom_managed_image_name" { 
+  validation {
+    condition     = length(var.custom_managed_image_name) > 0
+    error_message = "The custom managed image name is not set. Please set the custom_managed_image_name variable."
+  }
+ }
+
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-azure-machine-images" }
@@ -61,10 +66,10 @@ variable "scripts_dir" { default = "images/machines/scripts" }
 variable "configs_dir" { default = "images/machines/configs" }
 
 locals {
-  artifact_name = "UBUNTU-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
+  artifact_name = "NGINX-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
 }
 
-source "azure-arm" "ubuntu" {
+source "azure-arm" "nginx" {
 
   # AzureRM Parameters: https://www.packer.io/docs/builders/azure/arm
   async_resourcegroup_delete = true
@@ -74,9 +79,8 @@ source "azure-arm" "ubuntu" {
   client_secret   = var.az_sp_client_secret
   client_id       = var.az_sp_client_id
 
-  image_offer     = var.image_offer
-  image_publisher = var.image_publisher
-  image_sku       = var.image_sku
+  custom_managed_image_name = var.custom_managed_image_name
+  custom_managed_image_resource_group_name = var.custom_managed_image_resource_group_name
 
   location = var.location
   os_type  = var.os_type
@@ -91,14 +95,14 @@ source "azure-arm" "ubuntu" {
     "ops-created-by" = "packer"
     "ops-vm-size"   = var.vm_size
     "ops-vm-location" = var.location
-    "ops-vm-buildchain" = "${local.artifact_name}-from-${var.image_sku}"
+    "ops-vm-type" = "${local.artifact_name}-from-${var.custom_managed_image_name}"
   }
 
 }
 
 build {
-  name    = "ubuntu"
-  sources = ["source.azure-arm.ubuntu"]
+  name    = "nginx"
+  sources = ["source.azure-arm.nginx"]
 
   provisioner "shell" {
     environment_vars = [
@@ -109,9 +113,7 @@ build {
     pause_before    = "60s"
     scripts = [
       "${var.scripts_dir}/add-dependencies.sh",
-      "${var.scripts_dir}/installers/golang.sh",
-      "${var.scripts_dir}/installers/docker.sh",
-      "${var.scripts_dir}/installers/docker-compose.sh",
+      "${var.scripts_dir}/installers/nginx.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }
