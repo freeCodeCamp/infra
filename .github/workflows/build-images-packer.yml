@@ -1,4 +1,4 @@
-name: Build Images
+name: Build Machine Images - Ubuntu
 
 on:
   workflow_dispatch:
