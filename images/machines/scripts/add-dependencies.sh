@@ -3,7 +3,7 @@ set -e
 
 logger() {
   DT=$(date '+%Y/%m/%d %H:%M:%S')
-  echo "$DT dependencies.sh: $1"
+  echo "$DT add-dependencies.sh: $1"
 }
 
 logger "Executing"

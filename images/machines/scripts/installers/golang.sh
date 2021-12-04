@@ -3,7 +3,7 @@ set -e
 
 logger() {
   DT=$(date '+%Y/%m/%d %H:%M:%S')
-  echo "$DT go.sh: $1"
+  echo "$DT golang.sh: $1"
 }
 
 logger "Executing"

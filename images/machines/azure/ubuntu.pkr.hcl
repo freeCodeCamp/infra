@@ -52,7 +52,7 @@ variable "image_publisher" { default = "Canonical" }
 variable "image_sku" { default = "18.04-LTS" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
-variable "resource_group" { default = "ops_rg_azure_machine_images" }
+variable "resource_group" { default = "ops-rg-azure-machine-images" }
 variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "freecodecamp" }
 
@@ -108,10 +108,10 @@ build {
     # Wait for OS updates, cloud-init etc. to be completed. This is arbitrary and works quite well.
     pause_before    = "60s"
     scripts = [
-      "${var.scripts_dir}/install-dependencies.sh",
-      "${var.scripts_dir}/install-golang.sh",
-      "${var.scripts_dir}/install-docker.sh",
-      "${var.scripts_dir}/install-docker-compose.sh",
+      "${var.scripts_dir}/add-dependencies.sh",
+      "${var.scripts_dir}/installers/golang.sh",
+      "${var.scripts_dir}/installers/docker.sh",
+      "${var.scripts_dir}/installers/docker-compose.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }

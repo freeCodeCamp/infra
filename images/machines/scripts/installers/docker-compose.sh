@@ -3,7 +3,7 @@ set -e
 
 logger() {
   DT=$(date '+%Y/%m/%d %H:%M:%S')
-  echo "$DT docker.sh: $1"
+  echo "$DT docker-compose.sh: $1"
 }
 
 logger "Executing"
