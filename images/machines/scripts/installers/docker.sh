@@ -13,10 +13,18 @@ USER=$SSH_PROVISIONED_USER
 
 logger "Installing Docker"
 
-curl -sSL https://get.docker.com/ | sh
-sh -c "echo \"DOCKER_OPTS='--dns 127.0.0.1 --dns 8.8.8.8 --dns-search service.consul'\" >> /etc/default/docker"
-usermod -aG docker $USER
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io
+
+systemctl start docker
+systemctl enable docker
+
+sh -c "echo \"DOCKER_OPTS='--dns 127.0.0.1 --dns 8.8.8.8 --dns-search service.consul'\" >> /etc/default/docker"
+
+usermod -aG docker $USER
 service docker restart
 
 logger "Completed"
