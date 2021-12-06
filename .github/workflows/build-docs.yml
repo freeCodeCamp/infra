@@ -2,11 +2,15 @@ name: Deploy docs
 
 on:
   pull_request:
-    branches: [main]
-    paths: [docs/]
+    branches:
+      - main
+    paths:
+      - 'docs/**/*'
   push:
-    branches: [main]
-    paths: [docs/]
+    branches:
+      - main
+    paths:
+      - 'docs/**/*'
 
 jobs:
   checks:
@@ -17,6 +21,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: '16.x'
+      - run: cd docs
       - name: Test Build
         run: |
           if [ -e yarn.lock ]; then
@@ -35,6 +40,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: '16.x'
+      - run: cd docs
       - uses: webfactory/ssh-agent@v0.5.0
         with:
           ssh-private-key: ${{ secrets.GH_PAGES_DEPLOY }}
