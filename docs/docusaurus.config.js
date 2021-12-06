@@ -8,8 +8,8 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: `Infra@freeCodeCamp`,
   tagline: `Knowledgebase for DevOps and Site Reliability Engineering Practices`,
-  url: 'http://opensource.freecodecamp.org',
-  baseUrl: '/infra/',
+  url: 'http://infra-docs.freecodecamp.org',
+  baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
