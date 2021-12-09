@@ -52,7 +52,7 @@ variable "image_publisher" { default = "Canonical" }
 variable "image_sku" { default = "18.04-LTS" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
-variable "resource_group" { default = "ops-rg-azure-machine-images" }
+variable "resource_group" { default = "ops-rg-machine-images" }
 variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "freecodecamp" }
 
@@ -101,9 +101,6 @@ build {
   sources = ["source.azure-arm.ubuntu"]
 
   provisioner "shell" {
-    environment_vars = [
-      "SSH_PROVISIONED_USER=${var.ssh_username}"
-    ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
     # Wait for OS updates, cloud-init etc. to be completed. This is arbitrary and works quite well.
     pause_before    = "60s"

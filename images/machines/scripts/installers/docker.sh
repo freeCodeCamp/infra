@@ -8,8 +8,7 @@ logger() {
 
 logger "Executing"
 
-DEBIAN_FRONTEND=noninteractive
-USER=$SSH_PROVISIONED_USER
+export DEBIAN_FRONTEND=noninteractive
 
 logger "Installing Docker"
 
@@ -24,7 +23,6 @@ systemctl enable docker
 
 sh -c "echo \"DOCKER_OPTS='--dns 127.0.0.1 --dns 8.8.8.8 --dns-search service.consul'\" >> /etc/default/docker"
 
-usermod -aG docker $USER
 service docker restart
 
 logger "Completed"

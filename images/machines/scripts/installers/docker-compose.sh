@@ -8,8 +8,7 @@ logger() {
 
 logger "Executing"
 
-DEBIAN_FRONTEND=noninteractive
-USER=$SSH_PROVISIONED_USER
+export DEBIAN_FRONTEND=noninteractive
 
 logger "Installing Docker Compose"
 

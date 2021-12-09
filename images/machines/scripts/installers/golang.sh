@@ -8,7 +8,7 @@ logger() {
 
 logger "Executing"
 
-DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive
 
 cd /tmp
 
