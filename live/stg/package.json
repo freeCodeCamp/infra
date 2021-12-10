@@ -18,7 +18,7 @@
   "dependencies": {
     "@cdktf/provider-azurerm": "0.2.133",
     "cdktf": "0.7.0",
-    "constructs": "3.3.161",
+    "constructs": "3.3.164",
     "dotenv": "10.0.0"
   },
   "devDependencies": {
