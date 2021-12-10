@@ -7,9 +7,11 @@
   "private": true,
   "scripts": {
     "get": "cdktf get",
+    "compile": "tsc --pretty",
     "build": "tsc",
     "synth": "cdktf synth",
-    "compile": "tsc --pretty",
+    "diff": "cdktf diff",
+    "deploy": "cdktf deploy",
     "watch": "tsc -w",
     "test": "jest",
     "test:watch": "jest --watch",
