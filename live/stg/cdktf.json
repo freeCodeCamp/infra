@@ -1,6 +1,9 @@
 {
   "language": "typescript",
-  "app": "npm run --silent compile && node main.js",
+  "app": "npx ts-node main.ts",
+  "projectId": "78d0b10d-1833-42b4-a426-c2aa8ffa89d7",
+  "terraformProviders": [],
+  "terraformModules": [],
   "context": {
     "excludeStackIdFromLogicalIds": "true",
     "allowSepCharsInLogicalIds": "true"
