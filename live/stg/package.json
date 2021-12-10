@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "15.12.5",
-    "cdktf-cli": "0.7.0",
+    "cdktf-cli": "0.8.1",
     "typescript": "4.4.4"
   }
 }
