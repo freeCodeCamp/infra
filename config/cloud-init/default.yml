@@ -12,4 +12,8 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_import_id:
       - raisedadead
+      - gh:nhcarrigan
+      - gh:ojeytonwilliams
+      - gh:scissorsneedfoodtoo
+
 final_message: 'Setup complete'
