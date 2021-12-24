@@ -1,14 +1,21 @@
 #!/bin/bash
+
 set -e
+
+echo "Waiting for cloud-init to update /etc/apt/sources.list"
+timeout 180 /bin/bash -c \
+  'until stat /var/lib/cloud/instance/boot-finished 2>/dev/null; do echo waiting ...; sleep 1; done'
+
+# Disable interactive apt prompts
+export DEBIAN_FRONTEND=noninteractive
+echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections
 
 logger() {
   DT=$(date '+%Y/%m/%d %H:%M:%S')
-  echo "$DT add-dependencies.sh: $1"
+  echo "$DT do-presetup.sh: $1"
 }
 
 logger "Executing"
-
-DEBIAN_FRONTEND=noninteractive
 
 logger "Update the box"
 apt-get -y update

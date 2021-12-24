@@ -8,7 +8,7 @@ packer {
 }
 
 variable "az_sp_client_id" {
-  default   = "${env("AZURE_SERVICE_PRINCIPAL_CLIENT_ID")}"
+  default   = env("AZURE_SERVICE_PRINCIPAL_CLIENT_ID")
   sensitive = true
 
   validation {
@@ -18,7 +18,7 @@ variable "az_sp_client_id" {
 }
 
 variable "az_sp_client_secret" {
-  default   = "${env("AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET")}"
+  default   = env("AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET")
   sensitive = true
 
   validation {
@@ -28,7 +28,7 @@ variable "az_sp_client_secret" {
 }
 
 variable "az_sp_tenant_id" {
-  default   = "${env("AZURE_SERVICE_PRINCIPAL_TENANT_ID")}"
+  default   = env("AZURE_SERVICE_PRINCIPAL_TENANT_ID")
   sensitive = true
 
   validation {
@@ -38,7 +38,7 @@ variable "az_sp_tenant_id" {
 }
 
 variable "az_subscription_id" {
-  default   = "${env("AZURE_SUBSCRIPTION_ID")}"
+  default   = env("AZURE_SUBSCRIPTION_ID")
   sensitive = true
 
   validation {
@@ -48,12 +48,12 @@ variable "az_subscription_id" {
 }
 
 variable "custom_managed_image_resource_group_name" { default = "ops-rg-azure-machine-images" }
-variable "custom_managed_image_name" { 
+variable "custom_managed_image_name" {
   validation {
     condition     = length(var.custom_managed_image_name) > 0
     error_message = "The custom managed image name is not set. Please set the custom_managed_image_name variable."
   }
- }
+}
 
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
@@ -79,7 +79,7 @@ source "azure-arm" "nginx" {
   client_secret   = var.az_sp_client_secret
   client_id       = var.az_sp_client_id
 
-  custom_managed_image_name = var.custom_managed_image_name
+  custom_managed_image_name                = var.custom_managed_image_name
   custom_managed_image_resource_group_name = var.custom_managed_image_resource_group_name
 
   location = var.location
@@ -92,10 +92,10 @@ source "azure-arm" "nginx" {
   ssh_username = var.ssh_username
 
   azure_tags = {
-    "ops-created-by" = "packer"
-    "ops-vm-size"   = var.vm_size
+    "ops-created-by"  = "packer"
+    "ops-vm-size"     = var.vm_size
     "ops-vm-location" = var.location
-    "ops-vm-type" = "${local.artifact_name}-from-${var.custom_managed_image_name}"
+    "ops-vm-type"     = "${local.artifact_name}-from-${var.custom_managed_image_name}"
   }
 
 }
@@ -107,9 +107,9 @@ build {
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
     # Wait for OS updates, cloud-init etc. to be completed. This is arbitrary and works quite well.
-    pause_before    = "60s"
+    pause_before = "60s"
     scripts = [
-      "${var.scripts_dir}/add-dependencies.sh",
+      "${var.scripts_dir}/do-presetup.sh",
       "${var.scripts_dir}/installers/nginx.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]

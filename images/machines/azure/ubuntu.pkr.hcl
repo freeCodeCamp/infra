@@ -8,7 +8,7 @@ packer {
 }
 
 variable "az_sp_client_id" {
-  default   = "${env("AZURE_SERVICE_PRINCIPAL_CLIENT_ID")}"
+  default   = env("AZURE_SERVICE_PRINCIPAL_CLIENT_ID")
   sensitive = true
 
   validation {
@@ -18,7 +18,7 @@ variable "az_sp_client_id" {
 }
 
 variable "az_sp_client_secret" {
-  default   = "${env("AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET")}"
+  default   = env("AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET")
   sensitive = true
 
   validation {
@@ -28,7 +28,7 @@ variable "az_sp_client_secret" {
 }
 
 variable "az_sp_tenant_id" {
-  default   = "${env("AZURE_SERVICE_PRINCIPAL_TENANT_ID")}"
+  default   = env("AZURE_SERVICE_PRINCIPAL_TENANT_ID")
   sensitive = true
 
   validation {
@@ -38,7 +38,7 @@ variable "az_sp_tenant_id" {
 }
 
 variable "az_subscription_id" {
-  default   = "${env("AZURE_SUBSCRIPTION_ID")}"
+  default   = env("AZURE_SUBSCRIPTION_ID")
   sensitive = true
 
   validation {
@@ -88,9 +88,9 @@ source "azure-arm" "ubuntu" {
   ssh_username = var.ssh_username
 
   azure_tags = {
-    "ops-created-by" = "packer"
-    "ops-vm-size"   = var.vm_size
-    "ops-vm-location" = var.location
+    "ops-created-by"    = "packer"
+    "ops-vm-size"       = var.vm_size
+    "ops-vm-location"   = var.location
     "ops-vm-buildchain" = "${local.artifact_name}-from-${var.image_sku}"
   }
 
@@ -103,9 +103,9 @@ build {
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
     # Wait for OS updates, cloud-init etc. to be completed. This is arbitrary and works quite well.
-    pause_before    = "60s"
+    pause_before = "60s"
     scripts = [
-      "${var.scripts_dir}/add-dependencies.sh",
+      "${var.scripts_dir}/do-presetup.sh",
       "${var.scripts_dir}/installers/golang.sh",
       "${var.scripts_dir}/installers/docker.sh",
       "${var.scripts_dir}/installers/docker-compose.sh",
