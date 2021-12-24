@@ -13,37 +13,56 @@ on:
       - 'docs/**/*'
 
 jobs:
+  
   checks:
+    name: Check Build
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16.x]
+
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-node@v1
+      - name: Checkout Source Files
+        uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
         with:
-          node-version: '16.x'
-      - run: cd docs
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
       - name: Test Build
         run: |
-          if [ -e yarn.lock ]; then
-            yarn install --frozen-lockfile
-          elif [ -e package-lock.json ]; then
-            npm ci
-          else
-            npm i
-          fi
+          cd docs
+          npm ci
           npm run build
+
   gh-release:
+    name: Publish to GitHub
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16.x]
+
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-node@v1
+      - name: Checkout Source Files
+        uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
         with:
-          node-version: '16.x'
-      - run: cd docs
-      - uses: webfactory/ssh-agent@v0.5.4
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.GH_PAGES_DEPLOY }}
+
       - name: Release to GitHub Pages
         env:
           USE_SSH: true
@@ -51,11 +70,6 @@ jobs:
         run: |
           git config --global user.email "camperbot@users.noreply.github.com"
           git config --global user.name "camperbot"
-          if [ -e yarn.lock ]; then
-            yarn install --frozen-lockfile
-          elif [ -e package-lock.json ]; then
-            npm ci
-          else
-            npm i
-          fi
+          cd docs
+          npm ci
           npm run deploy

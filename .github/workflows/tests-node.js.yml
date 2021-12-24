@@ -4,7 +4,9 @@ on:
     branches-ignore:
       - 'renovate/**'
   pull_request:
+
 jobs:
+  
   lint:
     name: Lint
     runs-on: ubuntu-20.04
