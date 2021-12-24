@@ -8,7 +8,12 @@
   "scripts": {
     "get": "cdktf get",
     "build": "tsc",
+    "presynth": "npm run build",
     "synth": "cdktf synth",
+    "prediff": "npm run build",
+    "diff": "cdktf diff",
+    "deploy": "cdktf deploy",
+    "destroy": "cdktf destroy",
     "compile": "tsc --pretty",
     "watch": "tsc -w",
     "test": "jest",
