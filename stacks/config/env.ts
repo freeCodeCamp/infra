@@ -35,7 +35,10 @@ export const mysql_admin_username: string =
 export const mysql_admin_password: string =
   String(mysqlAdminPassword).toString();
 
-export const mysql_fs_sku: string = String(mysqlFsSku).toString() || 'B_Gen5_2';
+export const mysql_fs_sku: string = mysqlFsSku
+  ? String(mysqlFsSku).toString()
+  : 'B_Standard_B2s';
 
-export const mysql_fs_backup_retention_days: number =
-  Number(mysqlFsBackupRetentionDays) || 7;
+export const mysql_fs_backup_retention_days: number = mysqlFsBackupRetentionDays
+  ? Number(mysqlFsBackupRetentionDays)
+  : 7;
