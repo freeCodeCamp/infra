@@ -19,9 +19,18 @@
   "author": "freeCodeCamp <team@freecodecamp.org>",
   "main": "none",
   "workspaces": [
-    "stacks/*"
+    "stacks/stg",
+    "docs"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/jest": "27.0.3",
+    "@types/node": "16.11.17",
+    "jest": "27.4.5",
+    "ts-jest": "27.1.2",
+    "ts-node": "10.4.0",
+    "typescript": "4.5.4"
   }
 }
