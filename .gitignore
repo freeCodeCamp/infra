@@ -2,3 +2,4 @@
 scratchpad/
 *.pem
 manifest.json
+*.env
