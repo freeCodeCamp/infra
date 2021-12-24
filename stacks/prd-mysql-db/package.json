@@ -1,5 +1,5 @@
 {
-  "name": "stg",
+  "name": "prd-mysql-db",
   "version": "1.0.0",
   "main": "main.js",
   "types": "main.ts",
@@ -7,11 +7,9 @@
   "private": true,
   "scripts": {
     "get": "cdktf get",
-    "compile": "tsc --pretty",
     "build": "tsc",
     "synth": "cdktf synth",
-    "diff": "cdktf diff",
-    "deploy": "cdktf deploy",
+    "compile": "tsc --pretty",
     "watch": "tsc -w",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -22,8 +20,8 @@
     "node": ">=10.12"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "0.4.63",
-    "cdktf": "0.8.3",
-    "constructs": "10.0.13"
+    "@cdktf/provider-azurerm": "^0.4.58",
+    "cdktf": "^0.8.3",
+    "constructs": "^10.0.13"
   }
 }
