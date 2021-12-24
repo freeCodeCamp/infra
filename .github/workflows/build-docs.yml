@@ -35,9 +35,8 @@ jobs:
 
       - name: Test Build
         run: |
-          cd docs
           npm ci
-          npm run build
+          npm run docs:build
 
   gh-release:
     name: Publish to GitHub
@@ -70,6 +69,5 @@ jobs:
         run: |
           git config --global user.email "camperbot@users.noreply.github.com"
           git config --global user.name "camperbot"
-          cd docs
           npm ci
-          npm run deploy
+          npm run docs:deploy

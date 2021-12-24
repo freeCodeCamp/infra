@@ -23,7 +23,11 @@
     "docs"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docs:build": "cd docs && npm run build",
+    "docs:deploy": "cd docs && npm run deploy",
+    "docs:develop": "cd docs && npm run develop",
+    "docs:serve": "cd docs && npm run serve"
   },
   "devDependencies": {
     "@types/jest": "27.0.3",
