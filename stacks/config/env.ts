@@ -3,15 +3,14 @@ import { resolve } from 'path';
 const envPath = resolve(__dirname, '../.env');
 const { error } = require('dotenv').config({ path: envPath });
 if (error) {
-  console.warn(`
-  ----------------------------------------------------
-  Warning: .env file not found.
-  ----------------------------------------------------
-  Please copy sample.env to .env
-  You can ignore this warning if using a different way
-  to setup this environment.
-  ----------------------------------------------------
-  `);
+  console.warn(`Warning: .env file not found.`);
+}
+
+if (error && !process.env.DOPPLER_PROJECT) {
+  console.error(
+    `Error: Found Doppler project is ${process.env.DOPPLER_PROJECT}`
+  );
+  throw error.message;
 }
 
 const {
