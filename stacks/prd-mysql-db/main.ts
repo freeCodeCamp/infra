@@ -1,5 +1,5 @@
 import { Construct } from 'constructs';
-import { App, /*RemoteBackend,*/ TerraformStack } from 'cdktf';
+import { App, RemoteBackend, TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
   MysqlFlexibleServer,
@@ -94,17 +94,16 @@ class PrdMySQLDBStack extends TerraformStack {
     // ----------------------------------
     // End
     // ----------------------------------
-    // new RemoteBackend(this, {
-    //   hostname: 'app.terraform.io',
-    //   organization: 'freecodecamp',
-    //   workspaces: {
-    //     name: ' prd-tfws-mysql-db'
-    //   }
-    // });
   }
 }
-
 const app = new App();
-new PrdMySQLDBStack(app, 'prd-stack-mysql-db');
+const stack = new PrdMySQLDBStack(app, 'prd-stack-mysql-db');
+new RemoteBackend(stack, {
+  hostname: 'app.terraform.io',
+  organization: 'freecodecamp',
+  workspaces: {
+    name: ' prd-tfws-mysql-db'
+  }
+});
 
 app.synth();
