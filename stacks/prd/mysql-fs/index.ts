@@ -7,7 +7,7 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import fCCMysqlFlexibleServer from '../../components/mysql-flexible-server';
+import { createMysqlFlexibleServer } from '../../components/mysql-flexible-server';
 
 export default class prdMySQLDBStack extends TerraformStack {
   constructor(scope: Construct, name: string) {
@@ -55,7 +55,7 @@ export default class prdMySQLDBStack extends TerraformStack {
       ]
     });
 
-    new fCCMysqlFlexibleServer(this, 'prd-fs-mysql-test', {
+    createMysqlFlexibleServer(this, 'prd-fs-mysql-test', {
       name: 'prd-fs-mysql-test',
       resourceGroupName: rg.name,
       location: rg.location,
