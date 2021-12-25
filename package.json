@@ -20,8 +20,7 @@
   "main": "none",
   "workspaces": [
     "docs",
-    "stacks/stg",
-    "stacks/prd-mysql-db"
+    "stacks"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -31,11 +30,6 @@
     "docs:serve": "cd docs && npm run serve"
   },
   "devDependencies": {
-    "@types/jest": "27.0.3",
-    "@types/node": "16.11.17",
-    "jest": "27.4.5",
-    "ts-jest": "27.1.2",
-    "ts-node": "10.4.0",
     "typescript": "4.5.4",
     "dotenv": "10.0.0"
   }
