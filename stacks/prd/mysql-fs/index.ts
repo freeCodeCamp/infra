@@ -7,9 +7,9 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import fCCMysqlFlexibleServer from './mysql-flexible-server';
+import fCCMysqlFlexibleServer from '../../components/mysql-flexible-server';
 
-export default class fCCPrdMySQLDBStack extends TerraformStack {
+export default class prdMySQLDBStack extends TerraformStack {
   constructor(scope: Construct, name: string) {
     super(scope, name);
 

@@ -9,7 +9,7 @@ import {
   mysql_admin_username,
   mysql_admin_password,
   mysql_fs_backup_retention_days
-} from '../../../config/env';
+} from '../../config/env';
 
 export default class fCCMysqlFlexibleServer extends MysqlFlexibleServer {
   constructor(
@@ -20,7 +20,7 @@ export default class fCCMysqlFlexibleServer extends MysqlFlexibleServer {
     super(scope, name, config);
 
     new MysqlFlexibleServer(this, 'prd-fs-mysql-db', {
-      name: 'prd-fs-mysql-db',
+      name: String(config.name).replaceAll('-', ''),
 
       resourceGroupName: config.resourceGroupName,
       location: config.location,
