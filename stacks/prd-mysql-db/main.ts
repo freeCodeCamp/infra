@@ -3,8 +3,6 @@ import { App, /*RemoteBackend,*/ TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
   MysqlFlexibleServer,
-  PrivateDnsZone,
-  PrivateDnsZoneVirtualNetworkLink,
   ResourceGroup,
   Subnet,
   VirtualNetwork
@@ -64,24 +62,6 @@ class PrdMySQLDBStack extends TerraformStack {
     });
 
     // ----------------------------------
-    // Private DNS Zone & Link
-    // ----------------------------------
-    const privatedz = new PrivateDnsZone(this, 'prd-privatedz-mysql-db', {
-      name: 'prd-privatedz-mysql-db',
-      resourceGroupName: rg.name
-    });
-    const privatedzvnetlink = new PrivateDnsZoneVirtualNetworkLink(
-      this,
-      'prd-privatedzvnetlink-mysql-db',
-      {
-        name: 'prd-privatedzvnetlink-mysql-db',
-        resourceGroupName: rg.name,
-        privateDnsZoneName: privatedz.name,
-        virtualNetworkId: vnet.id
-      }
-    );
-
-    // ----------------------------------
     // MySQL Flexible Server
     // ----------------------------------
     new MysqlFlexibleServer(this, 'prd-fs-mysql-db', {
@@ -108,10 +88,7 @@ class PrdMySQLDBStack extends TerraformStack {
 
       version: '5.7',
 
-      delegatedSubnetId: subnet.id,
-      privateDnsZoneId: privatedz.id,
-
-      dependsOn: [privatedzvnetlink]
+      delegatedSubnetId: subnet.id
     });
 
     // ----------------------------------
