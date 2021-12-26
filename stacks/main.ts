@@ -2,20 +2,20 @@ import { App } from 'cdktf';
 
 import { createRemoteBackends } from './components/remote-backend';
 
-import prdMySQLDBStack from './prd/instances-mysql-flexible-server';
-import opsRGMachineImagesStack from './prd/instances-resource-group/ops-rg-machine-images';
-import opsRGCommonStack from './prd/instances-resource-group/ops-rg-common';
+import prdMySQLDBStack from './prd/mysql-db';
+import opsMachineImagesStack from './ops/machine-images';
+import opsCommonStack from './ops/common';
 
 const app = new App();
 
 createRemoteBackends(app, [
   {
-    stackConstruct: opsRGCommonStack,
+    stackConstruct: opsCommonStack,
     stackName: 'common',
-    stackConfig: { env: 'ops' }
+    stackConfig: { env: 'ops', tlds: ['dev', 'org'] }
   },
   {
-    stackConstruct: opsRGMachineImagesStack,
+    stackConstruct: opsMachineImagesStack,
     stackName: 'machine-images',
     stackConfig: { env: 'ops' }
   },

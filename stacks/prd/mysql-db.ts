@@ -7,39 +7,35 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { createMysqlFlexibleServer } from '../../components/mysql-flexible-server';
+import { createMysqlFlexibleServer } from '../components/mysql-flexible-server';
 
 export default class prdMySQLDBStack extends TerraformStack {
-  constructor(scope: Construct, name: string) {
+  constructor(scope: Construct, name: string, config: any) {
     super(scope, name);
+
+    const { env } = config;
 
     new AzurermProvider(this, 'azurerm', {
       features: {}
     });
 
-    // ----------------------------------
-    // Resource Group
-    // ----------------------------------
-    const rg = new ResourceGroup(this, 'prd-rg-mysql-db', {
-      name: 'prd-rg-mysql-db',
+    const rgIdentifier = `${env}-rg-${name}`;
+    const rg = new ResourceGroup(this, rgIdentifier, {
+      name: rgIdentifier,
       location: 'eastus'
     });
 
-    // ----------------------------------
-    // Virtual Network
-    // ----------------------------------
-    const vnet = new VirtualNetwork(this, 'prd-vnet-mysql-db', {
-      name: 'prd-vnet-mysql-db',
+    const vnetIdentifier = `${env}-vnet-${name}`;
+    const vnet = new VirtualNetwork(this, vnetIdentifier, {
+      name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
       addressSpace: ['10.0.0.0/16']
     });
 
-    // ----------------------------------
-    // Subnet
-    // ----------------------------------
-    const subnet = new Subnet(this, 'prd-subnet-mysql-db', {
-      name: 'prd-subnet-mysql-db',
+    const subnetIdentifier = `${env}-subnet-${name}`;
+    const subnet = new Subnet(this, subnetIdentifier, {
+      name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
       addressPrefixes: ['10.0.1.0/24'],
@@ -55,8 +51,8 @@ export default class prdMySQLDBStack extends TerraformStack {
       ]
     });
 
-    createMysqlFlexibleServer(this, 'prd-fs-mysql-test', {
-      name: 'prd-fs-mysql-test',
+    createMysqlFlexibleServer(this, `${env}-fs-mysql-test`, {
+      name: `${env}-fs-mysql-test`,
       resourceGroupName: rg.name,
       location: rg.location,
       delegatedSubnetId: subnet.id
