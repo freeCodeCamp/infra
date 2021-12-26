@@ -24,10 +24,10 @@
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "docs:build": "cd docs && npm run build",
-    "docs:deploy": "cd docs && npm run deploy",
-    "docs:develop": "cd docs && npm run develop",
-    "docs:serve": "cd docs && npm run serve"
+    "docs:build": "npm run --workspace=docs build",
+    "docs:deploy": "npm run --workspace=docs deploy",
+    "docs:develop": "npm run --workspace=docs develop",
+    "docs:serve": "npm run --workspace=docs serve"
   },
   "devDependencies": {
     "typescript": "4.5.4",
