@@ -27,7 +27,8 @@
     "docs:build": "npm run --workspace=docs build",
     "docs:deploy": "npm run --workspace=docs deploy",
     "docs:develop": "npm run --workspace=docs develop",
-    "docs:serve": "npm run --workspace=docs serve"
+    "docs:serve": "npm run --workspace=docs serve",
+    "stacks:build": "npm run --workspace=stacks build"
   },
   "devDependencies": {
     "typescript": "4.5.4",
