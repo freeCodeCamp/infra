@@ -2,9 +2,13 @@ import { App } from 'cdktf';
 
 import { createRemoteBackends } from './components/remote-backend';
 
-import prdMySQLDBStack from './prd/mysql-db';
+// Operations Resources
 import opsMachineImagesStack from './ops/machine-images';
 import opsCommonStack from './ops/common';
+
+// Production Resources
+import prdMySQLDBStack from './prd/mysql-db';
+import prdWriteStack from './prd/write';
 
 const app = new App();
 
@@ -22,6 +26,11 @@ createRemoteBackends(app, [
   {
     stackConstruct: prdMySQLDBStack,
     stackName: 'mysql-db',
+    stackConfig: { env: 'prd' }
+  },
+  {
+    stackConstruct: prdWriteStack,
+    stackName: 'write',
     stackConfig: { env: 'prd' }
   }
 ]);
