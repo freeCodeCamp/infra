@@ -9,12 +9,21 @@ import opsRGCommonStack from './prd/instances-resource-group/ops-rg-common';
 const app = new App();
 
 createRemoteBackends(app, [
-  { stackConstruct: opsRGCommonStack, stackName: 'ops-rg-common' },
+  {
+    stackConstruct: opsRGCommonStack,
+    stackName: 'common',
+    stackConfig: { env: 'ops' }
+  },
   {
     stackConstruct: opsRGMachineImagesStack,
-    stackName: 'ops-rg-machine-images'
+    stackName: 'machine-images',
+    stackConfig: { env: 'ops' }
   },
-  { stackConstruct: prdMySQLDBStack, stackName: 'prd-mysql-db' }
+  {
+    stackConstruct: prdMySQLDBStack,
+    stackName: 'mysql-db',
+    stackConfig: { env: 'prd' }
+  }
 ]);
 
 app.synth();

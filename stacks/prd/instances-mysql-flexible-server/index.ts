@@ -42,7 +42,7 @@ export default class prdMySQLDBStack extends TerraformStack {
       name: 'prd-subnet-mysql-db',
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
-      addressPrefixes: ['10.0.2.0/24'],
+      addressPrefixes: ['10.0.1.0/24'],
       serviceEndpoints: ['Microsoft.Storage'],
       delegation: [
         {
