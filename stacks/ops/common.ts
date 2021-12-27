@@ -2,6 +2,7 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
+  DnsZone,
   PrivateDnsZone,
   ResourceGroup,
   SshPublicKey
@@ -34,11 +35,20 @@ export default class CommonStack extends TerraformStack {
       publicKey: ssh_public_key
     });
 
-    // Create Private DNS Zones for each domain
     const { tlds } = config;
+
+    // Create Private DNS Zones for each domain
     tlds.forEach((tld: string) => {
-      new PrivateDnsZone(this, `${env}-private-dns-${tld}`, {
-        name: `private.freecodecamp.${tld}`,
+      new PrivateDnsZone(this, `${env}-prvdns-${tld}`, {
+        name: `prvdns.freecodecamp.${tld}`,
+        resourceGroupName: rg.name
+      });
+    });
+
+    // Create Public DNS Zones for each domain
+    tlds.forEach((tld: string) => {
+      new DnsZone(this, `${env}-pubdns-${tld}`, {
+        name: `pubdns.freecodecamp.${tld}`,
         resourceGroupName: rg.name
       });
     });
