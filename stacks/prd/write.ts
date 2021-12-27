@@ -42,7 +42,7 @@ export default class WriteStack extends TerraformStack {
     });
 
     createVirtualMachine(this, {
-      name: name,
+      stackName: name,
       vmName: 'test',
       rg: rg,
       env: env,

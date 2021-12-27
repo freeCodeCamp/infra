@@ -12,7 +12,7 @@ import { createPublicIp } from '../public-ip';
 import { ssh_public_key, custom_data } from '../../config/env';
 
 interface fCCVirtualMachineConfig {
-  name: string;
+  stackName: string;
   vmName: string;
   rg: ResourceGroup;
   subnet: Subnet;
@@ -25,7 +25,14 @@ export const createVirtualMachine = (
   config: fCCVirtualMachineConfig,
   allocatePublicIP: boolean = true
 ) => {
-  const { vmName, rg, subnet, env, privateIP: privateIP = undefined } = config;
+  const {
+    stackName,
+    vmName,
+    rg,
+    subnet,
+    env,
+    privateIP: privateIP = undefined
+  } = config;
 
   const niIdentifier = `${env}-ni-${vmName}`;
   const ni = new NetworkInterface(stack, niIdentifier, {
@@ -40,7 +47,7 @@ export const createVirtualMachine = (
         privateIpAddressAllocation: privateIP ? 'Static' : 'Dynamic',
         privateIpAddress: privateIP,
         publicIpAddressId: allocatePublicIP
-          ? createPublicIp(stack, vmName, rg, env).id
+          ? createPublicIp(stack, `${stackName}-${vmName}`, rg, env).id
           : ''
       }
     ]
