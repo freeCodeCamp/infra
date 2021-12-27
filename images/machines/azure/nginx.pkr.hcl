@@ -47,7 +47,7 @@ variable "az_subscription_id" {
   }
 }
 
-variable "custom_managed_image_resource_group_name" { default = "ops-rg-azure-machine-images" }
+variable "custom_managed_image_resource_group_name" { default = "ops-rg-machine-images" }
 variable "custom_managed_image_name" {
   validation {
     condition     = length(var.custom_managed_image_name) > 0
