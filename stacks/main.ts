@@ -10,6 +10,9 @@ import opsCommonStack from './ops/common';
 import prdMySQLDBStack from './prd/mysql-db';
 import prdWriteStack from './prd/write';
 
+// Staging Resources
+import stgNewsStack from './stg/news';
+
 const app = new App();
 
 createRemoteBackends(app, [
@@ -23,6 +26,7 @@ createRemoteBackends(app, [
     stackName: 'machine-images',
     stackConfig: { env: 'ops' }
   },
+
   {
     stackConstruct: prdMySQLDBStack,
     stackName: 'mysql-db',
@@ -32,6 +36,12 @@ createRemoteBackends(app, [
     stackConstruct: prdWriteStack,
     stackName: 'write',
     stackConfig: { env: 'prd' }
+  },
+
+  {
+    stackConstruct: stgNewsStack,
+    stackName: 'js-news',
+    stackConfig: { env: 'stg' }
   }
 ]);
 
