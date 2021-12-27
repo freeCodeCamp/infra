@@ -7,6 +7,7 @@
     "get": "cdktf get",
     "build": "tsc",
     "postbuild": "cdktf synth",
+    "list": "cdktf list",
     "compile": "tsc --pretty",
     "watch": "tsc -w",
     "test": "jest",
