@@ -16,7 +16,7 @@
     "upgrade:next": "npm i cdktf@next cdktf-cli@next"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "0.4.75",
+    "@cdktf/provider-azurerm": "0.4.79",
     "cdktf": "0.8.3",
     "constructs": "10.0.15"
   },
