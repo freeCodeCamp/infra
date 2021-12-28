@@ -31,7 +31,7 @@ module "runners" {
   runners_lambda_zip                = "lambdas/runners.zip"
 
   enable_organization_runners = false
-  runner_extra_labels         = "on-aws,default,news,ubuntu"
+  runner_extra_labels         = "on-aws,self-hosted,ubuntu"
 
   # enable access to the runners via SSM
   enable_ssm_on_runners = true
