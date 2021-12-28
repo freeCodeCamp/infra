@@ -37,7 +37,9 @@ jobs:
       - name: Build and push Docker image
         run: |
           cd images/containers/${{ matrix.images }}
+          
           docker build . \
           --tag ghcr.io/freecodecamp/${{ matrix.images }}:${{ github.sha }} \
-          --tag ghcr.io/freecodecamp/${{ matrix.images }}:latest \
+          --tag ghcr.io/freecodecamp/${{ matrix.images }}:latest
+          
           docker push --all-tags ghcr.io/freecodecamp/${{ matrix.images }}
