@@ -85,7 +85,8 @@ module "runners" {
   runners_maximum_count = 10
 
   # override scaling down - Will scale down to minimum runners if there are no builds in the queue in the last 2 hours
-  scale_down_schedule_expression = "cron(0 */2 * * *)"
+  # Also more context: https://stackoverflow.com/a/39508593/1932901
+  scale_down_schedule_expression = "cron(0 0/2 * * ? *)"
 }
 
 terraform {
