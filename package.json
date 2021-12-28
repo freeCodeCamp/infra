@@ -22,8 +22,10 @@
     "stacks"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "stacks:build": "npm run --workspace=stacks build"
+    "test": "npm run test --workspaces",
+    "stacks:build": "npm run --workspace=stacks build",
+    "stacks:list": "npm run --workspace=stacks list",
+    "stacks:test": "npm run --workspace=stacks test"
   },
   "devDependencies": {
     "typescript": "4.5.4",
