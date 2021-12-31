@@ -37,13 +37,14 @@ module "runners" {
   enable_ssm_on_runners = true
 
   minimum_running_time_in_minutes = 60
-  idle_config = [{
-    # https://github.com/philips-labs/terraform-aws-github-runner#supported-config-
-    # This is different from AWS Cron Expressions.
-    cron      = "* * * * * *"
-    timeZone  = "UTC"
-    idleCount = 2
-  }]
+
+  # idle_config = [{
+  #   # https://github.com/philips-labs/terraform-aws-github-runner#supported-config-
+  #   # This is different from AWS Cron Expressions.
+  #   cron      = "* * * * * *"
+  #   timeZone  = "UTC"
+  #   idleCount = 2
+  # }]
 
   instance_types = ["m5.large", "c5.large"]
 
