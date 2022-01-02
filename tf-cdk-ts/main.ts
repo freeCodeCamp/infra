@@ -3,13 +3,13 @@ import { App } from 'cdktf';
 import { createRemoteBackends } from './components/remote-backend';
 
 // Operations Resources
-import opsMachineImagesStack from './ops/machine-images';
-import opsCommonStack from './ops/common';
-import opsGitHubRunnersStack from './ops/github-runners';
+import opsMachineImagesStack from './stacks-ops/machine-images';
+import opsCommonStack from './stacks-ops/common';
+import opsGitHubRunnersStack from './stacks-ops/github-runners';
 
 // Production Resources
-import prdMySQLDBStack from './prd/mysql-db';
-import prdWriteStack from './prd/write';
+import prdMySQLDBStack from './stacks-prd/mysql-db';
+import prdWriteStack from './stacks-prd/write';
 
 const app = new App();
 

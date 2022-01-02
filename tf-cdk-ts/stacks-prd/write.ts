@@ -7,29 +7,22 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { createVirtualMachine } from '../components/virtual-machine';
-import { createAzureRBACServicePrincipal } from './../config/service_principal';
+import { createVirtualMachine } from '../components/virtual-machine/index';
 
-export default class GitHubRunners extends TerraformStack {
+export default class WriteStack extends TerraformStack {
   constructor(scope: Construct, name: string, config: any) {
     super(scope, name);
 
     const { env } = config;
 
-    const { subscriptionId, tenantId, clientId, clientSecret } =
-      createAzureRBACServicePrincipal(this);
     new AzurermProvider(this, 'azurerm', {
-      features: {},
-      subscriptionId: subscriptionId.stringValue,
-      tenantId: tenantId.stringValue,
-      clientId: clientId.stringValue,
-      clientSecret: clientSecret.stringValue
+      features: {}
     });
 
     const rgIdentifier = `${env}-rg-${name}`;
     const rg = new ResourceGroup(this, rgIdentifier, {
       name: rgIdentifier,
-      location: 'eastus2'
+      location: 'eastus'
     });
 
     const vnetIdentifier = `${env}-vnet-${name}`;
@@ -37,7 +30,7 @@ export default class GitHubRunners extends TerraformStack {
       name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
-      addressSpace: ['172.16.0.0/16']
+      addressSpace: ['10.1.0.0/16']
     });
 
     const subnetIdentifier = `${env}-subnet-${name}`;
@@ -45,16 +38,16 @@ export default class GitHubRunners extends TerraformStack {
       name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
-      addressPrefixes: ['172.16.0.0/24']
+      addressPrefixes: ['10.1.0.0/24']
     });
 
     createVirtualMachine(this, {
       stackName: name,
-      vmName: 'engnews',
+      vmName: 'test',
       rg: rg,
       env: env,
       subnet: subnet,
-      privateIP: '172.16.0.10'
+      privateIP: '10.1.0.10'
     });
   }
 }

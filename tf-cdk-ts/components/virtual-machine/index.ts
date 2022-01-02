@@ -17,6 +17,7 @@ interface fCCVirtualMachineConfig {
   rg: ResourceGroup;
   subnet: Subnet;
   env: string;
+  size?: string | undefined;
   privateIP?: string | undefined;
 }
 
@@ -31,6 +32,7 @@ export const createVirtualMachine = (
     rg,
     subnet,
     env,
+    size: size = 'Standard_B2s',
     privateIP: privateIP = undefined
   } = config;
 
@@ -79,7 +81,7 @@ export const createVirtualMachine = (
     computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
     location: rg.location,
-    size: 'Standard_B2s',
+    size: size,
     adminUsername: 'freecodecamp',
     adminSshKey: [
       {
