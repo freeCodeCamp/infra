@@ -1,5 +1,6 @@
 **/*.txt
-scratchpad/
 *.pem
 manifest.json
+
 *.env
+scratchpad/
