@@ -7,14 +7,16 @@
     "preinstall": "npx npm-force-resolutions",
     "get": "cdktf get",
     "build": "tsc",
-    "postbuild": "cdktf synth",
-    "list": "cdktf list",
+    "build:watch": "tsc -w",
+    "postbuild": "npx cdktf synth",
+    "postbuild:watch": "npx cdktf synth",
     "compile": "tsc --pretty",
-    "watch": "tsc -w",
+    "list": "npx cdktf list",
     "test": "jest",
     "test:watch": "jest --watch",
-    "upgrade": "npm i cdktf@latest cdktf-cli@latest",
-    "upgrade:next": "npm i cdktf@next cdktf-cli@next"
+    "upgrade": "npm run upgrade:cdk && npm run upgrade:cli",
+    "upgrade:cdk": "npm install --save-exact cdktf@latest",
+    "upgrade:cli": "npm install --save-dev --save-exact cdktf-cli@latest"
   },
   "resolutions": {
     "colors": "1.4.0"
@@ -27,6 +29,7 @@
   "devDependencies": {
     "@types/jest": "27.4.0",
     "@types/node": "16.11.19",
+    "cdktf-cli": "0.8.6",
     "dotenv": "10.0.0",
     "jest": "27.4.7",
     "npm-force-resolutions": "0.0.10",

@@ -3,13 +3,20 @@ import { resolve } from 'path';
 const envPath = resolve(__dirname, '../.env');
 const { error } = require('dotenv').config({ path: envPath });
 if (error) {
-  console.warn(`Warning: .env file not found.`);
+  console.info(
+    `
+     Warning: .env file not found. You can ignore this 
+     message if you are using some other way of setting 
+     the required keys & secrets.
+    `
+  );
 }
 
-if (error && !process.env.DOPPLER_PROJECT) {
-  console.error(
-    `Error: Found Doppler project is ${process.env.DOPPLER_PROJECT}`
-  );
+if (
+  error &&
+  (!process.env.DOPPLER_PROJECT || process.env.DOPPLER_PROJECT !== 'infra')
+) {
+  console.error(`Error: Doppler project is ${process.env.DOPPLER_PROJECT}`);
   throw error.message;
 }
 
