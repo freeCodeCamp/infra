@@ -7,6 +7,8 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
+import { languages } from '../config/news';
+import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { createMysqlFlexibleServer } from '../components/mysql-flexible-server';
 
 export default class prdMySQLDBStack extends TerraformStack {
@@ -15,8 +17,14 @@ export default class prdMySQLDBStack extends TerraformStack {
 
     const { env } = config;
 
+    const { subscriptionId, tenantId, clientId, clientSecret } =
+      createAzureRBACServicePrincipal(this);
     new AzurermProvider(this, 'azurerm', {
-      features: {}
+      features: {},
+      subscriptionId: subscriptionId.stringValue,
+      tenantId: tenantId.stringValue,
+      clientId: clientId.stringValue,
+      clientSecret: clientSecret.stringValue
     });
 
     const rgIdentifier = `${env}-rg-${name}`;
@@ -51,11 +59,14 @@ export default class prdMySQLDBStack extends TerraformStack {
       ]
     });
 
-    createMysqlFlexibleServer(this, `${env}-fs-mysql-test`, {
-      name: `${env}-fs-mysql-test`,
-      resourceGroupName: rg.name,
-      location: rg.location,
-      delegatedSubnetId: subnet.id
+    languages.forEach((language) => {
+      const MysqlFlexibleServerIdentifier = `${env}-mysql-flexible-server-${language}`;
+      createMysqlFlexibleServer(this, MysqlFlexibleServerIdentifier, {
+        name: MysqlFlexibleServerIdentifier,
+        resourceGroupName: rg.name,
+        location: rg.location,
+        delegatedSubnetId: subnet.id
+      });
     });
   }
 }
