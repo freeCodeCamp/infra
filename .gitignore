@@ -4,3 +4,4 @@ manifest.json
 
 *.env
 scratchpad/
+*.act.secrets
