@@ -1,19 +1,5 @@
 {
-  "labels": ["renovate"],
-  "extends": [
-    "config:base", 
-    "schedule:weekly"
-  ],
-  "dependencyDashboard": true,
-  "major": {
-    "dependencyDashboardApproval": true
-  },
-  "packageRules": [
-    {
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "automerge": true
-    }
-  ],
+  "extends": ["github>freecodecamp/renovate-config"],
   "ignorePaths": [
     "scratchpad"
   ]
