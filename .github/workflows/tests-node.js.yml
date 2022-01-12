@@ -1,9 +1,13 @@
 name: Node.js CI
 on:
-  push:
-    branches-ignore:
-      - 'renovate/**'
-  pull_request:
+  workflow_dispatch:
+  
+  # Disable this workflow for pull requests & pushes untill color.js issue is resolved
+
+  # push:
+  #   branches-ignore:
+  #     - 'renovate/**'
+  # pull_request:
 
 jobs:
   
