@@ -2,13 +2,12 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
-  PrivateDnsZone,
   ResourceGroup,
   Subnet,
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { languages } from '../config/news';
+// import { languages } from '../config/news';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { createMysqlFlexibleServer } from '../components/mysql-flexible-server';
 
@@ -60,26 +59,20 @@ export default class stgMySQLDBStack extends TerraformStack {
       ]
     });
 
+    // -- debug --
+    // Let's test with a single language
+    const languages = ['all'];
     languages.forEach(language => {
-      const prvDNSZone = new PrivateDnsZone(
-        this,
-        `${env}-prvdnsfsdb-${language}`,
-        {
-          name: `${language}.prvdnsfsdb.mysql.database.azure.com`,
-          resourceGroupName: rg.name
-        }
-      );
       createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
         name: `fcc${env}mysqlfs${language}`,
         resourceGroupName: rg.name,
         location: rg.location,
         delegatedSubnetId: subnet.id,
-        privateDnsZoneId: prvDNSZone.id
-        // skuName: 'Standard_D2ds_v4',
-        // storage: {
-        //   iops: 1024,
-        //   sizeGb: 32
-        // }
+        skuName: 'GP_Standard_D2ds_v4',
+        storage: {
+          iops: 1024,
+          sizeGb: 64
+        }
       });
     });
   }
