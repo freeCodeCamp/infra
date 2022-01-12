@@ -4,7 +4,8 @@ import {
   Subnet,
   LinuxVirtualMachine,
   NetworkInterface,
-  NetworkSecurityGroup
+  NetworkSecurityGroup,
+  NetworkInterfaceSecurityGroupAssociation
 } from '@cdktf/provider-azurerm';
 
 import { createPublicIp } from '../public-ip';
@@ -36,6 +37,26 @@ export const createVirtualMachine = (
     privateIP: privateIP = undefined
   } = config;
 
+  const nsgIdentifier = `${env}-nsg-${vmName}`;
+  const nsg = new NetworkSecurityGroup(stack, nsgIdentifier, {
+    name: nsgIdentifier,
+    resourceGroupName: rg.name,
+    location: rg.location,
+    securityRule: [
+      {
+        name: 'allow-ssh',
+        priority: 100,
+        direction: 'Inbound',
+        access: 'Allow',
+        protocol: 'Tcp',
+        sourcePortRange: '*',
+        destinationPortRange: '22',
+        sourceAddressPrefix: '*',
+        destinationAddressPrefix: '*'
+      }
+    ]
+  });
+
   const niIdentifier = `${env}-ni-${vmName}`;
   const ni = new NetworkInterface(stack, niIdentifier, {
     name: niIdentifier,
@@ -55,24 +76,10 @@ export const createVirtualMachine = (
     ]
   });
 
-  const nsgIdentifier = `${env}-nsg-${vmName}`;
-  new NetworkSecurityGroup(stack, nsgIdentifier, {
-    name: nsgIdentifier,
-    resourceGroupName: rg.name,
-    location: rg.location,
-    securityRule: [
-      {
-        name: 'allow-ssh',
-        priority: 100,
-        direction: 'Inbound',
-        access: 'Allow',
-        protocol: 'Tcp',
-        sourcePortRange: '*',
-        destinationPortRange: '22',
-        sourceAddressPrefix: '*',
-        destinationAddressPrefix: '*'
-      }
-    ]
+  // Attach the security group to the network interface
+  new NetworkInterfaceSecurityGroupAssociation(stack, `${env}-nsga-${vmName}`, {
+    networkInterfaceId: ni.id,
+    networkSecurityGroupId: nsg.id
   });
 
   const vmIdentifier = `${env}-vm-${vmName}`;
