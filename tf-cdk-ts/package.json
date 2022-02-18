@@ -29,7 +29,7 @@
   "devDependencies": {
     "@types/jest": "27.4.0",
     "@types/node": "16.11.19",
-    "cdktf-cli": "0.8.6",
+    "cdktf-cli": "0.9.1",
     "dotenv": "10.0.0",
     "jest": "27.4.7",
     "npm-force-resolutions": "0.0.10",
