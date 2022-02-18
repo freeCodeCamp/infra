@@ -3,7 +3,7 @@ name: Build Machine Images
 on:
   workflow_dispatch:
 
-jobs:      
+jobs:
   build-images:
     name: Build Images
     runs-on: ubuntu-18.04
@@ -11,8 +11,8 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        location: [ "eastus", "westus" ]
-    env: 
+        location: ["eastus", "westus"]
+    env:
       AZURE_SERVICE_PRINCIPAL_CLIENT_ID: ${{ secrets.AZURE_SERVICE_PRINCIPAL_CLIENT_ID }}
       AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET: ${{ secrets.AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET }}
       AZURE_SERVICE_PRINCIPAL_TENANT_ID: ${{ secrets.AZURE_SERVICE_PRINCIPAL_TENANT_ID }}
@@ -21,29 +21,29 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v2
-    
+
       # Packer's official GitHub Actions are unstable & outdated, use a community action instead
       - name: Use latest Packer
         uses: hashicorp-contrib/setup-packer@v1
-      
+
       - name: Check Version
         run: |
           echo "Packer version: $(packer version)"
-      
+
       - name: Build Images
         run: |
           packer init \
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
-      
+
           packer validate \
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
-      
+
           packer build \
           -var location=${{ matrix.location }} \
           ./images/machines/azure/ubuntu.pkr.hcl
-          
+
           UBUNTU_ARTIFACT_NAME=$(cat manifest.json | jq '.builds[].artifact_id' | sed -r 's|.*/(.*)"$|\1|')
           echo Building the next image with: $UBUNTU_ARTIFACT_NAME
 
@@ -51,7 +51,7 @@ jobs:
           -var location=${{ matrix.location }} \
           -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
           ./images/machines/azure/nginx.pkr.hcl
-      
+
           packer validate \
           -var location=${{ matrix.location }} \
           -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
@@ -61,4 +61,3 @@ jobs:
           -var location=${{ matrix.location }} \
           -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
           ./images/machines/azure/nginx.pkr.hcl
-      
