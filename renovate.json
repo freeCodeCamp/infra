@@ -1,6 +1,10 @@
 {
   "extends": ["github>freecodecamp/renovate-config"],
-  "ignorePaths": [
-    "scratchpad"
+  "ignorePaths": ["scratchpad"],
+  "packageRules": [
+    {
+      "groupName": "cdktf",
+      "matchPackageNames": ["cdktf", "cdktf-cli"]
+    }
   ]
 }
