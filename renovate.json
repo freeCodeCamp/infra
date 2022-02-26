@@ -5,6 +5,10 @@
     {
       "groupName": "cdktf",
       "matchPackageNames": ["cdktf", "cdktf-cli"]
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
     }
   ]
 }
