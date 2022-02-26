@@ -1,0 +1,11 @@
+- name: check uptime on virtual machines
+  hosts: "{{ variable_host | default('servers') }}"
+  become: true
+  become_user: root
+  tasks:
+    - name: Execute the Uptime command over Command module
+      register: uptimeoutput
+      command: "uptime"
+
+    - debug:
+        var: uptimeoutput.stdout_lines
