@@ -19,13 +19,13 @@
   },
   "dependencies": {
     "@cdktf/provider-azurerm": "0.5.35",
-    "cdktf": "0.9.2",
+    "cdktf": "0.9.4",
     "constructs": "10.0.74"
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
     "@types/node": "17.0.21",
-    "cdktf-cli": "0.9.2",
+    "cdktf-cli": "0.9.4",
     "dotenv": "16.0.0",
     "jest": "27.5.1",
     "ts-jest": "27.1.3",
