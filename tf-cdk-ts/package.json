@@ -18,7 +18,7 @@
     "upgrade:cli": "npm install --save-dev --save-exact cdktf-cli@latest"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "0.5.39",
+    "@cdktf/provider-azurerm": "0.5.44",
     "cdktf": "0.9.4",
     "constructs": "10.0.74"
   },
