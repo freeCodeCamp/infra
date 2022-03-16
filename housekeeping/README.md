@@ -1,5 +1,5 @@
 > Our Ansible configuration and documentation for housekeeping on some of our
-> instances.
+> instances. Study the hosts and the playbooks to run commands as shown below.
 
 You can use standard Ansible syntax to execute tasks using commands. Some
 examples are:
@@ -26,4 +26,3 @@ ansible-playbook -i hosts playbooks/remove.yml --extra-vars "variable_host=prd_c
 ansible-playbook -i hosts playbooks/reboot.yml --extra-vars "variable_host=prd_a"
 ```
 
-> **Study the hosts and the playbooks to run commands as shown below.**
