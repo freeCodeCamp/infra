@@ -1,0 +1,18 @@
+- name: reboot virtual machines
+  hosts: "{{ variable_host | default('servers') }}"
+  # become: true
+  # become_user: root
+  tasks:
+    - name: Capture directories older than 15 days
+      find:
+        paths: /home/freecodecamp/client/releases
+        recurse: no
+        file_type: directory
+        age: 15d
+      register: files_to_delete
+
+    - name: Remove directories older than 15 days
+      file:
+        path: '{{ item.path }}'
+        state: absent
+      with_items: '{{ files_to_delete.files }}'
