@@ -1,15 +1,23 @@
-- name: Update Rocket.Chat docker-compose apps
-  hosts: "{{ variable_host | default('servers') }}"
+---
+- name: update rocket.chat
+  hosts: "{{ variable_host | default('prd_chat') }}"
+  serial: 1
   gather_facts: false
   tasks:
-    - name: Pull latest image
+    - name: pull latest image
       command:
         cmd: docker-compose pull
         chdir: chat
-        warn: True # not required. Enable or disable task warnings.
+        warn: true # not required. enable or disable task warnings.
 
-    - name: Start all services
+    - name: start services
       command:
         cmd: docker-compose up -d
         chdir: chat
-        warn: True # not required. Enable or disable task warnings.
+        warn: true # not required. enable or disable task warnings.
+
+    - name: cleanup unused assets
+      command:
+        cmd: docker system prune --volumes -f
+        chdir: chat
+        warn: true # not required. enable or disable task warnings.
