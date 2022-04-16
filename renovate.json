@@ -4,7 +4,7 @@
   "packageRules": [
     {
       "groupName": "cdktf",
-      "matchPackageNames": ["cdktf", "cdktf-cli", "@cdktf/*"]
+      "matchPackageNames": ["cdktf", "cdktf-cli", "@cdktf/provider-azurerm"]
     },
     {
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
