@@ -18,14 +18,14 @@
     "upgrade:cli": "npm install --save-dev --save-exact cdktf-cli@latest"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "0.5.61",
-    "cdktf": "0.9.4",
+    "@cdktf/provider-azurerm": "0.6.19",
+    "cdktf": "0.10.1",
     "constructs": "10.0.116"
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
     "@types/node": "17.0.21",
-    "cdktf-cli": "0.9.4",
+    "cdktf-cli": "0.10.1",
     "dotenv": "16.0.0",
     "jest": "27.5.1",
     "ts-jest": "27.1.4",
