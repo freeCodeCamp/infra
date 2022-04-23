@@ -20,7 +20,7 @@
   "dependencies": {
     "@cdktf/provider-azurerm": "0.6.26",
     "cdktf": "0.10.2",
-    "constructs": "10.0.117"
+    "constructs": "10.0.123"
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
