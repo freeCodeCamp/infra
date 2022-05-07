@@ -23,7 +23,7 @@
     "constructs": "10.0.129"
   },
   "devDependencies": {
-    "@types/jest": "27.4.1",
+    "@types/jest": "27.5.0",
     "@types/node": "17.0.21",
     "cdktf-cli": "0.10.4",
     "dotenv": "16.0.0",
