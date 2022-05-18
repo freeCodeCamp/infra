@@ -2,7 +2,7 @@
 a.demo-projects.pubdns.freecodecamp.org
 
 [prd_api]
-[a:c].api.pubdns.freecodecamp.org
+[a:d].api.pubdns.freecodecamp.org
 
 [prd_nginx]
 [a:b].www.web.pubdns.freecodecamp.org
