@@ -1,0 +1,10 @@
+# Netdata configuration
+
+[global]
+  # {% if hostvars[inventory_hostname].hostname %}
+  # hostname = {{ hostvars[inventory_hostname].hostname }}
+  # {% endif %}
+  dbengine multihost disk space = {{ dbengine_multihost_disk_space }}
+
+[web]
+	mode = {{ web_mode }}
