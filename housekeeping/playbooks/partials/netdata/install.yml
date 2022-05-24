@@ -2,7 +2,7 @@
 - name: Install Netdata
   hosts: "{{ variable_host | default('all') }}"
   vars_files:
-    - '../../../vars/main.yml'
+    - '../../../vars/netdata.yml'
   become: true
   become_method: sudo
 
