@@ -2,7 +2,7 @@
 a.demo-projects.pubdns.freecodecamp.org
 
 [prd_api]
-[a:d].api.pubdns.freecodecamp.org
+[a:j].api.pubdns.freecodecamp.org
 
 [prd_nginx]
 [a:b].www.web.pubdns.freecodecamp.org
@@ -97,12 +97,15 @@ a.por.client.pubdns.freecodecamp.dev
 a.jpn.client.pubdns.freecodecamp.dev
 a.ukr.client.pubdns.freecodecamp.dev
 
-[stg]
+[stg_api]
 [a:b].api.pubdns.freecodecamp.dev
+
+[stg]
 a.ita.ghost.pubdns.freecodecamp.dev
 a.www.web.pubdns.freecodecamp.dev
 
 [stg:children]
+stg_api
 stg_client
 
 [all:vars]
