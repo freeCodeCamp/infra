@@ -1,6 +1,6 @@
 ---
 - name: Git Update
-  hosts: "{{ variable_host | default('all') }}"
+  hosts: "{{ variable_host | default('stg_client') }}"
 
   tasks:
     - name: Update Git Repository
