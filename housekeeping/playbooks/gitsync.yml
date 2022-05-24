@@ -1,0 +1,13 @@
+---
+- name: Git Update
+  hosts: "{{ variable_host | default('all') }}"
+
+  tasks:
+    - name: Update Git Repository
+      ansible.builtin.git:
+        name: https://github.com/freeCodeCamp/client-config.git
+        dest: /home/freecodecamp/client
+        clone: no
+        update: yes
+        single_branch: yes
+        version: master
