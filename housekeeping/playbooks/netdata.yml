@@ -1,8 +1,0 @@
----
-# Tasks file for Netdata
-
-- import_playbook: partials/netdata/install.yml
-
-# - import_playbook: partials/netdata/configure.yml
-
-- import_playbook: partials/netdata/claim.yml
