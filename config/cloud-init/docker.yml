@@ -15,7 +15,8 @@ users:
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_import_id:
-      - raisedadead
+      - gh:camperbot
+      - gh:raisedadead
 runcmd:
   # This will install docker on the virtual machine and add the freeCodeCamp user to docker usergroup
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
