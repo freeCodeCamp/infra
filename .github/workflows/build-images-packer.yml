@@ -12,6 +12,14 @@ on:
           - 'eastus'
           - 'westus'
           - 'centralus'
+      child_image:
+        description: 'the child image to build'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'nginx'
 
 jobs:
   build-images:
@@ -27,6 +35,10 @@ jobs:
         ${{ secrets.AZURE_SERVICE_PRINCIPAL_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    outputs:
+      output-build-ubuntu-image:
+        ${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }}
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v3
@@ -39,7 +51,8 @@ jobs:
         run: |
           echo "Packer version: $(packer version)"
 
-      - name: Build Images
+      - name: Build Ubuntu Image
+        id: build-ubuntu-image
         run: |
           packer init \
           -var location=${{ inputs.region }} \
@@ -55,18 +68,23 @@ jobs:
 
           UBUNTU_ARTIFACT_NAME=$(cat manifest.json | jq '.builds[].artifact_id' | sed -r 's|.*/(.*)"$|\1|')
           echo Building the next image with: $UBUNTU_ARTIFACT_NAME
+          echo "::set-output name=ubuntu_artifact_name::$UBUNTU_ARTIFACT_NAME"
 
+      - name: Build Child Image
+        if: ${{ inputs.child_image != 'none' }}
+        id: build-child-image
+        run: |
           packer init \
           -var location=${{ inputs.region }} \
-          -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
-          ./images/machines/azure/nginx.pkr.hcl
+          -var custom_managed_image_name=${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }} \
+          ./images/machines/azure/${{ inputs.child_image }}.pkr.hcl
 
           packer validate \
           -var location=${{ inputs.region }} \
-          -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
-          ./images/machines/azure/nginx.pkr.hcl
+          -var custom_managed_image_name=${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }} \
+          ./images/machines/azure/${{ inputs.child_image }}.pkr.hcl
 
           packer build \
           -var location=${{ inputs.region }} \
-          -var custom_managed_image_name=$UBUNTU_ARTIFACT_NAME \
-          ./images/machines/azure/nginx.pkr.hcl
+          -var custom_managed_image_name=${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }} \
+          ./images/machines/azure/${{ inputs.child_image }}.pkr.hcl
