@@ -23,6 +23,7 @@
     "constructs": "10.1.36"
   },
   "devDependencies": {
+    "@octokit/core": "3.6.0",
     "@types/jest": "27.5.2",
     "@types/node": "17.0.21",
     "cdktf-cli": "0.11.2",

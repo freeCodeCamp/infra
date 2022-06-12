@@ -22,6 +22,7 @@ if (
 
 const {
   SSH_PUBLIC_KEY: sshPublicKey,
+  GITHUB_PA_TOKEN: githubPAToken,
   BASE64_ENCODED_CUSTOM_DATA: customData,
   MYSQL_ADMIN_USERNAME: mysqlAdminUsername,
   MYSQL_ADMIN_PASSWORD: mysqlAdminPassword,
@@ -32,6 +33,8 @@ const {
 // TODO: Add valiadtion for all required env variables
 
 export const ssh_public_key: string = String(sshPublicKey).toString();
+
+export const github_pa_token: string = String(githubPAToken).toString();
 
 export const custom_data: string = String(customData).toString();
 
