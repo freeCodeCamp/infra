@@ -6,9 +6,7 @@
     "experimentalDecorators": true,
     "inlineSourceMap": true,
     "inlineSources": true,
-    "lib": [
-      "es2021"
-    ],
+    "lib": ["es2021"],
     "module": "CommonJS",
     "noEmitOnError": true,
     "noFallthroughCasesInSwitch": true,
@@ -23,13 +21,9 @@
     "strictPropertyInitialization": true,
     "stripInternal": true,
     "target": "ES2021",
-    "incremental": true
+    "incremental": true,
+    "esModuleInterop": true
   },
-  "include": [
-    "**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "cdktf.out"
-  ]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "cdktf.out"]
 }

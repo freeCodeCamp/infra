@@ -8,7 +8,7 @@ import {
   SshPublicKey
 } from '@cdktf/provider-azurerm';
 
-import { ssh_public_key } from '../config/env';
+import members from '../scripts/data/github-members.json';
 
 export default class CommonStack extends TerraformStack {
   constructor(scope: Construct, name: string, config: any) {
@@ -26,13 +26,23 @@ export default class CommonStack extends TerraformStack {
       location: 'eastus'
     });
 
-    // TODO: Add Dynamic Logic to create and update SSH Public Keys
-    const sshPublicKeyIdentifier = `${env}-ssh-key-mrugesh`;
-    new SshPublicKey(this, sshPublicKeyIdentifier, {
-      name: sshPublicKeyIdentifier,
-      resourceGroupName: rg.name,
-      location: rg.location,
-      publicKey: ssh_public_key
+    // Create SSH keys for all members of the ops team
+    members.forEach((member: { username: string; publicKeys: string[] }) => {
+      console.log(`Creating SSH keys for ${member?.username}`);
+      member?.publicKeys.forEach((key, index) => {
+        console.log(
+          `Key ${index + 1}: ${key.slice(0, 20)}...${key.slice(-20)}`
+        );
+        const sshPublicKeyIdentifier = `${env}-ssh-key-${member.username}-${
+          index + 1
+        }`;
+        new SshPublicKey(this, sshPublicKeyIdentifier, {
+          name: sshPublicKeyIdentifier,
+          resourceGroupName: rg.name,
+          location: rg.location,
+          publicKey: key
+        });
+      });
     });
 
     const { tlds } = config;

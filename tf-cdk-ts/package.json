@@ -4,9 +4,9 @@
   "license": "BSD-3-Clause",
   "private": true,
   "scripts": {
-    "get": "cdktf get",
+    "prebuild": "npx ts-node ./scripts/prebuild.ts",
     "build": "tsc",
-    "build:watch": "tsc -w",
+    "build:watch": "tsc --watch",
     "postbuild": "npx cdktf synth",
     "postbuild:watch": "npx cdktf synth",
     "compile": "tsc --pretty",
