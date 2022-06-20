@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout Source Files
-        uses: actions/checkout@v3
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # tag=v3
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@eeb10cff27034e7acf239c5d29f62154018672fd # tag=v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Lint Source Files
@@ -41,10 +41,10 @@ jobs:
 
     steps:
       - name: Checkout Source Files
-        uses: actions/checkout@v3
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # tag=v3
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@eeb10cff27034e7acf239c5d29f62154018672fd # tag=v3
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -54,7 +54,7 @@ jobs:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v1
+        uses: dopplerhq/cli-action@0636e30522ac1d88b3de47b7d58b734edf0f153f # tag=v1
 
       - name: Run Tests
         run: |
