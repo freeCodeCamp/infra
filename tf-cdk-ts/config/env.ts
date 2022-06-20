@@ -5,9 +5,9 @@ const { error } = require('dotenv').config({ path: envPath });
 if (error) {
   console.info(
     `
-     Warning: .env file not found. You can ignore this 
-     message if you are using some other way of setting 
-     the required keys & secrets.
+      Warning: .env file not found. You can ignore this 
+      message if you are using some other way of setting 
+      the required keys & secrets.
     `
   );
 }
@@ -34,7 +34,9 @@ const {
 
 export const ssh_public_key: string = String(sshPublicKey).toString();
 
-export const github_pa_token: string = String(githubPAToken).toString();
+export const github_pa_token: string = githubPAToken
+  ? String(githubPAToken).toString()
+  : '';
 
 export const custom_data: string = String(customData).toString();
 
