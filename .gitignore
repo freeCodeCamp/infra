@@ -58,4 +58,20 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+tsconfig.tsbuildinfo
+*.d.ts
+*.js
+
+node_modules
+cdktf.out
+cdktf.log
+
+*terraform.*.tfstate*
+.gen
+.terraform
+
 tf-cdk-ts/scripts/data/
+
+!jest.config.js
+!setup.js
+!.eslintrc.js
