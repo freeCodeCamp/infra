@@ -24,7 +24,7 @@ interface fCCVirtualMachineConfig {
 export const createVirtualMachine = (
   stack: Construct,
   config: fCCVirtualMachineConfig,
-  allocatePublicIP: boolean = true
+  allocatePublicIP = true
 ) => {
   const {
     stackName,

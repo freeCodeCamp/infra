@@ -1,12 +1,13 @@
 import { resolve } from 'path';
+import dotenv from 'dotenv';
 
 const envPath = resolve(__dirname, '../.env');
-const { error } = require('dotenv').config({ path: envPath });
+const { error } = dotenv.config({ path: envPath });
 if (error) {
   console.info(
     `
-      Warning: .env file not found. You can ignore this 
-      message if you are using some other way of setting 
+      Warning: .env file not found. You can ignore this
+      message if you are using some other way of setting
       the required keys & secrets.
     `
   );

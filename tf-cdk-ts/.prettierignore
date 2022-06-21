@@ -1,0 +1,2 @@
+# Comment out the line below to run Prettier against the files in the final build
+package-lock.json

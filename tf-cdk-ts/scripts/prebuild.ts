@@ -15,7 +15,7 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { getSSHKeysForUsersOnGitHubTeam } from '../utils/github';
 
 (() => {
-  getSSHKeysForUsersOnGitHubTeam('freeCodeCamp', 'ops').then((keys) => {
+  getSSHKeysForUsersOnGitHubTeam('freeCodeCamp', 'ops').then(keys => {
     mkdirSync(path.join(__dirname, `/data`), { recursive: true });
     writeFileSync(
       path.join(__dirname, `/data/github-members.json`),

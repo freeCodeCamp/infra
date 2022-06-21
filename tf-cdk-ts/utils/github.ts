@@ -20,10 +20,10 @@ export const getMembersFromGHTeam = async (
       org,
       team_slug
     })
-    .then((res) => {
+    .then(res => {
       return res.data;
     })
-    .catch((err) => {
+    .catch(err => {
       console.log(
         `
         Error getting team members for ${org}'s ${team_slug} team from GitHub.
@@ -44,10 +44,10 @@ export const getMembersFromGHTeam = async (
 export const getSSHKeysFor1User = async (user: string): Promise<keyMap> => {
   const data = await octokit
     .request(`GET /users/${user}/keys`, { username: user })
-    .then((res) => {
+    .then(res => {
       return res.data;
     })
-    .catch((err) => {
+    .catch(err => {
       console.log(
         `Error getting public SSH keys for user ${user}. Got status: ${err.status}`
       );
