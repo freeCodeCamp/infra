@@ -1,5 +1,5 @@
 import { Construct } from 'constructs';
-import { App, RemoteBackend } from 'cdktf';
+import { App, RemoteBackend, TerraformStack } from 'cdktf';
 
 export const createRemoteBackend = (
   stack: Construct,
@@ -20,8 +20,16 @@ export interface StackConfigOptions {
   name: string;
   tlds?: string[];
 }
+
+interface StackConstruct {
+  new (
+    scope: Construct,
+    tfConstructName: string,
+    config: StackConfigOptions
+  ): TerraformStack;
+}
 export interface StackOptions {
-  stackConstruct: any;
+  stackConstruct: StackConstruct;
   stackConfig: StackConfigOptions;
 }
 
