@@ -13,7 +13,7 @@ import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { createMysqlFlexibleServer } from '../components/mysql-flexible-server';
 import { StackConfigOptions } from '../components/remote-backend/index';
 
-export default class stgMySQLDBStack extends TerraformStack {
+export default class prdMySQLDBStack extends TerraformStack {
   constructor(
     scope: Construct,
     tfConstructName: string,
@@ -25,6 +25,7 @@ export default class stgMySQLDBStack extends TerraformStack {
 
     const { subscriptionId, tenantId, clientId, clientSecret } =
       createAzureRBACServicePrincipal(this);
+
     new AzurermProvider(this, 'azurerm', {
       features: {},
       subscriptionId: subscriptionId.stringValue,
@@ -65,27 +66,29 @@ export default class stgMySQLDBStack extends TerraformStack {
       ]
     });
 
-    languages.forEach(language => {
-      const prvDNSZone = new PrivateDnsZone(
-        this,
-        `${env}-prvdnsfsdb-${language}`,
-        {
-          name: `${language}.prvdnsfsdb.mysql.database.azure.com`,
-          resourceGroupName: rg.name
-        }
-      );
-      createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
-        name: `fcc${env}mysqlfs${language}`,
-        resourceGroupName: rg.name,
-        location: rg.location,
-        delegatedSubnetId: subnet.id,
-        privateDnsZoneId: prvDNSZone.id
-        // skuName: 'Standard_D2ds_v4',
-        // storage: {
-        //   iops: 1024,
-        //   sizeGb: 32
-        // }
+    languages
+      .filter(language => language !== 'eng')
+      .map(language => {
+        const prvDNSZone = new PrivateDnsZone(
+          this,
+          `${env}-prvdnsfsdb-${language}`,
+          {
+            name: `${language}.prvdnsfsdb.mysql.database.azure.com`,
+            resourceGroupName: rg.name
+          }
+        );
+        createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
+          name: `fcc${env}mysqlfs${language}`,
+          resourceGroupName: rg.name,
+          location: rg.location,
+          delegatedSubnetId: subnet.id,
+          privateDnsZoneId: prvDNSZone.id,
+          skuName: 'GP_Standard_D2ds_v4',
+          storage: {
+            iops: 1024,
+            sizeGb: 64
+          }
+        });
       });
-    });
   }
 }
