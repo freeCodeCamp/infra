@@ -15,18 +15,20 @@ export const createRemoteBackend = (
   });
 };
 
-interface StackConstructConfig {
-  stackConstruct: any;
-  stackName: string;
-  stackConfig: any;
+export interface StackConfigOptions {
+  env: string;
+  name: string;
+  tlds?: string[];
 }
-export const createRemoteBackends = (
-  app: App,
-  config: StackConstructConfig[]
-) => {
-  config.forEach(({ stackConstruct, stackName, stackConfig }) => {
-    const stack = new stackConstruct(app, stackName, stackConfig);
-    const { env } = stackConfig;
-    createRemoteBackend(stack, stackName, env);
+export interface StackOptions {
+  stackConstruct: any;
+  stackConfig: StackConfigOptions;
+}
+
+export const createRemoteBackends = (app: App, config: StackOptions[]) => {
+  config.forEach(({ stackConstruct, stackConfig }) => {
+    const { env, name } = stackConfig;
+    const stack = new stackConstruct(app, `${env}-${name}`, stackConfig);
+    createRemoteBackend(stack, name, env);
   });
 };

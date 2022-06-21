@@ -9,12 +9,17 @@ import {
 
 import { createVirtualMachine } from '../components/virtual-machine';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
+import { StackConfigOptions } from '../components/remote-backend/index';
 
 export default class GitHubRunners extends TerraformStack {
-  constructor(scope: Construct, name: string, config: any) {
-    super(scope, name);
+  constructor(
+    scope: Construct,
+    tfConstructName: string,
+    config: StackConfigOptions
+  ) {
+    super(scope, tfConstructName);
 
-    const { env } = config;
+    const { env, name } = config;
 
     const { subscriptionId, tenantId, clientId, clientSecret } =
       createAzureRBACServicePrincipal(this);

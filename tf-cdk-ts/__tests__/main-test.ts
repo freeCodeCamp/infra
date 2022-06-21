@@ -10,7 +10,7 @@ describe('News - Write Stack', () => {
       const app = Testing.app();
       const stack = new prdMySQLDBStack(app, 'mysql-db-test', {
         name: 'mysql-db-test',
-        config: { env: 'tst' }
+        env: 'tst'
       });
       expect(Testing.fullSynth(stack)).toBeValidTerraform();
     });
@@ -18,7 +18,7 @@ describe('News - Write Stack', () => {
       const app = Testing.app();
       const stack = new prdMySQLDBStack(app, 'mysql-db-test', {
         name: 'mysql-db-test',
-        config: { env: 'tst' }
+        env: 'tst'
       });
       expect(Testing.fullSynth(stack)).toPlanSuccessfully();
     });

@@ -20,37 +20,31 @@ createRemoteBackends(app, [
   // Operations Resources
   {
     stackConstruct: opsCommonStack,
-    stackName: 'common',
-    stackConfig: { env: 'ops', tlds: ['dev', 'org'] }
+    stackConfig: { env: 'ops', name: 'common', tlds: ['dev', 'org'] }
   },
   {
     stackConstruct: opsMachineImagesStack,
-    stackName: 'machine-images',
-    stackConfig: { env: 'ops' }
+    stackConfig: { env: 'ops', name: 'machine-images' }
   },
   // {
   //   stackConstruct: opsGitHubRunnersStack,
-  //   stackName: 'github-runners',
-  //   stackConfig: { env: 'ops' }
+  //   stackConfig: { env: 'ops', name: 'github-runners' }
   // },
 
   // Staging Resources
   {
     stackConstruct: stgMySQLDBStack,
-    stackName: 'mysql-db',
-    stackConfig: { env: 'stg' }
+    stackConfig: { env: 'stg', name: 'mysql-db' }
   }
 
   // Production Resources
   // {
   //   stackConstruct: prdMySQLDBStack,
-  //   stackName: 'mysql-db',
-  //   stackConfig: { env: 'prd' }
+  //   stackConfig: { env: 'prd', name: 'mysql-db' }
   // },
   // {
   //   stackConstruct: prdWriteStack,
-  //   stackName: 'write',
-  //   stackConfig: { env: 'prd' }
+  //   stackConfig: { env: 'prd', name: 'write' }
   // }
 ]);
 

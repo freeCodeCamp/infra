@@ -13,6 +13,7 @@
     "postbuild": "npx cdktf synth",
     "postbuild:watch": "npx cdktf synth",
     "compile": "tsc --pretty",
+    "postcompile": "npm run postbuild",
     "list": "npx cdktf list",
     "lint": "npx eslint .",
     "test": "jest",

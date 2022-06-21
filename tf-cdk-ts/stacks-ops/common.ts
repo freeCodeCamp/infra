@@ -8,13 +8,18 @@ import {
   SshPublicKey
 } from '@cdktf/provider-azurerm';
 
+import { StackConfigOptions } from '../components/remote-backend/index';
 import members from '../scripts/data/github-members.json';
 
 export default class CommonStack extends TerraformStack {
-  constructor(scope: Construct, name: string, config: any) {
-    super(scope, name);
+  constructor(
+    scope: Construct,
+    tfConstructName: string,
+    config: StackConfigOptions
+  ) {
+    super(scope, tfConstructName);
 
-    const { env } = config;
+    const { env, name, tlds } = config;
 
     new AzurermProvider(this, 'azurerm', {
       features: {}
@@ -45,10 +50,8 @@ export default class CommonStack extends TerraformStack {
       });
     });
 
-    const { tlds } = config;
-
     // Create Private DNS Zones for each domain
-    tlds.forEach((tld: string) => {
+    tlds?.forEach((tld: string) => {
       new PrivateDnsZone(this, `${env}-prvdns-${tld}`, {
         name: `prvdns.freecodecamp.${tld}`,
         resourceGroupName: rg.name
@@ -56,7 +59,7 @@ export default class CommonStack extends TerraformStack {
     });
 
     // Create Public DNS Zones for each domain
-    tlds.forEach((tld: string) => {
+    tlds?.forEach((tld: string) => {
       new DnsZone(this, `${env}-pubdns-${tld}`, {
         name: `pubdns.freecodecamp.${tld}`,
         resourceGroupName: rg.name
