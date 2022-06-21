@@ -2,7 +2,7 @@ name: Node.js CI
 on:
   push:
     branches-ignore:
-      - "renovate/**"
+      - 'renovate/**'
   pull_request:
 
 jobs:
@@ -58,10 +58,10 @@ jobs:
 
       - name: Run Tests
         run: |
-          cd tf-cdk-ts          
+          cd tf-cdk-ts
           npm ci
           export HISTIGNORE='doppler run*' # Prevent command with Service Token being recorded in bash history
-          doppler run --token=$DOPPLER_TOKEN --project=infra --config=github -- npm run build  
+          doppler run --token=$DOPPLER_TOKEN --project=infra --config=github -- npm run build
           echo ""
           echo ""
           echo "!!!! -------- Running tests is broken on CI, works locally though... -------- !!!!"
