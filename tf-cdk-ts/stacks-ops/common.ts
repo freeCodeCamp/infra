@@ -28,11 +28,11 @@ export default class CommonStack extends TerraformStack {
 
     // Create SSH keys for all members of the ops team
     members.forEach((member: { username: string; publicKeys: string[] }) => {
-      console.log(`Creating SSH keys for ${member?.username}`);
+      // console.log(`Creating SSH keys for ${member?.username}`);
       member?.publicKeys.forEach((key, index) => {
-        console.log(
-          `Key ${index + 1}: ${key.slice(0, 20)}...${key.slice(-20)}`
-        );
+        // console.log(
+        //   `Key ${index + 1}: ${key.slice(0, 20)}...${key.slice(-20)}`
+        // );
         const sshPublicKeyIdentifier = `${env}-ssh-key-${member.username}-${
           index + 1
         }`;
