@@ -24,6 +24,7 @@ export default class stgMySQLDBStack extends TerraformStack {
 
     const { subscriptionId, tenantId, clientId, clientSecret } =
       createAzureRBACServicePrincipal(this);
+
     new AzurermProvider(this, 'azurerm', {
       features: {},
       subscriptionId: subscriptionId.stringValue,
