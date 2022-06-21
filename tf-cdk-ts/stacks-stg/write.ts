@@ -10,7 +10,7 @@ import {
 import { createVirtualMachine } from '../components/virtual-machine/index';
 import { StackConfigOptions } from '../components/remote-backend/index';
 
-export default class prdWriteStack extends TerraformStack {
+export default class stgWriteStack extends TerraformStack {
   constructor(
     scope: Construct,
     tfConstructName: string,

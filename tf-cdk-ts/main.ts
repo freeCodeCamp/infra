@@ -9,9 +9,10 @@ import opsCommonStack from './stacks-ops/common';
 
 // Staging Resources
 import stgMySQLDBStack from './stacks-stg/mysql-db';
+import stgWriteStack from './stacks-prd/write';
 
 // Production Resources
-import prdMySQLDBStack from './stacks-prd/mysql-db';
+// import prdMySQLDBStack from './stacks-prd/mysql-db';
 // import prdWriteStack from './stacks-prd/write';
 
 const app = new App();
@@ -36,12 +37,16 @@ createRemoteBackends(app, [
     stackConstruct: stgMySQLDBStack,
     stackConfig: { env: 'stg', name: 'mysql-db' }
   },
+  {
+    stackConstruct: stgWriteStack,
+    stackConfig: { env: 'stg', name: 'write' }
+  }
 
   // Production Resources
-  {
-    stackConstruct: prdMySQLDBStack,
-    stackConfig: { env: 'prd', name: 'mysql-db' }
-  }
+  // {
+  //   stackConstruct: prdMySQLDBStack,
+  //   stackConfig: { env: 'prd', name: 'mysql-db' }
+  // },
   // {
   //   stackConstruct: prdWriteStack,
   //   stackConfig: { env: 'prd', name: 'write' }
