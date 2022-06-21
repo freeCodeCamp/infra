@@ -8,7 +8,7 @@
     "upgrade:cdk": "npm install --save-exact cdktf@latest",
     "upgrade:cli": "npm install --save-dev --save-exact cdktf-cli@latest",
     "prebuild": "npx ts-node ./scripts/prebuild.ts",
-    "build": "tsc",
+    "build": "echo 'This command should be used in Production and CI/CD only.' && tsc",
     "build:watch": "tsc --watch",
     "postbuild": "npx cdktf synth",
     "postbuild:watch": "npx cdktf synth",

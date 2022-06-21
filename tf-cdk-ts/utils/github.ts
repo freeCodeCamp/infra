@@ -24,7 +24,7 @@ export const getMembersFromGHTeam = async (
       return res.data;
     })
     .catch(err => {
-      console.log(
+      console.error(
         `
         Error getting team members for ${org}'s ${team_slug} team from GitHub.
         Check that you have configured the PA Token correctly and it has the
@@ -48,7 +48,7 @@ export const getSSHKeysFor1User = async (user: string): Promise<keyMap> => {
       return res.data;
     })
     .catch(err => {
-      console.log(
+      console.error(
         `Error getting public SSH keys for user ${user}. Got status: ${err.status}`
       );
       return { username: user, publicKeys: [] };
