@@ -73,7 +73,7 @@ export default class prdMySQLDBStack extends TerraformStack {
           this,
           `${env}-prvdnsfsdb-${language}`,
           {
-            name: `${language}.prvdnsfsdb.mysql.database.azure.com`,
+            name: `${language}.${env}.fsdb.private.mysql.database.azure.com`,
             resourceGroupName: rg.name
           }
         );

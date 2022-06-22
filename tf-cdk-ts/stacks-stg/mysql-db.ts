@@ -2,6 +2,7 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
+  PrivateDnsZone,
   ResourceGroup,
   Subnet,
   VirtualNetwork
@@ -69,11 +70,20 @@ export default class stgMySQLDBStack extends TerraformStack {
     // Let's test with a single language
     const languages = ['all'];
     languages.forEach(language => {
+      const prvDNSZone = new PrivateDnsZone(
+        this,
+        `${env}-prvdnsfsdb-${language}`,
+        {
+          name: `${language}.${env}.fsdb.private.mysql.database.azure.com`,
+          resourceGroupName: rg.name
+        }
+      );
       createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
         name: `fcc${env}mysqlfs${language}`,
         resourceGroupName: rg.name,
         location: rg.location,
         delegatedSubnetId: subnet.id,
+        privateDnsZoneId: prvDNSZone.id,
         skuName: 'GP_Standard_D2ds_v4',
         storage: {
           iops: 1024,
