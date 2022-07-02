@@ -36,7 +36,7 @@
     "@typescript-eslint/parser": "5.29.0",
     "cdktf-cli": "0.11.2",
     "dotenv": "16.0.1",
-    "eslint": "8.18.0",
+    "eslint": "8.19.0",
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-prettier": "4.0.0",
     "husky": "8.0.1",
