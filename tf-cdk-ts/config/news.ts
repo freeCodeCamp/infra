@@ -9,14 +9,14 @@ export const languages: Array<string> = [
   // 'chn', // Chinese  | We don't have a Chinese (traditional) - cnt Publication
   // 'esp', // Spanish
   'fre', // French
-  'ger', // German
-  'hin', // Hindi
+  'ger' // German
+  // 'hin', // Hindi
   // 'ita', // Italian
   // 'jpn', // Japanese
-  'kor', // Korean
+  // 'kor', // Korean
   // 'por', // Portuguese
-  'swa', // Swahili
-  'tur' // Turkish
+  // 'swa', // Swahili
+  // 'tur' // Turkish
   // 'ukr', // Ukrainian
   // 'urd' // Urdu
 ];

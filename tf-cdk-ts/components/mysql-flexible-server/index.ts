@@ -19,25 +19,25 @@ export const createMysqlFlexibleServer = (
 
     /*
       !! Important !!
-      
-      Azure makes it horibily difficult to find the documentation about skuName (sku_name in HCL). 
+
+      Azure makes it horibily difficult to find the documentation about skuName (sku_name in HCL).
 
       You can get a list of SKUs with the following command:
-      
+
       az mysql flexible-server list-skus -l eastus --query "[].supportedFlexibleServerEditions[].{Name:name, SKU:supportedServerVersions[].supportedSkus[].name}"
 
       The correct skuName format then is:
-      
+
       General Purpose (GP)  : "Standard_D2ds_v4"  --> "GP_Standard_D2ds_v4"
-      Burstable (B)         : "Standard_B1ms"     --> "B_Standard_B1ms"
-      
+      Burstable (B)         : "Standard_B2s"      --> "B_Standard_B2s"
+
       ...and so on.
     */
-    skuName: config.skuName || 'B_Standard_B1ms',
+    skuName: config.skuName || 'B_Standard_B2s',
 
     storage: {
       autoGrowEnabled: config.storage?.autoGrowEnabled || true,
-      iops: config.storage?.iops || 400,
+      iops: config.storage?.iops || 360,
       sizeGb: config.storage?.sizeGb || 20
     },
     version: '5.7',
@@ -52,7 +52,7 @@ export const createMysqlFlexibleServer = (
     geoRedundantBackupEnabled: true,
 
     // Network settings
-    delegatedSubnetId: config.delegatedSubnetId
-    // privateDnsZoneId: config.privateDnsZoneId
+    delegatedSubnetId: config.delegatedSubnetId || undefined
+    // privateDnsZoneId: config.privateDnsZoneId   // Do not use Private DNS - because we need to run Ghost on a different VNet
   });
 };

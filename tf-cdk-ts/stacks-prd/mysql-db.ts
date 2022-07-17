@@ -1,12 +1,6 @@
 import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
-import {
-  AzurermProvider,
-  PrivateDnsZone,
-  ResourceGroup,
-  Subnet,
-  VirtualNetwork
-} from '@cdktf/provider-azurerm';
+import { AzurermProvider, ResourceGroup } from '@cdktf/provider-azurerm';
 
 import { languages } from '../config/news';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
@@ -40,54 +34,22 @@ export default class prdMySQLDBStack extends TerraformStack {
       location: 'eastus'
     });
 
-    const vnetIdentifier = `${env}-vnet-${name}`;
-    const vnet = new VirtualNetwork(this, vnetIdentifier, {
-      name: vnetIdentifier,
-      resourceGroupName: rg.name,
-      location: rg.location,
-      addressSpace: ['10.0.0.0/16']
-    });
-
-    const subnetIdentifier = `${env}-subnet-${name}`;
-    const subnet = new Subnet(this, subnetIdentifier, {
-      name: subnetIdentifier,
-      resourceGroupName: rg.name,
-      virtualNetworkName: vnet.name,
-      addressPrefixes: ['10.0.1.0/24'],
-      serviceEndpoints: ['Microsoft.Storage'],
-      delegation: [
-        {
-          name: `${env}-fs-delegation`,
-          serviceDelegation: {
-            name: 'Microsoft.DBforMySQL/flexibleServers',
-            actions: ['Microsoft.Network/virtualNetworks/subnets/join/action']
-          }
-        }
-      ]
-    });
-
     languages
-      .filter(language => language !== 'eng')
+      .filter(language => language !== 'eng' && language !== 'chn')
       .map(language => {
-        const prvDNSZone = new PrivateDnsZone(
-          this,
-          `${env}-prvdnsfsdb-${language}`,
-          {
-            name: `${language}.${env}.fsdb.private.mysql.database.azure.com`,
-            resourceGroupName: rg.name
-          }
-        );
         createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
           name: `fcc${env}mysqlfs${language}`,
           resourceGroupName: rg.name,
           location: rg.location,
-          delegatedSubnetId: subnet.id,
-          privateDnsZoneId: prvDNSZone.id,
-          skuName: 'GP_Standard_D2ds_v4',
+
+          // Server configuration
+          // $52.04 per month, per instance.
+          skuName: 'B_Standard_B2s',
           storage: {
-            iops: 1024,
-            sizeGb: 64
+            iops: 360,
+            sizeGb: 20
           }
+          // Server configuration
         });
       });
   }
