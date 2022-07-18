@@ -66,10 +66,10 @@ variable "scripts_dir" { default = "images/machines/scripts" }
 variable "configs_dir" { default = "images/machines/configs" }
 
 locals {
-  artifact_name = "NGINX-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
+  artifact_name = "NOMAD-CONSUL-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
 }
 
-source "azure-arm" "nginx" {
+source "azure-arm" "nomad-consul" {
 
   # AzureRM Parameters: https://www.packer.io/docs/builders/azure/arm
   async_resourcegroup_delete = true
@@ -102,8 +102,8 @@ source "azure-arm" "nginx" {
 }
 
 build {
-  name    = "nginx"
-  sources = ["source.azure-arm.nginx"]
+  name    = "nomad-consul"
+  sources = ["source.azure-arm.nomad-consul"]
 
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
@@ -111,7 +111,8 @@ build {
     pause_before = "60s"
     scripts = [
       "${var.scripts_dir}/do-presetup.sh",
-      "${var.scripts_dir}/installers/nginx.sh",
+      "${var.scripts_dir}/installers/nomad.sh",
+      "${var.scripts_dir}/installers/consul.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }
