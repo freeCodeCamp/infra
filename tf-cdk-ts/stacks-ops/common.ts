@@ -8,6 +8,7 @@ import {
   SshPublicKey
 } from '@cdktf/provider-azurerm';
 
+import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import members from '../scripts/data/github-members.json';
 
@@ -21,8 +22,15 @@ export default class CommonStack extends TerraformStack {
 
     const { env, name, tlds } = config;
 
+    const { subscriptionId, tenantId, clientId, clientSecret } =
+      createAzureRBACServicePrincipal(this);
+
     new AzurermProvider(this, 'azurerm', {
-      features: {}
+      features: {},
+      subscriptionId: subscriptionId.stringValue,
+      tenantId: tenantId.stringValue,
+      clientId: clientId.stringValue,
+      clientSecret: clientSecret.stringValue
     });
 
     const rgIdentifier = `${env}-rg-${name}`;
