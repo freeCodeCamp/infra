@@ -1,7 +1,7 @@
 packer {
   required_plugins {
     azure = {
-      version = ">= 1.0.4"
+      version = ">= 1.2.0"
       source  = "github.com/hashicorp/azure" # From: https://github.com/hashicorp/packer-plugin-azure
     }
   }
@@ -47,9 +47,9 @@ variable "az_subscription_id" {
   }
 }
 
-variable "image_offer" { default = "UbuntuServer" }
+variable "image_offer" { default = "0001-com-ubuntu-server-jammy" }
 variable "image_publisher" { default = "Canonical" }
-variable "image_sku" { default = "18.04-LTS" }
+variable "image_sku" { default = "22_04-LTS-gen2" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
@@ -86,6 +86,7 @@ source "azure-arm" "ubuntu" {
 
   vm_size      = var.vm_size
   ssh_username = var.ssh_username
+  # temporary_key_pair_type = "ed25519"            # This is not yet supported by the Azure Builder Plugin. https://github.com/hashicorp/packer-plugin-azure/issues/201
 
   azure_tags = {
     "ops-created-by"    = "packer"

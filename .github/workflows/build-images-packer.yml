@@ -20,6 +20,7 @@ on:
         options:
           - 'none'
           - 'nginx'
+          - 'nomad-consul'
 
 jobs:
   build-images:
