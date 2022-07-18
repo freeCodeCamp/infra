@@ -2,7 +2,6 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import { AzurermProvider, ResourceGroup } from '@cdktf/provider-azurerm';
 
-import { languages } from '../config/news';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { createMysqlFlexibleServer } from '../components/mysql-flexible-server';
 import { StackConfigOptions } from '../components/remote-backend/index';
@@ -34,23 +33,23 @@ export default class stgMySQLDBStack extends TerraformStack {
       location: 'eastus'
     });
 
-    languages
-      .filter(language => language !== 'eng' && language !== 'chn')
-      .map(language => {
-        createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
-          name: `fcc${env}mysqlfs${language}`,
-          resourceGroupName: rg.name,
-          location: rg.location,
+    // languages
+    //   .filter(language => language !== 'eng' && language !== 'chn')
+    ['dot', 'ita'].map(language => {
+      createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
+        name: `fcc${env}mysqlfs${language}`,
+        resourceGroupName: rg.name,
+        location: rg.location,
 
-          // Server configuration
-          // $52.04 per month, per instance.
-          skuName: 'B_Standard_B2s',
-          storage: {
-            iops: 360,
-            sizeGb: 20
-          }
-          // Server configuration
-        });
+        // Server configuration
+        // $14.81 per month, per instance.
+        skuName: 'B_Standard_B1ms',
+        storage: {
+          iops: 360,
+          sizeGb: 20
+        }
+        // Server configuration
       });
+    });
   }
 }

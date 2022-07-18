@@ -44,15 +44,6 @@ export const createMysqlFlexibleServer = (
     administratorLogin: mysql_admin_username,
     administratorPassword: mysql_admin_password,
 
-    // Backup and Availability settings
-    // highAvailability: {                         // Do not use High Availability - because Ghost doesn't support it
-    //   mode: 'ZoneRedundant'                     // High Availability is not available on all SKUs
-    // },
-    backupRetentionDays: 7,
-    geoRedundantBackupEnabled: true,
-
-    // Network settings
-    delegatedSubnetId: config.delegatedSubnetId || undefined
-    // privateDnsZoneId: config.privateDnsZoneId   // Do not use Private DNS - because we need to run Ghost on a different VNet
+    backupRetentionDays: 7
   });
 };

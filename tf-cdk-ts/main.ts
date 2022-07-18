@@ -8,7 +8,7 @@ import opsCommonStack from './stacks-ops/common';
 // import opsGitHubRunnersStack from './stacks-ops/github-runners';
 
 // Staging Resources
-import stgMySQLDBStack from './stacks-stg/mysql-db';
+// import stgMySQLDBStack from './stacks-stg/mysql-db';
 
 // Production Resources
 // import prdMySQLDBStack from './stacks-prd/mysql-db';
@@ -24,17 +24,17 @@ createRemoteBackends(app, [
   {
     stackConstruct: opsMachineImagesStack,
     stackConfig: { env: 'ops', name: 'machine-images' }
-  },
+  }
   // {
   //   stackConstruct: opsGitHubRunnersStack,
   //   stackConfig: { env: 'ops', name: 'github-runners' }
   // },
 
   // Staging Resources
-  {
-    stackConstruct: stgMySQLDBStack,
-    stackConfig: { env: 'stg', name: 'mysql-db' }
-  }
+  // {
+  //   stackConstruct: stgMySQLDBStack,
+  //   stackConfig: { env: 'stg', name: 'mysql-db' }
+  // }
 
   // Production Resources
   // {
