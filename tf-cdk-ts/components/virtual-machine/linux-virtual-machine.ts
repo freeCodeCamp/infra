@@ -2,7 +2,7 @@ import { Construct } from 'constructs';
 import {
   ResourceGroup,
   Subnet,
-  VirtualMachine,
+  LinuxVirtualMachine,
   NetworkInterface,
   NetworkSecurityGroup,
   NetworkInterfaceSecurityGroupAssociation
@@ -10,7 +10,7 @@ import {
 
 import { createPublicIp } from '../public-ip';
 
-import { custom_data } from '../../config/env';
+import { ssh_public_key, custom_data } from '../../config/env';
 
 interface fCCVirtualMachineConfig {
   stackName: string;
@@ -20,11 +20,9 @@ interface fCCVirtualMachineConfig {
   env: string;
   size?: string | undefined;
   privateIP?: string | undefined;
-  sshPublicKeys?: Array<string> | undefined;
-  customImageId?: string | undefined;
 }
 
-export const createVirtualMachine = (
+export const createLinuxVirtualMachine = (
   stack: Construct,
   config: fCCVirtualMachineConfig,
   allocatePublicIP = true
@@ -36,9 +34,7 @@ export const createVirtualMachine = (
     subnet,
     env,
     size: size = 'Standard_B2s',
-    privateIP: privateIP = undefined,
-    sshPublicKeys: sshPublicKeys = [],
-    customImageId: customImageId = undefined
+    privateIP: privateIP = undefined
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -87,43 +83,32 @@ export const createVirtualMachine = (
   });
 
   const vmIdentifier = `${env}-vm-${vmName}`;
-  const adminUsername = 'freecodecamp';
-  new VirtualMachine(stack, vmIdentifier, {
+  new LinuxVirtualMachine(stack, vmIdentifier, {
     name: vmIdentifier,
-    // computerName: String(vmIdentifier).replaceAll('-', ''),
+    computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
     location: rg.location,
-    vmSize: size,
-    osProfile: {
-      computerName: vmName,
-      adminUsername: adminUsername,
-      // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
-      customData: custom_data
-    },
-    osProfileLinuxConfig: {
-      disablePasswordAuthentication: true,
-      sshKeys: sshPublicKeys.map(key => {
-        return {
-          keyData: key,
-          path: `/home/${adminUsername}/.ssh/authorized_keys`
-        };
-      })
-    },
+    size: size,
+    adminUsername: 'freecodecamp',
+    adminSshKey: [
+      {
+        username: 'freecodecamp',
+        publicKey: ssh_public_key
+      }
+    ],
     networkInterfaceIds: [ni.id],
-    storageOsDisk: {
+    osDisk: {
       name: `${env}-osdisk-${vmName}`,
-      createOption: 'FromImage',
       caching: 'ReadWrite',
-      diskSizeGb: 30,
-      osType: 'Linux'
+      storageAccountType: 'Standard_LRS'
     },
-    storageImageReference: customImageId
-      ? { id: customImageId }
-      : {
-          publisher: 'Canonical',
-          offer: 'UbuntuServer',
-          sku: '18.04-LTS',
-          version: 'latest'
-        }
+    sourceImageReference: {
+      publisher: 'Canonical',
+      offer: 'UbuntuServer',
+      sku: '18.04-LTS',
+      version: 'latest'
+    },
+    // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
+    customData: custom_data
   });
 };

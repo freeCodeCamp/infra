@@ -2,7 +2,7 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import { AzurermProvider, ResourceGroup } from '@cdktf/provider-azurerm';
 
-import { languages } from '../config/news';
+import { languages } from '../config/constant-strings';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { createMysqlFlexibleServer } from '../components/mysql-flexible-server';
 import { StackConfigOptions } from '../components/remote-backend/index';

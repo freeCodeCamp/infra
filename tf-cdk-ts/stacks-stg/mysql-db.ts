@@ -33,8 +33,6 @@ export default class stgMySQLDBStack extends TerraformStack {
       location: 'eastus'
     });
 
-    // languages
-    //   .filter(language => language !== 'eng' && language !== 'chn')
     ['dot', 'ita'].map(language => {
       createMysqlFlexibleServer(this, `${env}-mysql-fs-${language}`, {
         name: `fcc${env}mysqlfs${language}`,

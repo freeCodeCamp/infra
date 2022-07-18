@@ -7,11 +7,13 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { createLinuxVirtualMachine } from '../components/virtual-machine/linux-virtual-machine';
+import { fiveLetterNames } from '../config/constant-strings';
+import members from '../scripts/data/github-members.json';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
+import { createVirtualMachine } from '../components/virtual-machine';
 
-export default class GitHubRunners extends TerraformStack {
+export default class stgClusterLeaderStack extends TerraformStack {
   constructor(
     scope: Construct,
     tfConstructName: string,
@@ -23,6 +25,7 @@ export default class GitHubRunners extends TerraformStack {
 
     const { subscriptionId, tenantId, clientId, clientSecret } =
       createAzureRBACServicePrincipal(this);
+
     new AzurermProvider(this, 'azurerm', {
       features: {},
       subscriptionId: subscriptionId.stringValue,
@@ -34,7 +37,7 @@ export default class GitHubRunners extends TerraformStack {
     const rgIdentifier = `${env}-rg-${name}`;
     const rg = new ResourceGroup(this, rgIdentifier, {
       name: rgIdentifier,
-      location: 'eastus2'
+      location: 'eastus'
     });
 
     const vnetIdentifier = `${env}-vnet-${name}`;
@@ -42,7 +45,7 @@ export default class GitHubRunners extends TerraformStack {
       name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
-      addressSpace: ['172.16.0.0/16']
+      addressSpace: ['10.0.0.0/16']
     });
 
     const subnetIdentifier = `${env}-subnet-${name}`;
@@ -50,17 +53,36 @@ export default class GitHubRunners extends TerraformStack {
       name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
-      addressPrefixes: ['172.16.0.0/24']
+      addressPrefixes: ['10.0.0.0/24']
     });
 
-    createLinuxVirtualMachine(this, {
-      stackName: name,
-      vmName: 'engnews',
-      rg: rg,
-      env: env,
-      subnet: subnet,
-      size: 'Standard_D4s_v3',
-      privateIP: '172.16.0.10'
+    const numberofControllers = 3;
+    const nomadControllerServerNames = fiveLetterNames.slice(
+      0,
+      numberofControllers
+    );
+
+    const sshPublicKeys: Array<string> = [];
+    members.map(member => {
+      member?.publicKeys.forEach(key => {
+        sshPublicKeys.push(key);
+      });
     });
+
+    nomadControllerServerNames.map((serverName, index) => {
+      createVirtualMachine(this, {
+        stackName: name,
+        vmName: serverName,
+        rg: rg,
+        env: env,
+        size: 'Standard_D2s_v4',
+        subnet: subnet,
+        privateIP: '10.0.0.' + (10 + index),
+        sshPublicKeys: sshPublicKeys,
+        customImageId: `/subscriptions/${subscriptionId.stringValue}/resourceGroups/ops-rg-machine-images/providers/Microsoft.Compute/images/NOMAD-CONSUL-eastus-220718-1345`
+      });
+    });
+
+    // End of stack
   }
 }

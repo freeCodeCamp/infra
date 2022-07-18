@@ -12,7 +12,7 @@ export const createPublicIp = (
     resourceGroupName: rg.name,
     location: rg.location,
     allocationMethod: 'Static',
-    sku: 'Basic'
+    sku: 'Standard'
   });
 
   new DnsARecord(stack, `${env}-dns-a-record-${name}`, {
