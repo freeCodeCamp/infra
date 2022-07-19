@@ -55,6 +55,7 @@ variable "custom_managed_image_name" {
   }
 }
 
+variable "artifact_image_type" { default = "Nginx" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
@@ -66,7 +67,7 @@ variable "scripts_dir" { default = "images/machines/scripts" }
 variable "configs_dir" { default = "images/machines/configs" }
 
 locals {
-  artifact_name = "NGINX-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
+  artifact_name = "${artifact_image_type}-${image_sku}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
 }
 
 source "azure-arm" "nginx" {
@@ -94,6 +95,7 @@ source "azure-arm" "nginx" {
 
   azure_tags = {
     "ops-created-by"  = "packer"
+    "ops-image-type"  = var.artifact_image_type
     "ops-vm-size"     = var.vm_size
     "ops-vm-location" = var.location
     "ops-vm-type"     = "${local.artifact_name}-from-${var.custom_managed_image_name}"

@@ -50,6 +50,8 @@ variable "az_subscription_id" {
 variable "image_offer" { default = "0001-com-ubuntu-server-jammy" }
 variable "image_publisher" { default = "Canonical" }
 variable "image_sku" { default = "22_04-LTS-gen2" }
+
+variable "artifact_image_type" { default = "Ubuntu" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
@@ -61,7 +63,7 @@ variable "scripts_dir" { default = "images/machines/scripts" }
 variable "configs_dir" { default = "images/machines/configs" }
 
 locals {
-  artifact_name = "UBUNTU-${var.location}-${formatdate("YYMMDD-hhmm", timestamp())}"
+  artifact_name = "${artifact_image_type}-${image_sku}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
 }
 
 source "azure-arm" "ubuntu" {
@@ -90,6 +92,7 @@ source "azure-arm" "ubuntu" {
 
   azure_tags = {
     "ops-created-by"    = "packer"
+    "ops-image-type"    = var.artifact_image_type
     "ops-vm-size"       = var.vm_size
     "ops-vm-location"   = var.location
     "ops-vm-buildchain" = "${local.artifact_name}-from-${var.image_sku}"
