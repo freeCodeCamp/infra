@@ -83,7 +83,7 @@ export const createLinuxVirtualMachine = (
   });
 
   const vmIdentifier = `${env}-vm-${vmName}`;
-  new LinuxVirtualMachine(stack, vmIdentifier, {
+  return new LinuxVirtualMachine(stack, vmIdentifier, {
     name: vmIdentifier,
     computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,

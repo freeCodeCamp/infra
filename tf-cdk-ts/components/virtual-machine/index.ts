@@ -88,7 +88,7 @@ export const createVirtualMachine = (
 
   const vmIdentifier = `${env}-vm-${vmName}`;
   const adminUsername = 'freecodecamp';
-  new VirtualMachine(stack, vmIdentifier, {
+  return new VirtualMachine(stack, vmIdentifier, {
     name: vmIdentifier,
     // computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
@@ -117,6 +117,7 @@ export const createVirtualMachine = (
       diskSizeGb: 30,
       osType: 'Linux'
     },
+    deleteOsDiskOnTermination: true,
     storageImageReference: customImageId
       ? { id: customImageId }
       : {
