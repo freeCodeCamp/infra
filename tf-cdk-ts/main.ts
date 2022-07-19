@@ -10,6 +10,7 @@ import opsCommonStack from './stacks-ops/common';
 // Staging Resources
 // import stgMySQLDBStack from './stacks-stg/mysql-db';
 import stgClusterLeaderStack from './stacks-stg/cluster-leader';
+import stgClusterClientStack from './stacks-stg/cluster-client';
 
 // Production Resources
 // import prdMySQLDBStack from './stacks-prd/mysql-db';
@@ -34,7 +35,11 @@ createRemoteBackends(app, [
   // Staging Resources
   {
     stackConstruct: stgClusterLeaderStack,
-    stackConfig: { env: 'stg', name: 'cluster-leader' }
+    stackConfig: { env: 'stg', name: 'cluster-ldr' }
+  },
+  {
+    stackConstruct: stgClusterClientStack,
+    stackConfig: { env: 'stg', name: 'cluster-clt' }
   }
   // {
   //   stackConstruct: stgMySQLDBStack,

@@ -7,13 +7,13 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { fiveLetterNames } from '../config/constant-strings';
+import { generateNanoid } from '../utils/generators';
 import members from '../scripts/data/github-members.json';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
-export default class stgClusterLeaderStack extends TerraformStack {
+export default class stgClusterClientStack extends TerraformStack {
   constructor(
     scope: Construct,
     tfConstructName: string,
@@ -45,7 +45,7 @@ export default class stgClusterLeaderStack extends TerraformStack {
       name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
-      addressSpace: ['10.0.0.0/16']
+      addressSpace: ['10.1.0.0/16']
     });
 
     const subnetIdentifier = `${env}-subnet-${name}`;
@@ -53,11 +53,10 @@ export default class stgClusterLeaderStack extends TerraformStack {
       name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
-      addressPrefixes: ['10.0.0.0/24']
+      addressPrefixes: ['10.1.0.0/24']
     });
 
-    const numberofLeaders = 3;
-    const nomadLeaderNames = fiveLetterNames.slice(0, numberofLeaders);
+    const numberofClients = 5;
 
     const sshPublicKeys: Array<string> = [];
     members.map(member => {
@@ -66,19 +65,18 @@ export default class stgClusterLeaderStack extends TerraformStack {
       });
     });
 
-    nomadLeaderNames.map((leaderName, index) => {
+    for (let index = 0; index < numberofClients; index++) {
       createVirtualMachine(this, {
         stackName: name,
-        vmName: `${env}-ldr-${leaderName}`,
+        vmName: `${env}-clt-${generateNanoid()}`,
         rg: rg,
         env: env,
-        size: 'Standard_D2s_v4',
         subnet: subnet,
-        privateIP: '10.0.0.' + (10 + index),
+        privateIP: '10.0.0.' + (20 + index),
         sshPublicKeys: sshPublicKeys,
         customImageId: `/subscriptions/${subscriptionId.stringValue}/resourceGroups/ops-rg-machine-images/providers/Microsoft.Compute/images/NOMAD-CONSUL-eastus-220718-1345`
       });
-    });
+    }
 
     // End of stack
   }

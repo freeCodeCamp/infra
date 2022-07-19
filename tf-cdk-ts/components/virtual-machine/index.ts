@@ -35,7 +35,7 @@ export const createVirtualMachine = (
     rg,
     subnet,
     env,
-    size: size = 'Standard_B2s',
+    size,
     privateIP: privateIP = undefined,
     sshPublicKeys: sshPublicKeys = [],
     customImageId: customImageId = undefined
@@ -93,7 +93,7 @@ export const createVirtualMachine = (
     // computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
     location: rg.location,
-    vmSize: size,
+    vmSize: size || 'Standard_B2s',
     osProfile: {
       computerName: vmName,
       adminUsername: adminUsername,

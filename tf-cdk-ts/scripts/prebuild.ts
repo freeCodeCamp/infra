@@ -16,6 +16,11 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { getSSHKeysForUsersOnGitHubTeam } from '../utils/github';
 
 (() => {
+  console.log(`
+
+    Starting third-party API Calls. This will take a few minutes. You should run this only in PRODUCTION mode or in CI/CD.
+
+  `);
   getSSHKeysForUsersOnGitHubTeam('freeCodeCamp', 'ops').then(keys => {
     mkdirSync(path.join(__dirname, `/data`), { recursive: true });
     writeFileSync(
