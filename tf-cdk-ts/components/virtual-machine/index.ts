@@ -74,7 +74,7 @@ export const createVirtualMachine = (
         privateIpAddressAllocation: privateIP ? 'Static' : 'Dynamic',
         privateIpAddress: privateIP,
         publicIpAddressId: allocatePublicIP
-          ? createPublicIp(stack, `${stackName}-${vmName}`, rg, env).id
+          ? createPublicIp(stack, stackName, vmName, rg, env).id
           : ''
       }
     ]

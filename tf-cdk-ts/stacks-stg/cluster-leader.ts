@@ -71,7 +71,7 @@ export default class stgClusterLeaderStack extends TerraformStack {
     nomadLeaderNames.map((leaderName, index) => {
       createVirtualMachine(this, {
         stackName: name,
-        vmName: `${env}-ldr-${leaderName}`,
+        vmName: `ldr-${leaderName}`,
         rg: rg,
         env: env,
         size: 'Standard_D2s_v4',

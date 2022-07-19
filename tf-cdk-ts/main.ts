@@ -35,11 +35,11 @@ createRemoteBackends(app, [
   // Staging Resources
   {
     stackConstruct: stgClusterLeaderStack,
-    stackConfig: { env: 'stg', name: 'cluster-ldr' }
+    stackConfig: { env: 'stg', name: 'dc-leaders' }
   },
   {
     stackConstruct: stgClusterClientStack,
-    stackConfig: { env: 'stg', name: 'cluster-clt' }
+    stackConfig: { env: 'stg', name: 'dc-clients' }
   }
   // {
   //   stackConstruct: stgMySQLDBStack,

@@ -68,7 +68,7 @@ export default class stgClusterClientStack extends TerraformStack {
     for (let index = 0; index < numberofClients; index++) {
       createVirtualMachine(this, {
         stackName: name,
-        vmName: `${env}-clt-${generateNanoid()}`,
+        vmName: `clt-${generateNanoid()}`,
         rg: rg,
         env: env,
         subnet: subnet,
