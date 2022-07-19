@@ -31,6 +31,8 @@
     "constructs": "10.1.62"
   },
   "devDependencies": {
+    "@azure/arm-compute": "19.1.0",
+    "@azure/identity": "2.1.0",
     "@octokit/core": "3.6.0",
     "@types/jest": "27.5.2",
     "@types/node": "17.0.21",

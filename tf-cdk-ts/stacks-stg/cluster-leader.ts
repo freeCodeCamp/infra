@@ -7,8 +7,9 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { fiveLetterNames } from '../config/constant-strings';
 import members from '../scripts/data/github-members.json';
+import { getLatestImage } from '../utils';
+import { fiveLetterNames } from '../config/constant-strings';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
@@ -66,6 +67,7 @@ export default class stgClusterLeaderStack extends TerraformStack {
       });
     });
 
+    const customImage = getLatestImage('NomadConsul', 'eastus');
     nomadLeaderNames.map((leaderName, index) => {
       createVirtualMachine(this, {
         stackName: name,
@@ -76,7 +78,7 @@ export default class stgClusterLeaderStack extends TerraformStack {
         subnet: subnet,
         privateIP: '10.0.0.' + (10 + index),
         sshPublicKeys: sshPublicKeys,
-        customImageId: `/subscriptions/${subscriptionId.stringValue}/resourceGroups/ops-rg-machine-images/providers/Microsoft.Compute/images/NOMAD-CONSUL-eastus-220718-1345`
+        customImageId: customImage.id
       });
     });
 

@@ -7,8 +7,8 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { generateNanoid } from '../utils/generators';
 import members from '../scripts/data/github-members.json';
+import { generateNanoid, getLatestImage } from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
@@ -56,8 +56,6 @@ export default class stgClusterClientStack extends TerraformStack {
       addressPrefixes: ['10.1.0.0/24']
     });
 
-    const numberofClients = 5;
-
     const sshPublicKeys: Array<string> = [];
     members.map(member => {
       member?.publicKeys?.forEach(key => {
@@ -65,6 +63,8 @@ export default class stgClusterClientStack extends TerraformStack {
       });
     });
 
+    const customImage = getLatestImage('NomadConsul', 'eastus');
+    const numberofClients = 5;
     for (let index = 0; index < numberofClients; index++) {
       createVirtualMachine(this, {
         stackName: name,
@@ -74,7 +74,7 @@ export default class stgClusterClientStack extends TerraformStack {
         subnet: subnet,
         privateIP: '10.0.0.' + (20 + index),
         sshPublicKeys: sshPublicKeys,
-        customImageId: `/subscriptions/${subscriptionId.stringValue}/resourceGroups/ops-rg-machine-images/providers/Microsoft.Compute/images/NOMAD-CONSUL-eastus-220718-1345`
+        customImageId: customImage.id
       });
     }
 

@@ -22,6 +22,7 @@ if (
 }
 
 const {
+  AZURE_SUBSCRIPTION_ID: azureSubscriptionId,
   SSH_PUBLIC_KEY: sshPublicKey,
   // GitHub Personal Access Token,
   // from a member belonging to the GitHub team,
@@ -35,6 +36,9 @@ const {
 } = process.env;
 
 // TODO: Add valiadtion for all required env variables
+
+export const azure_subscription_id: string =
+  String(azureSubscriptionId).toString();
 
 export const ssh_public_key: string = String(sshPublicKey).toString();
 
