@@ -23,7 +23,10 @@ if (
 
 const {
   SSH_PUBLIC_KEY: sshPublicKey,
-  GITHUB_PA_TOKEN: githubPAToken,
+  // GitHub Personal Access Token,
+  // from a member belonging to the GitHub team,
+  // whose public keys need to be imported.
+  PA_TOKEN_FROM_GITHUB: githubPAToken,
   BASE64_ENCODED_CUSTOM_DATA: customData,
   MYSQL_ADMIN_USERNAME: mysqlAdminUsername,
   MYSQL_ADMIN_PASSWORD: mysqlAdminPassword,

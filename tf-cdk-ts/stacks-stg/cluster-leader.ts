@@ -64,7 +64,7 @@ export default class stgClusterLeaderStack extends TerraformStack {
 
     const sshPublicKeys: Array<string> = [];
     members.map(member => {
-      member?.publicKeys.forEach(key => {
+      member?.publicKeys?.forEach(key => {
         sshPublicKeys.push(key);
       });
     });
