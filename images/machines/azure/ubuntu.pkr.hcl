@@ -56,7 +56,7 @@ variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
 variable "vm_size" { default = "Standard_B2s" }
-variable "ssh_username" { default = "freecodecamp" }
+variable "ssh_username" { default = "packer" } # This is the default username for provisioning and will be deleted after the build.
 
 # TODO: These should be configurable via environment variables.
 variable "scripts_dir" { default = "images/machines/scripts" }
@@ -93,9 +93,9 @@ source "azure-arm" "ubuntu" {
   azure_tags = {
     "ops-created-by"    = "packer"
     "ops-image-type"    = var.artifact_image_type
-    "ops-vm-size"       = var.vm_size
-    "ops-vm-location"   = var.location
-    "ops-vm-buildchain" = "${local.artifact_name}-from-${var.image_sku}"
+    "ops-build-vm-size" = var.vm_size
+    "ops-location"      = var.location
+    "ops-image-source"  = var.image_sku
   }
 
 }

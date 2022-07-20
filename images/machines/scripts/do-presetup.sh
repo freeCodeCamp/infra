@@ -17,18 +17,18 @@ logger() {
 
 logger "Executing"
 
-logger "Update the box"
+logger "Update the base operating system"
 apt-get -y update
 apt-get -y upgrade
 
 logger "Install common dependencies"
-apt-get -y install build-essential 
-apt-get -y install curl 
-apt-get -y install git 
+apt-get -y install build-essential
+apt-get -y install curl
+apt-get -y install git
 apt-get -y install jq
 apt-get -y install software-properties-common
-apt-get -y install tar 
-apt-get -y install unzip 
-apt-get -y install zip 
+apt-get -y install tar
+apt-get -y install unzip
+apt-get -y install zip
 
 logger "Completed"
