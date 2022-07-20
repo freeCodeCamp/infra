@@ -49,12 +49,12 @@ logger "Completed"
 # Footnotes:
 #
 #     [1]
-#     The config files for server and client are available below
-#     and can be moved during provisioning:
+#     Copy configurations for servers and clients during provisioning.
 #
-#     /tmp/nomad/server.hcl
-#     /tmp/nomad/client.hcl
+#     /etc/nomad.d/server.hcl
+#     /etc/nomad.d/client.hcl
 #
+#     [2]
 #     Services can be started with:
 #
 #     systemctl enable nomad
@@ -62,6 +62,6 @@ logger "Completed"
 #     systemctl status nomad
 #
 #
-#     [2]
+#     [3]
 #     Files marked with ": <---- PreUpload" are uploaded
 #     as a part of the build.
