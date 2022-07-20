@@ -7,8 +7,11 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import members from '../scripts/data/github-members.json';
-import { generateNanoid, getLatestImage } from '../utils';
+import {
+  generateNanoid,
+  getLatestImage,
+  getSSHPublicKeysListArray
+} from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
@@ -56,13 +59,6 @@ export default class stgClusterClientStack extends TerraformStack {
       addressPrefixes: ['10.1.0.0/24']
     });
 
-    const sshPublicKeys: Array<string> = [];
-    members.map(member => {
-      member?.publicKeys?.forEach(key => {
-        sshPublicKeys.push(key);
-      });
-    });
-
     const customImage = getLatestImage('NomadConsul', 'eastus');
     const numberofClients = 5;
     for (let index = 0; index < numberofClients; index++) {
@@ -73,7 +69,7 @@ export default class stgClusterClientStack extends TerraformStack {
         env: env,
         subnet: subnet,
         privateIP: '10.0.0.' + (20 + index),
-        sshPublicKeys: sshPublicKeys,
+        sshPublicKeys: getSSHPublicKeysListArray(),
         customImageId: customImage.id
       });
     }

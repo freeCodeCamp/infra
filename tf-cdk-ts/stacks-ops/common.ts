@@ -10,7 +10,7 @@ import {
 
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';
-import members from '../scripts/data/github-members.json';
+import { importSSHPublicKeyMembers } from '../utils';
 
 export default class CommonStack extends TerraformStack {
   constructor(
@@ -40,23 +40,25 @@ export default class CommonStack extends TerraformStack {
     });
 
     // Create SSH keys for all members of the ops team
-    members.forEach((member: { username: string; publicKeys: string[] }) => {
-      // console.log(`Creating SSH keys for ${member?.username}`);
-      member?.publicKeys.forEach((key, index) => {
-        // console.log(
-        //   `Key ${index + 1}: ${key.slice(0, 20)}...${key.slice(-20)}`
-        // );
-        const sshPublicKeyIdentifier = `${env}-ssh-key-${member.username}-${
-          index + 1
-        }`;
-        new SshPublicKey(this, sshPublicKeyIdentifier, {
-          name: sshPublicKeyIdentifier,
-          resourceGroupName: rg.name,
-          location: rg.location,
-          publicKey: key
+    importSSHPublicKeyMembers().forEach(
+      (member: { username: string; publicKeys: string[] }) => {
+        // console.log(`Creating SSH keys for ${member?.username}`);
+        member?.publicKeys.forEach((key, index) => {
+          // console.log(
+          //   `Key ${index + 1}: ${key.slice(0, 20)}...${key.slice(-20)}`
+          // );
+          const sshPublicKeyIdentifier = `${env}-ssh-key-${member.username}-${
+            index + 1
+          }`;
+          new SshPublicKey(this, sshPublicKeyIdentifier, {
+            name: sshPublicKeyIdentifier,
+            resourceGroupName: rg.name,
+            location: rg.location,
+            publicKey: key
+          });
         });
-      });
-    });
+      }
+    );
 
     // Create Private DNS Zones for each domain
     tlds?.forEach((tld: string) => {

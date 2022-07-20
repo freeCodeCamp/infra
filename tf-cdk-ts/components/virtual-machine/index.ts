@@ -10,8 +10,6 @@ import {
 
 import { createPublicIp } from '../public-ip';
 
-import { custom_data } from '../../config/env';
-
 interface fCCVirtualMachineConfig {
   stackName: string;
   vmName: string;
@@ -22,7 +20,22 @@ interface fCCVirtualMachineConfig {
   privateIP?: string | undefined;
   sshPublicKeys?: Array<string> | undefined;
   customImageId?: string | undefined;
+  customData?: string | undefined;
 }
+
+// This is a fallback when custom data is not provided.
+const defaultCustomData = Buffer.from(
+  `#cloud-config
+users:
+  - name: freecodecamp
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_import_id:
+      - gh:camperbot
+final_message: 'Setup complete'
+`
+).toString('base64');
 
 export const createVirtualMachine = (
   stack: Construct,
@@ -38,7 +51,8 @@ export const createVirtualMachine = (
     size,
     privateIP: privateIP = undefined,
     sshPublicKeys: sshPublicKeys = [],
-    customImageId: customImageId = undefined
+    customImageId: customImageId = undefined,
+    customData: customData = defaultCustomData
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -97,8 +111,7 @@ export const createVirtualMachine = (
     osProfile: {
       computerName: vmName,
       adminUsername: adminUsername,
-      // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
-      customData: custom_data
+      customData: customData
     },
     osProfileLinuxConfig: {
       disablePasswordAuthentication: true,

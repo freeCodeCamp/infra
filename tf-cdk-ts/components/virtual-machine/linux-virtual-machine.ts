@@ -10,7 +10,7 @@ import {
 
 import { createPublicIp } from '../public-ip';
 
-import { ssh_public_key, custom_data } from '../../config/env';
+import { ssh_public_key } from '../../config/env';
 
 interface fCCVirtualMachineConfig {
   stackName: string;
@@ -20,8 +20,21 @@ interface fCCVirtualMachineConfig {
   env: string;
   size?: string | undefined;
   privateIP?: string | undefined;
+  customData?: string | undefined;
 }
 
+const defaultCustomData = Buffer.from(
+  `#cloud-config
+users:
+  - name: freecodecamp
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_import_id:
+      - gh:camperbot
+final_message: 'Setup complete'
+`
+).toString('base64');
 export const createLinuxVirtualMachine = (
   stack: Construct,
   config: fCCVirtualMachineConfig,
@@ -34,7 +47,8 @@ export const createLinuxVirtualMachine = (
     subnet,
     env,
     size: size = 'Standard_B2s',
-    privateIP: privateIP = undefined
+    privateIP: privateIP = undefined,
+    customData: customData = defaultCustomData
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -108,7 +122,6 @@ export const createLinuxVirtualMachine = (
       sku: '18.04-LTS',
       version: 'latest'
     },
-    // https://github.com/freeCodeCamp/infra/blob/master/cloud-init/basic.yaml
-    customData: custom_data
+    customData: customData
   });
 };

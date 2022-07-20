@@ -7,14 +7,14 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import members from '../scripts/data/github-members.json';
-import { getLatestImage } from '../utils';
+import { custom_data } from '../config/env';
 import { fiveLetterNames } from '../config/constant-strings';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
+import { getLatestImage, getSSHPublicKeysListArray } from '../utils';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
-export default class stgClusterLeaderStack extends TerraformStack {
+export default class stgClusterServerStack extends TerraformStack {
   constructor(
     scope: Construct,
     tfConstructName: string,
@@ -57,28 +57,22 @@ export default class stgClusterLeaderStack extends TerraformStack {
       addressPrefixes: ['10.0.0.0/24']
     });
 
-    const numberofLeaders = 3;
-    const nomadLeaderNames = fiveLetterNames.slice(0, numberofLeaders);
-
-    const sshPublicKeys: Array<string> = [];
-    members.map(member => {
-      member?.publicKeys?.forEach(key => {
-        sshPublicKeys.push(key);
-      });
-    });
+    const numberofServers = 3;
+    const nomadServerNames = fiveLetterNames.slice(0, numberofServers);
 
     const customImage = getLatestImage('NomadConsul', 'eastus');
-    nomadLeaderNames.map((leaderName, index) => {
+    nomadServerNames.map((serverName, index) => {
       createVirtualMachine(this, {
         stackName: name,
-        vmName: `ldr-${leaderName}`,
+        vmName: `ldr-${serverName}`,
         rg: rg,
         env: env,
         size: 'Standard_D2s_v4',
         subnet: subnet,
         privateIP: '10.0.0.' + (10 + index),
-        sshPublicKeys: sshPublicKeys,
-        customImageId: customImage.id
+        sshPublicKeys: getSSHPublicKeysListArray(),
+        customImageId: customImage.id,
+        customData: custom_data
       });
     });
 
