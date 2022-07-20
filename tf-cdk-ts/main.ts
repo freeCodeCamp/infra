@@ -9,8 +9,8 @@ import opsCommonStack from './stacks-ops/common';
 
 // Staging Resources
 // import stgMySQLDBStack from './stacks-stg/mysql-db';
-import stgClusterLeaderStack from './stacks-stg/cluster-leader';
-import stgClusterClientStack from './stacks-stg/cluster-client';
+import stgClusterLeaderStack from './stacks-stg/cluster-leaders';
+import stgClusterClientStack from './stacks-stg/cluster-clients';
 
 // Production Resources
 // import prdMySQLDBStack from './stacks-prd/mysql-db';
