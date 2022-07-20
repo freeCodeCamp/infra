@@ -7,33 +7,33 @@ packer {
   }
 }
 
-variable "az_sp_client_id" {
-  default   = env("AZURE_SERVICE_PRINCIPAL_CLIENT_ID")
+variable "az_client_id" {
+  default   = env("AZURE_CLIENT_ID")
   sensitive = true
 
   validation {
-    condition     = length(var.az_sp_client_id) > 0
-    error_message = "The environment variable AZURE_SERVICE_PRINCIPAL_CLIENT_ID is not set."
+    condition     = length(var.az_client_id) > 0
+    error_message = "The environment variable AZURE_CLIENT_ID is not set."
   }
 }
 
-variable "az_sp_client_secret" {
-  default   = env("AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET")
+variable "az_client_secret" {
+  default   = env("AZURE_CLIENT_SECRET")
   sensitive = true
 
   validation {
-    condition     = length(var.az_sp_client_secret) > 0
-    error_message = "The environment variable AZURE_SERVICE_PRINCIPAL_CLIENT_SECRET is not set."
+    condition     = length(var.az_client_secret) > 0
+    error_message = "The environment variable AZURE_CLIENT_SECRET is not set."
   }
 }
 
-variable "az_sp_tenant_id" {
-  default   = env("AZURE_SERVICE_PRINCIPAL_TENANT_ID")
+variable "az_tenant_id" {
+  default   = env("AZURE_TENANT_ID")
   sensitive = true
 
   validation {
-    condition     = length(var.az_sp_tenant_id) > 0
-    error_message = "The environment variable AZURE_SERVICE_PRINCIPAL_TENANT_ID is not set."
+    condition     = length(var.az_tenant_id) > 0
+    error_message = "The environment variable AZURE_TENANT_ID is not set."
   }
 }
 
@@ -72,9 +72,9 @@ source "azure-arm" "ubuntu" {
   async_resourcegroup_delete = true
 
   subscription_id = var.az_subscription_id
-  tenant_id       = var.az_sp_tenant_id
-  client_secret   = var.az_sp_client_secret
-  client_id       = var.az_sp_client_id
+  tenant_id       = var.az_tenant_id
+  client_secret   = var.az_client_secret
+  client_id       = var.az_client_id
 
   image_offer     = var.image_offer
   image_publisher = var.image_publisher
