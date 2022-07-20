@@ -30,9 +30,9 @@ mkdir --parents /opt/nomad
 chown --recursive nomad:nomad /opt/nomad
 
 # Sytemd config
-cp \
-  /tmp/nomad/nomad.service \
-  /etc/systemd/system/nomad.service # : <---- PreUpload
+# cp \
+#   /tmp/nomad/nomad.service \
+#   /etc/systemd/system/nomad.service # : <---- PreUpload
 
 # Common config
 mkdir --parents /etc/nomad.d
