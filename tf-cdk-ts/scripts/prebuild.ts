@@ -13,7 +13,7 @@
 
 import path from 'path';
 import { writeFileSync, mkdirSync } from 'fs';
-import { azure_subscription_id } from '../config/env';
+import { AZURE_SUBSCRIPTION_ID } from '../config/env';
 import { getSSHKeysForUsersOnGitHubTeam } from './github';
 import { listAllVirtualMachineImagesInASubscription } from './azure';
 
@@ -34,7 +34,7 @@ import { listAllVirtualMachineImagesInASubscription } from './azure';
     })
     .catch(console.error);
 
-  listAllVirtualMachineImagesInASubscription(azure_subscription_id)
+  listAllVirtualMachineImagesInASubscription(AZURE_SUBSCRIPTION_ID)
     .then(list => {
       mkdirSync(path.join(__dirname, `/data`), { recursive: true });
       writeFileSync(

@@ -1,8 +1,8 @@
 import { Octokit } from '@octokit/core';
-import { github_pa_token } from '../config/env';
+import { PA_TOKEN_FROM_GITHUB } from '../config/env';
 
 const octokit = new Octokit({
-  auth: github_pa_token
+  auth: PA_TOKEN_FROM_GITHUB
 });
 
 interface keyMap {

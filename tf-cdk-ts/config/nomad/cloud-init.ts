@@ -1,4 +1,4 @@
-import { custom_data } from '../env';
+import { BASE64_ENCODED_CUSTOM_DATA } from '../env';
 import { getCloudAutoJoinString, VMList } from '../../utils';
 
 //
@@ -7,7 +7,7 @@ import { getCloudAutoJoinString, VMList } from '../../utils';
 
 export const getCloudInitForNomadServers = (serverList: Array<VMList>) => {
   return Buffer.from(
-    `${Buffer.from(custom_data, 'base64').toString('ascii')}
+    `${Buffer.from(BASE64_ENCODED_CUSTOM_DATA, 'base64').toString('ascii')}
 write_files:
   - path: '/etc/nomad.d/server.hcl'
     owner: nomad:nomad
@@ -56,7 +56,7 @@ runcmd:
 export const getCloudInitForNomadClient =
   (/*serverList: Array<ServerList>*/) => {
     return Buffer.from(
-      `${Buffer.from(custom_data, 'base64').toString('ascii')}
+      `${Buffer.from(BASE64_ENCODED_CUSTOM_DATA, 'base64').toString('ascii')}
 write_files:
   - path: '/etc/nomad.d/client.hcl'
     owner: nomad:nomad

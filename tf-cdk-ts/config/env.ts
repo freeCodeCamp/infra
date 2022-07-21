@@ -41,27 +41,24 @@ const {
 
 // TODO: Add valiadtion for all required env variables
 
-export const azure_subscription_id: string =
-  String(azureSubscriptionId).toString();
-
-export const ssh_public_key: string = String(sshPublicKey).toString();
-
-export const github_pa_token: string = githubPAToken
+export const PA_TOKEN_FROM_GITHUB: string = githubPAToken
   ? String(githubPAToken).toString()
   : '';
 
-export const custom_data: string = String(customData).toString();
+export const AZURE_SUBSCRIPTION_ID: string =
+  String(azureSubscriptionId).toString();
 
-export const mysql_admin_username: string =
+export const SSH_PUBLIC_KEY: string = String(sshPublicKey).toString();
+export const BASE64_ENCODED_CUSTOM_DATA: string = String(customData).toString();
+
+export const MYSQL_ADMIN_USERNAME: string =
   String(mysqlAdminUsername).toString();
-
-export const mysql_admin_password: string =
+export const MYSQL_ADMIN_PASSWORD: string =
   String(mysqlAdminPassword).toString();
 
-export const mysql_fs_sku: string = mysqlFsSku
+export const MYSQL_FS_SKU: string = mysqlFsSku
   ? String(mysqlFsSku).toString()
   : 'B_Standard_B2s';
-
-export const mysql_fs_backup_retention_days: number = mysqlFsBackupRetentionDays
+export const MYSQL_FS_BACKUP_RETENTION_DAYS: number = mysqlFsBackupRetentionDays
   ? Number(mysqlFsBackupRetentionDays)
   : 7;

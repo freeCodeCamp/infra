@@ -10,7 +10,7 @@ import {
 
 import { createPublicIp } from '../public-ip';
 
-import { ssh_public_key } from '../../config/env';
+import { SSH_PUBLIC_KEY } from '../../config/env';
 
 interface fCCVirtualMachineConfig {
   stackName: string;
@@ -120,7 +120,7 @@ export const createLinuxVirtualMachine = (
     adminSshKey: [
       {
         username: 'freecodecamp',
-        publicKey: ssh_public_key
+        publicKey: SSH_PUBLIC_KEY
       }
     ],
     networkInterfaceIds: [ni.id],

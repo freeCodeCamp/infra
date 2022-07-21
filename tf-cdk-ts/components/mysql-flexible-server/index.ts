@@ -4,7 +4,7 @@ import {
   MysqlFlexibleServerConfig
 } from '@cdktf/provider-azurerm';
 
-import { mysql_admin_username, mysql_admin_password } from '../../config/env';
+import { MYSQL_ADMIN_USERNAME, MYSQL_ADMIN_PASSWORD } from '../../config/env';
 
 export const createMysqlFlexibleServer = (
   scope: Construct,
@@ -41,8 +41,8 @@ export const createMysqlFlexibleServer = (
       sizeGb: config.storage?.sizeGb || 20
     },
     version: '5.7',
-    administratorLogin: mysql_admin_username,
-    administratorPassword: mysql_admin_password,
+    administratorLogin: MYSQL_ADMIN_USERNAME,
+    administratorPassword: MYSQL_ADMIN_PASSWORD,
 
     backupRetentionDays: 7
   });
