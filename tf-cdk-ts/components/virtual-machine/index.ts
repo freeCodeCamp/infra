@@ -21,6 +21,8 @@ interface fCCVirtualMachineConfig {
   sshPublicKeys?: Array<string> | undefined;
   customImageId?: string | undefined;
   customData?: string | undefined;
+  vmTypeTag?: string | undefined;
+  createDnsARecord?: boolean | undefined;
 }
 
 // This is a fallback when custom data is not provided.
@@ -52,7 +54,9 @@ export const createVirtualMachine = (
     privateIP: privateIP = undefined,
     sshPublicKeys: sshPublicKeys = [],
     customImageId: customImageId = undefined,
-    customData: customData = defaultCustomData
+    customData: customData = defaultCustomData,
+    vmTypeTag: vmTypeTag = `${env}-vm`,
+    createDnsARecord = true
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -88,7 +92,8 @@ export const createVirtualMachine = (
         privateIpAddressAllocation: privateIP ? 'Static' : 'Dynamic',
         privateIpAddress: privateIP,
         publicIpAddressId: allocatePublicIP
-          ? createPublicIp(stack, stackName, vmName, rg, env).id
+          ? createPublicIp(stack, stackName, vmName, rg, env, createDnsARecord)
+              .id
           : ''
       }
     ]
@@ -107,6 +112,9 @@ export const createVirtualMachine = (
     // computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
     location: rg.location,
+    tags: {
+      'vm-type': vmTypeTag
+    },
     vmSize: size || 'Standard_B2s',
     osProfile: {
       computerName: vmName,

@@ -6,24 +6,28 @@ export const createPublicIp = (
   stackName: string,
   vmName: string,
   rg: ResourceGroup,
-  env: string
+  env: string,
+  createDnsARecord = true
 ) => {
   const pubIp = new PublicIp(stack, `${env}-ip-${stackName}-${vmName}`, {
     name: `${env}-ip-${stackName}-${vmName}`,
     resourceGroupName: rg.name,
     location: rg.location,
     allocationMethod: 'Static',
-    sku: 'Standard'
+    sku: 'Standard',
+    domainNameLabel: `${env}-${vmName}-${stackName}`
   });
 
-  new DnsARecord(stack, `${env}-dns-a-record-${stackName}-${vmName}`, {
-    name: String(`${vmName}.${stackName}`),
-    resourceGroupName: 'ops-rg-common',
-    zoneName:
-      env === 'prd' ? 'pubdns.freecodecamp.org' : 'pubdns.freecodecamp.dev',
-    ttl: 60,
-    targetResourceId: pubIp.id
-  });
+  if (createDnsARecord) {
+    new DnsARecord(stack, `${env}-dns-a-record-${stackName}-${vmName}`, {
+      name: `${vmName}.${stackName}`,
+      resourceGroupName: 'ops-rg-common',
+      zoneName:
+        env === 'prd' ? 'pubdns.freecodecamp.org' : 'pubdns.freecodecamp.dev',
+      ttl: 60,
+      targetResourceId: pubIp.id
+    });
+  }
 
   return pubIp;
 };
