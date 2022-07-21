@@ -16,13 +16,14 @@ interface fCCVirtualMachineConfig {
   rg: ResourceGroup;
   subnet: Subnet;
   env: string;
-  size?: string | undefined;
-  privateIP?: string | undefined;
+  privateIP?: string;
+  size?: string;
   sshPublicKeys?: Array<string> | undefined;
-  customImageId?: string | undefined;
-  customData?: string | undefined;
-  vmTypeTag?: string | undefined;
-  createDnsARecord?: boolean | undefined;
+  customImageId?: string;
+  customData?: string;
+  vmTypeTag?: string;
+  allocatePublicIP?: boolean;
+  createPublicDnsARecord?: boolean;
 }
 
 // This is a fallback when custom data is not provided.
@@ -41,8 +42,7 @@ final_message: 'Setup complete'
 
 export const createVirtualMachine = (
   stack: Construct,
-  config: fCCVirtualMachineConfig,
-  allocatePublicIP = true
+  config: fCCVirtualMachineConfig
 ) => {
   const {
     stackName,
@@ -56,7 +56,8 @@ export const createVirtualMachine = (
     customImageId: customImageId = undefined,
     customData: customData = defaultCustomData,
     vmTypeTag: vmTypeTag = `${env}-vm`,
-    createDnsARecord = true
+    allocatePublicIP = true,
+    createPublicDnsARecord = true
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -92,8 +93,14 @@ export const createVirtualMachine = (
         privateIpAddressAllocation: privateIP ? 'Static' : 'Dynamic',
         privateIpAddress: privateIP,
         publicIpAddressId: allocatePublicIP
-          ? createPublicIp(stack, stackName, vmName, rg, env, createDnsARecord)
-              .id
+          ? createPublicIp(
+              stack,
+              stackName,
+              vmName,
+              rg,
+              env,
+              createPublicDnsARecord
+            ).id
           : ''
       }
     ]

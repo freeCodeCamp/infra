@@ -81,7 +81,7 @@ export default class stgClusterServerStack extends TerraformStack {
         customImageId,
         customData,
         vmTypeTag,
-        createDnsARecord: false
+        createPublicDnsARecord: false
       });
     });
 
