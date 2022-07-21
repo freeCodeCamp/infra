@@ -72,11 +72,12 @@ export default class stgClusterClientStack extends TerraformStack {
         rg: rg,
         env: env,
         subnet: subnet,
-        privateIP: '10.0.0.' + (200 + index),
+        // privateIP: '10.0.0.' + (200 + index),
         sshPublicKeys: getSSHPublicKeysListArray(),
         customImageId,
         vmTypeTag,
-        customData
+        customData,
+        createBeforeDestroy: true
       });
     }
 

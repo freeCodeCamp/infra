@@ -24,6 +24,7 @@ interface fCCVirtualMachineConfig {
   vmTypeTag?: string;
   allocatePublicIP?: boolean;
   createPublicDnsARecord?: boolean;
+  createBeforeDestroy?: boolean;
 }
 
 // This is a fallback when custom data is not provided.
@@ -57,7 +58,8 @@ export const createVirtualMachine = (
     customData: customData = defaultCustomData,
     vmTypeTag: vmTypeTag = `${env}-vm`,
     allocatePublicIP = true,
-    createPublicDnsARecord = true
+    createPublicDnsARecord = true,
+    createBeforeDestroy = false
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -119,6 +121,9 @@ export const createVirtualMachine = (
   const adminUsername = 'freecodecamp';
   return new VirtualMachine(stack, vmIdentifier, {
     dependsOn: [ni, nsg],
+    lifecycle: {
+      createBeforeDestroy
+    },
     name: vmIdentifier,
     // computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
