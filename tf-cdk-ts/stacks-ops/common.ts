@@ -51,6 +51,7 @@ export default class CommonStack extends TerraformStack {
             index + 1
           }`;
           new SshPublicKey(this, sshPublicKeyIdentifier, {
+            dependsOn: [rg],
             name: sshPublicKeyIdentifier,
             resourceGroupName: rg.name,
             location: rg.location,

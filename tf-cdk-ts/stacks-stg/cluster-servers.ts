@@ -46,6 +46,7 @@ export default class stgClusterServerStack extends TerraformStack {
 
     const vnetIdentifier = `${env}-vnet-${name}`;
     const vnet = new VirtualNetwork(this, vnetIdentifier, {
+      dependsOn: [rg],
       name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
@@ -54,36 +55,40 @@ export default class stgClusterServerStack extends TerraformStack {
 
     const subnetIdentifier = `${env}-subnet-${name}`;
     const subnet = new Subnet(this, subnetIdentifier, {
+      dependsOn: [vnet],
       name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
       addressPrefixes: ['10.0.0.0/24']
     });
 
-    // Change the range of the array to match the number of servers you want to create
-    const startIndex = 0;
-    const numberOfServers = 3;
-    const serverList = getServerList(startIndex, numberOfServers);
-    const customImageId = getLatestImage('NomadConsul', 'eastus').id;
-    const vmTypeTag = `${env}-nomad-server`;
-    const customData = getCloudInitForNomadServers(serverList);
+    const disabled = false; // Change this to quickly delete only the VMs
+    if (!disabled) {
+      // Change the range of the array to match the number of servers you want to create
+      const startIndex = 0;
+      const numberOfServers = 3;
+      const serverList = getServerList(startIndex, numberOfServers);
+      const customImageId = getLatestImage('NomadConsul', 'eastus').id;
+      const vmTypeTag = `${env}-nomad-server`;
+      const customData = getCloudInitForNomadServers(serverList);
 
-    serverList.forEach(({ serverName, serverPrivateIP }) => {
-      createVirtualMachine(this, {
-        stackName: name,
-        vmName: `ldr-${serverName}`,
-        rg: rg,
-        env: env,
-        size: 'Standard_B2s',
-        subnet: subnet,
-        privateIP: serverPrivateIP,
-        sshPublicKeys: getSSHPublicKeysListArray(),
-        customImageId,
-        customData,
-        vmTypeTag,
-        createPublicDnsARecord: false
+      serverList.forEach(({ serverName, serverPrivateIP }) => {
+        createVirtualMachine(this, {
+          stackName: name,
+          vmName: `ldr-${serverName}`,
+          rg: rg,
+          env: env,
+          size: 'Standard_B2s',
+          subnet: subnet,
+          privateIP: serverPrivateIP,
+          sshPublicKeys: getSSHPublicKeysListArray(),
+          customImageId,
+          customData,
+          vmTypeTag,
+          createPublicDnsARecord: false
+        });
       });
-    });
+    }
 
     // End of stack
   }

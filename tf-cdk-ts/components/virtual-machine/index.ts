@@ -62,6 +62,7 @@ export const createVirtualMachine = (
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
   const nsg = new NetworkSecurityGroup(stack, nsgIdentifier, {
+    dependsOn: [rg],
     name: nsgIdentifier,
     resourceGroupName: rg.name,
     location: rg.location,
@@ -82,6 +83,7 @@ export const createVirtualMachine = (
 
   const niIdentifier = `${env}-ni-${vmName}`;
   const ni = new NetworkInterface(stack, niIdentifier, {
+    dependsOn: [nsg],
     name: niIdentifier,
     resourceGroupName: rg.name,
     location: rg.location,
@@ -108,6 +110,7 @@ export const createVirtualMachine = (
 
   // Attach the security group to the network interface
   new NetworkInterfaceSecurityGroupAssociation(stack, `${env}-nsga-${vmName}`, {
+    dependsOn: [ni],
     networkInterfaceId: ni.id,
     networkSecurityGroupId: nsg.id
   });
@@ -115,6 +118,7 @@ export const createVirtualMachine = (
   const vmIdentifier = `${env}-vm-${vmName}`;
   const adminUsername = 'freecodecamp';
   return new VirtualMachine(stack, vmIdentifier, {
+    dependsOn: [ni, nsg],
     name: vmIdentifier,
     // computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,

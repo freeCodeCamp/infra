@@ -10,6 +10,7 @@ export const createPublicIp = (
   createDnsARecord = true
 ) => {
   const pubIp = new PublicIp(stack, `${env}-ip-${stackName}-${vmName}`, {
+    dependsOn: [rg],
     name: `${env}-ip-${stackName}-${vmName}`,
     resourceGroupName: rg.name,
     location: rg.location,
@@ -20,6 +21,7 @@ export const createPublicIp = (
 
   if (createDnsARecord) {
     new DnsARecord(stack, `${env}-dns-a-record-${stackName}-${vmName}`, {
+      dependsOn: [pubIp],
       name: `${vmName}.${stackName}`,
       resourceGroupName: 'ops-rg-common',
       zoneName:

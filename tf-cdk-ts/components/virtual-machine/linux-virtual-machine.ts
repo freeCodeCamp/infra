@@ -53,6 +53,7 @@ export const createLinuxVirtualMachine = (
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
   const nsg = new NetworkSecurityGroup(stack, nsgIdentifier, {
+    dependsOn: [rg],
     name: nsgIdentifier,
     resourceGroupName: rg.name,
     location: rg.location,
@@ -73,6 +74,7 @@ export const createLinuxVirtualMachine = (
 
   const niIdentifier = `${env}-ni-${vmName}`;
   const ni = new NetworkInterface(stack, niIdentifier, {
+    dependsOn: [nsg],
     name: niIdentifier,
     resourceGroupName: rg.name,
     location: rg.location,
@@ -92,12 +94,14 @@ export const createLinuxVirtualMachine = (
 
   // Attach the security group to the network interface
   new NetworkInterfaceSecurityGroupAssociation(stack, `${env}-nsga-${vmName}`, {
+    dependsOn: [ni, nsg],
     networkInterfaceId: ni.id,
     networkSecurityGroupId: nsg.id
   });
 
   const vmIdentifier = `${env}-vm-${vmName}`;
   return new LinuxVirtualMachine(stack, vmIdentifier, {
+    dependsOn: [ni, nsg],
     name: vmIdentifier,
     computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
