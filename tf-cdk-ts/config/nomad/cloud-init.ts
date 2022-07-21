@@ -1,11 +1,11 @@
 import { custom_data } from '../env';
-import { getCloudAutoJoinString, ServerList } from '../../utils';
+import { getCloudAutoJoinString, VMList } from '../../utils';
 
 //
 // Decode the cloud-init script, append more customization and encode it again
 //
 
-export const getCloudInitForNomadServers = (serverList: Array<ServerList>) => {
+export const getCloudInitForNomadServers = (serverList: Array<VMList>) => {
   return Buffer.from(
     `${Buffer.from(custom_data, 'base64').toString('ascii')}
 write_files:

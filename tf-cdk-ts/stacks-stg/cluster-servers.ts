@@ -7,11 +7,7 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import {
-  getLatestImage,
-  getServerList,
-  getSSHPublicKeysListArray
-} from '../utils';
+import { getLatestImage, getVMList, getSSHPublicKeysListArray } from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { getCloudInitForNomadServers } from '../config/nomad/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
@@ -64,15 +60,17 @@ export default class stgClusterServerStack extends TerraformStack {
 
     const disabled = false; // Change this to quickly delete only the VMs
     if (!disabled) {
-      // Change the range of the array to match the number of servers you want to create
-      const startIndex = 0;
-      const numberOfServers = 3;
-      const serverList = getServerList(startIndex, numberOfServers);
+      const numberOfVMs = 3;
+
+      // This will cycle the VMs through the year.
+      const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
+
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
       const vmTypeTag = `${env}-nomad-server`;
+      const serverList = getVMList({ vmTypeTag, numberOfVMs, startIndex });
       const customData = getCloudInitForNomadServers(serverList);
 
-      serverList.forEach(({ serverName, serverPrivateIP }) => {
+      serverList.forEach(({ name: serverName, privateIP }) => {
         createVirtualMachine(this, {
           stackName: name,
           vmName: `ldr-${serverName}`,
@@ -80,12 +78,12 @@ export default class stgClusterServerStack extends TerraformStack {
           env: env,
           size: 'Standard_B2s',
           subnet: subnet,
-          privateIP: serverPrivateIP,
+          privateIP,
           sshPublicKeys: getSSHPublicKeysListArray(),
           customImageId,
           customData,
           vmTypeTag,
-          createPublicDnsARecord: false
+          allocatePublicIP: false
         });
       });
     }

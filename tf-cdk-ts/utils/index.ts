@@ -1,11 +1,10 @@
-import { customAlphabet } from 'nanoid';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-
-import { fiveLetterNames } from '../config/constant-strings';
+import { customAlphabet } from 'nanoid';
+import { uniqueNamesGenerator, colors, animals } from 'unique-names-generator';
 
 //
-// Working with random IDs
+// Working with random IDs & Names
 //
 const alphabet =
   '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -123,39 +122,48 @@ export const getLatestImage = (imageType: string, location: string) => {
 };
 
 //
-// Working with Server Lists
+// Working with VM Lists
 //
-export type ServerList = {
-  serverName: string;
-  serverPrivateIP: string;
+export type VMList = {
+  name: string;
+  privateIP: string;
 };
-export const getServerList = (
-  startIndex: number,
-  numberOfServers: number
-): Array<ServerList> => {
-  if (startIndex > fiveLetterNames.length - numberOfServers) {
-    throw new Error(`
-
-    Error: Not enough names in the server name list, recheck the start index.
-
-    `);
-  }
-  const serversList = [];
-  for (let i = startIndex; i < startIndex + numberOfServers; i++) {
-    serversList.push({
-      serverName: fiveLetterNames[i],
-      serverPrivateIP: `10.0.0.${(startIndex + 1) * 10 + (i + 1)}`
+// If numberOfVMs = 5 & suffix = 20 VM IPs like 10.0.0.21-10.0.0.25 and so on
+// Adjust the startIndex to churn through the IPs
+export const getVMList = ({
+  vmTypeTag,
+  numberOfVMs,
+  prefix = '10.0.0.',
+  suffix = 10,
+  startIndex = 1
+}: {
+  vmTypeTag: string;
+  numberOfVMs: number;
+  prefix?: string;
+  suffix?: number;
+  startIndex?: number;
+}): Array<VMList> => {
+  const machinesList = [];
+  for (let i = startIndex; i < startIndex + numberOfVMs; i++) {
+    machinesList.push({
+      name: uniqueNamesGenerator({
+        dictionaries: [colors, animals],
+        length: 2,
+        separator: '-',
+        style: 'lowerCase',
+        seed: vmTypeTag + i // Create a unique but deterministic name for a VM
+      }),
+      privateIP: `${prefix}${suffix + i}`
     });
   }
-  return serversList;
+  // console.log(machinesList);
+  return machinesList;
 };
 
-export const getCloudAutoJoinString = (
-  serverList: Array<ServerList>
-): string => {
+export const getCloudAutoJoinString = (serverList: Array<VMList>): string => {
   const cloudAutoJoinString = `"${serverList
     .map(server => {
-      return server.serverPrivateIP;
+      return server.privateIP;
     })
     .join('","')}"`;
   return cloudAutoJoinString;

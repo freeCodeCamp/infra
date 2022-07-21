@@ -21,15 +21,3 @@ export const languages: Array<string> = [
   'ukr', // Ukrainian
   'urd' // Urdu
 ];
-
-export const fiveLetterNames: Array<string> = [
-  'metis',
-  'thebe',
-  'elara',
-  'carpo',
-  'herse',
-  'arche',
-  'carme',
-  'eitne',
-  'aoede'
-];
