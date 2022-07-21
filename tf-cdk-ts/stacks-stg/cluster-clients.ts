@@ -42,6 +42,7 @@ export default class stgClusterClientStack extends TerraformStack {
 
     const vnetIdentifier = `${env}-vnet-${name}`;
     const vnet = new VirtualNetwork(this, vnetIdentifier, {
+      dependsOn: [rg],
       name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
@@ -50,46 +51,50 @@ export default class stgClusterClientStack extends TerraformStack {
 
     const subnetIdentifier = `${env}-subnet-${name}`;
     const subnet = new Subnet(this, subnetIdentifier, {
+      dependsOn: [vnet],
       name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
       addressPrefixes: ['10.1.0.0/24']
     });
 
-    const numberOfVMs = 5;
-    const prefix = '10.1.0.';
-    const suffix = 200;
+    const disabled = false; // Change this to quickly delete only the VMs
+    if (!disabled) {
+      const numberOfVMs = 3;
+      const prefix = '10.1.0.';
+      const suffix = 200;
 
-    // This will cycle the VMs through the year.
-    const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
+      // This will cycle the VMs through the year.
+      const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
 
-    const customImageId = getLatestImage('NomadConsul', 'eastus').id;
-    const vmTypeTag = `${env}-nomad-client`;
-    const clientList = getVMList({
-      vmTypeTag,
-      numberOfVMs,
-      prefix,
-      suffix,
-      startIndex
-    });
-    const customData = getCloudInitForNomadClient();
-
-    clientList.forEach(({ name: clientName, privateIP }) => {
-      createVirtualMachine(this, {
-        stackName: name,
-        vmName: `clt-${clientName}`,
-        rg: rg,
-        env: env,
-        subnet: subnet,
-        privateIP,
-        sshPublicKeys: getSSHPublicKeysListArray(),
-        customImageId,
+      const customImageId = getLatestImage('NomadConsul', 'eastus').id;
+      const vmTypeTag = `${env}-nomad-client`;
+      const clientList = getVMList({
         vmTypeTag,
-        customData,
-        allocatePublicIP: false,
-        createBeforeDestroy: true
+        numberOfVMs,
+        prefix,
+        suffix,
+        startIndex
       });
-    });
+      const customData = getCloudInitForNomadClient();
+
+      clientList.forEach(({ name: clientName, privateIP }) => {
+        createVirtualMachine(this, {
+          stackName: name,
+          vmName: `clt-${clientName}`,
+          rg: rg,
+          env: env,
+          subnet: subnet,
+          privateIP,
+          sshPublicKeys: getSSHPublicKeysListArray(),
+          customImageId,
+          vmTypeTag,
+          customData,
+          allocatePublicIP: false,
+          createBeforeDestroy: true
+        });
+      });
+    }
 
     // End of stack
   }

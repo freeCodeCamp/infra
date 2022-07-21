@@ -18,9 +18,11 @@ interface fCCVirtualMachineConfig {
   rg: ResourceGroup;
   subnet: Subnet;
   env: string;
-  size?: string | undefined;
-  privateIP?: string | undefined;
-  customData?: string | undefined;
+  size?: string;
+  privateIP?: string;
+  customData?: string;
+  allocatePublicIP?: boolean;
+  createPublicDnsARecord?: boolean;
 }
 
 const defaultCustomData = Buffer.from(
@@ -37,8 +39,7 @@ final_message: 'Setup complete'
 ).toString('base64');
 export const createLinuxVirtualMachine = (
   stack: Construct,
-  config: fCCVirtualMachineConfig,
-  allocatePublicIP = true
+  config: fCCVirtualMachineConfig
 ) => {
   const {
     stackName,
@@ -48,7 +49,9 @@ export const createLinuxVirtualMachine = (
     env,
     size: size = 'Standard_B2s',
     privateIP: privateIP = undefined,
-    customData: customData = defaultCustomData
+    customData: customData = defaultCustomData,
+    allocatePublicIP = true,
+    createPublicDnsARecord = true
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -86,7 +89,13 @@ export const createLinuxVirtualMachine = (
         privateIpAddressAllocation: privateIP ? 'Static' : 'Dynamic',
         privateIpAddress: privateIP,
         publicIpAddressId: allocatePublicIP
-          ? createPublicIp(stack, stackName, vmName, rg, env).id
+          ? createPublicIp(stack, {
+              stackName,
+              vmName,
+              rg,
+              env,
+              createPublicDnsARecord
+            }).id
           : ''
       }
     ]

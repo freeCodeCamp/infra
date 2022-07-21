@@ -3,11 +3,19 @@ import { DnsARecord, PublicIp, ResourceGroup } from '@cdktf/provider-azurerm';
 
 export const createPublicIp = (
   stack: Construct,
-  stackName: string,
-  vmName: string,
-  rg: ResourceGroup,
-  env: string,
-  createDnsARecord = true
+  {
+    stackName,
+    vmName,
+    rg,
+    env,
+    createPublicDnsARecord = true
+  }: {
+    stackName: string;
+    vmName: string;
+    rg: ResourceGroup;
+    env: string;
+    createPublicDnsARecord?: boolean;
+  }
 ) => {
   const pubIp = new PublicIp(stack, `${env}-ip-${stackName}-${vmName}`, {
     dependsOn: [rg],
@@ -19,7 +27,7 @@ export const createPublicIp = (
     domainNameLabel: `${env}-${vmName}-${stackName}`
   });
 
-  if (createDnsARecord) {
+  if (createPublicDnsARecord) {
     new DnsARecord(stack, `${env}-dns-a-record-${stackName}-${vmName}`, {
       dependsOn: [pubIp],
       name: `${vmName}.${stackName}`,

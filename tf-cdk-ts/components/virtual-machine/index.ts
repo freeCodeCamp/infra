@@ -97,14 +97,13 @@ export const createVirtualMachine = (
         privateIpAddressAllocation: privateIP ? 'Static' : 'Dynamic',
         privateIpAddress: privateIP,
         publicIpAddressId: allocatePublicIP
-          ? createPublicIp(
-              stack,
+          ? createPublicIp(stack, {
               stackName,
               vmName,
               rg,
               env,
               createPublicDnsARecord
-            ).id
+            }).id
           : ''
       }
     ]

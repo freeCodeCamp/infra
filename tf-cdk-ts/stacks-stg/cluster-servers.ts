@@ -46,7 +46,7 @@ export default class stgClusterServerStack extends TerraformStack {
       name: vnetIdentifier,
       resourceGroupName: rg.name,
       location: rg.location,
-      addressSpace: ['10.0.0.0/16']
+      addressSpace: ['10.0.0.0/8']
     });
 
     const subnetIdentifier = `${env}-subnet-${name}`;
@@ -55,7 +55,7 @@ export default class stgClusterServerStack extends TerraformStack {
       name: subnetIdentifier,
       resourceGroupName: rg.name,
       virtualNetworkName: vnet.name,
-      addressPrefixes: ['10.0.0.0/24']
+      addressPrefixes: ['10.0.0.0/16']
     });
 
     const disabled = false; // Change this to quickly delete only the VMs
