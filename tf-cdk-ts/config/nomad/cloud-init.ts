@@ -15,11 +15,11 @@ write_files:
       server {
         enabled          = true
         bootstrap_expect = 3
-        # server_join {
-        #   retry_join = [${getCloudAutoJoinString(serverList)}]
-        #   retry_max = 3
-        #   retry_interval = "30s"
-        # }
+        server_join {
+          retry_join = [${getCloudAutoJoinString(serverList)}]
+          retry_max = 3
+          retry_interval = "30s"
+        }
       }
   - path: '/etc/systemd/system/nomad.service'
     owner: root:root
