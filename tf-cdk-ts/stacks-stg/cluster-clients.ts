@@ -13,6 +13,7 @@ import {
   getSSHPublicKeysListArray
 } from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
+import { getCloudInitForNomadClient } from '../config/nomad/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
@@ -59,7 +60,10 @@ export default class stgClusterClientStack extends TerraformStack {
       addressPrefixes: ['10.1.0.0/24']
     });
 
-    const customImage = getLatestImage('NomadConsul', 'eastus');
+    const customImageId = getLatestImage('NomadConsul', 'eastus').id;
+    const vmTypeTag = `${env}-nomad-client`;
+    const customData = getCloudInitForNomadClient();
+
     const numberofClients = 5;
     for (let index = 0; index < numberofClients; index++) {
       createVirtualMachine(this, {
@@ -68,9 +72,11 @@ export default class stgClusterClientStack extends TerraformStack {
         rg: rg,
         env: env,
         subnet: subnet,
-        privateIP: '10.0.0.' + (20 + index),
+        privateIP: '10.0.0.' + (200 + index),
         sshPublicKeys: getSSHPublicKeysListArray(),
-        customImageId: customImage.id
+        customImageId,
+        vmTypeTag,
+        customData
       });
     }
 

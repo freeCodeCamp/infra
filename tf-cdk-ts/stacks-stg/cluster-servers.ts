@@ -7,10 +7,13 @@ import {
   VirtualNetwork
 } from '@cdktf/provider-azurerm';
 
-import { custom_data } from '../config/env';
-import { fiveLetterNames } from '../config/constant-strings';
+import {
+  getLatestImage,
+  getServerList,
+  getSSHPublicKeysListArray
+} from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
-import { getLatestImage, getSSHPublicKeysListArray } from '../utils';
+import { getCloudInitForNomadServers } from '../config/nomad/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
@@ -57,22 +60,28 @@ export default class stgClusterServerStack extends TerraformStack {
       addressPrefixes: ['10.0.0.0/24']
     });
 
-    const numberofServers = 3;
-    const nomadServerNames = fiveLetterNames.slice(0, numberofServers);
+    // Change the range of the array to match the number of servers you want to create
+    const startIndex = 0;
+    const numberOfServers = 3;
+    const serverList = getServerList(startIndex, numberOfServers);
+    const customImageId = getLatestImage('NomadConsul', 'eastus').id;
+    const vmTypeTag = `${env}-nomad-server`;
+    const customData = getCloudInitForNomadServers(serverList);
 
-    const customImage = getLatestImage('NomadConsul', 'eastus');
-    nomadServerNames.map((serverName, index) => {
+    serverList.forEach(({ serverName, serverPrivateIP }) => {
       createVirtualMachine(this, {
         stackName: name,
         vmName: `ldr-${serverName}`,
         rg: rg,
         env: env,
-        size: 'Standard_D2s_v4',
+        size: 'Standard_B2s',
         subnet: subnet,
-        privateIP: '10.0.0.' + (10 + index),
+        privateIP: serverPrivateIP,
         sshPublicKeys: getSSHPublicKeysListArray(),
-        customImageId: customImage.id,
-        customData: custom_data
+        customImageId,
+        customData,
+        vmTypeTag,
+        createDnsARecord: false
       });
     });
 

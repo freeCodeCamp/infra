@@ -6,7 +6,10 @@ export const listAllVirtualMachineImagesInASubscription = async (
 ) => {
   if (!subscriptionId || subscriptionId.length === 0) {
     throw new Error(`
-      AZURE_SUBSCRIPTION_ID is not set. This is required for fetching the list of virtual machine images.
+
+    Error:
+    AZURE_SUBSCRIPTION_ID is not set. This is required for fetching the list of virtual machine images.
+
     `);
   }
   const credential = new DefaultAzureCredential();

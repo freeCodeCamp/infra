@@ -1,6 +1,9 @@
 import { customAlphabet } from 'nanoid';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+
+import { fiveLetterNames } from '../config/constant-strings';
+
 //
 // Working with random IDs
 //
@@ -36,8 +39,9 @@ export const importSSHPublicKeyMembers = () => {
   } catch (error) {
     throw new Error(`
 
-      No members found in the github-members file, or the file does not exist.
-      Please run the prebuild scripts to generate the data.
+    Error:
+    No members found in the github-members file, or the file does not exist.
+    Please run the prebuild scripts to generate the data.
 
     `);
   }
@@ -68,8 +72,9 @@ export const importMachineImages = () => {
   } catch (error) {
     throw new Error(`
 
-      No machine images found in the machine-images file, or the file does not exist.
-      Please run the prebuild scripts to generate the data.
+    Error:
+    No machine images found in the machine-images file, or the file does not exist.
+    Please run the prebuild scripts to generate the data.
 
     `);
   }
@@ -115,4 +120,43 @@ export const getLatestImage = (imageType: string, location: string) => {
     (a: MachineImage, b: MachineImage) => -1 * a.name.localeCompare(b.name)
   )[0];
   return latestImage;
+};
+
+//
+// Working with Server Lists
+//
+export type ServerList = {
+  serverName: string;
+  serverPrivateIP: string;
+};
+export const getServerList = (
+  startIndex: number,
+  numberOfServers: number
+): Array<ServerList> => {
+  if (startIndex > fiveLetterNames.length - numberOfServers) {
+    throw new Error(`
+
+    Error: Not enough names in the server name list, recheck the start index.
+
+    `);
+  }
+  const serversList = [];
+  for (let i = startIndex; i < startIndex + numberOfServers; i++) {
+    serversList.push({
+      serverName: fiveLetterNames[i],
+      serverPrivateIP: `10.0.0.${(startIndex + 1) * 10 + (i + 1)}`
+    });
+  }
+  return serversList;
+};
+
+export const getCloudAutoJoinString = (
+  serverList: Array<ServerList>
+): string => {
+  const cloudAutoJoinString = `"${serverList
+    .map(server => {
+      return server.serverPrivateIP;
+    })
+    .join('","')}"`;
+  return cloudAutoJoinString;
 };

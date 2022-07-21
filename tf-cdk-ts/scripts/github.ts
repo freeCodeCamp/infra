@@ -24,16 +24,17 @@ export const getMembersFromGHTeam = async (
       return res.data;
     })
     .catch(err => {
-      console.error(
-        `
-        Error getting team members for ${org}'s ${team_slug} team from GitHub.
-        Check that you have configured the PA Token correctly and it has the
-        correct scopes.
+      throw new Error(`
 
-        Status: ${err.status}
-        Message: ${err.message}
-        `
-      );
+    Error:
+    Could not get team members for ${org}'s ${team_slug} team from GitHub.
+    Check that you have configured the PA Token correctly and it has the
+    correct scopes.
+
+    Status: ${err.status}
+    Message: ${err.message}
+
+      `);
       return [];
     });
 
@@ -48,9 +49,15 @@ export const getSSHKeysFor1User = async (user: string): Promise<keyMap> => {
       return res.data;
     })
     .catch(err => {
-      console.error(
-        `Error getting public SSH keys for user ${user}. Got status: ${err.status}`
-      );
+      throw new Error(`
+
+      Error:
+      Could not get Public SSH keys for user ${user}.
+
+      Status: ${err.status}
+      Message: ${err.message}
+
+      `);
       return { username: user, publicKeys: [] };
     });
 
