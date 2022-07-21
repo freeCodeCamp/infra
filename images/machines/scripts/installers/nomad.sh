@@ -36,7 +36,8 @@ chown --recursive nomad:nomad /opt/nomad
 
 # Common config
 mkdir --parents /etc/nomad.d
-chmod 700 /etc/nomad.d
+chmod 0755 /etc/nomad.d
+chown --recursive nomad:nomad /etc/nomad.d
 cp \
   /tmp/nomad/nomad.hcl \
   /etc/nomad.d/nomad.hcl # : <---- PreUpload
