@@ -33,7 +33,7 @@ write_files:
       User=nomad
       Group=nomad
       ExecReload=/bin/kill -HUP $MAINPID
-      ExecStart=/usr/bin/nomad agent -config /etc/nomad.d
+      ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
       KillMode=process
       KillSignal=SIGINT
       LimitNOFILE=infinity
@@ -76,7 +76,7 @@ write_files:
       User=root
       Group=root
       ExecReload=/bin/kill -HUP $MAINPID
-      ExecStart=/usr/bin/nomad agent -config /etc/nomad.d
+      ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
       KillMode=process
       KillSignal=SIGINT
       LimitNOFILE=infinity
