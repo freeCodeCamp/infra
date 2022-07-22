@@ -9,8 +9,15 @@ export const getCloudInitForNomadServers = (serverList: Array<VMList>) => {
   return Buffer.from(
     `${Buffer.from(BASE64_ENCODED_CUSTOM_DATA, 'base64').toString('ascii')}
 write_files:
+  - path: '/etc/nomad.d/nomad.hcl'
+    owner: nomad:nomad
+    permissions: 0755
+    content: |
+      datacenter = "dc1"
+      data_dir   = "/opt/nomad"
   - path: '/etc/nomad.d/server.hcl'
     owner: nomad:nomad
+    permissions: 0755
     content: |
       server {
         enabled          = true
@@ -58,8 +65,15 @@ export const getCloudInitForNomadClient =
     return Buffer.from(
       `${Buffer.from(BASE64_ENCODED_CUSTOM_DATA, 'base64').toString('ascii')}
 write_files:
+  - path: '/etc/nomad.d/nomad.hcl'
+    owner: nomad:nomad
+    permissions: 0755
+    content: |
+      datacenter = "dc1"
+      data_dir   = "/opt/nomad"
   - path: '/etc/nomad.d/client.hcl'
     owner: nomad:nomad
+    permissions: 0755
     content: |
       client {
         enabled = true

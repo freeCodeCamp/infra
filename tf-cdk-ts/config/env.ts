@@ -26,15 +26,19 @@ if (
 }
 
 const {
-  AZURE_SUBSCRIPTION_ID: azureSubscriptionId,
-  SSH_PUBLIC_KEY: sshPublicKey,
   // GitHub Personal Access Token,
   // from a member belonging to the GitHub team,
   // whose public keys need to be imported.
   PA_TOKEN_FROM_GITHUB: githubPAToken,
+
+  AZURE_SUBSCRIPTION_ID: azureSubscriptionId,
+
+  SSH_PUBLIC_KEY: sshPublicKey,
   BASE64_ENCODED_CUSTOM_DATA: customData,
+
   MYSQL_ADMIN_USERNAME: mysqlAdminUsername,
   MYSQL_ADMIN_PASSWORD: mysqlAdminPassword,
+
   MYSQL_FS_SKU: mysqlFsSku,
   MYSQL_FS_BACKUP_RETENTION_DAYS: mysqlFsBackupRetentionDays
 } = process.env;
