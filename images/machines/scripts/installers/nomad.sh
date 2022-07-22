@@ -36,11 +36,12 @@ chown --recursive nomad:nomad /opt/nomad
 
 # Common config
 mkdir --parents /etc/nomad.d
-chmod 0755 /etc/nomad.d
+chmod 0644 /etc/nomad.d
 chown --recursive nomad:nomad /etc/nomad.d
-cp \
-  /tmp/nomad/nomad.hcl \
-  /etc/nomad.d/nomad.hcl # : <---- PreUpload
+
+# cp \
+#   /tmp/nomad/nomad.hcl \
+#   /etc/nomad.d/nomad.hcl # : <---- PreUpload
 
 logger "Checking Consul version"
 nomad version
@@ -50,19 +51,27 @@ logger "Completed"
 # Footnotes:
 #
 #     [1]
-#     Copy configurations for servers and clients during provisioning.
+#     Files marked with ": <---- PreUpload" are uploaded
+#     as a part of the image build process.
+#
+#     Ensure the config in the packer template is like so:
+#
+#     provisioner "file" {
+#       source      = "${var.configs_dir}/nomad"
+#       destination = "/tmp/"
+#     }
+#
+#     [2]
+#     Create remaining configuration files after VM provisioning,
+#     for example:
 #
 #     /etc/nomad.d/server.hcl
 #     /etc/nomad.d/client.hcl
+#     /etc/systemd/system/nomad.service
 #
-#     [2]
-#     Services can be started with:
+#     [3]
+#     Start services with:
 #
 #     systemctl enable nomad
 #     systemctl start  nomad
 #     systemctl status nomad
-#
-#
-#     [3]
-#     Files marked with ": <---- PreUpload" are uploaded
-#     as a part of the build.

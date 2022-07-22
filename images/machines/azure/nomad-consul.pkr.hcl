@@ -107,10 +107,10 @@ build {
   name    = "nomad-consul"
   sources = ["source.azure-arm.nomad-consul"]
 
-  provisioner "file" {
-    source      = "${var.configs_dir}/nomad"
-    destination = "/tmp/"
-  }
+  # provisioner "file" {
+  #   source      = "${var.configs_dir}/nomad"
+  #   destination = "/tmp/"
+  # }
 
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
