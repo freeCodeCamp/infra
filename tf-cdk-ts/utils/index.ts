@@ -110,15 +110,24 @@ type MachineImage = {
   imageType: string;
 };
 export const getLatestImage = (imageType: string, location: string) => {
-  const requestedImageList: [MachineImage] = getMachineImages(imageType);
-  const filteredImageList = requestedImageList.filter(
-    (image: MachineImage) => image.location === location
-  );
-  const latestImage = filteredImageList.sort(
-    // localeCompare returns -1, 0, 1 if a is 'before' b, t
-    (a: MachineImage, b: MachineImage) => -1 * a.name.localeCompare(b.name)
-  )[0];
-  return latestImage;
+  try {
+    const requestedImageList: [MachineImage] = getMachineImages(imageType);
+    const filteredImageList = requestedImageList.filter(
+      (image: MachineImage) => image.location === location
+    );
+    const latestImage = filteredImageList.sort(
+      // localeCompare returns -1, 0, 1 if a is 'before' b, t
+      (a: MachineImage, b: MachineImage) => -1 * a.name.localeCompare(b.name)
+    )[0];
+    return latestImage;
+  } catch (error) {
+    throw new Error(`
+
+    Error:
+    The requested image type "${imageType}" does not exist OR the machine-images file is empty.
+
+    `);
+  }
 };
 
 //

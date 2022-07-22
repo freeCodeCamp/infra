@@ -9,7 +9,7 @@ import {
 
 import { getVMList, getLatestImage, getSSHPublicKeysListArray } from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
-import { getCloudInitForNomadClient } from '../config/nomad/cloud-init';
+import { getCloudInitForNomadConsulClients } from '../config/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
@@ -76,7 +76,7 @@ export default class stgClusterClientStack extends TerraformStack {
         suffix,
         startIndex
       });
-      const customData = getCloudInitForNomadClient();
+      const customData = getCloudInitForNomadConsulClients();
 
       clientList.forEach(({ name: clientName, privateIP }) => {
         createVirtualMachine(this, {
@@ -90,7 +90,7 @@ export default class stgClusterClientStack extends TerraformStack {
           customImageId,
           vmTypeTag,
           customData,
-          allocatePublicIP: false,
+          allocatePublicIP: true,
           createBeforeDestroy: true
         });
       });
