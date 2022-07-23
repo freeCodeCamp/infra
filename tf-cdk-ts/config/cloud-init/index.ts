@@ -49,9 +49,9 @@ write_files:
       data_dir = "/opt/consul"
 
       encrypt = "${CLUSTER_ENCRYPTION_KEY}"
-      verify_incoming = true
-      verify_outgoing = true
-      verify_server_hostname = true
+      # verify_incoming = true
+      # verify_outgoing = true
+      # verify_server_hostname = true
 
       bind_addr = "${privateIP}"
       client_addr = "${privateIP}"

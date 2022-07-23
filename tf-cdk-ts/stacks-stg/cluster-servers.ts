@@ -9,6 +9,7 @@ import {
 } from '@cdktf/provider-azurerm';
 
 import { getLatestImage, getVMList, getSSHPublicKeysListArray } from '../utils';
+import { CLUSTER_DATA_CENTER, CLUSTER_CURRENT_VERSION } from './../config/env';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { getCloudInitForNomadConsulCluster } from '../config/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
@@ -38,7 +39,7 @@ export default class stgClusterServerStack extends TerraformStack {
     const rgIdentifier = `${env}-rg-${name}`;
     const rg = new ResourceGroup(this, rgIdentifier, {
       name: rgIdentifier,
-      location: 'eastus'
+      location: CLUSTER_DATA_CENTER
     });
 
     const vnetIdentifier = `${env}-vnet-${name}`;
@@ -64,7 +65,7 @@ export default class stgClusterServerStack extends TerraformStack {
       const numberOfVMs = 3;
 
       // This will cycle the VMs through the year.
-      const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
+      const startIndex = new Date().getUTCMonth() + CLUSTER_CURRENT_VERSION; // Add 1 because January is 0.
 
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
       const typeTag = `${env}-nomad-server`;
@@ -80,25 +81,26 @@ export default class stgClusterServerStack extends TerraformStack {
       serverList.forEach(({ name: serverName, privateIP, privateDnsName }) => {
         availabiltyzone >= 3 ? (availabiltyzone = 1) : (availabiltyzone += 1);
         const customData = getCloudInitForNomadConsulCluster({
-          dataCenter: `${env}-dc-${rg.location}`,
+          dataCenter: `${env}-dc-${CLUSTER_DATA_CENTER}`,
           serverList,
           privateIP,
           clusterServerAgent: true
         });
         const vm = createVirtualMachine(this, {
-          stackName: name,
-          vmName: serverName,
-          rg: rg,
-          env: env,
-          size: 'Standard_B2s',
-          subnet: subnet,
-          privateIP,
-          sshPublicKeys: getSSHPublicKeysListArray(),
-          customImageId,
-          customData,
-          typeTag,
           allocatePublicIP: true,
-          availabiltyzone: numberOfVMs > 1 ? availabiltyzone : 0
+          availabiltyzone: numberOfVMs > 1 ? availabiltyzone : 0,
+          createBeforeDestroy: true,
+          customData,
+          customImageId,
+          env: env,
+          privateIP,
+          rg: rg,
+          size: 'Standard_B2s',
+          sshPublicKeys: getSSHPublicKeysListArray(),
+          stackName: name,
+          subnet: subnet,
+          typeTag,
+          vmName: serverName
         });
         const prvDnsARecordIdentifier = `${env}-prv-dns-a-record-${serverName}`;
         new PrivateDnsARecord(this, prvDnsARecordIdentifier, {

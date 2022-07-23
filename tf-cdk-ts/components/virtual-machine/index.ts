@@ -11,21 +11,21 @@ import {
 import { createPublicIp } from '../public-ip';
 
 interface fCCVirtualMachineConfig {
-  stackName: string;
-  vmName: string;
-  rg: ResourceGroup;
-  subnet: Subnet;
+  allocatePublicIP?: boolean;
+  availabiltyzone?: number;
+  createBeforeDestroy?: boolean;
+  createPublicDnsARecord?: boolean;
+  customData?: string;
+  customImageId?: string;
   env: string;
   privateIP?: string;
+  rg: ResourceGroup;
   size?: string;
   sshPublicKeys?: Array<string> | undefined;
-  customImageId?: string;
-  customData?: string;
+  stackName: string;
+  subnet: Subnet;
   typeTag?: string;
-  allocatePublicIP?: boolean;
-  createPublicDnsARecord?: boolean;
-  createBeforeDestroy?: boolean;
-  availabiltyzone?: number;
+  vmName: string;
 }
 
 // This is a fallback when custom data is not provided.
@@ -47,21 +47,21 @@ export const createVirtualMachine = (
   config: fCCVirtualMachineConfig
 ) => {
   const {
-    stackName,
-    vmName,
-    rg,
-    subnet,
-    env,
-    size,
-    privateIP: privateIP = undefined,
-    sshPublicKeys: sshPublicKeys = [],
-    customImageId: customImageId = undefined,
-    customData: customData = defaultCustomData,
-    typeTag: typeTag = `${env}-vm`,
     allocatePublicIP = true,
-    createPublicDnsARecord = true,
+    availabiltyzone = 0,
     createBeforeDestroy = false,
-    availabiltyzone = 0
+    createPublicDnsARecord = true,
+    customData: customData = defaultCustomData,
+    customImageId: customImageId = undefined,
+    env,
+    privateIP: privateIP = undefined,
+    rg,
+    size,
+    sshPublicKeys: sshPublicKeys = [],
+    stackName,
+    subnet,
+    typeTag: typeTag = `${env}-vm`,
+    vmName
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;

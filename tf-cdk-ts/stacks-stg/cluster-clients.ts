@@ -8,6 +8,7 @@ import {
 } from '@cdktf/provider-azurerm';
 
 import { getVMList, getLatestImage, getSSHPublicKeysListArray } from '../utils';
+import { CLUSTER_DATA_CENTER, CLUSTER_CURRENT_VERSION } from './../config/env';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { getCloudInitForNomadConsulCluster } from '../config/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
@@ -37,7 +38,7 @@ export default class stgClusterClientStack extends TerraformStack {
     const rgIdentifier = `${env}-rg-${name}`;
     const rg = new ResourceGroup(this, rgIdentifier, {
       name: rgIdentifier,
-      location: 'eastus'
+      location: CLUSTER_DATA_CENTER
     });
 
     const vnetIdentifier = `${env}-vnet-${name}`;
@@ -65,7 +66,7 @@ export default class stgClusterClientStack extends TerraformStack {
       const suffix = 200;
 
       // This will cycle the VMs through the year.
-      const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
+      const startIndex = new Date().getUTCMonth() + CLUSTER_CURRENT_VERSION;
 
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
       const typeTag = `${env}-nomad-client`;
@@ -81,22 +82,22 @@ export default class stgClusterClientStack extends TerraformStack {
 
       clientList.forEach(({ name: clientName, privateIP }) => {
         const customData = getCloudInitForNomadConsulCluster({
-          dataCenter: `${env}-dc-${rg.location}`,
+          dataCenter: `${env}-dc-${CLUSTER_DATA_CENTER}`,
           privateIP
         });
         createVirtualMachine(this, {
-          stackName: name,
-          vmName: clientName,
-          rg: rg,
-          env: env,
-          subnet: subnet,
-          privateIP,
-          sshPublicKeys: getSSHPublicKeysListArray(),
-          customImageId,
-          typeTag,
-          customData,
           allocatePublicIP: true,
-          createBeforeDestroy: true
+          createBeforeDestroy: true,
+          customData,
+          customImageId,
+          env: env,
+          privateIP,
+          rg: rg,
+          sshPublicKeys: getSSHPublicKeysListArray(),
+          stackName: name,
+          subnet: subnet,
+          typeTag,
+          vmName: clientName
         });
       });
     }
