@@ -13,56 +13,25 @@ cd /tmp
 
 logger "Installing Consul"
 
-export CONSUL_VERSION="1.8.0"
+export CONSUL_VERSION="1.8.3"
 
-curl -fsL -o /tmp/consul.zip \
-  https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip
+curl --fail --silent --show-error --location https://apt.releases.hashicorp.com/gpg |
+  gpg --dearmor |
+  sudo dd of=/usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-unzip -o /tmp/consul.zip -d /usr/local/bin
-chmod 0755 /usr/local/bin/consul
-chown root:root /usr/local/bin/consul
+FILE=/etc/apt/sources.list.d/hashicorp.list
+if test -f "$FILE"; then
+  logger "Warn: sources list $FILE already exists. Skipping sources configuration."
+else
+  logger "Info: sources list $FILE does not exit. Configuring sources."
+  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" |
+    sudo tee -a /etc/apt/sources.list.d/hashicorp.list
+fi
 
-logger "Configuring Consul"
-
-# User config
-useradd --system --home /etc/consul.d --shell /bin/false consul
-mkdir --parents /opt/consul
-chown --recursive consul:consul /opt/consul
-
-# Common config
-mkdir --parents /etc/consul.d
-chmod 0644 /etc/consul.d
-chown --recursive consul:consul /etc/consul.d
+sudo apt-get update
+sudo apt-get install -y consul=$CONSUL_VERSION
 
 logger "Checking Consul version"
 consul version
 
 logger "Completed"
-
-# Footnotes:
-#
-#     [1]
-#     Files marked with ": <---- PreUpload" are uploaded
-#     as a part of the image build process.
-#
-#     Ensure the config in the packer template is like so:
-#
-#     provisioner "file" {
-#       source      = "${var.configs_dir}/consul"
-#       destination = "/tmp/"
-#     }
-#
-#     [2]
-#     Create remaining configuration files after VM provisioning,
-#     for example:
-#
-#     /etc/consul.d/server.hcl
-#     /etc/consul.d/client.hcl
-#     /etc/systemd/system/consul.service
-#
-#     [3]
-#     Start services with:
-#
-#     systemctl enable consul
-#     systemctl start  consul
-#     systemctl status consul

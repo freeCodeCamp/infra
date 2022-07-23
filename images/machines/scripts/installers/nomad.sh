@@ -15,63 +15,23 @@ logger "Installing Nomad"
 
 export NOMAD_VERSION="1.1.0"
 
-curl -fsL -o /tmp/nomad.zip \
-  https://releases.hashicorp.com/nomad/${NOMAD_VERSION}/nomad_${NOMAD_VERSION}_linux_amd64.zip
+curl --fail --silent --show-error --location https://apt.releases.hashicorp.com/gpg |
+  gpg --dearmor |
+  sudo dd of=/usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-unzip -o /tmp/nomad.zip -d /usr/local/bin
-chmod 0755 /usr/local/bin/nomad
-chown root:root /usr/local/bin/nomad
+FILE=/etc/apt/sources.list.d/hashicorp.list
+if test -f "$FILE"; then
+  logger "Warn: sources list $FILE already exists. Skipping sources configuration."
+else
+  logger "Info: sources list $FILE does not exit. Configuring sources."
+  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" |
+    sudo tee -a /etc/apt/sources.list.d/hashicorp.list
+fi
 
-logger "Configuring Nomad"
+sudo apt-get update
+sudo apt-get install -y nomad=$NOMAD_VERSION
 
-# User config
-useradd --system --home /etc/nomad.d --shell /bin/false nomad
-mkdir --parents /opt/nomad
-chown --recursive nomad:nomad /opt/nomad
-
-# Sytemd config
-# cp \
-#   /tmp/nomad/nomad.service \
-#   /etc/systemd/system/nomad.service # : <---- PreUpload
-
-# Common config
-mkdir --parents /etc/nomad.d
-chmod 0644 /etc/nomad.d
-chown --recursive nomad:nomad /etc/nomad.d
-
-# cp \
-#   /tmp/nomad/nomad.hcl \
-#   /etc/nomad.d/nomad.hcl # : <---- PreUpload
-
-logger "Checking Consul version"
+logger "Checking Nomad version"
 nomad version
 
 logger "Completed"
-
-# Footnotes:
-#
-#     [1]
-#     Files marked with ": <---- PreUpload" are uploaded
-#     as a part of the image build process.
-#
-#     Ensure the config in the packer template is like so:
-#
-#     provisioner "file" {
-#       source      = "${var.configs_dir}/nomad"
-#       destination = "/tmp/"
-#     }
-#
-#     [2]
-#     Create remaining configuration files after VM provisioning,
-#     for example:
-#
-#     /etc/nomad.d/server.hcl
-#     /etc/nomad.d/client.hcl
-#     /etc/systemd/system/nomad.service
-#
-#     [3]
-#     Start services with:
-#
-#     systemctl enable nomad
-#     systemctl start  nomad
-#     systemctl status nomad
