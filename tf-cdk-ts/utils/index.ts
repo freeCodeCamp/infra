@@ -136,17 +136,22 @@ export const getLatestImage = (imageType: string, location: string) => {
 export type VMList = {
   name: string;
   privateIP: string;
+  privateDnsName: string;
 };
 // If numberOfVMs = 5 & suffix = 20 VM IPs like 10.0.0.21-10.0.0.25 and so on
 // Adjust the startIndex to churn through the IPs
 export const getVMList = ({
-  vmTypeTag,
+  env,
+  vmPrefix = 'tst',
+  typeTag,
   numberOfVMs,
   prefix = '10.0.0.',
   suffix = 10,
   startIndex = 1
 }: {
-  vmTypeTag: string;
+  env: string;
+  vmPrefix?: string;
+  typeTag: string;
   numberOfVMs: number;
   prefix?: string;
   suffix?: number;
@@ -154,26 +159,23 @@ export const getVMList = ({
 }): Array<VMList> => {
   const machinesList = [];
   for (let i = startIndex; i < startIndex + numberOfVMs; i++) {
+    const name = `${vmPrefix}${uniqueNamesGenerator({
+      dictionaries: [colors, animals],
+      length: 2,
+      separator: '-',
+      style: 'lowerCase',
+      seed: typeTag + i // Create a unique but deterministic name for a VM
+    })}`;
     machinesList.push({
-      name: uniqueNamesGenerator({
-        dictionaries: [colors, animals],
-        length: 2,
-        separator: '-',
-        style: 'lowerCase',
-        seed: vmTypeTag + i // Create a unique but deterministic name for a VM
-      }),
-      privateIP: `${prefix}${suffix + i}`
+      name,
+      privateIP: `${prefix}${suffix + i}`,
+      privateDnsName: `${name}.${
+        env === 'prd' ? 'prvdns.freecodecamp.org' : 'prvdns.freecodecamp.dev'
+      }`
     });
   }
-  // console.log(machinesList);
+  console.log(`Generating a list of ${numberOfVMs} VMs with the following properties:
+${JSON.stringify(machinesList, null, 2)}
+  `);
   return machinesList;
-};
-
-export const getCloudAutoJoinString = (serverList: Array<VMList>): string => {
-  const cloudAutoJoinString = `"${serverList
-    .map(server => {
-      return server.privateIP;
-    })
-    .join('","')}"`;
-  return cloudAutoJoinString;
 };

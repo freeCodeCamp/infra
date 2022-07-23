@@ -21,7 +21,7 @@ interface fCCVirtualMachineConfig {
   sshPublicKeys?: Array<string> | undefined;
   customImageId?: string;
   customData?: string;
-  vmTypeTag?: string;
+  typeTag?: string;
   allocatePublicIP?: boolean;
   createPublicDnsARecord?: boolean;
   createBeforeDestroy?: boolean;
@@ -56,7 +56,7 @@ export const createVirtualMachine = (
     sshPublicKeys: sshPublicKeys = [],
     customImageId: customImageId = undefined,
     customData: customData = defaultCustomData,
-    vmTypeTag: vmTypeTag = `${env}-vm`,
+    typeTag: typeTag = `${env}-vm`,
     allocatePublicIP = true,
     createPublicDnsARecord = true,
     createBeforeDestroy = false
@@ -128,7 +128,7 @@ export const createVirtualMachine = (
     resourceGroupName: rg.name,
     location: rg.location,
     tags: {
-      'vm-type': vmTypeTag
+      'vm-type': typeTag
     },
     vmSize: size || 'Standard_B2s',
     osProfile: {

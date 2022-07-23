@@ -1,7 +1,7 @@
 import yaml from 'js-yaml';
 
 import { BASE64_ENCODED_CUSTOM_DATA } from '../env';
-import { getCloudAutoJoinString, VMList } from '../../utils';
+import { VMList } from '../../utils';
 
 const testSource = (source: string, debugCloudInit: boolean): boolean => {
   // Test the cloud-init data Syntax
@@ -22,9 +22,15 @@ const testSource = (source: string, debugCloudInit: boolean): boolean => {
   }
 };
 
-export const getCloudInitForNomadConsulServers = (
-  serverList: Array<VMList>
-) => {
+export const getCloudInitForNomadConsulCluster = ({
+  dataCenter,
+  serverList = [],
+  clusterServerAgent = false
+}: {
+  dataCenter: string;
+  serverList?: Array<VMList>;
+  clusterServerAgent?: boolean;
+}) => {
   // Decode the intial base64 encoded cloud-init data
   const intialCloudInit = Buffer.from(
     BASE64_ENCODED_CUSTOM_DATA || '',
@@ -38,7 +44,7 @@ write_files:
     owner: consul:consul
     permissions: 0640
     content: |
-      datacenter = "dc1"
+      datacenter = "${dataCenter}"
       data_dir = "/opt/consul"
 
       # Uncomment & Update the following lines after provisioning the cluster
@@ -65,7 +71,9 @@ write_files:
       # performance {
       #   raft_multiplier = 1
       # }
-
+${
+  clusterServerAgent
+    ? `
   - path: /etc/consul.d/server.hcl
     owner: consul:consul
     permissions: 0640
@@ -89,33 +97,42 @@ write_files:
       ui_config {
         enabled = true
       }
-
+`
+    : ''
+}
   - path: /etc/nomad.d/nomad.hcl
     owner: nomad:nomad
     permissions: 0755
     content: |
-      datacenter = "dc1"
+      datacenter = "${dataCenter}"
       data_dir   = "/opt/nomad"
-
+${
+  clusterServerAgent
+    ? `
   - path: '/etc/nomad.d/server.hcl'
     owner: nomad:nomad
     permissions: 0755
     content: |
       server {
         enabled          = true
-        bootstrap_expect =
-        server_join {
-          retry_join = [ ${getCloudAutoJoinString(serverList)} ]
-          retry_max = 3
-          retry_interval = "30s"
-        }
+        bootstrap_expect = ${serverList.length}
       }
-
+`
+    : `
+  - path: '/etc/nomad.d/client.hcl'
+    owner: nomad:nomad
+    permissions: 0755
+    content: |
+      client {
+        enabled = true
+      }
+`
+}
   - path: /etc/systemd/system/consul.service
     owner: root:root
     content: |
       [Unit]
-      Description=Consul Server
+      Description=Consul ${clusterServerAgent ? 'Server' : 'Client'} Agent
       Documentation=https://www.consul.io/
       Requires=network-online.target
       After=network-online.target
@@ -125,7 +142,7 @@ write_files:
       EnvironmentFile=-/etc/consul.d/consul.env
       User=consul
       Group=consul
-      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d/
+      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
       ExecReload=/bin/kill --signal HUP $MAINPID
       KillMode=process
       KillSignal=SIGTERM
@@ -139,14 +156,14 @@ write_files:
     owner: root:root
     content: |
       [Unit]
-      Description=Nomad Server
+      Description=Nomad ${clusterServerAgent ? 'Server' : 'Client'} Agent
       Documentation=https://www.nomadproject.io/docs/
       Requires=network-online.target
       After=network-online.target
 
       [Service]
-      User=nomad
-      Group=nomad
+      User=${clusterServerAgent ? 'nomad' : 'root'}
+      Group=${clusterServerAgent ? 'nomad' : 'root'}
       ExecReload=/bin/kill -HUP $MAINPID
       ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
       KillMode=process
@@ -165,9 +182,9 @@ write_files:
 runcmd:
   - systemctl enable consul
   - systemctl start consul
+  - systemctl status consul
   - systemctl enable nomad
   - systemctl start nomad
-  - systemctl status consul
   - systemctl status nomad
 `;
 
@@ -175,129 +192,5 @@ runcmd:
   // console.log (source);   // Uncomment to debug the cloud-init data
 
   // Encode the cloud-init data to base64 from the 'source'
-  const cloudInitBase64 = Buffer.from(source, 'utf8').toString('base64');
-
-  return cloudInitBase64;
+  return Buffer.from(source, 'utf8').toString('base64');
 };
-
-export const getCloudInitForNomadConsulClients =
-  (/*serverList: Array<ServerList>*/) => {
-    // Decode the intial base64 encoded cloud-init data
-    const intialCloudInit = Buffer.from(
-      BASE64_ENCODED_CUSTOM_DATA || '',
-      'base64'
-    ).toString('ascii');
-
-    // Append more cloud-init data
-    const source = `${intialCloudInit}
-write_files:
-  - path: /etc/consul.d/consul.hcl
-    owner: consul:consul
-    permissions: 0640
-    content: |
-      datacenter = "dc1"
-      data_dir = "/opt/consul"
-
-      # Uncomment & Update the following lines after provisioning the cluster
-
-      # encrypt = "CHANGE THIS TO A VALID KEY"
-      # verify_incoming = true
-      # verify_outgoing = true
-      # verify_server_hostname = true
-
-      # ca_file = "<Consul configuration directory>/certs/consul-agent-ca.pem"
-
-      # auto_encrypt {
-      #   allow_tls = true
-      # }
-
-      # acl {
-      #   enabled = true
-      #   default_policy = "allow"
-      #   enable_token_persistence = true
-      # }
-
-      # performance {
-      #   raft_multiplier = 1
-      # }
-
-  - path: '/etc/nomad.d/nomad.hcl'
-    owner: nomad:nomad
-    permissions: 0755
-    content: |
-      datacenter = "dc1"
-      data_dir   = "/opt/nomad"
-
-  - path: '/etc/nomad.d/client.hcl'
-    owner: nomad:nomad
-    permissions: 0755
-    content: |
-      client {
-        enabled = true
-      }
-
-  - path: /etc/systemd/system/consul.service
-    owner: root:root
-    content: |
-      [Unit]
-      Description=Consul Server
-      Documentation=https://www.consul.io/
-      Requires=network-online.target
-      After=network-online.target
-      ConditionFileNotEmpty=/etc/consul.d/consul.hcl
-
-      [Service]
-      EnvironmentFile=-/etc/consul.d/consul.env
-      User=consul
-      Group=consul
-      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d/
-      ExecReload=/bin/kill --signal HUP $MAINPID
-      KillMode=process
-      KillSignal=SIGTERM
-      Restart=on-failure
-      LimitNOFILE=65536
-
-      [Install]
-      WantedBy=multi-user.target
-
-  - path: '/etc/systemd/system/nomad.service'
-    owner: root:root
-    content: |
-      [Unit]
-      Description=Nomad Client
-      Documentation=https://www.nomadproject.io/docs/
-      Requires=network-online.target
-      After=network-online.target
-
-      [Service]
-      User=root
-      Group=root
-      ExecReload=/bin/kill -HUP $MAINPID
-      ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
-      KillMode=process
-      KillSignal=SIGINT
-      LimitNOFILE=infinity
-      LimitNPROC=infinity
-      Restart=on-failure
-      RestartSec=2
-      StartLimitBurst=0
-      StartLimitIntervalSec=10
-      TasksMax=infinity
-
-      [Install]
-      WantedBy=multi-user.target
-
-runcmd:
-  - systemctl enable nomad
-  - systemctl start nomad
-  - systemctl status nomad
-`;
-
-    testSource(source, false); // Change the value to true to debug the cloud-init data
-    // console.log (source);   // Uncomment to debug the cloud-init data
-
-    // Encode the cloud-init data to base64 from the 'source'
-    const cloudInitBase64 = Buffer.from(source, 'utf8').toString('base64');
-
-    return cloudInitBase64;
-  };

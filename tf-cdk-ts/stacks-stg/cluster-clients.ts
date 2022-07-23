@@ -9,7 +9,7 @@ import {
 
 import { getVMList, getLatestImage, getSSHPublicKeysListArray } from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
-import { getCloudInitForNomadConsulClients } from '../config/cloud-init';
+import { getCloudInitForNomadConsulCluster } from '../config/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
@@ -68,27 +68,31 @@ export default class stgClusterClientStack extends TerraformStack {
       const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
 
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
-      const vmTypeTag = `${env}-nomad-client`;
+      const typeTag = `${env}-nomad-client`;
       const clientList = getVMList({
-        vmTypeTag,
+        env,
+        vmPrefix: 'clt-',
+        typeTag,
         numberOfVMs,
         prefix,
         suffix,
         startIndex
       });
-      const customData = getCloudInitForNomadConsulClients();
+      const customData = getCloudInitForNomadConsulCluster({
+        dataCenter: `${env}-dc-${rg.location}`
+      });
 
       clientList.forEach(({ name: clientName, privateIP }) => {
         createVirtualMachine(this, {
           stackName: name,
-          vmName: `clt-${clientName}`,
+          vmName: clientName,
           rg: rg,
           env: env,
           subnet: subnet,
           privateIP,
           sshPublicKeys: getSSHPublicKeysListArray(),
           customImageId,
-          vmTypeTag,
+          typeTag,
           customData,
           allocatePublicIP: true,
           createBeforeDestroy: true

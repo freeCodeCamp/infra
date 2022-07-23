@@ -2,6 +2,7 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
+  PrivateDnsARecord,
   ResourceGroup,
   Subnet,
   VirtualNetwork
@@ -9,7 +10,7 @@ import {
 
 import { getLatestImage, getVMList, getSSHPublicKeysListArray } from '../utils';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
-import { getCloudInitForNomadConsulServers } from '../config/cloud-init';
+import { getCloudInitForNomadConsulCluster } from '../config/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
@@ -66,14 +67,24 @@ export default class stgClusterServerStack extends TerraformStack {
       const startIndex = new Date().getUTCMonth() + 1; // Add 1 because January is 0.
 
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
-      const vmTypeTag = `${env}-nomad-server`;
-      const serverList = getVMList({ vmTypeTag, numberOfVMs, startIndex });
-      const customData = getCloudInitForNomadConsulServers(serverList);
+      const typeTag = `${env}-nomad-server`;
+      const serverList = getVMList({
+        env,
+        vmPrefix: 'ldr-',
+        typeTag,
+        numberOfVMs,
+        startIndex
+      });
+      const customData = getCloudInitForNomadConsulCluster({
+        dataCenter: `${env}-dc-${rg.location}`,
+        serverList,
+        clusterServerAgent: true
+      });
 
-      serverList.forEach(({ name: serverName, privateIP }) => {
-        createVirtualMachine(this, {
+      serverList.forEach(({ name: serverName, privateIP, privateDnsName }) => {
+        const vm = createVirtualMachine(this, {
           stackName: name,
-          vmName: `ldr-${serverName}`,
+          vmName: serverName,
           rg: rg,
           env: env,
           size: 'Standard_B2s',
@@ -82,8 +93,20 @@ export default class stgClusterServerStack extends TerraformStack {
           sshPublicKeys: getSSHPublicKeysListArray(),
           customImageId,
           customData,
-          vmTypeTag,
+          typeTag,
           allocatePublicIP: true
+        });
+        const prvDnsARecordIdentifier = `${env}-prv-dns-a-record-${serverName}`;
+        new PrivateDnsARecord(this, prvDnsARecordIdentifier, {
+          dependsOn: [vm],
+          name: privateDnsName,
+          resourceGroupName: 'ops-rg-common',
+          zoneName:
+            env === 'prd'
+              ? 'prvdns.freecodecamp.org'
+              : 'prvdns.freecodecamp.dev',
+          ttl: 60,
+          records: [privateIP]
         });
       });
     }
