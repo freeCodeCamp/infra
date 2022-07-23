@@ -39,6 +39,15 @@ export const getCloudInitForNomadConsulCluster = ({
     'base64'
   ).toString('ascii');
 
+  if (clusterServerAgent) {
+    console.warn(`
+
+    Warning:
+    Please implement passing the server list details for the client nodes.
+
+  `);
+  }
+
   // Append more cloud-init data
   const source = `${intialCloudInit}
 write_files:
@@ -55,6 +64,11 @@ write_files:
 
       bind_addr = "${privateIP}"
       client_addr = "${privateIP}"
+
+      retry_join = ["${serverList
+        .filter(s => s.privateIP !== privateIP)
+        .map(s => s.privateIP)
+        .join('", "')}"]
 ${
   clusterServerAgent
     ? `
@@ -81,6 +95,9 @@ ${
       datacenter = "${dataCenter}"
       data_dir   = "/opt/nomad"
       bind_addr = "${privateIP}"
+      consul {
+        address = "${privateIP}:8500"
+      }
 ${
   clusterServerAgent
     ? `
