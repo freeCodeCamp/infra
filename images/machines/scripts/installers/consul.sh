@@ -32,7 +32,7 @@ chown --recursive consul:consul /opt/consul
 # Common config
 mkdir --parents /etc/consul.d
 chmod 0644 /etc/consul.d
-chown --recursive consul:consul /etc/nomad.d
+chown --recursive consul:consul /etc/consul.d
 
 logger "Checking Consul version"
 consul version
