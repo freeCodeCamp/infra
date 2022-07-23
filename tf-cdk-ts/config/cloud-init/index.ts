@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 
-import { BASE64_ENCODED_CUSTOM_DATA } from '../env';
+import { BASE64_ENCODED_CUSTOM_DATA, CLUSTER_ENCRYPTION_KEY } from '../env';
 import { VMList } from '../../utils';
 
 const testSource = (source: string, debugCloudInit: boolean): boolean => {
@@ -42,17 +42,16 @@ export const getCloudInitForNomadConsulCluster = ({
 write_files:
   - path: /etc/consul.d/consul.hcl
     owner: consul:consul
-    permissions: 0640
     content: |
       datacenter = "${dataCenter}"
       data_dir = "/opt/consul"
 
       # Uncomment & Update the following lines after provisioning the cluster
 
-      # encrypt = "CHANGE THIS TO A VALID KEY"
-      # verify_incoming = true
-      # verify_outgoing = true
-      # verify_server_hostname = true
+      encrypt = "${CLUSTER_ENCRYPTION_KEY}"
+      verify_incoming = true
+      verify_outgoing = true
+      verify_server_hostname = true
 
       # ca_file = "<Consul configuration directory>/certs/consul-agent-ca.pem"
       # cert_file = "<Consul configuration directory>/certs/dc1-server-consul-0.pem"
@@ -76,15 +75,15 @@ ${
     ? `
   - path: /etc/consul.d/server.hcl
     owner: consul:consul
-    permissions: 0640
     content: |
       server = true
       bootstrap_expect = ${serverList.length}
 
       # Uncomment & Update the following lines after provisioning the cluster
-      connect {
-        enabled = true
-      }
+
+      # connect {
+      #   enabled = true
+      # }
 
       # addresses {
       #   grpc = "127.0.0.1"
@@ -94,15 +93,14 @@ ${
       #   grpc  = 8502
       # }
 
-      ui_config {
-        enabled = true
-      }
+      # ui_config {
+      #   enabled = true
+      # }
 `
     : ''
 }
   - path: /etc/nomad.d/nomad.hcl
     owner: nomad:nomad
-    permissions: 0755
     content: |
       datacenter = "${dataCenter}"
       data_dir   = "/opt/nomad"
@@ -111,7 +109,6 @@ ${
     ? `
   - path: '/etc/nomad.d/server.hcl'
     owner: nomad:nomad
-    permissions: 0755
     content: |
       server {
         enabled          = true
@@ -121,7 +118,6 @@ ${
     : `
   - path: '/etc/nomad.d/client.hcl'
     owner: nomad:nomad
-    permissions: 0755
     content: |
       client {
         enabled = true
@@ -189,7 +185,7 @@ runcmd:
 `;
 
   testSource(source, false); // Change the value to true to debug the cloud-init data
-  // console.log (source);   // Uncomment to debug the cloud-init data
+  // console.log(source); // Uncomment to debug the cloud-init data
 
   // Encode the cloud-init data to base64 from the 'source'
   return Buffer.from(source, 'utf8').toString('base64');

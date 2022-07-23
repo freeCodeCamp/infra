@@ -40,7 +40,9 @@ const {
   MYSQL_ADMIN_PASSWORD: mysqlAdminPassword,
 
   MYSQL_FS_SKU: mysqlFsSku,
-  MYSQL_FS_BACKUP_RETENTION_DAYS: mysqlFsBackupRetentionDays
+  MYSQL_FS_BACKUP_RETENTION_DAYS: mysqlFsBackupRetentionDays,
+
+  CLUSTER_ENCRYPTION_KEY: clusterEncryptionKey
 } = process.env;
 
 // TODO: Add valiadtion for all required env variables
@@ -66,3 +68,6 @@ export const MYSQL_FS_SKU: string = mysqlFsSku
 export const MYSQL_FS_BACKUP_RETENTION_DAYS: number = mysqlFsBackupRetentionDays
   ? Number(mysqlFsBackupRetentionDays)
   : 7;
+
+export const CLUSTER_ENCRYPTION_KEY: string =
+  String(clusterEncryptionKey).toString();
