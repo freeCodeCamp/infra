@@ -26,7 +26,7 @@
   "dependencies": {
     "@cdktf/provider-azurerm": "0.8.15",
     "cdktf": "0.11.2",
-    "constructs": "10.1.48"
+    "constructs": "10.1.54"
   },
   "devDependencies": {
     "@octokit/core": "3.6.0",
