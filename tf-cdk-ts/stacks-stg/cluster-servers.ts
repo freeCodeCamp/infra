@@ -75,13 +75,16 @@ export default class stgClusterServerStack extends TerraformStack {
         numberOfVMs,
         startIndex
       });
-      const customData = getCloudInitForNomadConsulCluster({
-        dataCenter: `${env}-dc-${rg.location}`,
-        serverList,
-        clusterServerAgent: true
-      });
 
+      let availabiltyzone = 0;
       serverList.forEach(({ name: serverName, privateIP, privateDnsName }) => {
+        availabiltyzone >= 3 ? (availabiltyzone = 1) : (availabiltyzone += 1);
+        const customData = getCloudInitForNomadConsulCluster({
+          dataCenter: `${env}-dc-${rg.location}`,
+          serverList,
+          privateIP,
+          clusterServerAgent: true
+        });
         const vm = createVirtualMachine(this, {
           stackName: name,
           vmName: serverName,
@@ -94,7 +97,8 @@ export default class stgClusterServerStack extends TerraformStack {
           customImageId,
           customData,
           typeTag,
-          allocatePublicIP: true
+          allocatePublicIP: true,
+          availabiltyzone: numberOfVMs > 1 ? availabiltyzone : 0
         });
         const prvDnsARecordIdentifier = `${env}-prv-dns-a-record-${serverName}`;
         new PrivateDnsARecord(this, prvDnsARecordIdentifier, {

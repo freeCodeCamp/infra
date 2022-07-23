@@ -25,10 +25,12 @@ const testSource = (source: string, debugCloudInit: boolean): boolean => {
 export const getCloudInitForNomadConsulCluster = ({
   dataCenter,
   serverList = [],
+  privateIP = '127.0.0.1',
   clusterServerAgent = false
 }: {
   dataCenter: string;
   serverList?: Array<VMList>;
+  privateIP?: string;
   clusterServerAgent?: boolean;
 }) => {
   // Decode the intial base64 encoded cloud-init data
@@ -46,55 +48,29 @@ write_files:
       datacenter = "${dataCenter}"
       data_dir = "/opt/consul"
 
-      # Uncomment & Update the following lines after provisioning the cluster
-
       encrypt = "${CLUSTER_ENCRYPTION_KEY}"
       verify_incoming = true
       verify_outgoing = true
       verify_server_hostname = true
 
-      # ca_file = "<Consul configuration directory>/certs/consul-agent-ca.pem"
-      # cert_file = "<Consul configuration directory>/certs/dc1-server-consul-0.pem"
-      # key_file = "<Consul configuration directory>/certs/dc1-server-consul-0-key.pem"
-
-      # auto_encrypt {
-      #   allow_tls = true
-      # }
-
-      # acl {
-      #   enabled = true
-      #   default_policy = "allow"
-      #   enable_token_persistence = true
-      # }
-
-      # performance {
-      #   raft_multiplier = 1
-      # }
+      bind_addr = "${privateIP}"
+      client_addr = "${privateIP}"
 ${
   clusterServerAgent
     ? `
-  - path: /etc/consul.d/server.hcl
-    owner: consul:consul
-    content: |
       server = true
       bootstrap_expect = ${serverList.length}
 
-      # Uncomment & Update the following lines after provisioning the cluster
-
-      # connect {
-      #   enabled = true
-      # }
+      connect {
+        enabled = true
+      }
 
       # addresses {
-      #   grpc = "127.0.0.1"
+      #   grpc = "${privateIP}"
       # }
 
       # ports {
       #   grpc  = 8502
-      # }
-
-      # ui_config {
-      #   enabled = true
       # }
 `
     : ''
@@ -104,27 +80,22 @@ ${
     content: |
       datacenter = "${dataCenter}"
       data_dir   = "/opt/nomad"
+      bind_addr = "${privateIP}"
 ${
   clusterServerAgent
     ? `
-  - path: '/etc/nomad.d/server.hcl'
-    owner: nomad:nomad
-    content: |
       server {
         enabled          = true
         bootstrap_expect = ${serverList.length}
       }
 `
     : `
-  - path: '/etc/nomad.d/client.hcl'
-    owner: nomad:nomad
-    content: |
       client {
         enabled = true
       }
 `
 }
-  - path: /etc/systemd/system/consul.service
+  - path: /usr/lib/systemd/system/consul.service
     owner: root:root
     content: |
       [Unit]
@@ -138,49 +109,53 @@ ${
       EnvironmentFile=-/etc/consul.d/consul.env
       User=consul
       Group=consul
-      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+      ExecStart=/usr/bin/consul agent -config-dir=/etc/consul.d/
       ExecReload=/bin/kill --signal HUP $MAINPID
       KillMode=process
       KillSignal=SIGTERM
       Restart=on-failure
+      RestartSec=2
+      StartLimitBurst=0
+      StartLimitIntervalSec=10
       LimitNOFILE=65536
 
       [Install]
       WantedBy=multi-user.target
 
-  - path: /etc/systemd/system/nomad.service
+  - path: /usr/lib/systemd/system/nomad.service
     owner: root:root
     content: |
       [Unit]
       Description=Nomad ${clusterServerAgent ? 'Server' : 'Client'} Agent
-      Documentation=https://www.nomadproject.io/docs/
-      Requires=network-online.target
+      Wants=network-online.target
       After=network-online.target
+      Wants=consul.service
+      After=consul.service
+
 
       [Service]
-      User=${clusterServerAgent ? 'nomad' : 'root'}
-      Group=${clusterServerAgent ? 'nomad' : 'root'}
+      EnvironmentFile=/etc/nomad.d/nomad.env
       ExecReload=/bin/kill -HUP $MAINPID
-      ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
+      ExecStart=/usr/bin/nomad agent -config /etc/nomad.d
       KillMode=process
       KillSignal=SIGINT
-      LimitNOFILE=infinity
+      LimitNOFILE=65536
       LimitNPROC=infinity
       Restart=on-failure
       RestartSec=2
       StartLimitBurst=0
       StartLimitIntervalSec=10
       TasksMax=infinity
+      OOMScoreAdjust=-1000
 
       [Install]
       WantedBy=multi-user.target
 
 runcmd:
-  - systemctl enable consul
-  - systemctl start consul
+  - systemctl daemon-reload
+  - systemctl restart consul
+  - systemctl restart nomad
   - systemctl status consul
-  - systemctl enable nomad
-  - systemctl start nomad
   - systemctl status nomad
 `;
 

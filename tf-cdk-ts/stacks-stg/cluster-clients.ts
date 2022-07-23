@@ -78,11 +78,12 @@ export default class stgClusterClientStack extends TerraformStack {
         suffix,
         startIndex
       });
-      const customData = getCloudInitForNomadConsulCluster({
-        dataCenter: `${env}-dc-${rg.location}`
-      });
 
       clientList.forEach(({ name: clientName, privateIP }) => {
+        const customData = getCloudInitForNomadConsulCluster({
+          dataCenter: `${env}-dc-${rg.location}`,
+          privateIP
+        });
         createVirtualMachine(this, {
           stackName: name,
           vmName: clientName,

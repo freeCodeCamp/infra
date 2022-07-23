@@ -25,6 +25,7 @@ interface fCCVirtualMachineConfig {
   allocatePublicIP?: boolean;
   createPublicDnsARecord?: boolean;
   createBeforeDestroy?: boolean;
+  availabiltyzone?: number;
 }
 
 // This is a fallback when custom data is not provided.
@@ -59,7 +60,8 @@ export const createVirtualMachine = (
     typeTag: typeTag = `${env}-vm`,
     allocatePublicIP = true,
     createPublicDnsARecord = true,
-    createBeforeDestroy = false
+    createBeforeDestroy = false,
+    availabiltyzone = 0
   } = config;
 
   const nsgIdentifier = `${env}-nsg-${vmName}`;
@@ -127,6 +129,7 @@ export const createVirtualMachine = (
     // computerName: String(vmIdentifier).replaceAll('-', ''),
     resourceGroupName: rg.name,
     location: rg.location,
+    zones: [`${availabiltyzone}`],
     tags: {
       'vm-type': typeTag
     },
