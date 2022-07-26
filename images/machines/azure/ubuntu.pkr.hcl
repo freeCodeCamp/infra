@@ -112,7 +112,6 @@ build {
       "${var.scripts_dir}/do-presetup.sh",
       "${var.scripts_dir}/installers/golang.sh",
       "${var.scripts_dir}/installers/docker.sh",
-      "${var.scripts_dir}/installers/docker-compose.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }
