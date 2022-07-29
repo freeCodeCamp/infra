@@ -71,7 +71,6 @@ export default class stgClusterClientStack extends TerraformStack {
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
       const typeTag = `${env}-nomad-client`;
       const clientList = getVMList({
-        env,
         vmPrefix: 'clt-',
         typeTag,
         numberOfVMs,

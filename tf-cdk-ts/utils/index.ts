@@ -136,12 +136,10 @@ export const getLatestImage = (imageType: string, location: string) => {
 export type VMList = {
   name: string;
   privateIP: string;
-  privateDnsName: string;
 };
 // If numberOfVMs = 5 & suffix = 20 VM IPs like 10.0.0.21-10.0.0.25 and so on
 // Adjust the startIndex to churn through the IPs
 export const getVMList = ({
-  env,
   vmPrefix = 'tst',
   typeTag,
   numberOfVMs,
@@ -149,7 +147,6 @@ export const getVMList = ({
   suffix = 10,
   startIndex = 1
 }: {
-  env: string;
   vmPrefix?: string;
   typeTag: string;
   numberOfVMs: number;
@@ -168,10 +165,7 @@ export const getVMList = ({
     })}`;
     machinesList.push({
       name,
-      privateIP: `${prefix}${suffix + i}`,
-      privateDnsName: `${name}.${
-        env === 'prd' ? 'prvdns.freecodecamp.org' : 'prvdns.freecodecamp.dev'
-      }`
+      privateIP: `${prefix}${suffix + i}`
     });
   }
   console.log(`Generating a list of ${numberOfVMs} VMs with the following properties:

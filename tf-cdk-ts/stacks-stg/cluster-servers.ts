@@ -2,7 +2,6 @@ import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
-  PrivateDnsARecord,
   ResourceGroup,
   Subnet,
   VirtualNetwork
@@ -70,7 +69,6 @@ export default class stgClusterServerStack extends TerraformStack {
       const customImageId = getLatestImage('NomadConsul', 'eastus').id;
       const typeTag = `${env}-nomad-server`;
       const serverList = getVMList({
-        env,
         vmPrefix: 'ldr-',
         typeTag,
         numberOfVMs,
@@ -78,7 +76,7 @@ export default class stgClusterServerStack extends TerraformStack {
       });
 
       let availabiltyzone = 0;
-      serverList.forEach(({ name: serverName, privateIP, privateDnsName }) => {
+      serverList.forEach(({ name: serverName, privateIP }) => {
         availabiltyzone >= 3 ? (availabiltyzone = 1) : (availabiltyzone += 1);
         const customData = getCloudInitForNomadConsulCluster({
           dataCenter: `${env}-dc-${CLUSTER_DATA_CENTER}`,
@@ -86,7 +84,7 @@ export default class stgClusterServerStack extends TerraformStack {
           privateIP,
           clusterServerAgent: true
         });
-        const vm = createVirtualMachine(this, {
+        createVirtualMachine(this, {
           allocatePublicIP: true,
           availabiltyzone: numberOfVMs > 1 ? availabiltyzone : 0,
           createBeforeDestroy: true,
@@ -101,18 +99,6 @@ export default class stgClusterServerStack extends TerraformStack {
           subnet: subnet,
           typeTag,
           vmName: serverName
-        });
-        const prvDnsARecordIdentifier = `${env}-prv-dns-a-record-${serverName}`;
-        new PrivateDnsARecord(this, prvDnsARecordIdentifier, {
-          dependsOn: [vm],
-          name: privateDnsName,
-          resourceGroupName: 'ops-rg-common',
-          zoneName:
-            env === 'prd'
-              ? 'prvdns.freecodecamp.org'
-              : 'prvdns.freecodecamp.dev',
-          ttl: 60,
-          records: [privateIP]
         });
       });
     }
