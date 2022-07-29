@@ -3,7 +3,6 @@ import { TerraformStack } from 'cdktf';
 import {
   AzurermProvider,
   DnsZone,
-  PrivateDnsZone,
   ResourceGroup,
   SshPublicKey
 } from '@cdktf/provider-azurerm';
@@ -50,24 +49,28 @@ export default class CommonStack extends TerraformStack {
           const sshPublicKeyIdentifier = `${env}-ssh-key-${member.username}-${
             index + 1
           }`;
-          new SshPublicKey(this, sshPublicKeyIdentifier, {
-            dependsOn: [rg],
-            name: sshPublicKeyIdentifier,
-            resourceGroupName: rg.name,
-            location: rg.location,
-            publicKey: key
-          });
+
+          const isRSAKey = key.startsWith('ssh-rsa');
+          isRSAKey
+            ? new SshPublicKey(this, sshPublicKeyIdentifier, {
+                dependsOn: [rg],
+                name: sshPublicKeyIdentifier,
+                resourceGroupName: rg.name,
+                location: rg.location,
+                publicKey: key
+              })
+            : console.error(`
+
+    Warning:
+    Skipping SSH key ${key.slice(0, 20)}...${key.slice(-20)} from the user "${
+                member.username
+              }" because it is not a RSA-based key.
+    Only RSA-based keys are supported by Azure.
+
+          `);
         });
       }
     );
-
-    // Create Private DNS Zones for each domain
-    tlds?.forEach((tld: string) => {
-      new PrivateDnsZone(this, `${env}-prvdns-${tld}`, {
-        name: `prvdns.freecodecamp.${tld}`,
-        resourceGroupName: rg.name
-      });
-    });
 
     // Create Public DNS Zones for each domain
     tlds?.forEach((tld: string) => {
