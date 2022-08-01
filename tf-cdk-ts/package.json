@@ -28,12 +28,12 @@
   "dependencies": {
     "@cdktf/provider-azurerm": "0.8.15",
     "cdktf": "0.11.2",
-    "constructs": "10.1.62"
+    "constructs": "10.1.63"
   },
   "devDependencies": {
     "@azure/arm-compute": "19.1.0",
     "@azure/identity": "2.1.0",
-    "@octokit/core": "3.6.0",
+    "@octokit/core": "4.0.4",
     "@types/jest": "27.5.2",
     "@types/js-yaml": "4.0.5",
     "@types/node": "17.0.21",
@@ -41,7 +41,7 @@
     "@typescript-eslint/parser": "5.31.0",
     "cdktf-cli": "0.11.2",
     "dotenv": "16.0.1",
-    "eslint": "8.20.0",
+    "eslint": "8.21.0",
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-prettier": "4.2.1",
     "husky": "8.0.1",
