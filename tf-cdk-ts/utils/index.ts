@@ -1,15 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { customAlphabet } from 'nanoid';
 import { uniqueNamesGenerator, colors, animals } from 'unique-names-generator';
-
-//
-// Working with random IDs & Names
-//
-const alphabet =
-  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const nanoid = customAlphabet(alphabet, 5);
-export const generateNanoid = (): string => nanoid();
 
 //
 // Working with SSH Public Keys
