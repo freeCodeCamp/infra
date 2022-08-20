@@ -33,7 +33,7 @@
   "devDependencies": {
     "@azure/arm-compute": "19.1.0",
     "@azure/identity": "2.1.0",
-    "@octokit/core": "4.0.4",
+    "@octokit/core": "4.0.5",
     "@types/jest": "27.5.2",
     "@types/js-yaml": "4.0.5",
     "@types/node": "17.0.21",
