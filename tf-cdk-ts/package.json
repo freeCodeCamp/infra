@@ -26,8 +26,8 @@
     "**/*": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "0.8.15",
-    "cdktf": "0.11.2",
+    "@cdktf/provider-azurerm": "2.0.14",
+    "cdktf": "0.12.2",
     "constructs": "10.1.109"
   },
   "devDependencies": {
@@ -39,7 +39,7 @@
     "@types/node": "17.0.21",
     "@typescript-eslint/eslint-plugin": "5.38.0",
     "@typescript-eslint/parser": "5.38.0",
-    "cdktf-cli": "0.11.2",
+    "cdktf-cli": "0.12.2",
     "dotenv": "16.0.2",
     "eslint": "8.23.1",
     "eslint-config-prettier": "8.5.0",
