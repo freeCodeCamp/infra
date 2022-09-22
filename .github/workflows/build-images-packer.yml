@@ -43,7 +43,7 @@ jobs:
 
       # Packer's official GitHub Actions are unstable & outdated, use a community action instead
       - name: Use latest Packer
-        uses: hashicorp-contrib/setup-packer@b9dd0b644cd73b8fe7ae5e96f6387015d25401ca # tag=v1
+        uses: hashicorp-contrib/setup-packer@ee5bed669b01ca73e42651206470fc355a60400d # tag=v2
 
       - name: Check Version
         run: |
