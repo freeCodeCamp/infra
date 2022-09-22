@@ -1,4 +1,4 @@
-FROM node:16-alpine
+FROM node:18-alpine
 RUN npm install -g --progress=false serve@13
 
 ARG BUILD_LANGUAGE
