@@ -26,7 +26,7 @@
     "**/*": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@cdktf/provider-azurerm": "2.0.14",
+    "@cdktf/provider-azurerm": "2.0.15",
     "cdktf": "0.12.2",
     "constructs": "10.1.109"
   },
