@@ -1,22 +1,19 @@
-locals {
-  environment = "default"
-  aws_region  = "us-east-1"
-}
 
 resource "random_id" "random" {
   byte_length = 20
 }
-
 module "runners" {
-  source                          = "github.com/philips-labs/terraform-aws-github-runner"
+  source                          = "philips-labs/github-runner/aws"
+  version                         = "1.10.0"
   create_service_linked_role_spot = true
-  aws_region                      = local.aws_region
+  aws_region                      = var.aws_region
   vpc_id                          = module.vpc.vpc_id
   subnet_ids                      = module.vpc.private_subnets
 
-  environment = local.environment
+  prefix = var.environment
   tags = {
-    Project = "GitHubRunner"
+    Project     = "GitHubRunner"
+    Environment = var.environment
   }
 
   github_app = {
