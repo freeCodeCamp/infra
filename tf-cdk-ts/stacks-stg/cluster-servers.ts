@@ -10,7 +10,7 @@ import {
 import { getLatestImage, getVMList, getSSHPublicKeysListArray } from '../utils';
 import { CLUSTER_DATA_CENTER, CLUSTER_CURRENT_VERSION } from './../config/env';
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
-import { getCloudInitForNomadConsulCluster } from '../config/cloud-init';
+import { getCloudInitData } from '../config/cloud-init';
 import { StackConfigOptions } from '../components/remote-backend/index';
 import { createVirtualMachine } from '../components/virtual-machine';
 
@@ -78,12 +78,7 @@ export default class stgClusterServerStack extends TerraformStack {
       let availabiltyzone = 0;
       serverList.forEach(({ name: serverName, privateIP }) => {
         availabiltyzone >= 3 ? (availabiltyzone = 1) : (availabiltyzone += 1);
-        const customData = getCloudInitForNomadConsulCluster({
-          dataCenter: `${env}-dc-${CLUSTER_DATA_CENTER}`,
-          serverList,
-          privateIP,
-          clusterServerAgent: true
-        });
+        const customData = getCloudInitData();
         createVirtualMachine(this, {
           allocatePublicIP: true,
           availabiltyzone: numberOfVMs > 1 ? availabiltyzone : 0,
