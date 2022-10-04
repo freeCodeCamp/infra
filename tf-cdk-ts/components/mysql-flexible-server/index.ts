@@ -1,8 +1,8 @@
+import { Construct } from 'constructs';
 import {
   MysqlFlexibleServer,
   MysqlFlexibleServerConfig
 } from '@cdktf/provider-azurerm/lib/mysql-flexible-server';
-import { Construct } from 'constructs';
 
 import { MYSQL_ADMIN_USERNAME, MYSQL_ADMIN_PASSWORD } from '../../config/env';
 

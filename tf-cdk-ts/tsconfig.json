@@ -22,7 +22,7 @@
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "stripInternal": true,
-    "target": "ES2021",
+    "target": "ES2021"
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "cdktf.out"]
