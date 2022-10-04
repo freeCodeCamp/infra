@@ -7,8 +7,7 @@
     "upgrade": "npm run upgrade:cdk && npm run upgrade:cli",
     "upgrade:cdk": "npm install --save-exact cdktf@latest",
     "upgrade:cli": "npm install --save-dev --save-exact cdktf-cli@latest",
-    "clean": "tsc --build --clean",
-    "prebuild": "npm run clean && npx ts-node ./scripts/prebuild.ts",
+    "prebuild": "npx ts-node ./scripts/prebuild.ts",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "postbuild": "npx cdktf synth",
@@ -28,7 +27,7 @@
   "dependencies": {
     "@cdktf/provider-azurerm": "2.0.20",
     "cdktf": "0.12.3",
-    "constructs": "10.1.119"
+    "constructs": "10.1.121"
   },
   "devDependencies": {
     "@azure/arm-compute": "19.2.0",
@@ -36,9 +35,9 @@
     "@octokit/core": "4.0.5",
     "@types/jest": "29.1.1",
     "@types/js-yaml": "4.0.5",
-    "@types/node": "18.7.18",
-    "@typescript-eslint/eslint-plugin": "5.38.1",
-    "@typescript-eslint/parser": "5.38.1",
+    "@types/node": "18.8.1",
+    "@typescript-eslint/eslint-plugin": "5.39.0",
+    "@typescript-eslint/parser": "5.39.0",
     "cdktf-cli": "0.12.3",
     "dotenv": "16.0.3",
     "eslint": "8.24.0",
