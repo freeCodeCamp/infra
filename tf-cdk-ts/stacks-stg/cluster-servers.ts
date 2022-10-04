@@ -1,11 +1,9 @@
 import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
-import {
-  AzurermProvider,
-  ResourceGroup,
-  Subnet,
-  VirtualNetwork
-} from '@cdktf/provider-azurerm';
+import { AzurermProvider } from '@cdktf/provider-azurerm/lib/provider';
+import { ResourceGroup } from '@cdktf/provider-azurerm/lib/resource-group';
+import { Subnet } from '@cdktf/provider-azurerm/lib/subnet';
+import { VirtualNetwork } from '@cdktf/provider-azurerm/lib/virtual-network';
 
 import { getLatestImage, getVMList, getSSHPublicKeysListArray } from '../utils';
 import { CLUSTER_DATA_CENTER, CLUSTER_CURRENT_VERSION } from './../config/env';

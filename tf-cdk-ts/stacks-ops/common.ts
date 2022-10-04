@@ -1,11 +1,9 @@
 import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
-import {
-  AzurermProvider,
-  DnsZone,
-  ResourceGroup,
-  SshPublicKey
-} from '@cdktf/provider-azurerm';
+import { AzurermProvider } from '@cdktf/provider-azurerm/lib/provider';
+import { ResourceGroup } from '@cdktf/provider-azurerm/lib/resource-group';
+import { DnsZone } from '@cdktf/provider-azurerm/lib/dns-zone';
+import { SshPublicKey } from '@cdktf/provider-azurerm/lib/ssh-public-key';
 
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';

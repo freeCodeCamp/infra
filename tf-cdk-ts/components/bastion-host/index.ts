@@ -1,10 +1,8 @@
 import { Construct } from 'constructs';
-import {
-  ResourceGroup,
-  VirtualNetwork,
-  Subnet,
-  BastionHost
-} from '@cdktf/provider-azurerm';
+import { BastionHost } from '@cdktf/provider-azurerm/lib/bastion-host';
+import { ResourceGroup } from '@cdktf/provider-azurerm/lib/resource-group';
+import { Subnet } from '@cdktf/provider-azurerm/lib/subnet';
+import { VirtualNetwork } from '@cdktf/provider-azurerm/lib/virtual-network';
 
 import { createPublicIp } from '../public-ip';
 
