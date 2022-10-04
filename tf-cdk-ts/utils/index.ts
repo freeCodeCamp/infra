@@ -110,6 +110,12 @@ export const getLatestImage = (imageType: string, location: string) => {
       // localeCompare returns -1, 0, 1 if a is 'before' b, t
       (a: MachineImage, b: MachineImage) => -1 * a.name.localeCompare(b.name)
     )[0];
+    if (!latestImage) {
+      throw new Error();
+    }
+    console.log(
+      `Latest image for ${imageType} in ${location} is ${latestImage}`
+    );
     return latestImage;
   } catch (error) {
     throw new Error(`

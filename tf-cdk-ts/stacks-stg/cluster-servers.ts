@@ -66,7 +66,10 @@ export default class stgClusterServerStack extends TerraformStack {
       // This will cycle the VMs through the year.
       const startIndex = new Date().getUTCMonth() + CLUSTER_CURRENT_VERSION; // Add 1 because January is 0.
 
-      const customImageId = getLatestImage('NomadConsul', 'eastus').id;
+      const customImageId = getLatestImage(
+        'NomadConsul',
+        CLUSTER_DATA_CENTER
+      )?.id;
       const typeTag = `${env}-nomad-server`;
       const serverList = getVMList({
         vmPrefix: 'ldr-',
@@ -80,7 +83,7 @@ export default class stgClusterServerStack extends TerraformStack {
         availabiltyzone >= 3 ? (availabiltyzone = 1) : (availabiltyzone += 1);
         const customData = getCloudInitData();
         createVirtualMachine(this, {
-          allocatePublicIP: true,
+          allocatePublicIP: false,
           availabiltyzone: numberOfVMs > 1 ? availabiltyzone : 0,
           createBeforeDestroy: true,
           customData,
