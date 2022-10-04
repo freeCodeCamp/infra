@@ -1,5 +1,7 @@
 import { Construct } from 'constructs';
-import { DnsARecord, PublicIp, ResourceGroup } from '@cdktf/provider-azurerm';
+import { DnsARecord } from '@cdktf/provider-azurerm/lib/dns-a-record';
+import { PublicIp } from '@cdktf/provider-azurerm/lib/public-ip';
+import { ResourceGroup } from '@cdktf/provider-azurerm/lib/resource-group';
 
 export const createPublicIp = (
   stack: Construct,

@@ -3,7 +3,9 @@
     "alwaysStrict": true,
     "charset": "utf8",
     "declaration": true,
+    "esModuleInterop": true,
     "experimentalDecorators": true,
+    "incremental": true,
     "inlineSourceMap": true,
     "inlineSources": true,
     "lib": ["es2021"],
@@ -21,8 +23,6 @@
     "strictPropertyInitialization": true,
     "stripInternal": true,
     "target": "ES2021",
-    "incremental": true,
-    "esModuleInterop": true
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "cdktf.out"]

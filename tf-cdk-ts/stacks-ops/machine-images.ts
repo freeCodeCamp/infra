@@ -1,6 +1,7 @@
 import { Construct } from 'constructs';
 import { TerraformStack } from 'cdktf';
-import { AzurermProvider, ResourceGroup } from '@cdktf/provider-azurerm';
+import { AzurermProvider } from '@cdktf/provider-azurerm/lib/provider';
+import { ResourceGroup } from '@cdktf/provider-azurerm/lib/resource-group';
 
 import { createAzureRBACServicePrincipal } from '../config/service_principal';
 import { StackConfigOptions } from '../components/remote-backend/index';

@@ -75,3 +75,5 @@ tf-cdk-ts/scripts/data/
 !jest.config.js
 !setup.js
 !.eslintrc.js
+
+dist

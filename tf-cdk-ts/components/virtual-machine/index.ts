@@ -1,12 +1,10 @@
 import { Construct } from 'constructs';
-import {
-  ResourceGroup,
-  Subnet,
-  VirtualMachine,
-  NetworkInterface,
-  NetworkSecurityGroup,
-  NetworkInterfaceSecurityGroupAssociation
-} from '@cdktf/provider-azurerm';
+import { NetworkInterface } from '@cdktf/provider-azurerm/lib/network-interface';
+import { NetworkInterfaceSecurityGroupAssociation } from '@cdktf/provider-azurerm/lib/network-interface-security-group-association';
+import { NetworkSecurityGroup } from '@cdktf/provider-azurerm/lib/network-security-group';
+import { ResourceGroup } from '@cdktf/provider-azurerm/lib/resource-group';
+import { Subnet } from '@cdktf/provider-azurerm/lib/subnet';
+import { VirtualMachine } from '@cdktf/provider-azurerm/lib/virtual-machine';
 
 import { createPublicIp } from '../public-ip';
 
