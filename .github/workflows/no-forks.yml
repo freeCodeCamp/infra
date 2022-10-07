@@ -1,0 +1,26 @@
+name: GitHub - No PRs from Forks
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  no-forks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and Close
+        uses: actions/github-script@7dff1a87643417cf3b95bb10b29f4c4bc60d8ebd # tag=v6
+        if: ${{ github.event.pull_request.head.repo.full_name != 'freeCodeCamp/news' }}
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "This is a quick reminder that we can not accept pull requests from forks (including staff and prior contributors).\n\nThis repo is a \"special\" case because of how we build, test and deploy the codebase. If you are working on something, Please open a new pull request from a branch on this repository."
+            })
+            github.rest.pulls.update({
+              pull_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed'
+            })
