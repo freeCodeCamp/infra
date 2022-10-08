@@ -33,7 +33,7 @@
     "@azure/arm-compute": "19.2.0",
     "@azure/identity": "3.0.0",
     "@octokit/core": "4.0.5",
-    "@types/jest": "29.1.1",
+    "@types/jest": "29.1.2",
     "@types/js-yaml": "4.0.5",
     "@types/node": "18.8.1",
     "@typescript-eslint/eslint-plugin": "5.39.0",
