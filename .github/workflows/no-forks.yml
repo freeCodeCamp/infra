@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Comment and Close
         uses: actions/github-script@7dff1a87643417cf3b95bb10b29f4c4bc60d8ebd # tag=v6
-        if: ${{ github.event.pull_request.head.repo.full_name != 'freeCodeCamp/news' }}
+        if: ${{ github.event.pull_request.head.repo.full_name != 'freeCodeCamp/infra' }}
         with:
           script: |
             github.rest.issues.createComment({
