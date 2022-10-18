@@ -54,7 +54,7 @@ jobs:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@0636e30522ac1d88b3de47b7d58b734edf0f153f # tag=v1
+        uses: dopplerhq/cli-action@41106dbef2e821dcf2250b0c936a616a438a278a # tag=v2
 
       - name: Run Tests
         run: |
