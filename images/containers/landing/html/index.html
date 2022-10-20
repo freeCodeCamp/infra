@@ -29,7 +29,6 @@
 
       .block-middle {
         display: block;
-        vertical-align: middle;
         width: 60vw;
       }
 
@@ -57,10 +56,22 @@
 
   <body>
     <div class="block-middle">
+      <h1>freeCodeCamp</h1>
       <h2>
         We are working on something new, and it will be available here shortly.
       </h2>
-      <p>Thanks for your patience, and happy coding!</p>
+      <p>Thanks for your patience and happy coding.</p>
+      <br />
+      <code> Here is a random string: <span id="random"></span> </code>
     </div>
+    <script>
+      // Generate a random sring and display it in the div with the id "random"
+      const randomString = () => {
+        const random = Math.random().toString(36).substring(2, 15);
+        const random2 = Math.random().toString(36).substring(2, 15);
+        return random + random2;
+      };
+      document.getElementById('random').innerHTML = randomString();
+    </script>
   </body>
 </html>
