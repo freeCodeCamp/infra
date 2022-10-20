@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - "images/containers/**/*"
+      - 'images/containers/**/*'
 
 jobs:
   build-and-push-image:
@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        images: [serve, landing-initial]
+        images: [serve, landing]
 
     steps:
       - name: Checkout code
