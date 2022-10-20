@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source=https://github.com/freecodecamp/infra
 LABEL org.opencontainers.image.description="A quick landing page for the freeCodeCamp.org Docker containers."
 LABEL org.opencontainers.image.licenses=BSD-3-Clause
 
-RUN npm install -g --progress=false serve@13
+RUN npm install -g --progress=false serve@14
 
 ARG BUILD_LANGUAGE
 
