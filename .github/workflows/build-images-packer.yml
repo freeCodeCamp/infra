@@ -1,4 +1,4 @@
-name: Build Machine Images
+name: CD - Machine Images
 
 on:
   workflow_dispatch:
