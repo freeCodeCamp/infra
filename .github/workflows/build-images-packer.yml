@@ -12,6 +12,15 @@ on:
           - 'eastus'
           - 'westus'
           - 'centralus'
+      ubuntu-flavor:
+        description: 'the Ubuntu flavor to build the image in'
+        required: true
+        default: 'ubuntu-20.04'
+        type: choice
+        options:
+          - 'ubuntu-22.04'
+          - 'ubuntu-20.04'
+          - 'ubuntu-18.04'
       child_image:
         description: 'the child image to build'
         required: true
@@ -25,7 +34,7 @@ on:
 jobs:
   build-images:
     name: Build Images
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -52,16 +61,39 @@ jobs:
       - name: Build Ubuntu Image
         id: build-ubuntu-image
         run: |
+          IMAGE_OFFER='0001-com-ubuntu-server-focal'
+          IMAGE_SKU='22_04-LTS-gen2'
+          case "${{ inputs.ubuntu-flavor }}" in
+            ubuntu-22.04)
+              IMAGE_OFFER='0001-com-ubuntu-server-jammy'
+              IMAGE_SKU='22_04-LTS-gen2'
+              ;;
+            ubuntu-20.04)
+              IMAGE_OFFER='0001-com-ubuntu-server-focal'
+              IMAGE_SKU='20_04-LTS-gen2'
+              ;;
+            ubuntu-18.04)
+              IMAGE_OFFER='0001-com-ubuntu-server-bionic'
+              IMAGE_SKU='18_04-LTS-gen2'
+              ;;
+          esac
+
           packer init \
           -var location=${{ inputs.region }} \
+          -var image_offer=${IMAGE_OFFER} \
+          -var image_sku=${IMAGE_SKU} \
           ./images/machines/azure/ubuntu.pkr.hcl
 
           packer validate \
+          -var image_offer=${IMAGE_OFFER} \
+          -var image_sku=${IMAGE_SKU} \
           -var location=${{ inputs.region }} \
           ./images/machines/azure/ubuntu.pkr.hcl
 
           packer build \
           -var location=${{ inputs.region }} \
+          -var image_offer=${IMAGE_OFFER} \
+          -var image_sku=${IMAGE_SKU} \
           ./images/machines/azure/ubuntu.pkr.hcl
 
           UBUNTU_ARTIFACT_NAME=$(cat manifest.json | jq '.builds[].artifact_id' | sed -r 's|.*/(.*)"$|\1|')
