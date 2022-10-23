@@ -27,7 +27,7 @@
   "dependencies": {
     "@cdktf/provider-azurerm": "3.0.12",
     "cdktf": "0.13.1",
-    "constructs": "10.1.136"
+    "constructs": "10.1.137"
   },
   "devDependencies": {
     "@azure/arm-compute": "19.2.0",
