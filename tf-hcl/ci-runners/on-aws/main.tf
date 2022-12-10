@@ -4,7 +4,7 @@ resource "random_id" "random" {
 }
 module "runners" {
   source                          = "philips-labs/github-runner/aws"
-  version                         = "1.17.0"
+  version                         = "1.18.0"
   create_service_linked_role_spot = true
   aws_region                      = var.aws_region
   vpc_id                          = module.vpc.vpc_id
