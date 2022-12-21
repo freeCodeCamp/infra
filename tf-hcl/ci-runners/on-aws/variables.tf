@@ -18,6 +18,16 @@ variable "aws_region" {
 }
 
 variable "environment" {
-  default     = "default"
+  default     = "ubuntu"
   description = "Environment name to use for tagging resources"
+}
+
+variable "runner_os" {
+  type    = string
+  default = "linux"
+}
+
+variable "ami_name_filter" {
+  type    = string
+  default = "github-runner-amzn2-x86_64-*"
 }
