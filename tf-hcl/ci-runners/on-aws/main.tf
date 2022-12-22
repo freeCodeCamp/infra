@@ -38,7 +38,7 @@ module "runners" {
   # enable access to the runners via SSM
   enable_ssm_on_runners = true
 
-  minimum_running_time_in_minutes = 60
+  minimum_running_time_in_minutes = 30
 
   # idle_config = [{
   #   # https://github.com/philips-labs/terraform-aws-github-runner#supported-config-
@@ -106,8 +106,8 @@ module "runners" {
   # scale_down_schedule_expression = "cron(* * * * ? *)"
 
   # More on AWS Cron Expressions: https://stackoverflow.com/a/39508593/1932901
-  # Will scale down to minimum runners if there are no builds in the queue in the last 2 hours
-  scale_down_schedule_expression = "cron(0 0/2 * * ? *)"
+  # Will scale down to minimum runners if there are no builds in the queue in the last 1 hours
+  scale_down_schedule_expression = "cron(0 0/1 * * ? *)"
 }
 
 terraform {
