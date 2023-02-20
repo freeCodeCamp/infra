@@ -55,7 +55,7 @@ variable "custom_managed_image_name" {
   }
 }
 
-variable "artifact_image_type" { default = "NomadConsul" }
+variable "artifact_image_type" { default = "Nomad" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
@@ -70,7 +70,7 @@ locals {
   artifact_name = "${var.artifact_image_type}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
 }
 
-source "azure-arm" "nomad-consul" {
+source "azure-arm" "nomad" {
 
   # AzureRM Parameters: https://www.packer.io/docs/builders/azure/arm
   async_resourcegroup_delete = true
@@ -104,8 +104,8 @@ source "azure-arm" "nomad-consul" {
 }
 
 build {
-  name    = "nomad-consul"
-  sources = ["source.azure-arm.nomad-consul"]
+  name    = "nomad"
+  sources = ["source.azure-arm.nomad"]
 
   # provisioner "file" {
   #   source      = "${var.configs_dir}/nomad"
@@ -119,7 +119,6 @@ build {
     scripts = [
       "${var.scripts_dir}/do-presetup.sh",
       "${var.scripts_dir}/installers/nomad.sh",
-      "${var.scripts_dir}/installers/consul.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }
