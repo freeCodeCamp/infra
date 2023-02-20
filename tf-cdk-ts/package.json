@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@cdktf/provider-azurerm": "^4.0.0",
-    "cdktf": "^0.14.1",
+    "cdktf": "^0.15.0",
     "constructs": "10.1.255"
   },
   "devDependencies": {
@@ -38,7 +38,7 @@
     "@types/node": "18.14.0",
     "@typescript-eslint/eslint-plugin": "5.53.0",
     "@typescript-eslint/parser": "5.53.0",
-    "cdktf-cli": "^0.14.1",
+    "cdktf-cli": "^0.15.0",
     "dotenv": "16.0.3",
     "eslint": "8.34.0",
     "eslint-config-prettier": "8.6.0",
