@@ -25,7 +25,7 @@ else
 fi
 
 logger "Installing Nomad"
-export NOMAD_VERSION="1.1.0"
+export NOMAD_VERSION="1.4.4-1"
 sudo apt-get update
 sudo apt-get install -y nomad=$NOMAD_VERSION
 

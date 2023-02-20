@@ -47,9 +47,9 @@ variable "az_subscription_id" {
   }
 }
 
-variable "image_offer" { default = "0001-com-ubuntu-server-jammy" }
+variable "image_offer" { default = "0001-com-ubuntu-server-focal" }
 variable "image_publisher" { default = "Canonical" }
-variable "image_sku" { default = "22_04-LTS-gen2" }
+variable "image_sku" { default = "20_04-LTS-gen2" }
 
 variable "artifact_image_type" { default = "Ubuntu" }
 variable "location" { default = "eastus" }

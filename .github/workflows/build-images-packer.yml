@@ -29,7 +29,7 @@ on:
         options:
           - 'none'
           - 'nginx'
-          - 'nomad-consul'
+          - 'nomad'
 
 jobs:
   build-images:

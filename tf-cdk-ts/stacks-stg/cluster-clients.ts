@@ -66,10 +66,7 @@ export default class stgClusterClientStack extends TerraformStack {
       // This will cycle the VMs through the year.
       const startIndex = new Date().getUTCMonth() + CLUSTER_CURRENT_VERSION;
 
-      const customImageId = getLatestImage(
-        'NomadConsul',
-        CLUSTER_DATA_CENTER
-      )?.id;
+      const customImageId = getLatestImage('Nomad', CLUSTER_DATA_CENTER)?.id;
       const typeTag = `${env}-nomad-client`;
       const clientList = getVMList({
         vmPrefix: 'clt-',
