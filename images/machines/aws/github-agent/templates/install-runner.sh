@@ -22,7 +22,6 @@ echo "Creating actions-runner directory for the GH Action installation"
 cd /opt/
 mkdir -p actions-runner && cd actions-runner
 
-
 if [[ -n "$RUNNER_TARBALL_URL" ]]; then
   echo "Downloading the GH Action runner from $RUNNER_TARBALL_URL to $file_name"
   curl -o $file_name -L "$RUNNER_TARBALL_URL"
@@ -48,8 +47,8 @@ fi
 
 os_id=$(awk -F= '/^ID/{print $2}' /etc/os-release)
 if [[ "$os_id" =~ ^ubuntu.* ]]; then
-    echo "Installing dependencies"
-    ./bin/installdependencies.sh
+  echo "Installing dependencies"
+  ./bin/installdependencies.sh
 fi
 
 echo "Set file ownership of action runner"
