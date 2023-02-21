@@ -7,7 +7,7 @@ data "aws_caller_identity" "current" {}
 
 module "runners" {
   source                          = "philips-labs/github-runner/aws"
-  version                         = "1.18.2"
+  version                         = "2.2.1"
   create_service_linked_role_spot = true
   aws_region                      = var.aws_region
   vpc_id                          = module.vpc.vpc_id
@@ -55,8 +55,8 @@ module "runners" {
   ami_filter = {
     name = ["github-runner-ubuntu-focal-amd64-*"]
   }
-  ami_owners = [data.aws_caller_identity.current.account_id]
-  enabled_userdata = false
+  ami_owners      = [data.aws_caller_identity.current.account_id]
+  enable_userdata = false
 
   block_device_mappings = [{
     # Set the block device name for Ubuntu root device
@@ -100,7 +100,7 @@ module "runners" {
   runners_maximum_count = 10
 
   # set up a fifo queue to remain order
-  fifo_build_queue = true
+  enable_fifo_build_queue = true
 
   # override scaling down
   # scale_down_schedule_expression = "cron(* * * * ? *)"
