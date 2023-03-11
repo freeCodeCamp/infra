@@ -7,7 +7,7 @@ data "aws_caller_identity" "current" {}
 
 module "runners" {
   source                          = "philips-labs/github-runner/aws"
-  version                         = "2.3.0"
+  version                         = "2.5.0"
   create_service_linked_role_spot = true
   aws_region                      = var.aws_region
   vpc_id                          = module.vpc.vpc_id
