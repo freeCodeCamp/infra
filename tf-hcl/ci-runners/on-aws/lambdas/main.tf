@@ -1,21 +1,17 @@
-locals {
-  version = "v2.2.1"
-}
-
 module "lambdas" {
   source = "github.com/philips-labs/terraform-aws-github-runner//modules/download-lambda"
   lambdas = [
     {
       name = "webhook"
-      tag  = local.version
+      tag  = var.download_lambda_tag
     },
     {
       name = "runners"
-      tag  = local.version
+      tag  = var.download_lambda_tag
     },
     {
       name = "runner-binaries-syncer"
-      tag  = local.version
+      tag  = var.download_lambda_tag
     }
   ]
 }

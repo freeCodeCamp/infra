@@ -25,10 +25,11 @@ module "runners" {
     webhook_secret = random_id.random.hex
   }
 
-  # Grab zip files via lambda_download
-  webhook_lambda_zip                = "lambdas-download/webhook.zip"
-  runner_binaries_syncer_lambda_zip = "lambdas-download/runner-binaries-syncer.zip"
-  runners_lambda_zip                = "lambdas-download/runners.zip"
+  # Grab zip files via the download-lambda module into the lambdas folder
+  # See the makefile for more details
+  webhook_lambda_zip                = "lambdas/webhook.zip"
+  runner_binaries_syncer_lambda_zip = "lambdas/runner-binaries-syncer.zip"
+  runners_lambda_zip                = "lambdas/runners.zip"
 
   enable_organization_runners = false
   runner_extra_labels         = "ubuntu,on-aws"
