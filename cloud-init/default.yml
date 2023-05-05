@@ -13,5 +13,4 @@ users:
     ssh_import_id:
       - gh:camperbot
       - gh:raisedadead
-
 final_message: 'Setup complete'
