@@ -1,0 +1,36 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
+packages:
+  - unattended-upgrades
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+  - lsb-release
+users:
+  - name: freecodecamp
+    groups: sudo
+    ansible.builtin.shell:  /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_import_id:
+      - gh:camperbot
+      - gh:raisedadead
+runcmd:
+  # This will install docker on the virtual machine and add the freeCodeCamp user to docker usergroup
+  - sudo mkdir -p /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor
+    -o /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture)
+    signed-by=/etc/apt/keyrings/docker.gpg]
+    https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io
+    docker-compose-plugin
+  - systemctl start docker
+  - systemctl enable docker
+  - usermod -aG docker freecodecamp
+final_message: 'Setup complete'
