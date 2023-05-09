@@ -7,8 +7,7 @@ packer {
   }
 }
 
-variable "scripts_dir" { default = "images/machines/scripts" }
-variable "configs_dir" { default = "images/machines/configs" }
+variable "scripts_dir" { default = "images/machines/linode/scripts" }
 
 locals { image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}" }
 
@@ -47,6 +46,30 @@ build {
   provisioner "shell" {
     inline = [
       "cloud-init status --wait"
+    ]
+  }
+
+  provisioner "ansible" {
+    playbook_file = "${var.scripts_dir}/ansible/install-common.yml"
+    user = "root"
+    use_proxy = false
+    ansible_env_vars = [
+      "ANSIBLE_HOST_KEY_CHECKING=False"
+    ]
+    extra_arguments = [
+      "-v"
+    ]
+  }
+
+  provisioner "ansible" {
+    playbook_file = "${var.scripts_dir}/ansible/install-docker.yml"
+    user = "root"
+    use_proxy = false
+    ansible_env_vars = [
+      "ANSIBLE_HOST_KEY_CHECKING=False"
+    ]
+    extra_arguments = [
+      "-v"
     ]
   }
 
