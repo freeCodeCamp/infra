@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        images: [serve, landing]
+        images: [landing]
 
     steps:
       - name: Checkout code
