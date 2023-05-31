@@ -1,0 +1,35 @@
+name: CD - Machine Images - Linode
+
+on:
+  workflow_dispatch
+
+jobs:
+  build-ubuntu-image:
+    name: Build Ubuntu Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
+
+      # Packer's official GitHub Actions are unstable & outdated, use a community action instead
+      - name: Use latest Packer
+        uses: hashicorp-contrib/setup-packer@ee5bed669b01ca73e42651206470fc355a60400d # tag=v2
+
+      - name: Check Version
+        run: |
+          echo "Packer version: $(packer version)"
+
+      - name: Build Ubuntu Image
+        id: build-ubuntu-image
+        env:
+          LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        run: |
+          packer init \
+          ./images/machines/linode/ubuntu.pkr.hcl
+
+          packer validate \
+          ./images/machines/linode/ubuntu.pkr.hcl
+
+          packer build \
+          ./images/machines/linode/ubuntu.pkr.hcl
