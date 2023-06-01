@@ -1,0 +1,98 @@
+name: TF - Cluster o11y - Linode
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'clusters/cluster-o11y/**'
+  pull_request:
+    paths:
+      - 'clusters/cluster-o11y/**'
+
+jobs:
+  terraform:
+    name: "Terraform O11y Cluster"
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+
+    defaults:
+      run:
+        working-directory: ./clusters/cluster-o11y
+
+    env:
+      EXPAND_SUMMARY_DETAILS: 'false'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Post Format
+        if: always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome == 'success' || steps.fmt.outcome == 'failure')
+        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+        with:
+          commenter_type: fmt
+          commenter_input: ${{ format('{0}{1}', steps.fmt.outputs.stdout, steps.fmt.outputs.stderr) }}
+          commenter_exitcode: ${{ steps.fmt.outputs.exitcode }}
+          terraform_version: 1.4
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Post Init
+        if: always() && github.ref != 'refs/heads/main' && (steps.init.outcome == 'success' || steps.init.outcome == 'failure')
+        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+        with:
+          commenter_type: init
+          commenter_input: ${{ format('{0}{1}', steps.init.outputs.stdout, steps.init.outputs.stderr) }}
+          commenter_exitcode: ${{ steps.init.outputs.exitcode }}
+          terraform_version: 1.4
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Post Validate
+        if: always() && github.ref != 'refs/heads/main' && (steps.validate.outcome == 'success' || steps.validate.outcome == 'failure')
+        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+        with:
+          commenter_type: validate
+          commenter_input: ${{ format('{0}{1}', steps.validate.outputs.stdout, steps.validate.outputs.stderr) }}
+          commenter_exitcode: ${{ steps.validate.outputs.exitcode }}
+          terraform_version: 1.4
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -no-color -input=false
+        continue-on-error: true
+
+      - name: Post Plan
+        if: always() && github.ref != 'refs/heads/main' && (steps.plan.outcome == 'success' || steps.plan.outcome == 'failure')
+        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+        with:
+          commenter_type: plan
+          commenter_input: ${{ format('{0}{1}', steps.plan.outputs.stdout, steps.plan.outputs.stderr) }}
+          commenter_exitcode: ${{ steps.plan.outputs.exitcode }}
+          terraform_version: 1.4
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve -input=false
