@@ -1,7 +1,7 @@
-resource "linode_instance" "ops_o11y_workers" {
-  count     = var.worker_node_count
+resource "linode_instance" "ops_o11y_leaders" {
+  count     = var.leader_node_count
   image     = var.image_id
-  label     = "ops-vm-o11y-wkr-${count.index + 1}"
+  label     = "ops-vm-o11y-ldr-${count.index + 1}"
   group     = "ops-o11y"
   region    = var.region
   type      = "g6-standard-2"
@@ -28,8 +28,8 @@ resource "linode_instance" "ops_o11y_workers" {
   }
 }
 
-resource "linode_instance" "ops_o11y_leaders" {
-  count     = var.leader_node_count
+resource "linode_instance" "ops_o11y_workers" {
+  count     = var.worker_node_count
   image     = var.image_id
   label     = "ops-vm-o11y-wkr-${count.index + 1}"
   group     = "ops-o11y"

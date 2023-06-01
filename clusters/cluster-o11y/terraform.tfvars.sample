@@ -2,5 +2,5 @@ linode_token = "<LinodeApiToken>"
 password = "<RootPassword>"
 worker_node_count = 3
 leader_node_count = 1
-image_id = "private/<LinodeImageId>"
+image_id = "private/ami-ubuntu-20.04-golden"
 import_ssh_users = ["gh:someuser", "raisedadead"]
