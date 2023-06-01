@@ -4,7 +4,7 @@ terraform {
     organization = "freecodecamp"
 
     workspaces {
-      name = "tfws-monitoring"
+      name = "tfws-ops-o11y"
     }
   }
 }
