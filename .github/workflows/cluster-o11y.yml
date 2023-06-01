@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - 'clusters/cluster-o11y/**'
+      - 'terraform/cluster-o11y/**'
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp
   TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
   TF_WORKSPACE: tfws-ops-o11y
-  CONFIG_DIRECTORY: clusters/cluster-o11y
+  CONFIG_DIRECTORY: terraform/cluster-o11y
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
