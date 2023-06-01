@@ -1,6 +1,6 @@
 # Usage
 
-Once the stackscript is provisioned using the terraform config in this folder, you can use it as a resource elsewhere like so:
+Once the StackScript is provisioned using the terraform config in this folder, you can use it as a resource elsewhere like so:
 
 ```hcl
   resource "linode_instance" "test" {
@@ -15,3 +15,5 @@ Once the stackscript is provisioned using the terraform config in this folder, y
     }
   }
 ```
+
+This StackScript terraform template is based on <https://github.com/displague/terraform-linode-cloudinit-example>
