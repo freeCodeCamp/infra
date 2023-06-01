@@ -39,6 +39,11 @@ resource "linode_instance" "ops_o11y_workers" {
   type      = "g6-standard-2"
   root_pass = var.password
 
+  stackscript_id = 1187159
+  stackscript_data = {
+    userdata = "${var.userdata}"
+  }
+
   connection {
     type     = "ssh"
     user     = "root"

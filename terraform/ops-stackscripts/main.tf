@@ -24,11 +24,7 @@ See README.md for more information.
 EOF
 
   rev_note = "Initial version"
-  images = [
-    "linode/ubuntu18.04",
-    "linode/ubuntu20.04",
-    "linode/ubuntu22.04",
-  ]
+  images   = ["any/all"]
 
   is_public = var.public_stackscript
   label     = "CloudInit"
