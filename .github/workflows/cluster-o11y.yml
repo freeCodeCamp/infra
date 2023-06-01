@@ -46,7 +46,7 @@ jobs:
           terraform_version: 1.4
 
       - name: Terraform Cloud Upload Configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -54,7 +54,7 @@ jobs:
           speculative: true
 
       - name: Terraform Cloud Create Speculative Run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
+        uses: hashicorp/tfc-workflows-github/actions/create-run@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -63,13 +63,13 @@ jobs:
           message: "Triggered From GitHub Actions CI ${{ github.sha }}"
 
       - name: Terraform Cloud Plan Output
-        uses: hashicorp/tfc-workflows-github/actions/plan-output@v1.0.0
+        uses: hashicorp/tfc-workflows-github/actions/plan-output@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
         id: plan-output
         with:
           plan: ${{ steps.run.outputs.plan_id }}
 
       - name: Comment on PR
-        uses: actions/github-script@v6
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
         if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
