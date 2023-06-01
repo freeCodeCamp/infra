@@ -12,6 +12,7 @@ env:
   TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
   TF_WORKSPACE: tfws-ops-o11y
   CONFIG_DIRECTORY: clusters/cluster-o11y
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   terraform-cloud-speculative-run:
@@ -22,16 +23,38 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
 
-      - uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
+        # This is only for the GitHub Actions runner, not Terraform Cloud
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
+
+        # This is only for formatting check on GitHub Actions runner, not Terraform Cloud
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: Post Format
+        if: always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome == 'success' || steps.fmt.outcome == 'failure')
+        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+        with:
+          commenter_type: fmt
+          commenter_input: ${{ format('{0}{1}', steps.fmt.outputs.stdout, steps.fmt.outputs.stderr) }}
+          commenter_exitcode: ${{ steps.fmt.outputs.exitcode }}
+          # This is the minimum version required to get the comment to show up
+          terraform_version: 1.4
+
+      - name: Terraform Cloud Upload Configuration
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
           directory: ${{ env.CONFIG_DIRECTORY }}
           speculative: true
 
-      - uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
+      - name: Terraform Cloud Create Speculative Run
+        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -39,12 +62,14 @@ jobs:
           plan_only: true
           message: "Triggered From GitHub Actions CI ${{ github.sha }}"
 
-      - uses: hashicorp/tfc-workflows-github/actions/plan-output@v1.0.0
+      - name: Terraform Cloud Plan Output
+        uses: hashicorp/tfc-workflows-github/actions/plan-output@v1.0.0
         id: plan-output
         with:
           plan: ${{ steps.run.outputs.plan_id }}
 
-      - uses: actions/github-script@v6
+      - name: Comment on PR
+        uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
