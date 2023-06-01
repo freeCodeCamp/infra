@@ -1,98 +1,82 @@
 name: TF - Cluster o11y - Linode
 
 on:
-  push:
+  pull_request:
     branches:
       - main
     paths:
-      - 'clusters/cluster-o11y/**'
-  pull_request:
-    paths:
-      - 'clusters/cluster-o11y/**'
+      - 'clusters/cluster-o11y-linode/**'
+
+env:
+  TF_CLOUD_ORGANIZATION: freecodecamp
+  TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+  TF_WORKSPACE: tfws-ops-o11y
+  CONFIG_DIRECTORY: clusters/cluster-o11y-linode
 
 jobs:
-  terraform:
-    name: "Terraform O11y Cluster"
+  terraform-cloud-speculative-run:
     runs-on: ubuntu-latest
-
+    name: Terraform Cloud Speculative Run
     permissions:
+      contents: read
       pull-requests: write
 
-    defaults:
-      run:
-        working-directory: ./clusters/cluster-o11y
-
-    env:
-      EXPAND_SUMMARY_DETAILS: 'false'
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
+      - uses: actions/checkout@v3
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
+      - uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
+        id: upload
         with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          workspace: ${{ env.TF_WORKSPACE }}
+          directory: ${{ env.CONFIG_DIRECTORY }}
+          speculative: true
 
-      - name: Terraform Format
-        id: fmt
-        run: terraform fmt -check
-
-      - name: Post Format
-        if: always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome == 'success' || steps.fmt.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+      - uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
+        id: run
         with:
-          commenter_type: fmt
-          commenter_input: ${{ format('{0}{1}', steps.fmt.outputs.stdout, steps.fmt.outputs.stderr) }}
-          commenter_exitcode: ${{ steps.fmt.outputs.exitcode }}
-          terraform_version: 1.4
+          workspace: ${{ env.TF_WORKSPACE }}
+          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
+          plan_only: true
+          message: "Triggered From GitHub Actions CI ${{ github.sha }}"
 
-      - name: Terraform Init
-        id: init
-        run: terraform init
-
-      - name: Post Init
-        if: always() && github.ref != 'refs/heads/main' && (steps.init.outcome == 'success' || steps.init.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+      - uses: hashicorp/tfc-workflows-github/actions/plan-output@v1.0.0
+        id: plan-output
         with:
-          commenter_type: init
-          commenter_input: ${{ format('{0}{1}', steps.init.outputs.stdout, steps.init.outputs.stderr) }}
-          commenter_exitcode: ${{ steps.init.outputs.exitcode }}
-          terraform_version: 1.4
+          plan: ${{ steps.run.outputs.plan_id }}
 
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
-
-      - name: Post Validate
-        if: always() && github.ref != 'refs/heads/main' && (steps.validate.outcome == 'success' || steps.validate.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
-        with:
-          commenter_type: validate
-          commenter_input: ${{ format('{0}{1}', steps.validate.outputs.stdout, steps.validate.outputs.stderr) }}
-          commenter_exitcode: ${{ steps.validate.outputs.exitcode }}
-          terraform_version: 1.4
-
-      - name: Terraform Plan
-        id: plan
+      - uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
-        run: terraform plan -no-color -input=false
-        continue-on-error: true
-
-      - name: Post Plan
-        if: always() && github.ref != 'refs/heads/main' && (steps.plan.outcome == 'success' || steps.plan.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
         with:
-          commenter_type: plan
-          commenter_input: ${{ format('{0}{1}', steps.plan.outputs.stdout, steps.plan.outputs.stderr) }}
-          commenter_exitcode: ${{ steps.plan.outputs.exitcode }}
-          terraform_version: 1.4
-
-      - name: Terraform Plan Status
-        if: steps.plan.outcome == 'failure'
-        run: exit 1
-
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve -input=false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // 1. Retrieve existing bot comments for the PR
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+            const botComment = comments.find(comment => {
+              return comment.user.type === 'Bot' && comment.body.includes('Terraform Cloud Plan Output')
+            })
+            const output = `#### Terraform Cloud Plan Output
+               \`\`\`\n
+               Plan: ${{ steps.plan-output.outputs.add }} to add, ${{ steps.plan-output.outputs.change }} to change, ${{ steps.plan-output.outputs.destroy }} to destroy.
+               [Terraform Cloud Plan](${{ steps.run.outputs.run_link }})
+               \`\`\`
+               `
+            // 3. If we have a comment, update it, otherwise create a new one
+            if (botComment) {
+              github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              })
+            } else {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              })
+            }
