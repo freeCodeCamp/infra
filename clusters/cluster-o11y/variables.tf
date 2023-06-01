@@ -27,5 +27,5 @@ variable "region" {
 
 variable "image_id" {
   description = "The ID for the Linode image to be used in provisioning the instances"
-  default     = "private/ami-ubuntu-20.04-golden"
+  default     = "private/20418248"
 }
