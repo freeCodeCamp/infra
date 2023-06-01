@@ -13,7 +13,7 @@ packages:
 users:
   - name: freecodecamp
     groups: sudo
-    ansible.builtin.shell:  /bin/bash
+    shell:  /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_import_id:
       - gh:camperbot
