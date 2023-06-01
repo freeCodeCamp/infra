@@ -7,6 +7,11 @@ resource "linode_instance" "ops_o11y_leaders" {
   type      = "g6-standard-2"
   root_pass = var.password
 
+  stackscript_id = 1187159
+  stackscript_data = {
+    userdata = "${var.userdata}"
+  }
+
   connection {
     type     = "ssh"
     user     = "root"
@@ -20,10 +25,7 @@ resource "linode_instance" "ops_o11y_leaders" {
       "apt-get update -qq",
       # Disable password authentication; users can only connect with an SSH key.
       "sed -i '/PasswordAuthentication/d' /etc/ssh/sshd_config",
-      "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config",
-      "apt-get install -y ssh-import-id",
-      # Import the public keys for the users specified in the import_ssh_users variable.
-      "ssh-import-id ${join(",", var.import_ssh_users)}",
+      "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config"
     ]
   }
 }
@@ -50,10 +52,7 @@ resource "linode_instance" "ops_o11y_workers" {
       "apt-get update -qq",
       # Disable password authentication; users can only connect with an SSH key.
       "sed -i '/PasswordAuthentication/d' /etc/ssh/sshd_config",
-      "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config",
-      "apt-get install -y ssh-import-id",
-      # Import the public keys for the users specified in the import_ssh_users variable.
-      "ssh-import-id ${join(",", var.import_ssh_users)}",
+      "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config"
     ]
   }
 }
