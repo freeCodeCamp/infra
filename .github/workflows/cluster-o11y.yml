@@ -138,7 +138,7 @@ jobs:
           configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
           message: "Triggered From GitHub Actions CI ${{ github.sha }}"
 
-      - uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.0.0
+      - uses: hashicorp/tfc-workflows-github/actions/apply-run@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
         id: apply
         if: ${{ fromJSON(steps.run.outputs.payload).data.attributes.actions.IsConfirmable }}
         with:
