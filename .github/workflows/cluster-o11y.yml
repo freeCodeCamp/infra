@@ -21,7 +21,7 @@ env:
 
 jobs:
   terraform-cloud-speculative-run:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     name: Terraform Cloud Speculative Run
     permissions:
