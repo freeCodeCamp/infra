@@ -95,7 +95,7 @@ jobs:
                \`\`\`
                #### [Terraform Cloud Plan](${{ steps.run.outputs.run_link }})
 
-               :red_circle: **Attention** :red_circle: This workflow has a Job that will apply these changes when merged to the `main` branch.
+               :red_circle: **Attention** :red_circle: This workflow has a Job that will apply these changes when merged to the \`main\` branch.
                `
             // 3. If we have a comment, update it, otherwise create a new one
             if (botComment) {
