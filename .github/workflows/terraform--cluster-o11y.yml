@@ -69,42 +69,29 @@ jobs:
         with:
           plan: ${{ steps.run.outputs.plan_id }}
 
-      - name: Comment on PR
-        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
-        if: github.event_name == 'pull_request'
+      - name: Find Comment
+        uses: peter-evans/find-comment@v2
+        id: fc
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            // 1. Retrieve existing bot comments for the PR
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            })
-            const botComment = comments.find(comment => {
-              return comment.user.type === 'Bot' && comment.body.includes('Terraform Cloud Plan Output')
-            })
-            const output = `#### Terraform Cloud Plan Output
-               \`\`\`\n
-               Plan: ${{ steps.plan-output.outputs.add }} to add, ${{ steps.plan-output.outputs.change }} to change, ${{ steps.plan-output.outputs.destroy }} to destroy.
-               \`\`\`
-               #### [Terraform Cloud Plan](${{ steps.run.outputs.run_link }})
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: TFC Run Details
 
-               **Warning :warning:**  These changes will NOT be applied automatically on merge. Please trigger a Apply run locally or in Terraform Cloud to apply these changes.
-               `
-            // 3. If we have a comment, update it, otherwise create a new one
-            if (botComment) {
-              github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: output
-              })
-            } else {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: output
-              })
-            }
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            _TFC Run Details_
+
+            **Terraform Cloud Plan Output**
+
+            ```
+            Plan: ${{ steps.plan-output.outputs.add }} to add, ${{ steps.plan-output.outputs.change }} to change, ${{ steps.plan-output.outputs.destroy }} to destroy.
+            ```
+
+            **TFC Run Link : <${{ steps.run.outputs.run_link }}>**
+
+            ###### :yellow_circle: **Warning:** _Merging these changes WILL NOT trigger any further Terraform Cloud runs, you will need to APPLY these changes from your local workspace or TFC Dashboard._
