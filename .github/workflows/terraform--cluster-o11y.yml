@@ -6,11 +6,6 @@ on:
       - main
     paths:
       - 'terraform/cluster-o11y/**'
-  push:
-    branches:
-      - main
-    paths:
-      - 'terraform/cluster-o11y/**'
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp
@@ -93,7 +88,9 @@ jobs:
                \`\`\`\n
                Plan: ${{ steps.plan-output.outputs.add }} to add, ${{ steps.plan-output.outputs.change }} to change, ${{ steps.plan-output.outputs.destroy }} to destroy.
                \`\`\`
-               [Terraform Cloud Plan](${{ steps.run.outputs.run_link }})
+               #### [Terraform Cloud Plan](${{ steps.run.outputs.run_link }})
+
+               **Warning :warning:**  These changes will NOT be applied automatically on merge. Please trigger a Apply run locally or in Terraform Cloud to apply these changes.
                `
             // 3. If we have a comment, update it, otherwise create a new one
             if (botComment) {
@@ -111,36 +108,3 @@ jobs:
                 body: output
               })
             }
-
-  terraform-cloud-apply-run:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    name: Terraform Cloud Apply Run
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3
-
-      - name: Terraform Cloud Upload Configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
-        id: upload
-        with:
-          workspace: ${{ env.TF_WORKSPACE }}
-          directory: ${{ env.CONFIG_DIRECTORY }}
-
-      - name: Terraform Cloud Create Run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
-        id: run
-        with:
-          workspace: ${{ env.TF_WORKSPACE }}
-          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
-          message: "Triggered From GitHub Actions CI ${{ github.sha }}"
-
-      - uses: hashicorp/tfc-workflows-github/actions/apply-run@4c569ffb1a0f1bf0daf00539abb505bcd246748a # v1.0.0
-        id: apply
-        if: ${{ fromJSON(steps.run.outputs.payload).data.attributes.actions.IsConfirmable }}
-        with:
-          run: ${{ steps.run.outputs.run_id }}
-          comment: "Apply Run from GitHub Actions CI ${{ github.sha }}"
