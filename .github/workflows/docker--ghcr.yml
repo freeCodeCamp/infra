@@ -1,4 +1,4 @@
-name: CD - Docker Images
+name: Docker -- GHCR
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'images/containers/**/*'
+      - 'docker/**/*'
 
 jobs:
   build-and-push-image:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          cd images/containers/${{ matrix.images }}
+          cd docker/${{ matrix.images }}
 
           docker build . \
           --tag ghcr.io/freecodecamp/${{ matrix.images }}:${{ github.sha }} \

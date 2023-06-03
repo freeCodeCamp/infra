@@ -7,7 +7,7 @@ packer {
   }
 }
 
-variable "scripts_dir" { default = "images/machines/linode/scripts" }
+variable "scripts_dir" { default = "packer/linode/scripts" }
 
 locals { image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}" }
 

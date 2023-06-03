@@ -55,7 +55,7 @@ variable "custom_managed_image_name" {
   }
 }
 
-variable "artifact_image_type" { default = "Nginx" }
+variable "artifact_image_type" { default = "Nomad" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
@@ -63,13 +63,13 @@ variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "packer" } # This is the default username for provisioning and will be deleted after the build.
 
 # TODO: These should be configurable via environment variables.
-variable "scripts_dir" { default = "images/machines/azure/scripts" }
+variable "scripts_dir" { default = "packer/azure/scripts" }
 
 locals {
   artifact_name = "${var.artifact_image_type}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
 }
 
-source "azure-arm" "nginx" {
+source "azure-arm" "nomad" {
 
   # AzureRM Parameters: https://www.packer.io/docs/builders/azure/arm
   async_resourcegroup_delete = true
@@ -93,18 +93,23 @@ source "azure-arm" "nginx" {
   temporary_key_pair_type = "ed25519"
 
   azure_tags = {
-    "ops-created-by"    = "packer"
-    "ops-image-type"    = var.artifact_image_type
-    "ops-build-vm-size" = var.vm_size
-    "ops-location"      = var.location
-    "ops-image-source"  = var.custom_managed_image_name
+    "ops-created-by"   = "packer"
+    "ops-image-type"   = var.artifact_image_type
+    "ops-vm-size"      = var.vm_size
+    "ops-vm-location"  = var.location
+    "ops-image-source" = var.custom_managed_image_name
   }
 
 }
 
 build {
-  name    = "nginx"
-  sources = ["source.azure-arm.nginx"]
+  name    = "nomad"
+  sources = ["source.azure-arm.nomad"]
+
+  # provisioner "file" {
+  #   source      = "${var.configs_dir}/nomad"
+  #   destination = "/tmp/"
+  # }
 
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
@@ -112,7 +117,7 @@ build {
     pause_before = "60s"
     scripts = [
       "${var.scripts_dir}/do-presetup.sh",
-      "${var.scripts_dir}/installers/nginx.sh",
+      "${var.scripts_dir}/installers/nomad.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }
