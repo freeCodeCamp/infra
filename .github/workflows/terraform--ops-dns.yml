@@ -75,7 +75,7 @@ jobs:
           plan: ${{ steps.run.outputs.plan_id }}
 
       - name: Find Comment
-        uses: peter-evans/find-comment@v2
+        uses: peter-evans/find-comment@a54c31d7fa095754bfef525c0c8e5e5674c4b4b1 # v2
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -83,7 +83,7 @@ jobs:
           body-includes: TFC Run Details
 
       - name: Create or update comment
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@ca08ebd5dc95aa0cd97021e9708fcd6b87138c9b # v3
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
