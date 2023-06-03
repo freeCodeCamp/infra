@@ -1,4 +1,4 @@
-name: CD - Machine Images - Azure
+name: Packer -- Azure
 
 on:
   workflow_dispatch:
@@ -82,19 +82,19 @@ jobs:
           -var location=${{ inputs.region }} \
           -var image_offer=${IMAGE_OFFER} \
           -var image_sku=${IMAGE_SKU} \
-          ./images/machines/azure/ubuntu.pkr.hcl
+          ./packer/azure/ubuntu.pkr.hcl
 
           packer validate \
           -var image_offer=${IMAGE_OFFER} \
           -var image_sku=${IMAGE_SKU} \
           -var location=${{ inputs.region }} \
-          ./images/machines/azure/ubuntu.pkr.hcl
+          ./packer/azure/ubuntu.pkr.hcl
 
           packer build \
           -var location=${{ inputs.region }} \
           -var image_offer=${IMAGE_OFFER} \
           -var image_sku=${IMAGE_SKU} \
-          ./images/machines/azure/ubuntu.pkr.hcl
+          ./packer/azure/ubuntu.pkr.hcl
 
           UBUNTU_ARTIFACT_NAME=$(cat manifest.json | jq '.builds[].artifact_id' | sed -r 's|.*/(.*)"$|\1|')
           echo Building the next image with: $UBUNTU_ARTIFACT_NAME
@@ -107,14 +107,14 @@ jobs:
           packer init \
           -var location=${{ inputs.region }} \
           -var custom_managed_image_name=${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }} \
-          ./images/machines/azure/${{ inputs.child_image }}.pkr.hcl
+          ./packer/azure/${{ inputs.child_image }}.pkr.hcl
 
           packer validate \
           -var location=${{ inputs.region }} \
           -var custom_managed_image_name=${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }} \
-          ./images/machines/azure/${{ inputs.child_image }}.pkr.hcl
+          ./packer/azure/${{ inputs.child_image }}.pkr.hcl
 
           packer build \
           -var location=${{ inputs.region }} \
           -var custom_managed_image_name=${{ steps.build-ubuntu-image.outputs.ubuntu_artifact_name }} \
-          ./images/machines/azure/${{ inputs.child_image }}.pkr.hcl
+          ./packer/azure/${{ inputs.child_image }}.pkr.hcl

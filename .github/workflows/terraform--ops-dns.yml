@@ -1,4 +1,4 @@
-name: TF - DNS - Linode
+name: TF -- Linode - Ops DNS
 
 on:
   pull_request:

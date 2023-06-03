@@ -1,4 +1,4 @@
-name: CD - Machine Images - Linode
+name: Packer -- Linode
 
 on:
   workflow_dispatch
@@ -26,10 +26,10 @@ jobs:
           LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
         run: |
           packer init \
-          ./images/machines/linode/ubuntu.pkr.hcl
+          ./packer/linode/ubuntu.pkr.hcl
 
           packer validate \
-          ./images/machines/linode/ubuntu.pkr.hcl
+          ./packer/linode/ubuntu.pkr.hcl
 
           packer build \
-          ./images/machines/linode/ubuntu.pkr.hcl
+          ./packer/linode/ubuntu.pkr.hcl

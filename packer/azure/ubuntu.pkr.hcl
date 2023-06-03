@@ -47,15 +47,11 @@ variable "az_subscription_id" {
   }
 }
 
-variable "custom_managed_image_resource_group_name" { default = "ops-rg-machine-images" }
-variable "custom_managed_image_name" {
-  validation {
-    condition     = length(var.custom_managed_image_name) > 0
-    error_message = "The custom managed image name is not set. Please set the custom_managed_image_name variable."
-  }
-}
+variable "image_offer" { default = "0001-com-ubuntu-server-focal" }
+variable "image_publisher" { default = "Canonical" }
+variable "image_sku" { default = "20_04-LTS-gen2" }
 
-variable "artifact_image_type" { default = "Nomad" }
+variable "artifact_image_type" { default = "Ubuntu" }
 variable "location" { default = "eastus" }
 variable "os_type" { default = "Linux" }
 variable "resource_group" { default = "ops-rg-machine-images" }
@@ -63,13 +59,13 @@ variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "packer" } # This is the default username for provisioning and will be deleted after the build.
 
 # TODO: These should be configurable via environment variables.
-variable "scripts_dir" { default = "images/machines/azure/scripts" }
+variable "scripts_dir" { default = "packer/azure/scripts" }
 
 locals {
-  artifact_name = "${var.artifact_image_type}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
+  artifact_name = "${var.artifact_image_type}-${var.image_sku}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
 }
 
-source "azure-arm" "nomad" {
+source "azure-arm" "ubuntu" {
 
   # AzureRM Parameters: https://www.packer.io/docs/builders/azure/arm
   async_resourcegroup_delete = true
@@ -79,8 +75,9 @@ source "azure-arm" "nomad" {
   client_secret   = var.az_client_secret
   client_id       = var.az_client_id
 
-  custom_managed_image_name                = var.custom_managed_image_name
-  custom_managed_image_resource_group_name = var.custom_managed_image_resource_group_name
+  image_offer     = var.image_offer
+  image_publisher = var.image_publisher
+  image_sku       = var.image_sku
 
   location = var.location
   os_type  = var.os_type
@@ -88,28 +85,23 @@ source "azure-arm" "nomad" {
   managed_image_name                = local.artifact_name
   managed_image_resource_group_name = var.resource_group
 
-  vm_size                 = var.vm_size
-  ssh_username            = var.ssh_username
-  temporary_key_pair_type = "ed25519"
+  vm_size      = var.vm_size
+  ssh_username = var.ssh_username
+  # temporary_key_pair_type = "ed25519"            # This is not yet supported by the Azure Builder Plugin. https://github.com/hashicorp/packer-plugin-azure/issues/201
 
   azure_tags = {
-    "ops-created-by"   = "packer"
-    "ops-image-type"   = var.artifact_image_type
-    "ops-vm-size"      = var.vm_size
-    "ops-vm-location"  = var.location
-    "ops-image-source" = var.custom_managed_image_name
+    "ops-created-by"    = "packer"
+    "ops-image-type"    = var.artifact_image_type
+    "ops-build-vm-size" = var.vm_size
+    "ops-location"      = var.location
+    "ops-image-source"  = var.image_sku
   }
 
 }
 
 build {
-  name    = "nomad"
-  sources = ["source.azure-arm.nomad"]
-
-  # provisioner "file" {
-  #   source      = "${var.configs_dir}/nomad"
-  #   destination = "/tmp/"
-  # }
+  name    = "ubuntu"
+  sources = ["source.azure-arm.ubuntu"]
 
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
@@ -117,7 +109,8 @@ build {
     pause_before = "60s"
     scripts = [
       "${var.scripts_dir}/do-presetup.sh",
-      "${var.scripts_dir}/installers/nomad.sh",
+      "${var.scripts_dir}/installers/golang.sh",
+      "${var.scripts_dir}/installers/docker.sh",
       "${var.scripts_dir}/do-cleanup.sh",
     ]
   }
