@@ -1,0 +1,29 @@
+# tasks file for roles/docker
+---
+- name: add gpg key
+  apt_key:
+    url: "{{ docker_repo_key }} "
+    state: present
+
+- name: Add repository
+  apt_repository:
+    repo: "{{ docker_repo }}"
+
+- name: install docker and dependencies
+  apt:
+    name: "{{ docker_packages }}"
+    state: latest
+    update_cache: yes
+    cache_valid_time: 3600
+  with_items: "{{ docker_packages}}"
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    group: docker
+
+- name: start docker
+  service:
+    name: docker
+    state: started
+    enabled: yes

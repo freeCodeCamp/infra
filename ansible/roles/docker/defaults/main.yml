@@ -1,0 +1,15 @@
+---
+# defaults file for roles/docker
+
+docker_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - python3-docker
+docker_repo: deb [arch=amd64] https://download.docker.com/linux/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} stable
+docker_repo_key: https://download.docker.com/linux/ubuntu/gpg
+docker_repo_key_id: 0EBFCD88

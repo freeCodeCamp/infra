@@ -1,0 +1,22 @@
+# tasks file for roles/ubuntu
+---
+- name: Update apt repo and cache
+  apt:
+    update_cache: true
+    force_apt_get: true
+    cache_valid_time: 3600
+
+- name: Upgrade all packages
+  apt:
+    upgrade: dist
+    force_apt_get: true
+
+- name: Autoclean old packages
+  apt:
+    autoclean: true
+    force_apt_get: true
+
+- name: Autoremove unused packages
+  apt:
+    autoremove: true
+    force_apt_get: true

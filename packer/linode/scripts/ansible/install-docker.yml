@@ -4,7 +4,7 @@
   become: true
   vars:
     ansible_python_interpreter: /usr/bin/python3
-    stdout_callback: "yaml"
+    stdout_callback: 'yaml'
 
   tasks:
     - name: Update apt package index
@@ -20,6 +20,10 @@
           - curl
           - gnupg
           - lsb-release
+          - python3-pip
+          - python3-setuptools
+          - software-properties-common
+          - virtualenv
         state: present
         autoclean: true
         autoremove: true
@@ -41,3 +45,7 @@
       become: true
       register: docker_install
       changed_when: docker_install.stdout.find('Setting up docker-ce') != -1
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker

@@ -1,0 +1,6 @@
+---
+- name: Update
+  import_tasks: update.yml
+
+- name: Reboot
+  import_tasks: reboot.yml

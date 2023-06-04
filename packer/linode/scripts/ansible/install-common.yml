@@ -4,10 +4,9 @@
   become: true
   vars:
     ansible_python_interpreter: /usr/bin/python3
-    stdout_callback: "yaml"
+    stdout_callback: 'yaml'
 
   tasks:
-
     - name: Update apt package index
       ansible.builtin.apt:
         update_cache: true
@@ -21,22 +20,22 @@
 
     - name: Install common packages
       ansible.builtin.apt:
-        name: "{{ packages }}"
+        name: '{{ packages }}'
         state: present
         autoclean: true
         autoremove: true
         purge: true
       vars:
         packages:
+          - build-essential
           - curl
           - git
           - htop
-          - vim
           - software-properties-common
-          - build-essential
-          - unzip
-          - zip
           - tar
+          - unzip
+          - vim
+          - zip
 
     - name: Disable automatic and security updates
       ansible.builtin.apt:

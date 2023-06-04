@@ -1,0 +1,51 @@
+---
+- name: Start a docker swarm cluster and test it
+  hosts: all
+  become: true
+  vars:
+    # Use `--extra-vars '{ "variable_purge_test" : false }'` to skip
+    # deleteing the resources. This is helpful if you want to keep
+    # debugging manually after the playbook run is finished.
+    purge_test: '{{ variable_purge_test | default(true) }}'
+
+  roles:
+    - ubuntu # Update the OS and reboot the server
+    - dns # Configure ansible facts for networking info lookup
+    - docker # Intialize docker and docker swarm cluster
+
+  tasks:
+    - name: Run a docker container
+      docker_container:
+        name: echo
+        image: hashicorp/http-echo
+        state: started
+        restart_policy: always
+        command: ['-text', 'hello world from {{ ansible_hostname }}']
+        ports:
+          - '5080:5678'
+
+    - name: Test the docker container
+      uri:
+        url: http://localhost:5080
+        return_content: yes
+      register: result
+
+    - name: Print the result
+      debug:
+        msg: '{{ result.content }}'
+
+    - name: Stop the docker container
+      docker_container:
+        name: echo
+        image: hashicorp/http-echo
+        state: absent
+      when: purge_test
+
+    - name: Prune the docker system
+      docker_prune:
+        images: yes
+        containers: yes
+        volumes: yes
+        networks: yes
+        builder_cache: yes
+      when: purge_test

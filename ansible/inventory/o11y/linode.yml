@@ -1,0 +1,12 @@
+# IMPORTANT: This file has to be be named linode.yml or linode.yaml
+# See: https://github.com/ansible-collections/community.general/blob/011b2f8bdc2a042f0eb44739ff51ce425f391afa/plugins/inventory/linode.py#L274
+
+plugin: community.general.linode # can be replaced with linode.cloud.instance, when they support Jinja2 template strings
+access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
+
+groups:
+  managers: "'o11y_leader' in (tags|list)"
+  workers: "'o11y_worker' in (tags|list)"
+
+compose:
+  ansible_ssh_host: ipv4[0]

@@ -1,0 +1,16 @@
+---
+- name: Check if Docker is installed
+  stat:
+    path: /usr/bin/docker
+  register: docker_installed
+
+- name: Install Docker if not installed using the role
+  include_role:
+    name: docker
+    tasks_from: install-docker.yml
+  when: docker_installed.stat.exists == false
+
+- name: Initialize Swarm using the role
+  include_role:
+    name: docker
+    tasks_from: install-swarm.yml

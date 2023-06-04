@@ -1,0 +1,18 @@
+---
+# We expect the /etc/hostname file to be populated with a FQDN
+# when the host is provisioned, using terraform or cloud-init.
+#
+# The FQDN should point to a Public IP address that is resolvable
+#
+- name: Get Hostname from /etc/hostname
+  slurp:
+    src: /etc/hostname
+  register: hostname
+
+- name: Set the anisble_fqdn
+  set_fact:
+    ansible_fqdn: "{{ hostname['content'] | b64decode }}"
+
+- name: Print the ansible_fqdn
+  debug:
+    var: ansible_fqdn

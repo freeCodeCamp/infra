@@ -1,0 +1,11 @@
+---
+- name: Check uptime on virtual machines
+  hosts: '{{ variable_host | default("all") }}'
+  gather_facts: true
+  become_user: root
+  tasks:
+    - name: Print uptime
+      debug:
+        msg:
+          'Host machine {{ inventory_hostname }} has been up for {{
+          ansible_facts.uptime_seconds/86400 }} days'

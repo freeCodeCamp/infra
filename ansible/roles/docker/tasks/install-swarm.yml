@@ -1,0 +1,55 @@
+# tasks file for roles/swarm
+---
+- name: Retrieve the initial Swarm Info
+  community.docker.docker_swarm_info:
+  register: swarm_info_initial
+  when: inventory_hostname == groups['managers'][0]
+  ignore_errors: true
+  no_log: "{{ variable_no_log | default (true) }}"
+  changed_when: swarm_info_initial.docker_swarm_active == false
+
+- name: Initialize Swarm
+  community.docker.docker_swarm:
+    state: present
+    advertise_addr: "{{ ansible_default_ipv4.address }}"
+    listen_addr: "{{ ansible_default_ipv4.address }}:2377"
+  when: inventory_hostname == groups['managers'][0] and swarm_info_initial.docker_swarm_active == false
+  no_log: "{{ variable_no_log | default (true) }}"
+
+- name: Refresh the Swarm Info
+  community.docker.docker_swarm_info:
+    nodes: true
+  register: swarm_info
+  when: inventory_hostname == groups['managers'][0]
+  no_log: "{{ variable_no_log | default (true) }}"
+
+# TODO: Add checks and add more managers if needed
+
+- name: Set useful information on Workers as Facts
+  set_fact:
+    swarm_join_token_worker: "{{ hostvars[groups['managers'][0]]['swarm_info']['swarm_facts']['JoinTokens']['Worker'] }}"
+    swarm_manager_addr: "{{ hostvars[groups['managers'][0]]['ansible_default_ipv4']['address'] }}"
+  when: inventory_hostname in groups['workers']
+  no_log: "{{ variable_no_log | default (true) }}"
+
+- name: Join Swarm as worker using token
+  community.docker.docker_swarm:
+    state: join
+    advertise_addr: "{{ ansible_default_ipv4.address }}"
+    join_token: "{{ swarm_join_token_worker }}"
+    remote_addrs: [
+      "{{ swarm_manager_addr }}"
+    ]
+  when: inventory_hostname in groups['workers']
+
+- name: List Swarm Nodes
+  community.docker.docker_swarm_info:
+    nodes: true
+  when: inventory_hostname == groups['managers'][0]
+  register: result
+  no_log: "{{ variable_no_log | default (true) }}"
+
+- name: Print Swarm Nodes
+  debug:
+    msg: "{{ result.nodes }}"
+  when: inventory_hostname == groups['managers'][0]
