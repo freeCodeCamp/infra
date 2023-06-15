@@ -3,6 +3,7 @@
   stat:
     path: /usr/bin/docker
   register: docker_installed
+  no_log: "{{ variable_no_log | default (true) }}"
 
 - name: Install Docker if not installed using the role
   include_role:

@@ -1,5 +1,5 @@
 ---
-- name: Initialize a O11y Cluster
+- name: Initialize O11y Cluster
   hosts: all
   become: true
   roles:

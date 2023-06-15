@@ -9,7 +9,7 @@
     purge_test: '{{ variable_purge_test | default(true) }}'
 
   roles:
-    - ubuntu # Update the OS and reboot the server
+    # - ubuntu # Update the OS and reboot the server
     - dns # Configure ansible facts for networking info lookup
     - docker # Intialize docker and docker swarm cluster
 
