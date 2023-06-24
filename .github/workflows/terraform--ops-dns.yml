@@ -43,7 +43,7 @@ jobs:
 
       - name: Post Format
         if: always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome == 'success' || steps.fmt.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@e86dd74eb198208c55079399c2f6cc12e44e333a # v2
+        uses: GetTerminus/terraform-pr-commenter@86bff5a07ff7586127ad776f0ba1faceb4d5c4ab # v2
         with:
           commenter_type: fmt
           commenter_input: ${{ format('{0}{1}', steps.fmt.outputs.stdout, steps.fmt.outputs.stderr) }}
