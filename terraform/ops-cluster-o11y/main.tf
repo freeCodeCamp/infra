@@ -71,11 +71,11 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
 
   provisioner "remote-exec" {
     inline = [
-      # Disable password authentication; users can only connect with an SSH key.
-      "sed -i '/PasswordAuthentication/d' /etc/ssh/sshd_config",
-      "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config",
+      # Wait for cloud-init to finish.
+      "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
       # Set the hostname.
-      "hostnamectl set-hostname ldr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}"
+      "hostnamectl set-hostname ldr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}",
+      "echo \"ldr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
     ]
   }
 
@@ -174,13 +174,11 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
 
   provisioner "remote-exec" {
     inline = [
-      # Update the system.
-      "apt-get update -qq",
-      # Disable password authentication; users can only connect with an SSH key.
-      "sed -i '/PasswordAuthentication/d' /etc/ssh/sshd_config",
-      "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config",
+      # Wait for cloud-init to finish.
+      "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
       # Set the hostname.
-      "hostnamectl set-hostname wkr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}"
+      "hostnamectl set-hostname wkr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}",
+      "echo \"wkr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
     ]
   }
 

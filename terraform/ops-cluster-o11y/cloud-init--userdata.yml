@@ -8,5 +8,10 @@ users:
       - gh:camperbot
       - raisedadead
 runcmd:
+  - sudo sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sudo sed -i -e '/^PasswordAuthentication/s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - sudo sed -i -e '$aAllowUsers freecodecamp' /etc/ssh/sshd_config
+  - sudo restart ssh"}
   - sudo usermod -aG docker freecodecamp
+  - sudo apt update -qq
 final_message: 'Setup complete'
