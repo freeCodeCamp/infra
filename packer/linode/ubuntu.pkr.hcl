@@ -12,21 +12,21 @@ variable "scripts_dir" { default = "packer/linode/scripts" }
 locals { image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}" }
 
 variable "linode_api_token" {
-  type = string
+  type    = string
   default = env("LINODE_API_TOKEN")
 
   validation {
-    condition = length(var.linode_api_token) > 0
+    condition     = length(var.linode_api_token) > 0
     error_message = "The LINODE_API_TOKEN environment variable must be set or the -var linode_api_token=xxxxx must be used to set the token value."
   }
 }
 
-variable "linode_instance_type"     { default = "g6-dedicated-2" }
-variable "linode_region"            { default = "us-east" }
-variable "linode_image"             { default = "linode/ubuntu22.04" }
+variable "linode_instance_type" { default = "g6-dedicated-2" }
+variable "linode_region" { default = "us-east" }
+variable "linode_image" { default = "linode/ubuntu22.04" }
 variable "linode_image_description" { default = "Ubuntu 22.04 LTS" }
-variable "linode_os_version"        { default = "22.04" }
-variable "linode_os_flavor"         { default = "ubuntu" }
+variable "linode_os_version" { default = "22.04" }
+variable "linode_os_flavor" { default = "ubuntu" }
 
 source "linode" "ubuntu" {
   linode_token      = "${var.linode_api_token}"
@@ -40,13 +40,13 @@ source "linode" "ubuntu" {
 }
 
 build {
-  name = "ubuntu"
+  name    = "ubuntu"
   sources = ["source.linode.ubuntu"]
 
   provisioner "ansible" {
     playbook_file = "${var.scripts_dir}/ansible/install-common.yml"
-    user = "root"
-    use_proxy = false
+    user          = "root"
+    use_proxy     = false
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",
       "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",
@@ -59,8 +59,8 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${var.scripts_dir}/ansible/reboot.yml"
-    user = "root"
-    use_proxy = false
+    user          = "root"
+    use_proxy     = false
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",
       "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",
@@ -73,8 +73,8 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${var.scripts_dir}/ansible/install-docker.yml"
-    user = "root"
-    use_proxy = false
+    user          = "root"
+    use_proxy     = false
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",
       "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",

@@ -58,6 +58,11 @@ jobs:
         run: |
           echo "Packer version: $(packer version)"
 
+      - name: Check formating
+        run: |
+          terraform fmt -check -recursive -diff \
+          ./packer/azure
+
       - name: Build Ubuntu Image
         id: build-ubuntu-image
         run: |
