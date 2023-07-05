@@ -1,0 +1,4 @@
+linode_token = "<LinodeApiToken>"
+password = "<RootPassword>"
+
+# Override any more variables from the variables.tf file here
