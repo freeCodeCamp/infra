@@ -38,6 +38,6 @@ variable "region" {
 
 variable "image_id" {
   description = "The ID for the Linode image to be used in provisioning the instances"
-  default     = "private/20769265"
+  default     = "private/20789403"
   type        = string
 }
