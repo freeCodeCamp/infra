@@ -4,6 +4,11 @@ terraform {
       source  = "linode/linode"
       version = "2.5.1"
     }
+
+    hcp = {
+      source  = "hashicorp/hcp"
+      version = "0.63.0"
+    }
   }
   required_version = ">= 1"
 }

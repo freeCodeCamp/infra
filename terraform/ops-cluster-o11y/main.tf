@@ -23,13 +23,20 @@ resource "linode_instance" "ops_o11y_leaders" {
   tags = ["ops", "o11y", "o11y_leader"] # tags should use underscores for Ansible compatibility
 }
 
+data "hcp_packer_image" "linode-ubuntu" {
+  bucket_name    = "linode-ubuntu"
+  channel        = "latest"
+  cloud_provider = "linode"
+  region         = "us-east"
+}
+
 resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
   count     = var.leader_node_count
   label     = "ops-vm-o11y-ldr-${count.index + 1}-boot"
   linode_id = linode_instance.ops_o11y_leaders[count.index].id
   size      = linode_instance.ops_o11y_leaders[count.index].specs.0.disk
 
-  image     = var.image_id
+  image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
@@ -132,7 +139,7 @@ resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
   linode_id = linode_instance.ops_o11y_workers[count.index].id
   size      = linode_instance.ops_o11y_workers[count.index].specs.0.disk
 
-  image     = var.image_id
+  image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id

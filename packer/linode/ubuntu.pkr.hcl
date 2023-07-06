@@ -94,7 +94,7 @@ build {
     bucket_name = "linode-ubuntu"
 
     description = <<EOT
-An Ubuntu 22.04 LTS image with Docker installed.
+An Ubuntu LTS - Server image with Docker installed.
     EOT
 
     bucket_labels = {

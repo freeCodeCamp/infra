@@ -14,8 +14,18 @@ variable "region" {
   type        = string
 }
 
-variable "image_id" {
-  description = "The ID for the Linode image to be used in provisioning the instances"
-  default     = "private/20789403"
+# variable "image_id" {
+#   description = "The ID for the Linode image to be used in provisioning the instances"
+#   default     = "private/20789403"
+#   type        = string
+# }
+
+variable "hcp_client_id" {
+  description = "The client ID for the HCP API."
+  type        = string
+}
+
+variable "hcp_client_secret" {
+  description = "The client secret for the HCP API."
   type        = string
 }

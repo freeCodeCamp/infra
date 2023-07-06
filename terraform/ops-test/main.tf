@@ -22,12 +22,19 @@ resource "linode_instance" "ops_test" {
   tags = ["ops", "test"] # tags should use underscores for Ansible compatibility
 }
 
+data "hcp_packer_image" "linode-ubuntu" {
+  bucket_name    = "linode-ubuntu"
+  channel        = "latest"
+  cloud_provider = "linode"
+  region         = "us-east"
+}
+
 resource "linode_instance_disk" "ops_test_disk__boot" {
   label     = "ops-vm-test-boot"
   linode_id = linode_instance.ops_test.id
   size      = linode_instance.ops_test.specs.0.disk
 
-  image     = var.image_id
+  image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
