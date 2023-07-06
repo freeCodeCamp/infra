@@ -20,21 +20,21 @@ data "hcp_packer_image" "linode-ubuntu" {
   region         = "us-east"
 }
 
-resource "linode_instance" "ops_o11y_leaders" {
+resource "linode_instance" "ops_publish_leaders" {
   count  = var.leader_node_count
-  label  = "ops-vm-o11y-ldr-${count.index + 1}"
-  group  = "o11y-ldr"
+  label  = "ops-vm-publish-ldr-${count.index + 1}"
+  group  = "publish-ldr"
   region = var.region
   type   = "g6-standard-2"
 
-  tags = ["ops", "o11y", "o11y_leader"] # tags should use underscores for Ansible compatibility
+  tags = ["ops", "publish", "publish_leader"] # tags should use underscores for Ansible compatibility
 }
 
-resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
+resource "linode_instance_disk" "ops_publish_leaders_disk__boot" {
   count     = var.leader_node_count
-  label     = "ops-vm-o11y-ldr-${count.index + 1}-boot"
-  linode_id = linode_instance.ops_o11y_leaders[count.index].id
-  size      = linode_instance.ops_o11y_leaders[count.index].specs.0.disk
+  label     = "ops-vm-publish-ldr-${count.index + 1}-boot"
+  linode_id = linode_instance.ops_publish_leaders[count.index].id
+  size      = linode_instance.ops_publish_leaders[count.index].specs.0.disk
 
   image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
   root_pass = var.password
@@ -45,14 +45,14 @@ resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
   }
 }
 
-resource "linode_instance_config" "ops_o11y_leaders_config" {
+resource "linode_instance_config" "ops_publish_leaders_config" {
   count     = var.leader_node_count
-  label     = "ops-vm-o11y-ldr-config"
-  linode_id = linode_instance.ops_o11y_leaders[count.index].id
+  label     = "ops-vm-publish-ldr-config"
+  linode_id = linode_instance.ops_publish_leaders[count.index].id
 
   devices {
     sda {
-      disk_id = linode_instance_disk.ops_o11y_leaders_disk__boot[count.index].id
+      disk_id = linode_instance_disk.ops_publish_leaders_disk__boot[count.index].id
     }
   }
 
@@ -64,7 +64,7 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   # eth1 is the private interface.
   interface {
     purpose = "vlan"
-    label   = "o11y-vlan"
+    label   = "publish-vlan"
     # This results in IPAM address like 10.0.0.11/24, 10.0.0.12/24, etc.
     ipam_address = "${cidrhost("10.0.0.0/8", 10 + count.index + 1)}/24"
   }
@@ -73,7 +73,7 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
     type     = "ssh"
     user     = "root"
     password = var.password
-    host     = linode_instance.ops_o11y_leaders[count.index].ip_address
+    host     = linode_instance.ops_publish_leaders[count.index].ip_address
   }
 
   provisioner "remote-exec" {
@@ -81,8 +81,8 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
       # Wait for cloud-init to finish.
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
       # Set the hostname.
-      "hostnamectl set-hostname ldr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}",
-      "echo \"ldr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
+      "hostnamectl set-hostname ldr-${count.index + 1}.publish.${data.linode_domain.ops_dns_domain.domain}",
+      "echo \"ldr-${count.index + 1}.publish.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
     ]
   }
 
@@ -93,51 +93,51 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_records" {
+resource "linode_domain_record" "ops_publish_leaders_records" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "ldr-${count.index + 1}.o11y"
+  name        = "ldr-${count.index + 1}.publish"
   record_type = "A"
-  target      = linode_instance.ops_o11y_leaders[count.index].ip_address
+  target      = linode_instance.ops_publish_leaders[count.index].ip_address
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_records__public" {
+resource "linode_domain_record" "ops_publish_leaders_records__public" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.ldr-${count.index + 1}.o11y"
+  name        = "pub.ldr-${count.index + 1}.publish"
   record_type = "A"
-  target      = linode_instance.ops_o11y_leaders[count.index].ip_address
+  target      = linode_instance.ops_publish_leaders[count.index].ip_address
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_records__private" {
+resource "linode_domain_record" "ops_publish_leaders_records__private" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.ldr-${count.index + 1}.o11y"
+  name        = "prv.ldr-${count.index + 1}.publish"
   record_type = "A"
-  target      = trimsuffix(linode_instance_config.ops_o11y_leaders_config[count.index].interface[1].ipam_address, "/24")
+  target      = trimsuffix(linode_instance_config.ops_publish_leaders_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
 }
 
-resource "linode_instance" "ops_o11y_workers" {
+resource "linode_instance" "ops_publish_workers" {
   count  = var.worker_node_count
-  label  = "ops-vm-o11y-wkr-${count.index + 1}"
-  group  = "o11y-wkr"
+  label  = "ops-vm-publish-wkr-${count.index + 1}"
+  group  = "publish-wkr"
   region = var.region
-  type   = "g6-standard-2"
+  type   = "g6-standard-4"
 
-  tags = ["ops", "o11y", "o11y_worker"]
+  tags = ["ops", "publish", "publish_worker"]
 }
 
-resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
+resource "linode_instance_disk" "ops_publish_workers_disk__boot" {
   count     = var.worker_node_count
-  label     = "ops-vm-o11y-wkr-${count.index + 1}-boot"
-  linode_id = linode_instance.ops_o11y_workers[count.index].id
-  size      = linode_instance.ops_o11y_workers[count.index].specs.0.disk
+  label     = "ops-vm-publish-wkr-${count.index + 1}-boot"
+  linode_id = linode_instance.ops_publish_workers[count.index].id
+  size      = linode_instance.ops_publish_workers[count.index].specs.0.disk
 
   image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
   root_pass = var.password
@@ -148,14 +148,14 @@ resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
   }
 }
 
-resource "linode_instance_config" "ops_o11y_workers_config" {
+resource "linode_instance_config" "ops_publish_workers_config" {
   count     = var.worker_node_count
-  label     = "ops-vm-o11y-wkr-config"
-  linode_id = linode_instance.ops_o11y_workers[count.index].id
+  label     = "ops-vm-publish-wkr-config"
+  linode_id = linode_instance.ops_publish_workers[count.index].id
 
   devices {
     sda {
-      disk_id = linode_instance_disk.ops_o11y_workers_disk__boot[count.index].id
+      disk_id = linode_instance_disk.ops_publish_workers_disk__boot[count.index].id
     }
   }
 
@@ -167,7 +167,7 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
   # eth1 is the private interface.
   interface {
     purpose = "vlan"
-    label   = "o11y-vlan"
+    label   = "publish-vlan"
     # This results in IPAM address like 10.0.0.21/24, 10.0.0.22/24, etc.
     ipam_address = "${cidrhost("10.0.0.0/8", 20 + count.index + 1)}/24"
   }
@@ -176,7 +176,7 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
     type     = "ssh"
     user     = "root"
     password = var.password
-    host     = linode_instance.ops_o11y_workers[count.index].ip_address
+    host     = linode_instance.ops_publish_workers[count.index].ip_address
   }
 
   provisioner "remote-exec" {
@@ -184,8 +184,8 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
       # Wait for cloud-init to finish.
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
       # Set the hostname.
-      "hostnamectl set-hostname wkr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}",
-      "echo \"wkr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
+      "hostnamectl set-hostname wkr-${count.index + 1}.publish.${data.linode_domain.ops_dns_domain.domain}",
+      "echo \"wkr-${count.index + 1}.publish.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
     ]
   }
 
@@ -196,38 +196,38 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_o11y_workers_records" {
+resource "linode_domain_record" "ops_publish_workers_records" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "wkr-${count.index + 1}.o11y"
+  name        = "wkr-${count.index + 1}.publish"
   record_type = "A"
-  target      = linode_instance.ops_o11y_workers[count.index].ip_address
+  target      = linode_instance.ops_publish_workers[count.index].ip_address
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_workers_records__public" {
+resource "linode_domain_record" "ops_publish_workers_records__public" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.wkr-${count.index + 1}.o11y"
+  name        = "pub.wkr-${count.index + 1}.publish"
   record_type = "A"
-  target      = linode_instance.ops_o11y_workers[count.index].ip_address
+  target      = linode_instance.ops_publish_workers[count.index].ip_address
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_workers_records__private" {
+resource "linode_domain_record" "ops_publish_workers_records__private" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.wkr-${count.index + 1}.o11y"
+  name        = "prv.wkr-${count.index + 1}.publish"
   record_type = "A"
-  target      = trimsuffix(linode_instance_config.ops_o11y_workers_config[count.index].interface[1].ipam_address, "/24")
+  target      = trimsuffix(linode_instance_config.ops_publish_workers_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
 }
 
-resource "linode_firewall" "ops_o11y_firewall" {
-  label = "ops-fw-o11y"
+resource "linode_firewall" "ops_publish_firewall" {
+  label = "ops-fw-publish"
 
   inbound {
     label    = "allow-ssh"
@@ -245,7 +245,7 @@ resource "linode_firewall" "ops_o11y_firewall" {
   outbound_policy = "ACCEPT"
 
   linodes = flatten([
-    [for i in linode_instance.ops_o11y_leaders : i.id],
-    [for i in linode_instance.ops_o11y_workers : i.id],
+    [for i in linode_instance.ops_publish_leaders : i.id],
+    [for i in linode_instance.ops_publish_workers : i.id],
   ])
 }

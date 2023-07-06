@@ -1,17 +1,17 @@
-name: TF -- Linode - Ops Cluster Publish
+name: TF--Linode-PRD-Cluster:Publish
 
 on:
   pull_request:
     branches:
       - main
     paths:
-      - 'terraform/ops-cluster-publish/**'
+      - 'terraform/prd-cluster-publish/**'
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp
   TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-  TF_WORKSPACE: tfws-ops-publish
-  CONFIG_DIRECTORY: terraform/ops-cluster-publish
+  TF_WORKSPACE: tfws-prd-publish
+  CONFIG_DIRECTORY: terraform/prd-cluster-publish
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:

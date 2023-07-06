@@ -1,4 +1,4 @@
-name: TF -- Linode - Ops Cluster o11y
+name: TF--Linode-OPS-Cluster:O11y
 
 on:
   pull_request:

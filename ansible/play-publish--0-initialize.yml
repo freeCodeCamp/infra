@@ -1,0 +1,8 @@
+---
+- name: Initialize Publications Cluster
+  hosts: all
+  become: true
+  roles:
+    # - ubuntu # Update the OS and reboot the server
+    - dns # Configure ansible facts for networking info lookup
+    - nomad # Install and configure Nomad

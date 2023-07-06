@@ -13,6 +13,13 @@ data "linode_domain" "ops_dns_domain" {
   domain = "freecodecamp.net"
 }
 
+data "hcp_packer_image" "linode-ubuntu" {
+  bucket_name    = "linode-ubuntu"
+  channel        = "latest"
+  cloud_provider = "linode"
+  region         = "us-east"
+}
+
 resource "linode_instance" "ops_test" {
   label  = "ops-vm-test"
   group  = "o11y-tst"
@@ -20,13 +27,6 @@ resource "linode_instance" "ops_test" {
   type   = "g6-standard-2"
 
   tags = ["ops", "test"] # tags should use underscores for Ansible compatibility
-}
-
-data "hcp_packer_image" "linode-ubuntu" {
-  bucket_name    = "linode-ubuntu"
-  channel        = "latest"
-  cloud_provider = "linode"
-  region         = "us-east"
 }
 
 resource "linode_instance_disk" "ops_test_disk__boot" {

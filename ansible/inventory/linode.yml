@@ -5,8 +5,12 @@ plugin: community.general.linode # can be replaced with linode.cloud.instance, w
 access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
 
 groups:
+  # O11y Cluster
   managers: "'o11y_leader' in (tags|list)"
   workers: "'o11y_worker' in (tags|list)"
+  # Publish Cluster
+  publish_leaders: "'publish_leader' in (tags|list)"
+  publish_workers: "'publish_worker' in (tags|list)"
 
 compose:
   ansible_ssh_host: ipv4[0]

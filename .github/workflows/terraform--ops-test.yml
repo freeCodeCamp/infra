@@ -1,4 +1,4 @@
-name: TF -- Linode - Ops Cluster Test
+name: TF--Linode-OPS-Cluster:Test
 
 on:
   pull_request:
