@@ -41,5 +41,7 @@
       changed_when: docker_install.stdout.find('Setting up docker-ce') != -1
 
     - name: Install Docker Module for Python
-      pip:
+      become: true
+      become_user: freecodecamp
+      ansible.builtin.pip:
         name: docker
