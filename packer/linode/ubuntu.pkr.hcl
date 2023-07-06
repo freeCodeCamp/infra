@@ -89,4 +89,26 @@ build {
     output     = "manifest.json"
     strip_path = true
   }
+
+  hcp_packer_registry {
+    bucket_name = "linode-ubuntu"
+
+    description = <<EOT
+An Ubuntu 22.04 LTS image with Docker installed.
+    EOT
+
+    bucket_labels = {
+      "linode_instance_type" = var.linode_instance_type
+      "linode_region"        = var.linode_region
+      "os_flavor"            = var.linode_os_flavor
+      "os_version"           = var.linode_os_version
+    }
+
+    build_labels = {
+      "os_ami_id"     = "ami-${var.linode_os_flavor}-${var.linode_os_version}-${local.image_version}"
+      "os_base_image" = var.linode_image
+      "os_flavor"     = var.linode_os_flavor
+      "os_version"    = var.linode_os_version
+    }
+  }
 }
