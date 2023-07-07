@@ -5,10 +5,16 @@ plugin: community.general.linode # can be replaced with linode.cloud.instance, w
 access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
 
 groups:
+  # Test
+  test_all: "'test' in (tags|list)"
+
   # O11y Cluster
+  o11y_all: "'o11y' in (tags|list)"
   managers: "'o11y_leader' in (tags|list)"
   workers: "'o11y_worker' in (tags|list)"
+
   # Publish Cluster
+  publish_all: "'publish' in (tags|list)"
   publish_leaders: "'publish_leader' in (tags|list)"
   publish_workers: "'publish_worker' in (tags|list)"
 
