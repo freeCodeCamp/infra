@@ -1,0 +1,18 @@
+---
+- name: Enable and Start Nomad Services
+  hosts: publish_all
+  become: true
+  gather_facts: false
+  vars:
+    - restart_services: '{{ variable_restart_services | default(false) }}'
+  tasks:
+    - name: Enable and Start Nomad Services
+      service: name=nomad state=started enabled=yes
+      when: restart_services == false
+
+    - name: Restart Nomad Services
+      service: name=nomad state=restarted
+      when: restart_services == true
+
+    # - name: Print Nomad Status
+    #   shell: nomad status

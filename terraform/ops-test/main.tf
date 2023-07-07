@@ -22,11 +22,11 @@ data "hcp_packer_image" "linode-ubuntu" {
 
 resource "linode_instance" "ops_test" {
   label  = "ops-vm-test"
-  group  = "o11y-tst"
+  group  = "o11y_test" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   region = var.region
   type   = "g6-standard-2"
 
-  tags = ["ops", "test"] # tags should use underscores for Ansible compatibility
+  tags = ["ops", "test"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
 
 resource "linode_instance_disk" "ops_test_disk__boot" {
