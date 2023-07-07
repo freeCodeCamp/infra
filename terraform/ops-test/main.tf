@@ -22,7 +22,7 @@ data "hcp_packer_image" "linode-ubuntu" {
 
 resource "linode_instance" "ops_test" {
   label  = "ops-vm-test"
-  group  = "o11y_test" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  group  = "test" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   region = var.region
   type   = "g6-standard-2"
 
@@ -44,7 +44,7 @@ resource "linode_instance_disk" "ops_test_disk__boot" {
 }
 
 resource "linode_instance_config" "ops_test_config" {
-  label     = "ops-vm-o11y-ldr-config"
+  label     = "ops-vm-test-config"
   linode_id = linode_instance.ops_test.id
 
   devices {
@@ -106,18 +106,8 @@ resource "linode_domain_record" "ops_test_records__public" {
   ttl_sec     = 120
 }
 
-# resource "linode_domain_record" "ops_test_records__private" {
-#   count = var.leader_node_count
-
-#   domain_id   = data.linode_domain.ops_dns_domain.id
-#   name        = "prv.test"
-#   record_type = "A"
-#   target      = trimsuffix(linode_instance_config.ops_test_config.interface[1].ipam_address, "/24")
-#   ttl_sec     = 120
-# }
-
-resource "linode_firewall" "ops_o11y_firewall" {
-  label = "ops-fw-o11y"
+resource "linode_firewall" "ops_test_firewall" {
+  label = "ops-fw-test"
 
   inbound {
     label    = "allow-ssh"
@@ -128,10 +118,9 @@ resource "linode_firewall" "ops_o11y_firewall" {
     ipv6     = ["::/0"]
   }
 
-  inbound_policy = "DROP"
-
   # outbound { }
 
+  inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
 
   linodes = [
