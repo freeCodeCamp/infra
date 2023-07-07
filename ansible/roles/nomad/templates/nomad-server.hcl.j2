@@ -4,4 +4,10 @@ data_dir   = "/opt/nomad"
 server {
   enabled          = true
   bootstrap_expect = 3
+
+  server_join {
+    retry_join = ["provider=linode tag_name=publish region=us-east address_type=private_v4 api_token={{ lookup('env', 'LINODE_API_TOKEN') }}"]
+    retry_max = 3
+    retry_interval = "15s"
+  }
 }

@@ -23,11 +23,13 @@ data "hcp_packer_image" "linode-ubuntu" {
 resource "linode_instance" "ops_publish_leaders" {
   count  = var.leader_node_count
   label  = "ops-vm-publish-ldr-${count.index + 1}"
-  group  = "publish-ldr"
+  group  = "publish_leader" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   region = var.region
   type   = "g6-standard-2"
 
-  tags = ["ops", "publish", "publish_leader"] # tags should use underscores for Ansible compatibility
+  private_ip = true
+
+  tags = ["ops", "publish", "publish_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
 
 resource "linode_instance_disk" "ops_publish_leaders_disk__boot" {
@@ -93,13 +95,19 @@ resource "linode_instance_config" "ops_publish_leaders_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_publish_leaders_records" {
+resource "linode_instance_ip" "ops_publish_leaders_ip__private" {
+  count     = var.leader_node_count
+  linode_id = linode_instance.ops_publish_leaders[count.index].id
+  public    = false
+}
+
+resource "linode_domain_record" "ops_publish_leaders_records__vlan" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "ldr-${count.index + 1}.publish"
   record_type = "A"
-  target      = linode_instance.ops_publish_leaders[count.index].ip_address
+  target      = trimsuffix(linode_instance_config.ops_publish_leaders_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
 }
 
@@ -119,18 +127,20 @@ resource "linode_domain_record" "ops_publish_leaders_records__private" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.ldr-${count.index + 1}.publish"
   record_type = "A"
-  target      = trimsuffix(linode_instance_config.ops_publish_leaders_config[count.index].interface[1].ipam_address, "/24")
+  target      = linode_instance_ip.ops_publish_leaders_ip__private[count.index].address
   ttl_sec     = 120
 }
 
 resource "linode_instance" "ops_publish_workers" {
   count  = var.worker_node_count
   label  = "ops-vm-publish-wkr-${count.index + 1}"
-  group  = "publish-wkr"
+  group  = "publish_worker" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   region = var.region
   type   = "g6-standard-4"
 
-  tags = ["ops", "publish", "publish_worker"]
+  private_ip = true
+
+  tags = ["ops", "publish", "publish_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
 
 resource "linode_instance_disk" "ops_publish_workers_disk__boot" {
@@ -196,13 +206,19 @@ resource "linode_instance_config" "ops_publish_workers_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_publish_workers_records" {
+resource "linode_instance_ip" "ops_publish_workers_ip__private" {
+  count     = var.worker_node_count
+  linode_id = linode_instance.ops_publish_workers[count.index].id
+  public    = false
+}
+
+resource "linode_domain_record" "ops_publish_workers_records__vlan" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "wkr-${count.index + 1}.publish"
   record_type = "A"
-  target      = linode_instance.ops_publish_workers[count.index].ip_address
+  target      = trimsuffix(linode_instance_config.ops_publish_workers_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
 }
 
@@ -222,7 +238,7 @@ resource "linode_domain_record" "ops_publish_workers_records__private" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.wkr-${count.index + 1}.publish"
   record_type = "A"
-  target      = trimsuffix(linode_instance_config.ops_publish_workers_config[count.index].interface[1].ipam_address, "/24")
+  target      = linode_instance_ip.ops_publish_workers_ip__private[count.index].address
   ttl_sec     = 120
 }
 
@@ -230,7 +246,7 @@ resource "linode_firewall" "ops_publish_firewall" {
   label = "ops-fw-publish"
 
   inbound {
-    label    = "allow-ssh"
+    label    = "allow-ssh-from-anywhere"
     ports    = "22"
     protocol = "TCP"
     action   = "ACCEPT"
@@ -238,10 +254,31 @@ resource "linode_firewall" "ops_publish_firewall" {
     ipv6     = ["::/0"]
   }
 
-  inbound_policy = "DROP"
+  inbound {
+    label    = "allow-all-tcp-traffic-in-cluster"
+    ports    = "1-65535"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      [for i in linode_instance_ip.ops_publish_leaders_ip__private : "${i.address}/32"],
+      [for i in linode_instance_ip.ops_publish_workers_ip__private : "${i.address}/32"],
+    ])
+  }
+
+  # inbound {
+  #   label    = "allow-all-udp-traffic-in-cluster"
+  #   ports    = "1-65535"
+  #   protocol = "UDP"
+  #   action   = "ACCEPT"
+  #   ipv4 = flatten([
+  #     [for i in linode_instance_ip.ops_publish_leaders_ip__private : "${i.address}/32"],
+  #     [for i in linode_instance_ip.ops_publish_workers_ip__private : "${i.address}/32"],
+  #   ])
+  # }
 
   # outbound { }
 
+  inbound_policy  = "DROP"
   outbound_policy = "ACCEPT"
 
   linodes = flatten([

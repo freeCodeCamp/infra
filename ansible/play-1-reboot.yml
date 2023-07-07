@@ -1,0 +1,19 @@
+---
+- name: Reboot a machine and wait for it to come back
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: true
+  become_user: root
+  tasks:
+    - name: Print uptime
+      debug:
+        msg:
+          'Host machine {{ inventory_hostname }} has been up for {{
+          ansible_facts.uptime_seconds/86400 }} days'
+
+    - name: Reboot
+      reboot:
+        reboot_msg: 'Reboot intiated by Ansible'
+        test_command: uptime
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0

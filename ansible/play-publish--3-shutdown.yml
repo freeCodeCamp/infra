@@ -1,0 +1,8 @@
+---
+- name: Enable and Start Nomad Services
+  hosts: publish_all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Stop Nomad Services
+      service: name=nomad state=stopped enabled=yes

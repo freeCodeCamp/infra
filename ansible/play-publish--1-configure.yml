@@ -1,0 +1,20 @@
+---
+- name: Configure Nomad Servers
+  hosts: publish_leaders
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Set up Nomad Server
+      include_role:
+        name: nomad
+        tasks_from: config-nomad-server.yml
+
+- name: Configure Nomad Clients
+  hosts: publish_workers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Set up Nomad Client
+      include_role:
+        name: nomad
+        tasks_from: config-nomad-client.yml

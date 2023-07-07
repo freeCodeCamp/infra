@@ -1,20 +1,28 @@
 ---
-- name: Add gpg key
-  apt_key:
-    url: "https://apt.releases.hashicorp.com/gpg"
-    state: present
-    keyring: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+- name: Set the Nomad version (pin to a specific version)
+  set_fact:
+    nomad_version: 1.5.6
 
-- name: Add nomad repo
-  apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
-    state: present
+- name: Install Nomad from releases
+  unarchive:
+    src: https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_linux_amd64.zip
+    dest: /usr/local/bin
+    remote_src: yes
+    creates: /usr/local/bin/nomad
+    owner: root
+    group: root
+    mode: 0755
 
-- name: Install nomad
-  apt:
+- name: Check nomad version
+  command: nomad version
+  register: nomad_version_output
+  changed_when: false
+  failed_when: "'Nomad v' not in nomad_version_output.stdout"
+
+- name: Create a nomad group
+  group:
     name: nomad
-    state: present
-    update_cache: yes
+    system: yes
 
 - name: Create a nomad user
   user:
@@ -23,7 +31,7 @@
     comment: "Nomad user"
     shell: /bin/false
     system: yes
-    create_home: no
+    create_home: yes
     home: /etc/nomad.d
 
 - name: Set the permissions on the nomad home directory
@@ -36,7 +44,7 @@
 
 - name: Create a data directory
   file:
-    path: /opts/nomad
+    path: /opt/nomad
     state: directory
     owner: nomad
     group: nomad
