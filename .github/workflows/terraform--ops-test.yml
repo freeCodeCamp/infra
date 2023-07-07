@@ -1,17 +1,17 @@
-name: TF -- Linode - Ops Cluster o11y
+name: TF -- Linode - Ops Cluster Test
 
 on:
   pull_request:
     branches:
       - main
     paths:
-      - 'terraform/ops-cluster-o11y/**'
+      - 'terraform/ops-cluster-test/**'
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp
   TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-  TF_WORKSPACE: tfws-ops-o11y
-  CONFIG_DIRECTORY: terraform/ops-cluster-o11y
+  TF_WORKSPACE: tfws-ops-test
+  CONFIG_DIRECTORY: terraform/ops-cluster-test
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:

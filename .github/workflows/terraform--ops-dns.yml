@@ -42,11 +42,15 @@ jobs:
         run: terraform fmt -check -recursive -diff
 
       - name: Post Format
-        if: always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome == 'success' || steps.fmt.outcome == 'failure')
+        if:
+          always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome ==
+          'success' || steps.fmt.outcome == 'failure')
         uses: GetTerminus/terraform-pr-commenter@86bff5a07ff7586127ad776f0ba1faceb4d5c4ab # v2
         with:
           commenter_type: fmt
-          commenter_input: ${{ format('{0}{1}', steps.fmt.outputs.stdout, steps.fmt.outputs.stderr) }}
+          commenter_input:
+            ${{ format('{0}{1}', steps.fmt.outputs.stdout,
+            steps.fmt.outputs.stderr) }}
           commenter_exitcode: ${{ steps.fmt.outputs.exitcode }}
           # This is the minimum version required to get the comment to show up
           terraform_version: 1.4
@@ -64,9 +68,10 @@ jobs:
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
-          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
+          configuration_version:
+            ${{ steps.upload.outputs.configuration_version_id }}
           plan_only: true
-          message: "Triggered From GitHub Actions CI ${{ github.sha }}"
+          message: 'Triggered From GitHub Actions CI ${{ github.sha }}'
 
       - name: Terraform Cloud Plan Output
         uses: hashicorp/tfc-workflows-github/actions/plan-output@02ae73d5f2ff0b7eaec858cd12c41b3d914e8d2c # v1.0.2
@@ -80,7 +85,7 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: 'github-actions[bot]'
-          body-includes: TFC Run Details
+          body-includes: Run Details - ${{ env.TF_WORKSPACE }}
 
       - name: Create or update comment
         uses: peter-evans/create-or-update-comment@c6c9a1a66007646a28c153e2a8580a5bad27bcfa # v3
@@ -89,7 +94,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           edit-mode: replace
           body: |
-            _TFC Run Details_
+            Run Details - ${{ env.TF_WORKSPACE }}
 
             **Terraform Cloud Plan Output**
 
@@ -99,7 +104,7 @@ jobs:
 
             **TFC Run Link : <${{ steps.run.outputs.run_link }}>**
 
-            ###### :red_circle: _**Attention:** Merging these changes to the default branch WILL trigger a Terraform Cloud run to APPLY these changes, automatically._
+            ###### :red_circle: **Attention:** Merging these changes to the default branch WILL trigger a Terraform Cloud run to APPLY these changes, automatically.
 
   terraform-cloud-apply-run:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -124,12 +129,16 @@ jobs:
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
-          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
-          message: "Triggered From GitHub Actions CI ${{ github.sha }}"
+          configuration_version:
+            ${{ steps.upload.outputs.configuration_version_id }}
+          message: 'Triggered From GitHub Actions CI ${{ github.sha }}'
 
       - uses: hashicorp/tfc-workflows-github/actions/apply-run@02ae73d5f2ff0b7eaec858cd12c41b3d914e8d2c # v1.0.2
         id: apply
-        if: ${{ fromJSON(steps.run.outputs.payload).data.attributes.actions.IsConfirmable }}
+        if:
+          ${{
+          fromJSON(steps.run.outputs.payload).data.attributes.actions.IsConfirmable
+          }}
         with:
           run: ${{ steps.run.outputs.run_id }}
-          comment: "Apply Run from GitHub Actions CI ${{ github.sha }}"
+          comment: 'Apply Run from GitHub Actions CI ${{ github.sha }}'
