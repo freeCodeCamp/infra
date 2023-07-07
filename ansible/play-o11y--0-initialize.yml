@@ -1,8 +1,9 @@
 ---
 - name: Initialize O11y Cluster
-  hosts: all
+  hosts: o11y_all
   become: true
   roles:
-    - ubuntu # Update the OS and reboot the server
+    # - ubuntu # Update the OS and reboot the server
     - dns # Configure ansible facts for networking info lookup
-    - docker # Intialize docker and docker swarm cluster
+    - docker # Intialize docker
+    - docker-swarm # Initialize a docker swarm cluster

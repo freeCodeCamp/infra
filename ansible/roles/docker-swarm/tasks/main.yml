@@ -5,8 +5,8 @@
   register: docker_installed
   no_log: "{{ variable_no_log | default (true) }}"
 
-- name: Install Docker if not installed using the role
+- name: Initialize Swarm using the role
   include_role:
     name: docker
-    tasks_from: install-docker.yml
-  when: docker_installed.stat.exists == false
+    tasks_from: install-swarm.yml
+  when: docker_installed.stat.exists == true

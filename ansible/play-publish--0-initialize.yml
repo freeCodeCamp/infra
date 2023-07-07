@@ -1,6 +1,6 @@
 ---
 - name: Initialize Publications Cluster
-  hosts: all
+  hosts: publish_all
   become: true
   roles:
     # - ubuntu # Update the OS and reboot the server
