@@ -17,6 +17,12 @@ install:
 	pip install -r requirements.txt
 	ansible-galaxy install -r requirements.yml
 
-.PHONY: check-inventory
-check-inventory:
-	ansible-inventory -i inventory --graph
+.PHONY: check-linode-env-token
+check-linode-env-token:
+  ifndef LINODE_API_TOKEN
+    $(error LINODE_API_TOKEN is undefined)
+  endif
+
+.PHONY: inventory
+inventory: check-linode-env-token
+	ansible-inventory -i inventory --graph -vvv
