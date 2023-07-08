@@ -95,12 +95,6 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   booted = true
 }
 
-resource "linode_instance_ip" "ops_o11y_leaders_ip__private" {
-  count     = var.leader_node_count
-  linode_id = linode_instance.ops_o11y_leaders[count.index].id
-  public    = false
-}
-
 resource "linode_domain_record" "ops_o11y_leaders_records__vlan" {
   count = var.leader_node_count
 
@@ -127,7 +121,7 @@ resource "linode_domain_record" "ops_o11y_leaders_records__private" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.ldr-${count.index + 1}.o11y"
   record_type = "A"
-  target      = linode_instance_ip.ops_o11y_leaders_ip__private[count.index].address
+  target      = linode_instance.ops_o11y_leaders[count.index].private_ip_address
   ttl_sec     = 120
 }
 
@@ -206,13 +200,7 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
   booted = true
 }
 
-resource "linode_instance_ip" "ops_o11y_workers_ip__private" {
-  count     = var.worker_node_count
-  linode_id = linode_instance.ops_o11y_workers[count.index].id
-  public    = false
-}
-
-resource "linode_domain_record" "ops_o11y_workers_records" {
+resource "linode_domain_record" "ops_o11y_workers_records__vlan" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -238,7 +226,7 @@ resource "linode_domain_record" "ops_o11y_workers_records__private" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.wkr-${count.index + 1}.o11y"
   record_type = "A"
-  target      = linode_instance_ip.ops_o11y_workers_ip__private[count.index].address
+  target      = linode_instance.ops_o11y_workers[count.index].private_ip_address
   ttl_sec     = 120
 }
 
@@ -246,7 +234,7 @@ resource "linode_firewall" "ops_o11y_firewall" {
   label = "ops-fw-o11y"
 
   inbound {
-    label    = "allow-ssh"
+    label    = "allow-ssh_from-anywhere"
     ports    = "22"
     protocol = "TCP"
     action   = "ACCEPT"
@@ -255,26 +243,26 @@ resource "linode_firewall" "ops_o11y_firewall" {
   }
 
   inbound {
-    label    = "allow-all-tcp-traffic-in-cluster"
+    label    = "allow-tcp_within-cluster"
     ports    = "1-65535"
     protocol = "TCP"
     action   = "ACCEPT"
     ipv4 = flatten([
-      [for i in linode_instance_ip.ops_o11y_leaders_ip__private : "${i.address}/32"],
-      [for i in linode_instance_ip.ops_o11y_workers_ip__private : "${i.address}/32"],
+      [for i in linode_instance.ops_o11y_leaders : "${i.private_ip_address}/32"],
+      [for i in linode_instance.ops_o11y_workers : "${i.private_ip_address}/32"]
     ])
   }
 
-  # inbound {
-  #   label    = "allow-all-udp-traffic-in-cluster"
-  #   ports    = "1-65535"
-  #   protocol = "UDP"
-  #   action   = "ACCEPT"
-  #   ipv4 = flatten([
-  #     [for i in linode_instance_ip.ops_o11y_leaders_ip__private : "${i.address}/32"],
-  #     [for i in linode_instance_ip.ops_o11y_workers_ip__private : "${i.address}/32"],
-  #   ])
-  # }
+  inbound {
+    label    = "allow-udp_within-cluster"
+    ports    = "1-65535"
+    protocol = "UDP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      [for i in linode_instance.ops_o11y_leaders : "${i.private_ip_address}/32"],
+      [for i in linode_instance.ops_o11y_workers : "${i.private_ip_address}/32"]
+    ])
+  }
 
   # outbound { }
 
