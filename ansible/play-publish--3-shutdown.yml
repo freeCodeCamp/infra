@@ -1,5 +1,5 @@
 ---
-- name: Enable and Start Nomad Services
+- name: Stop Nomad Services
   hosts: publish_all
   become: true
   gather_facts: false
