@@ -1,7 +1,3 @@
-locals {
-  cltjpn_node_count = 2
-}
-
 resource "linode_instance" "stg_oldeworld_cltjpn" {
   count  = local.cltjpn_node_count
   label  = "stg-vm-oldeworld-cltjpn-${count.index + 1}"
@@ -50,7 +46,7 @@ resource "linode_instance_config" "stg_oldeworld_cltjpn_config" {
     purpose = "vlan"
     label   = "oldeworld-vlan"
     # This results in IPAM address like 10.0.0.11/24, 10.0.0.12/24, etc.
-    ipam_address = "${cidrhost("10.0.0.0/8", 10 + count.index + 1)}/24"
+    ipam_address = "${cidrhost("10.0.0.0/8", local.ipam_block_cltjpn + count.index + 1)}/24"
   }
 
   connection {
