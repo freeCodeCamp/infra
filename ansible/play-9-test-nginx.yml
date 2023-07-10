@@ -1,0 +1,31 @@
+---
+- name: Test NGINX Setup
+  hosts: '{{ variable_host | default("oldeworld_pxy") }}'
+  become: true
+  tasks:
+    - name: Create the NGINX config file
+      copy:
+        dest: /etc/nginx/sites-enabled/test.conf
+        content: |
+          server {
+            listen 80 default_server;
+            server_name _;
+            location / {
+              return 200 "Hello World!";
+              add_header Content-Type text/plain;
+            }
+          }
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Test NGINX config
+      shell: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Restart NGINX
+      service:
+        name: nginx
+        state: restarted
+      when: nginx_test.rc == 0
