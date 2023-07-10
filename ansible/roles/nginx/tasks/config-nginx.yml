@@ -1,0 +1,52 @@
+---
+- name: Check if config is from the repository
+  stat:
+    path: /etc/nginx/.git
+  register: nginx_config_is_from_repo
+
+- name: Remove the default NGINX files
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/nginx
+  when: nginx_config_is_from_repo.stat.exists == false
+
+- name: Clone the NGINX configuration files from the repository
+  git:
+    repo: https://github.com/freeCodeCamp/nginx-config
+    dest: /etc/nginx
+    clone: true
+    update: true
+    force: true
+    single_branch: true
+    version: main
+    accept_hostkey: true
+
+- name: Clone the error pages from the repository
+  git:
+    repo: https://github.com/freeCodeCamp/error-pages
+    dest: /var/www/error-pages
+    clone: true
+    update: true
+    force: true
+    single_branch: true
+    version: main
+    accept_hostkey: true
+
+- name: Copy the SSL certificates directory from the local machine
+  copy:
+    src: "{{ playbook_dir }}/files/ssl"
+    dest: /etc/nginx/
+    directory_mode: yes
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy the Upstream configs directory from the local machine
+  copy:
+    src: "{{ playbook_dir }}/files/configs/upstreams.conf"
+    dest: /etc/nginx/configs/
+    owner: root
+    group: root
+    mode: 0644

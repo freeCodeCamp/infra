@@ -1,0 +1,7 @@
+---
+- name: Initialize Olde World Cluster
+  hosts: '{{ variable_host | default("oldeworld_all") }}'
+  become: true
+  roles:
+    - ubuntu # Update the OS and reboot the server
+    - dns # Configure ansible facts for networking info lookup

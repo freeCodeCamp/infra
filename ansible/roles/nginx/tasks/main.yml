@@ -1,0 +1,9 @@
+---
+- name: Check if NGINX is installed
+  stat:
+    path: /usr/sbin/nginx
+  register: nginx_installed
+
+- name: Install NGINX
+  include_tasks: install-nginx.yml
+  when: nginx_installed.stat.exists == false

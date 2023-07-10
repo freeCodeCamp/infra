@@ -1,0 +1,33 @@
+---
+- name: Startup NGINX on the Olde World Cluster
+  hosts: '{{ variable_host | default("oldeworld_pxy") }}'
+  become: true
+  serial: 1
+  roles:
+    - dns # Configure ansible facts for networking info lookup
+
+  tasks:
+    - name: Add a delay to stagger the reloads
+      pause:
+        seconds: 20
+      when: variable_add_delay is defined
+
+    - name: Check NGINX Config
+      shell:
+        chdir: /etc/nginx
+        cmd: nginx -t
+      register: nginx_config_check
+      ignore_errors: true
+
+    - name: Start NGINX
+      service:
+        name: nginx
+        state: started
+        enabled: true
+      when: nginx_config_check.rc == 0
+
+    - name: Reload NGINX
+      shell:
+        chdir: /etc/nginx
+        cmd: nginx -s 'reload'
+      when: nginx_config_check.rc == 0
