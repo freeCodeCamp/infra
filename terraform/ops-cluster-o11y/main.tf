@@ -13,7 +13,7 @@ data "linode_domain" "ops_dns_domain" {
   domain = "freecodecamp.net"
 }
 
-data "hcp_packer_image" "linode-ubuntu" {
+data "hcp_packer_image" "linode_ubuntu" {
   bucket_name    = "linode-ubuntu"
   channel        = "latest"
   cloud_provider = "linode"
@@ -38,7 +38,7 @@ resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
   linode_id = linode_instance.ops_o11y_leaders[count.index].id
   size      = linode_instance.ops_o11y_leaders[count.index].specs.0.disk
 
-  image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
+  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
@@ -143,7 +143,7 @@ resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
   linode_id = linode_instance.ops_o11y_workers[count.index].id
   size      = linode_instance.ops_o11y_workers[count.index].specs.0.disk
 
-  image     = data.hcp_packer_image.linode-ubuntu.cloud_image_id
+  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
