@@ -9,7 +9,7 @@ data "linode_stackscripts" "cloudinit_scripts" {
 
 # This data source depends on the domain resource
 # which is created in terraform/ops-dns/main.tf
-data "linode_domain" "prd_dns_domain" {
+data "linode_domain" "ops_dns_domain" {
   domain = "freecodecamp.net"
 }
 
@@ -83,8 +83,8 @@ resource "linode_instance_config" "prd_publish_leaders_config" {
       # Wait for cloud-init to finish.
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
       # Set the hostname.
-      "hostnamectl set-hostname ldr-${count.index + 1}.publish.prd.${data.linode_domain.prd_dns_domain.domain}",
-      "echo \"ldr-${count.index + 1}.publish.prd.${data.linode_domain.prd_dns_domain.domain}\" > /etc/hostname",
+      "hostnamectl set-hostname ldr-${count.index + 1}.publish.prd.${data.linode_domain.ops_dns_domain.domain}",
+      "echo \"ldr-${count.index + 1}.publish.prd.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
     ]
   }
 
@@ -98,7 +98,7 @@ resource "linode_instance_config" "prd_publish_leaders_config" {
 resource "linode_domain_record" "prd_publish_leaders_records__vlan" {
   count = var.leader_node_count
 
-  domain_id   = data.linode_domain.prd_dns_domain.id
+  domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "ldr-${count.index + 1}.publish.prd"
   record_type = "A"
   target      = trimsuffix(linode_instance_config.prd_publish_leaders_config[count.index].interface[1].ipam_address, "/24")
@@ -108,7 +108,7 @@ resource "linode_domain_record" "prd_publish_leaders_records__vlan" {
 resource "linode_domain_record" "prd_publish_leaders_records__public" {
   count = var.leader_node_count
 
-  domain_id   = data.linode_domain.prd_dns_domain.id
+  domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "pub.ldr-${count.index + 1}.publish.prd"
   record_type = "A"
   target      = linode_instance.prd_publish_leaders[count.index].ip_address
@@ -118,7 +118,7 @@ resource "linode_domain_record" "prd_publish_leaders_records__public" {
 resource "linode_domain_record" "prd_publish_leaders_records__private" {
   count = var.leader_node_count
 
-  domain_id   = data.linode_domain.prd_dns_domain.id
+  domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.ldr-${count.index + 1}.publish.prd"
   record_type = "A"
   target      = linode_instance.prd_publish_leaders[count.index].private_ip_address
@@ -188,8 +188,8 @@ resource "linode_instance_config" "prd_publish_workers_config" {
       # Wait for cloud-init to finish.
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
       # Set the hostname.
-      "hostnamectl set-hostname wkr-${count.index + 1}.publish.prd.${data.linode_domain.prd_dns_domain.domain}",
-      "echo \"wkr-${count.index + 1}.publish.prd.${data.linode_domain.prd_dns_domain.domain}\" > /etc/hostname",
+      "hostnamectl set-hostname wkr-${count.index + 1}.publish.prd.${data.linode_domain.ops_dns_domain.domain}",
+      "echo \"wkr-${count.index + 1}.publish.prd.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
     ]
   }
 
@@ -203,7 +203,7 @@ resource "linode_instance_config" "prd_publish_workers_config" {
 resource "linode_domain_record" "prd_publish_workers_records__vlan" {
   count = var.worker_node_count
 
-  domain_id   = data.linode_domain.prd_dns_domain.id
+  domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "wkr-${count.index + 1}.publish.prd"
   record_type = "A"
   target      = trimsuffix(linode_instance_config.prd_publish_workers_config[count.index].interface[1].ipam_address, "/24")
@@ -213,7 +213,7 @@ resource "linode_domain_record" "prd_publish_workers_records__vlan" {
 resource "linode_domain_record" "prd_publish_workers_records__public" {
   count = var.worker_node_count
 
-  domain_id   = data.linode_domain.prd_dns_domain.id
+  domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "pub.wkr-${count.index + 1}.publish.prd"
   record_type = "A"
   target      = linode_instance.prd_publish_workers[count.index].ip_address
@@ -223,7 +223,7 @@ resource "linode_domain_record" "prd_publish_workers_records__public" {
 resource "linode_domain_record" "prd_publish_workers_records__private" {
   count = var.worker_node_count
 
-  domain_id   = data.linode_domain.prd_dns_domain.id
+  domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.wkr-${count.index + 1}.publish.prd"
   record_type = "A"
   target      = linode_instance.prd_publish_workers[count.index].private_ip_address
