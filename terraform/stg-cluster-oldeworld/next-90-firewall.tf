@@ -11,21 +11,19 @@ resource "linode_firewall" "stg_oldeworld_firewall_pxy" {
   }
 
   inbound {
-    label    = "allow-http_from-anywhere"
+    label    = "allow-http_from-nb"
     ports    = "80"
     protocol = "TCP"
     action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
+    ipv4     = ["192.168.255.0/24"]
   }
 
   inbound {
-    label    = "allow-https_from-anywhere"
+    label    = "allow-https_from-nb"
     ports    = "443"
     protocol = "TCP"
     action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
+    ipv4     = ["192.168.255.0/24"]
   }
 
   # outbound { }
