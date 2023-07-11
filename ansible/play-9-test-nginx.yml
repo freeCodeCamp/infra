@@ -11,7 +11,7 @@
             listen 80 default_server;
             server_name _;
             location / {
-              return 200 "Hello World!";
+              return 200 "Hello World from {{ inventory_hostname  }}!";
               add_header Content-Type text/plain;
             }
           }
