@@ -1,0 +1,75 @@
+---
+- name: Install Azure DevOps Pipeline Agent
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  become_method: sudo
+  gather_facts: false
+
+  vars:
+    agent_name:
+      '{{ lookup("env", "AZP_HOSTNAME") | default(inventory_hostname) }}'
+    agent_deployment_group:
+      '{{ lookup("env", "AZP_AGENT_DEPLOYMENT_GROUP") |
+      variable_deployment_group }}'
+    azgent_project:
+      '{{ lookup("env", "AZP_AGENT_PROJECT") | variable_project |
+      default("freeCodeCamp") }}'
+    agent_pat: '{{ lookup("env", "AZURE_DEVOPS_PAT") | variable_pat }}'
+    agent_url:
+      'https://dev.azure.com/{{ lookup("env", "AZP_ORG") | variable_org |
+      default("freeCodeCamp-org") }}'
+    agent_version: '{{ lookup("env", "AZP_AGENT_VERSION") | variable_version }}'
+
+  tasks:
+    - name: Create a directory for the Azure DevOps Pipeline Agent
+      file:
+        path: /home/{{ ansible_user }}/azagent
+        state: directory
+        mode: '0755'
+
+    - name: Download the Azure DevOps Pipeline Agent
+      get_url:
+        url:
+          '{{ agent_url }}/agent/_admin/vstsagent-linux-x64-{{ agent_version
+          }}.tar.gz'
+        dest: /home/{{ ansible_user }}/azagent/agent.tar.gz
+        mode: '0755'
+
+    - name: Extract the Azure DevOps Pipeline Agent
+      unarchive:
+        src: /home/{{ ansible_user }}/azagent/agent.tar.gz
+        dest: /home/{{ ansible_user }}/azagent
+        remote_src: true
+        mode: '0755'
+
+    - name: Configure Azure DevOps Pipeline Agent Service
+      shell: |
+        ./config.sh \
+          --unattended \
+          --acceptteeeula \
+          --deploymentgroup \
+          --work '_work' \
+          --auth pat \
+          --agent '{{ agent_name }}' \
+          --deploymentgroupname '{{ agent_deployment_group }}'
+          --projectname '{{ azgent_project }}' \
+          --token '{{ agent_pat }}' \
+          --url '{{ agent_url }}' \
+          --runasservice
+      args:
+        chdir: /home/{{ ansible_user }}/azagent
+      register: config_agent
+
+    - name: Install Azure DevOps Pipeline Agent Service
+      shell: |
+        ./svc.sh install
+      args:
+        chdir: /home/{{ ansible_user }}/azagent
+      register: install_agent
+
+    - name: Start Azure DevOps Pipeline Agent Service
+      shell: |
+        ./svc.sh start
+      args:
+        chdir: /home/{{ ansible_user }}/azagent
+      register: start_agent

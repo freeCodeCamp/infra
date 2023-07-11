@@ -1,3 +1,5 @@
+# This file contains the list of Ansible collections
+# that are required to run the playbooks.
 ---
 collections:
   - community.general

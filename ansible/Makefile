@@ -15,14 +15,24 @@ help:
 install:
 	pip install ansible ansible-lint
 	pip install -r requirements.txt
-	ansible-galaxy install -r requirements.yml
+	ansible-galaxy install -r requirements.yml --pre
 
-.PHONY: check-linode-env-token
-check-linode-env-token:
+.PHONY: check-linode-token
+check-linode-token:
   ifndef LINODE_API_TOKEN
     $(error LINODE_API_TOKEN is undefined)
   endif
 
+.PHONY: check-az-pat
+check-az-pat:
+  ifndef AZURE_DEVOPS_PAT
+    $(error AZURE_DEVOPS_PAT is undefined)
+  endif
+
 .PHONY: inventory
-inventory: check-linode-env-token
+inventory: check-linode-token
 	ansible-inventory -i inventory --graph -vvv
+
+.PHONY: install-az-agent
+install-az-agent: check-az-pat
+  ansible-playbook play-oldeworld--azops-1-install.yml -v

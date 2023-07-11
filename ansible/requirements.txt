@@ -1,3 +1,5 @@
+# This file contains python dependencies (SDK)
+# for the Ansible plugins and roles
 linode-api4>=5.5.1
 polling>=0.3.2
 types-requests==2.31.0.1
