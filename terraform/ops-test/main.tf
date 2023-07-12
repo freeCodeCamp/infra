@@ -98,7 +98,7 @@ resource "linode_domain_record" "ops_test_records" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_test_records__public" {
+resource "linode_domain_record" "ops_test_dnsrecord__public" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "pub.test"
   record_type = "A"
