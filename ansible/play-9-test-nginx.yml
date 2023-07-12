@@ -1,6 +1,6 @@
 ---
 - name: Test NGINX Setup
-  hosts: '{{ variable_host | default("oldeworld_pxy") }}'
+  hosts: '{{ variable_host | default("null")}}'
   become: true
   tasks:
     - name: Create the NGINX config file
