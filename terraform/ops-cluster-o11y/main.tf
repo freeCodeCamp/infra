@@ -95,7 +95,7 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_records__vlan" {
+resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__vlan" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -105,7 +105,7 @@ resource "linode_domain_record" "ops_o11y_leaders_records__vlan" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_records__public" {
+resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__public" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -115,7 +115,7 @@ resource "linode_domain_record" "ops_o11y_leaders_records__public" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_records__private" {
+resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__private" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -200,7 +200,7 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_o11y_workers_records__vlan" {
+resource "linode_domain_record" "ops_o11y_workers_dnsrecord__vlan" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -210,7 +210,7 @@ resource "linode_domain_record" "ops_o11y_workers_records__vlan" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_workers_records__public" {
+resource "linode_domain_record" "ops_o11y_workers_dnsrecord__public" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -220,7 +220,7 @@ resource "linode_domain_record" "ops_o11y_workers_records__public" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "ops_o11y_workers_records__private" {
+resource "linode_domain_record" "ops_o11y_workers_dnsrecord__private" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id

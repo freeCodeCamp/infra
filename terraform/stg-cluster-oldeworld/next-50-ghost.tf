@@ -70,7 +70,7 @@ resource "linode_instance_config" "stg_oldeworld_newstst_config" {
   booted = true
 }
 
-resource "linode_domain_record" "stg_oldeworld_newstst_config_records__vlan" {
+resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__vlan" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "newstst-1.oldeworld.stg"
   record_type = "A"
@@ -78,7 +78,7 @@ resource "linode_domain_record" "stg_oldeworld_newstst_config_records__vlan" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "stg_oldeworld_newstst_config_records__public" {
+resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__public" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "pub.newstst-1.oldeworld.stg"
   record_type = "A"
@@ -86,7 +86,7 @@ resource "linode_domain_record" "stg_oldeworld_newstst_config_records__public" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "stg_oldeworld_newstst_config_records__private" {
+resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__private" {
   domain_id   = data.linode_domain.ops_dns_domain.id
   name        = "prv.newstst-1.oldeworld.stg"
   record_type = "A"

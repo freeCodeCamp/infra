@@ -73,7 +73,7 @@ resource "linode_instance_config" "stg_oldeworld_cltita_config" {
   booted = true
 }
 
-resource "linode_domain_record" "stg_oldeworld_cltita_config_records__vlan" {
+resource "linode_domain_record" "stg_oldeworld_cltita_dnsrecord__vlan" {
   count = local.cltita_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -83,7 +83,7 @@ resource "linode_domain_record" "stg_oldeworld_cltita_config_records__vlan" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "stg_oldeworld_cltita_config_records__public" {
+resource "linode_domain_record" "stg_oldeworld_cltita_dnsrecord__public" {
   count = local.cltita_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
@@ -93,7 +93,7 @@ resource "linode_domain_record" "stg_oldeworld_cltita_config_records__public" {
   ttl_sec     = 120
 }
 
-resource "linode_domain_record" "stg_oldeworld_cltita_config_records__private" {
+resource "linode_domain_record" "stg_oldeworld_cltita_dnsrecord__private" {
   count = local.cltita_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
