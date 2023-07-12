@@ -5,13 +5,22 @@ plugin: community.general.linode # can be replaced with linode.cloud.instance, w
 access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
 
 groups:
-  # Test
+  # Test Instances
   test_all: "'test' in (tags|list)"
+
+  # Staging Instances
+  stg_all: "'stg' in (tags|list)"
+
+  # Production Instances
+  prd_all: "'prd' in (tags|list)"
+
+  # Operations Instances
+  ops_all: "'ops' in (tags|list)"
 
   # O11y Cluster
   o11y_all: "'o11y' in (tags|list)"
-  managers: "'o11y_leader' in (tags|list)"
-  workers: "'o11y_worker' in (tags|list)"
+  managers: "'o11y_leader' in (tags|list)"  # TODO: Refactor the naming of this group
+  workers: "'o11y_worker' in (tags|list)"   # TODO: Refactor the naming of this group
 
   # Publish Cluster
   publish_all: "'publish' in (tags|list)"
