@@ -33,9 +33,5 @@ groups:
   stg_oldeworld_clt: "'stg_oldeworld_clt' in (tags|list)"
   stg_oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list)"
 
-#
-# NOTE: More groups are automatically created by the plugin
-#
-
 compose:
   ansible_ssh_host: ipv4[0]
