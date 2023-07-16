@@ -1,11 +1,12 @@
 name: TF--Linode-OPS-Cluster:Test
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/ops-cluster-test/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'terraform/ops-cluster-test/**'
+  workflow_dispatch:
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp

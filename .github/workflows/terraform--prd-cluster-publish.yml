@@ -1,11 +1,12 @@
 name: TF--Linode-PRD-Cluster:Publish
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/prd-cluster-publish/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'terraform/prd-cluster-publish/**'
+  workflow_dispatch:
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp

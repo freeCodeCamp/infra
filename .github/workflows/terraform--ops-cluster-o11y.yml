@@ -1,11 +1,12 @@
 name: TF--Linode-OPS-Cluster:O11y
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/ops-cluster-o11y/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'terraform/ops-cluster-o11y/**'
+  workflow_dispatch:
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp
