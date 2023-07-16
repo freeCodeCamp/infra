@@ -77,7 +77,7 @@ resource "linode_domain_record" "stg_oldeworld_api_dnsrecord__vlan" {
   count = local.api_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "api-${count.index + 1}.oldeworld.stg"
+  name        = "api-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = trimsuffix(linode_instance_config.stg_oldeworld_api_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
@@ -87,7 +87,7 @@ resource "linode_domain_record" "stg_oldeworld_api_dnsrecord__public" {
   count = local.api_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.api-${count.index + 1}.oldeworld.stg"
+  name        = "pub.api-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_api[count.index].ip_address
   ttl_sec     = 120
@@ -97,7 +97,7 @@ resource "linode_domain_record" "stg_oldeworld_api_dnsrecord__private" {
   count = local.api_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.api-${count.index + 1}.oldeworld.stg"
+  name        = "prv.api-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_api[count.index].private_ip_address
   ttl_sec     = 120

@@ -99,7 +99,7 @@ resource "linode_domain_record" "prd_publish_leaders_dnsrecord__vlan" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "ldr-${count.index + 1}.publish.prd"
+  name        = "ldr-${count.index + 1}.publish.prd.${var.network_subdomain}"
   record_type = "A"
   target      = trimsuffix(linode_instance_config.prd_publish_leaders_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
@@ -109,7 +109,7 @@ resource "linode_domain_record" "prd_publish_leaders_dnsrecord__public" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.ldr-${count.index + 1}.publish.prd"
+  name        = "pub.ldr-${count.index + 1}.publish.prd.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.prd_publish_leaders[count.index].ip_address
   ttl_sec     = 120
@@ -119,7 +119,7 @@ resource "linode_domain_record" "prd_publish_leaders_dnsrecord__private" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.ldr-${count.index + 1}.publish.prd"
+  name        = "prv.ldr-${count.index + 1}.publish.prd.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.prd_publish_leaders[count.index].private_ip_address
   ttl_sec     = 120
@@ -204,7 +204,7 @@ resource "linode_domain_record" "prd_publish_workers_dnsrecord__vlan" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "wkr-${count.index + 1}.publish.prd"
+  name        = "wkr-${count.index + 1}.publish.prd.${var.network_subdomain}"
   record_type = "A"
   target      = trimsuffix(linode_instance_config.prd_publish_workers_config[count.index].interface[1].ipam_address, "/24")
   ttl_sec     = 120
@@ -214,7 +214,7 @@ resource "linode_domain_record" "prd_publish_workers_dnsrecord__public" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.wkr-${count.index + 1}.publish.prd"
+  name        = "pub.wkr-${count.index + 1}.publish.prd.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.prd_publish_workers[count.index].ip_address
   ttl_sec     = 120
@@ -224,7 +224,7 @@ resource "linode_domain_record" "prd_publish_workers_dnsrecord__private" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.wkr-${count.index + 1}.publish.prd"
+  name        = "prv.wkr-${count.index + 1}.publish.prd.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.prd_publish_workers[count.index].private_ip_address
   ttl_sec     = 120

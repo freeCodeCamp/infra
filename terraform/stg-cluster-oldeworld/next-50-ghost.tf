@@ -72,7 +72,7 @@ resource "linode_instance_config" "stg_oldeworld_newstst_config" {
 
 resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__vlan" {
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "newstst-1.oldeworld.stg"
+  name        = "newstst-1.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = trimsuffix(linode_instance_config.stg_oldeworld_newstst_config.interface[1].ipam_address, "/24")
   ttl_sec     = 120
@@ -80,7 +80,7 @@ resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__vlan" {
 
 resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__public" {
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.newstst-1.oldeworld.stg"
+  name        = "pub.newstst-1.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_newstst.ip_address
   ttl_sec     = 120
@@ -88,7 +88,7 @@ resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__public" {
 
 resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__private" {
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.newstst-1.oldeworld.stg"
+  name        = "prv.newstst-1.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_newstst.private_ip_address
   ttl_sec     = 120

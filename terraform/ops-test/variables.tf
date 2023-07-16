@@ -15,6 +15,12 @@ variable "region" {
   type        = string
 }
 
+variable "network_subdomain" {
+  description = "The subdomain for the network."
+  type        = string
+  sensitive   = true
+}
+
 # variable "image_id" {
 #   description = "The ID for the Linode image to be used in provisioning the instances"
 #   default     = "private/20789403"
