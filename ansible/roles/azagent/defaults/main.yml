@@ -1,0 +1,5 @@
+---
+azagent_dir: "/home/freecodecamp/azagent"
+vstsagent_tar_file: "vstsagent.tar.gz"
+azdevops_url: "https://dev.azure.com/freeCodeCamp-org/"
+work: "_work"

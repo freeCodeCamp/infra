@@ -1,0 +1,22 @@
+---
+- name: Update nvm to the latest version
+  shell: |
+    curl --silent "https://api.github.com/repos/nvm-sh/nvm/releases/latest" |
+    grep '"tag_name":' |
+    sed -E 's/.*"([^"]+)".*/\1/' |
+    xargs -I % curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/%/install.sh |
+    bash
+  args:
+    executable: /bin/bash
+
+- name: Update Node.js to the latest version
+  shell: |
+    source ~/.nvm/nvm.sh
+    if [[ $(nvm version) == 'none' ]] ; then
+      nvm install --lts --latest-npm --default
+    else
+      nvm install --lts --latest-npm --default --reinstall-packages-from=node
+    fi
+    node --version | xargs npx -y cowsay 'hello from node'
+  args:
+    executable: /bin/bash

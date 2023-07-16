@@ -1,0 +1,44 @@
+---
+- name: Create directory for Azure DevOps agent
+  file:
+    path: "{{ azagent_dir }}"
+    state: directory
+
+- name: Download Azure DevOps agent
+  get_url:
+    url: "{{ agent_download_url }}"
+    dest: "{{ azagent_dir }}/{{ vstsagent_tar_file }}"
+    mode: '0755'
+
+- name: Extract Azure DevOps agent tar file
+  unarchive:
+    src: "{{ azagent_dir }}/{{ vstsagent_tar_file }}"
+    dest: "{{ azagent_dir }}"
+    remote_src: yes
+
+- name: Configure Azure DevOps agent
+  shell:
+    executable: /bin/bash
+    chdir: "{{ azagent_dir }}"
+    cmd: |
+      ./config.sh \
+      --unattended \
+      --acceptteeeula \
+      --deploymentgroup \
+      --replace \
+      --runasservice \
+      --deploymentgroupname '{{ agent_deploymentgroup_name }}' \
+      --agent '{{ agent_machine_name }}' \
+      --url '{{ azdevops_url }}' \
+      --work '{{ work }}' \
+      --projectname '{{ agent_project_name }}' \
+      --auth pat \
+      --token '{{ agent_pat_token }}'
+
+- name: Install & Start Azure DevOps Pipeline Agent
+  shell:
+    cmd: |
+      sudo ./svc.sh install
+      sudo ./svc.sh start
+    executable: /bin/bash
+    chdir: "{{ azagent_dir }}"
