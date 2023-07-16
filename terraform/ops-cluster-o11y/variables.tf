@@ -1,11 +1,13 @@
 variable "linode_token" {
   description = "The Linode API Personal Access Token."
   type        = string
+  sensitive   = true
 }
 
 variable "password" {
   description = "The root password for the Linode instances."
   type        = string
+  sensitive   = true
 }
 
 variable "worker_node_count" {
@@ -45,9 +47,11 @@ variable "region" {
 variable "hcp_client_id" {
   description = "The client ID for the HCP API."
   type        = string
+  sensitive   = true
 }
 
 variable "hcp_client_secret" {
   description = "The client secret for the HCP API."
   type        = string
+  sensitive   = true
 }
