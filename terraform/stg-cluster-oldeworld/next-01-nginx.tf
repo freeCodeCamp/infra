@@ -21,7 +21,11 @@ resource "linode_instance_disk" "stg_oldeworld_pxy_disk__boot" {
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
   stackscript_data = {
-    userdata = filebase64("${path.root}/cloud-init--userdata.yml")
+    userdata = base64encode(
+      templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
+        tf_hostname = "pxy-${count.index + 1}.oldeworld.stg.${data.linode_domain.ops_dns_domain.domain}"
+      })
+    )
   }
 }
 
@@ -56,13 +60,22 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
     host     = linode_instance.stg_oldeworld_pxy[count.index].ip_address
   }
 
+  # All of the provisioning should be done via cloud-init.
+  # This is just to setup the reboot.
   provisioner "remote-exec" {
     inline = [
       # Wait for cloud-init to finish.
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for cloud-init...'; sleep 1; done",
-      # Set the hostname.
-      "hostnamectl set-hostname pxy-${count.index + 1}.oldeworld.stg.${data.linode_domain.ops_dns_domain.domain}",
-      "echo \"pxy-${count.index + 1}.oldeworld.stg.${data.linode_domain.ops_dns_domain.domain}\" > /etc/hostname",
+      "echo Current hostname...; hostname",
+      "shutdown -r +1 'Terraform: Rebooting to apply hostname change in 1 min.'"
+    ]
+  }
+
+  # This run is a hack to trigger the reboot,
+  # which may fail otherwise in the previous step.
+  provisioner "remote-exec" {
+    inline = [
+      "uptime"
     ]
   }
 

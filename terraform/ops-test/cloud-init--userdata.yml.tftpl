@@ -1,0 +1,31 @@
+#cloud-config
+users:
+  - name: freecodecamp
+    groups: sudo
+    shell:  /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_import_id:
+      - gh:camperbot
+      - raisedadead
+runcmd:
+  - usermod -aG docker freecodecamp
+  # Configure sshd
+  - |
+    sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
+    sed -i -e '/^PasswordAuthentication/s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config
+    sed -i -e '/^PubkeyAuthentication/s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+    sed -i -e '$aAllowUsers freecodecamp' /etc/ssh/sshd_config
+  # Configure hostname
+  - |
+    sed -i '/preserve_hostname: false/c\preserve_hostname: true' /etc/cloud/cloud.cfg
+    hostnamectl set-hostname ${tf_hostname}
+    echo \"${tf_hostname}\" > /etc/hostname
+  #
+  # :-----------------------: WARNING :-----------------------:
+  #
+  #   This next line should be the last command in the list,
+  #   because it involves restarting the ssh service.
+  #
+  # :-----------------------: WARNING :-----------------------:
+  - systemctl restart sshd
+final_message: 'Setup complete'
