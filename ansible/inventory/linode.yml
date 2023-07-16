@@ -27,9 +27,14 @@ groups:
   publish_leaders: "'publish_leader' in (tags|list)"
   publish_workers: "'publish_worker' in (tags|list)"
 
-  # OldeWorld Cluster
-  oldeworld_all: "'oldeworld' in (tags|list)"
-  oldeworld_pxy: "'oldeworld_pxy' in (tags|list)"
+  # # OldeWorld Cluster
+  # oldeworld_all: "'oldeworld' in (tags|list)"
+  # oldeworld_pxy: "'oldeworld_pxy' in (tags|list)"
+
+  # Oldeworld Cluster -- STG
+  stg_oldeworld_all: "'stg' in (tags|list) and 'oldeworld' in (tags|list)"
+  stg_oldeworld_pxy: "'stg' in (tags|list) and 'oldeworld_pxy' in (tags|list)"
+
 
 compose:
   ansible_ssh_host: ipv4[0]
