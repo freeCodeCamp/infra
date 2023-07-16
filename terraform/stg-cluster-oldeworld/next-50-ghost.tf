@@ -80,7 +80,7 @@ resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__vlan" {
 
 resource "linode_domain_record" "stg_oldeworld_newstst_dnsrecord__public" {
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.newstst-1.oldeworld.stg"
+  name        = "pub.newstst-1.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_newstst.ip_address
   ttl_sec     = 120

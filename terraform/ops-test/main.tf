@@ -100,7 +100,7 @@ resource "linode_domain_record" "ops_test_records" {
 
 resource "linode_domain_record" "ops_test_dnsrecord__public" {
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.test"
+  name        = "pub.test.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.ops_test.ip_address
   ttl_sec     = 120
