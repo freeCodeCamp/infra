@@ -109,7 +109,7 @@ resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__public" {
   count = var.leader_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.ldr-${count.index + 1}.o11y"
+  name        = "pub.ldr-${count.index + 1}.o11y.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.ops_o11y_leaders[count.index].ip_address
   ttl_sec     = 120
@@ -214,7 +214,7 @@ resource "linode_domain_record" "ops_o11y_workers_dnsrecord__public" {
   count = var.worker_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.wkr-${count.index + 1}.o11y"
+  name        = "pub.wkr-${count.index + 1}.o11y.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.ops_o11y_workers[count.index].ip_address
   ttl_sec     = 120

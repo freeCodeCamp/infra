@@ -87,7 +87,7 @@ resource "linode_domain_record" "stg_oldeworld_cltita_dnsrecord__public" {
   count = local.cltita_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.cltita-${count.index + 1}.oldeworld.stg"
+  name        = "pub.cltita-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_cltita[count.index].ip_address
   ttl_sec     = 120

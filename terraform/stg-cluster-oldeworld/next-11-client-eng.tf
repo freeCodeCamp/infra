@@ -87,7 +87,7 @@ resource "linode_domain_record" "stg_oldeworld_clteng_dnsrecord__public" {
   count = local.clteng_node_count
 
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.clteng-${count.index + 1}.oldeworld.stg"
+  name        = "pub.clteng-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
   record_type = "A"
   target      = linode_instance.stg_oldeworld_clteng[count.index].ip_address
   ttl_sec     = 120
