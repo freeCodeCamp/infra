@@ -1,16 +1,17 @@
 name: TF -- Linode - Ops DNS
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/ops-dns/**'
-  push:
-    branches:
-      - main
-    paths:
-      - 'terraform/ops-dns/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'terraform/ops-dns/**'
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'terraform/ops-dns/**'
+  workflow_dispatch:
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp

@@ -1,11 +1,12 @@
 name: TF--Linode-STG-Cluster:OldeWorld
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/stg-cluster-oldeworld/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'terraform/stg-cluster-oldeworld/**'
+  workflow_dispatch:
 
 env:
   TF_CLOUD_ORGANIZATION: freecodecamp
