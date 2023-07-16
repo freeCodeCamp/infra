@@ -1,0 +1,45 @@
+---
+- name: Initialize Olde World Cluster - API
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  become_user: freecodecamp
+  gather_facts: false
+  vars:
+    api_hosts: ['1', '2']
+    api_env: '{{ variable_api_env | default("stg") }}'
+    agent_version: '{{ variable_agent_version | default("3.220.5") }}'
+  tasks:
+    - name: Install or Update Node.js
+      include_role:
+        name: nodejs
+
+    - name: Uninstall and remove azagent
+      include_role:
+        name: azagent
+        tasks_from: delete-azagent.yml
+      vars:
+        agent_deploymentgroup_name: '{{ api_env }}-dp-api'
+        agent_machine_name:
+          '{{ api_env }}-vm-oldeworld-api-{{ item[0] }}'
+        agent_project_name: 'freeCodeCamp'
+        agent_pat_token: '{{ variable_pat_token }}'
+      loop: '{{ api_hosts | list }}'
+      when:
+        inventory_hostname == api_env + "-vm-oldeworld-api-" + item[0]
+
+    - name: Install azagent
+      include_role:
+        name: azagent
+        tasks_from: install-azagent.yml
+      vars:
+        agent_deploymentgroup_name: '{{ api_env }}-dp-api'
+        agent_machine_name:
+          '{{ api_env }}-vm-oldeworld-api-{{ item[0] }}'
+        agent_project_name: 'freeCodeCamp'
+        agent_pat_token: '{{ variable_pat_token }}'
+        agent_download_url:
+          'https://vstsagentpackage.azureedge.net/agent/{{ agent_version
+          }}/vsts-agent-linux-x64-{{ agent_version }}.tar.gz'
+      loop: '{{ api_hosts | list }}'
+      when:
+        inventory_hostname == api_env + "-vm-oldeworld-api-" + item[0]
