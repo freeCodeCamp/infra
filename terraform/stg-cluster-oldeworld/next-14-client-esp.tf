@@ -7,7 +7,7 @@ resource "linode_instance" "stg_oldeworld_cltesp" {
 
   private_ip = true
 
-  tags = ["stg", "oldeworld", "oldeworld_cltesp"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  tags = ["stg", "oldeworld", "stg_oldeworld_clt", "clt", "esp"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
 
 resource "linode_instance_disk" "stg_oldeworld_cltesp_disk__boot" {
