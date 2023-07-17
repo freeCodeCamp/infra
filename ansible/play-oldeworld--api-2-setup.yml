@@ -9,10 +9,11 @@
       git:
         name: https://github.com/freeCodeCamp/freeCodeCamp.git
         dest: /home/freecodecamp/freeCodeCamp
+        accept_hostkey: true
         clone: true
-        update: false
-        single_branch: true
-        version: 'prod-{{ api_env == "stg" | ternary("staging", "current") }}'
+        update: true
+        force: true
+        version: "{{ 'prod-staging' if api_env == 'stg' else 'prod-current' }}"
 
     - name: Copy the .env file
       copy:
