@@ -1,0 +1,105 @@
+---
+- name: Setup Olde World Cluster - API
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
+  vars:
+    api_env: '{{ variable_api_env | default("stg") }}'
+  tasks:
+    - name: Clone the Git Repository
+      git:
+        name: https://github.com/freeCodeCamp/freeCodeCamp.git
+        dest: /home/freecodecamp/freeCodeCamp
+        clone: true
+        update: false
+        single_branch: true
+        version: 'prod-{{ api_env == "stg" | ternary("staging", "current") }}'
+
+    - name: Copy the .env file
+      copy:
+        src: '{{ playbook_dir }}/files/api/.env'
+        dest: /home/freecodecamp/freeCodeCamp/.env
+        owner: freecodecamp
+        group: freecodecamp
+        mode: 0644
+
+    - name: Get the Node.js version
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          node -v
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
+      register: node_version_output
+
+    - name: Set the Node.js version fact
+      set_fact:
+        node_version: '{{ node_version_output.stdout }}'
+
+    - name: Install Global Dependencies
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          npm i -g pnpm
+          npm i -g pm2
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
+
+    - name: Setup PM2 & Logrotate
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          pm2 update
+          pm2 install pm2-logrotate
+          sudo env PATH=$PATH:/home/freecodecamp/.nvm/versions/node/{{ node_version }}/bin /home/freecodecamp/.nvm/versions/node/{{ node_version }}/lib/node_modules/pm2/bin/pm2 startup systemd -u freecodecamp --hp /home/freecodecamp
+          pm2 save
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
+      register: pm2_setup_output
+
+    - name: Install Dependencies
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          pnpm install
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
+
+    - name: Build the server
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          pnpm prebuild
+          pnpm build:curriculum
+          pnpm build:server
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
+
+    - name: Start the server
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          pnpm start:server
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
+
+    - name: Save the running process
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          pm2 save
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
