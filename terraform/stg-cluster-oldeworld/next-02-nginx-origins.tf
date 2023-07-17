@@ -3,12 +3,12 @@ data "linode_nodebalancer" "stg_oldeworld_nb_pxy" {
 }
 
 data "linode_nodebalancer_config" "stg_oldeworld_nb_pxy_config__port_443" {
-  id              = 597404 # TODO: Find a way to get this ID dynamically
+  id              = 597405 # TODO: Find a way to get this ID dynamically
   nodebalancer_id = data.linode_nodebalancer.stg_oldeworld_nb_pxy.id
 }
 
 data "linode_nodebalancer_config" "stg_oldeworld_nb_pxy_config__port_80" {
-  id              = 597405 # TODO: Find a way to get this ID dynamically
+  id              = 597404 # TODO: Find a way to get this ID dynamically
   nodebalancer_id = data.linode_nodebalancer.stg_oldeworld_nb_pxy.id
 }
 
