@@ -36,7 +36,7 @@
 
 - name: Copy the SSL certificates directory from the local machine
   copy:
-    src: "{{ playbook_dir }}/files/ssl"
+    src: "{{ playbook_dir }}/files/nginx/ssl"
     dest: /etc/nginx/
     directory_mode: yes
     owner: root
@@ -45,7 +45,7 @@
 
 - name: Copy the Upstream configs directory from the local machine
   copy:
-    src: "{{ playbook_dir }}/files/configs/upstreams.conf"
+    src: "{{ playbook_dir }}/files/nginx/configs/upstreams.conf"
     dest: /etc/nginx/configs/
     owner: root
     group: root

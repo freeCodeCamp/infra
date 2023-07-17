@@ -1,5 +1,5 @@
 ---
-- name: Initialize Olde World Cluster - API
+- name: Update Olde World Cluster - API
   hosts: '{{ variable_host | default("null") }}'
   become: true
   become_user: freecodecamp
