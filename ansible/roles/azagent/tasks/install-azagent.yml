@@ -39,6 +39,7 @@
   shell:
     cmd: |
       sudo ./svc.sh install
+      ./env.sh
       sudo ./svc.sh start
     executable: /bin/bash
     chdir: "{{ azagent_dir }}"
