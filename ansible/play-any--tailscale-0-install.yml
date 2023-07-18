@@ -1,0 +1,40 @@
+---
+- name: Tailscale - Install
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: true
+  vars:
+    apt_keyring_path: /usr/share/keyrings/tailscale-archive-keyring.gpg
+  tasks:
+    - name: Install Tailscale Dependencies
+      apt:
+        name:
+          - gnupg2
+          - gnupg-agent
+          - apt-transport-https
+          - python3-apt
+          - jq
+        state: present
+        cache_valid_time: 3600
+
+    - name: Add Tailscale GPG Key
+      apt_key:
+        url:
+          'https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower
+          }}/{{ ansible_distribution_release | lower }}.noarmor.gpg'
+        keyring: '{{ apt_keyring_path }}'
+        state: present
+
+    - name: Add Tailscale APT Repository
+      apt_repository:
+        repo:
+          'deb [signed-by={{ apt_keyring_path }}]
+          https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}
+          {{ ansible_distribution_release | lower }} main'
+        state: present
+
+    - name: Install Tailscale
+      apt:
+        name: tailscale
+        state: latest
+        update_cache: true

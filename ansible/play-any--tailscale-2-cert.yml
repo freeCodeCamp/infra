@@ -1,0 +1,14 @@
+---
+- name: Tailscale - Issue Cert
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run Tailscale Cert
+      shell:
+        cmd: |
+          tailscale cert
+        executable: /bin/bash
+      no_log: true
+      changed_when: true
+      ignore_errors: true

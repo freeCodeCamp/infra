@@ -1,0 +1,38 @@
+---
+- name: Tailscale - Start SSH
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Add Tailscale to Network
+      shell:
+        cmd: |
+          tailscale up \
+          --authkey "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}" \
+          --hostname "{{ inventory_hostname }}" \
+          --force-reauth \
+          --ssh
+        executable: /bin/bash
+      no_log: true
+      changed_when: true
+      ignore_errors: true
+
+    - name: Check if Tailscale is Connected
+      shell:
+        cmd: |
+          tailscale status --json | jq -r '.Self.Online'
+        executable: /bin/bash
+      register: tailscale_status
+
+    - name: Check DNS name
+      shell:
+        cmd: |
+          tailscale status --json | jq -r '.Self.DNSName'
+        executable: /bin/bash
+      register: tailscale_dns
+
+    - name: Print Tailscale Status
+      debug:
+        msg: |
+          Tailscale Status: {{ tailscale_status.stdout }}
+          Tailscale DNS: {{ tailscale_dns.stdout }}
