@@ -8,7 +8,7 @@
     client_groups:
       ['chn', 'cnt', 'eng', 'esp', 'ger', 'ita', 'jpn', 'por', 'ukr']
     client_hosts: ['1', '2']
-    client_env: '{{ variable_client_env | default("stg") }}'
+    client_env: '{{ variable_client_env }}'
     agent_version: '{{ variable_agent_version | default("3.220.5") }}'
   tasks:
     # - name: Create deployment groups from list of items

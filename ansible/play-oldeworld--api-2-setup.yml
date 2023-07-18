@@ -3,7 +3,7 @@
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: false
   vars:
-    api_env: '{{ variable_api_env | default("stg") }}'
+    api_env: '{{ variable_api_env }}'
   tasks:
     - name: Clone the Git Repository
       git:
