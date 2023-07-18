@@ -14,14 +14,15 @@ help:
 .PHONY: install
 install:
 	pip install ansible ansible-lint
-	pip install -r requirements.txt
-	ansible-galaxy install -r requirements.yml
+	pip install -r requirements/python.txt
+	ansible-galaxy install -r requirements/roles.yml
+	ansible-galaxy collection install -r requirements/collections.yml
 
 .PHONY: check-linode-env-token
 check-linode-env-token:
-  ifndef LINODE_API_TOKEN
-    $(error LINODE_API_TOKEN is undefined)
-  endif
+	ifndef LINODE_API_TOKEN
+		$(error LINODE_API_TOKEN is undefined)
+	endif
 
 .PHONY: inventory
 inventory: check-linode-env-token
