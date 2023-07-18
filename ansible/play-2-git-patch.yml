@@ -1,0 +1,71 @@
+---
+- name: Apply a patch to a Git Repository
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
+  serial: 1
+  tasks:
+    - name: Pause for 5 seconds
+      pause:
+        seconds: 5
+
+    - name: Copy the patch file to the server
+      copy:
+        src: '{{ playbook_dir }}/files/patches/{{ variable_patch_file }}'
+        dest: '/home/freecodecamp/{{ variable_patch_file }}'
+        owner: freecodecamp
+        group: freecodecamp
+        mode: 0644
+
+    - name: Apply the patch
+      shell: |
+        git apply --ignore-space-change --ignore-whitespace /home/freecodecamp/{{ variable_patch_file }}
+      args:
+        chdir: '/home/freecodecamp/{{ variable_repo_dir }}'
+      register: patch_result
+
+    - name: Check if the patch was applied
+      debug:
+        msg: 'Patch was applied'
+      when: patch_result.stdout.find('error') == -1
+      failed_when: patch_result.stdout.find('error') != -1
+
+    - name: Check the status of the repository
+      shell: |
+        git status
+        git diff
+      args:
+        chdir: '/home/freecodecamp/{{ variable_repo_dir }}'
+      register: status_result
+
+    - name: Show the status of the repository
+      debug:
+        msg: '{{ status_result.stdout }}'
+      when: status_result.stdout.find('error') == -1
+      failed_when: status_result.stdout.find('error') != -1
+
+    - name: Copy any follow up scripts
+      copy:
+        src: '{{ playbook_dir }}/files/scripts/{{ variable_followup_script }}'
+        dest: '/home/freecodecamp/{{ variable_followup_script }}'
+        owner: freecodecamp
+        group: freecodecamp
+        mode: 0755
+
+    # WARNING:
+    # This is a hack to get around the fact that the variable
+    # variable_source_envs is not being expanded in the shell
+    # task below.
+    #
+    # Use the following syntax when setting variables
+    # that have spaces in them:
+    #
+    # ansible-playbook playbool.yml -e 'variable_source_envs="export MY_VAR=myvalue"'
+    #
+    - name: Run any follow up scripts
+      shell:
+        cmd: |
+          {{ variable_source_envs | default("echo no-additional vars set") }}
+          /home/freecodecamp/{{ variable_followup_script }}
+        executable: /bin/bash
+        chdir: '/home/freecodecamp/{{ variable_repo_dir }}'
+      register: followup_result
