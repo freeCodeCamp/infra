@@ -6,7 +6,7 @@
   gather_facts: false
   vars:
     api_hosts: ['1', '2', '3']
-    api_env: '{{ variable_api_env | default("stg") }}'
+    api_env: '{{ variable_api_env }}'
     agent_version: '{{ variable_agent_version | default("3.220.5") }}'
   tasks:
     - name: Install or Update Node.js
