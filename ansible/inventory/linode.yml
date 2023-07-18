@@ -33,5 +33,11 @@ groups:
   stg_oldeworld_clt: "'stg_oldeworld_clt' in (tags|list)"
   stg_oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list)"
 
+  # Oldeworld Cluster -- PRD
+  prd_oldeworld_all: "'prd' in (tags|list) and 'oldeworld' in (tags|list)"
+  prd_oldeworld_api: "'prd_oldeworld_api' in (tags|list)"
+  prd_oldeworld_clt: "'prd_oldeworld_clt' in (tags|list)"
+  prd_oldeworld_pxy: "'prd_oldeworld_pxy' in (tags|list)"
+
 compose:
   ansible_ssh_host: ipv4[0]
