@@ -1,0 +1,14 @@
+---
+- name: Install Tailscale and add to Network
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Add Tailscale to Network
+      shell:
+        cmd: |
+          tailscale cert
+        executable: /bin/bash
+      no_log: true
+      changed_when: true
+      ignore_errors: true
