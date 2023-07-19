@@ -21,7 +21,7 @@
         agent_deploymentgroup_name: '{{ api_env }}-dp-api'
         agent_machine_name: '{{ api_env }}-vm-oldeworld-api-{{ item[0] }}'
         agent_project_name: 'freeCodeCamp'
-        agent_pat_token: '{{ variable_pat_token }}'
+        agent_pat_token: "{{ lookup('env', 'AZURE_DEVOPS_PAT') }}"
       loop: '{{ api_hosts | list }}'
       when: inventory_hostname == api_env + "-vm-oldeworld-api-" + item[0]
 
@@ -33,7 +33,7 @@
         agent_deploymentgroup_name: '{{ api_env }}-dp-api'
         agent_machine_name: '{{ api_env }}-vm-oldeworld-api-{{ item[0] }}'
         agent_project_name: 'freeCodeCamp'
-        agent_pat_token: '{{ variable_pat_token }}'
+        agent_pat_token: "{{ lookup('env', 'AZURE_DEVOPS_PAT') }}"
         agent_download_url:
           'https://vstsagentpackage.azureedge.net/agent/{{ agent_version
           }}/vsts-agent-linux-x64-{{ agent_version }}.tar.gz'
