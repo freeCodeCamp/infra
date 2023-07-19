@@ -54,6 +54,10 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
   outbound_policy = "ACCEPT"
 
   linodes = flatten([
+    # All API nodes.
+    [for i in linode_instance.stg_oldeworld_api : i.id],
+
+    # All Client nodes.
     [for i in linode_instance.stg_oldeworld_clteng : i.id],
     [for i in linode_instance.stg_oldeworld_cltchn : i.id],
     [for i in linode_instance.stg_oldeworld_cltcnt : i.id],
@@ -62,6 +66,9 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     [for i in linode_instance.stg_oldeworld_cltita : i.id],
     [for i in linode_instance.stg_oldeworld_cltjpn : i.id],
     [for i in linode_instance.stg_oldeworld_cltpor : i.id],
-    [for i in linode_instance.stg_oldeworld_cltukr : i.id]
+    [for i in linode_instance.stg_oldeworld_cltukr : i.id],
+
+    # News Test node.
+    linode_instance.stg_oldeworld_newstst.id
   ])
 }
