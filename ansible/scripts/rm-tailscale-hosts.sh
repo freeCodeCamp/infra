@@ -6,13 +6,13 @@ apikey="$3"
 doit="$4"
 
 echo "Removing hosts from tailnet $tailnet that have not been seen since $remove_before_date"
-echo ""
 echo "Doit is set to: $doit"
 echo ""
 echo "DANGER: This script will remove hosts from the backend. If you want to do this, pass the 'doit' param."
-
+echo ""
+echo ""
 curl -s "https://api.tailscale.com/api/v2/tailnet/$tailnet/devices" -u "$apikey:" | jq -r '.devices[] |  "\(.lastSeen) \(.id) \(.hostname)"' |
-  while read seen id hostname; do
+  while read -r seen id hostname; do
     if [[ $seen < $remove_before_date ]]; then
       echo Hostname: $hostname - ID: $id " was last seen " $seen " deleting it from the backend"
       if [[ $doit == "doit" ]]; then
@@ -22,5 +22,5 @@ curl -s "https://api.tailscale.com/api/v2/tailnet/$tailnet/devices" -u "$apikey:
       echo Hostname: $hostname - ID: $id " was last seen " $seen " keeping it"
     fi
   done
-
+echo ""
 echo "Done"
