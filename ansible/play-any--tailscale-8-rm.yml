@@ -15,4 +15,10 @@
     - name: Remove Old Hosts
       command:
         "{{ playbook_dir }}/scripts/rm-tailscale-hosts.sh '{{ tailnet }}' '{{
-        seenbeforedate.stdout }}' {{ lookup('env', 'TAILSCALE_API_KEY') }}"
+        seenbeforedate.stdout }}' {{ lookup('env', 'TAILSCALE_API_KEY') }} {{
+        variable_doit | default('') }}"
+      register: rmhosts
+
+    - name: Print the output
+      debug:
+        msg: '{{ rmhosts.stdout }}'
