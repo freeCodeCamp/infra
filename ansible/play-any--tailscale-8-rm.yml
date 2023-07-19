@@ -1,0 +1,19 @@
+---
+- name: Tailscale - Connect
+  hosts: localhost
+  gather_facts: false
+  vars:
+    tailnet: "{{ variable_tailnet | default('freecodecamp.org.github') }}"
+    purge_before_date:
+      "{{ variable_purge_before_date | default('1 hour ago') }}"
+  tasks:
+    - name: Get the ISO date for Purge Before Data
+      command:
+        '{{ playbook_dir }}/scripts/get-iso-date.sh "{{ purge_before_date }}"'
+      register: seenbeforedate
+
+    - name: Remove Old Hosts
+      command:
+        '{{ playbook_dir }}/scripts/rm-tailscale-hosts.sh "{{ tailnet }}" "{{
+        seenbeforedate.stdout }}" {{ variable_tailscale_api_key }}'
+      # no_log: true

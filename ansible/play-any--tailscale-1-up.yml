@@ -1,8 +1,7 @@
 ---
 - name: Tailscale - Connect
   hosts: '{{ variable_host | default("null") }}'
-  become: true
-  gather_facts: true
+  gather_facts: false
   tasks:
     - name: Run Tailscale Up
       shell:

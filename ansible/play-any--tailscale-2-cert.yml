@@ -1,13 +1,12 @@
 ---
 - name: Tailscale - Issue Cert
   hosts: '{{ variable_host | default("null") }}'
-  become: true
-  gather_facts: true
+  gather_facts: false
   tasks:
     - name: Run Tailscale Cert
       shell:
         cmd: |
-          tailscale cert
+          tailscale cert {{ inventory_hostname }}.{{ variable_tailnet_dns_name }}
         executable: /bin/bash
       no_log: true
       changed_when: true

@@ -1,8 +1,7 @@
 ---
 - name: Tailscale - Start SSH
   hosts: '{{ variable_host | default("null") }}'
-  become: true
-  gather_facts: true
+  gather_facts: false
   tasks:
     - name: Add Tailscale to Network
       shell:
