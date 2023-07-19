@@ -6,6 +6,13 @@ if [[ $os == "Linux" ]]; then
   date --iso-8601=seconds -d "$input"
 elif [[ $os == "Darwin" ]]; then
   case "$input" in
+  *minute* | *minutes* | *min* | *mins*)
+    amount=${input%% minute*}
+    amount=${amount%% minutes*}
+    amount=${amount%% min*}
+    amount=${amount%% mins*}
+    date -v-"$amount"M -u +"%Y-%m-%dT%H:%M:%SZ"
+    ;;
   *hour* | *hours*)
     amount=${input%% hour*}
     amount=${amount%% hours*}
