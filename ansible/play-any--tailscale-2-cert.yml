@@ -1,6 +1,7 @@
 ---
 - name: Tailscale - Issue Cert
   hosts: '{{ variable_host | default("null") }}'
+  become: true
   gather_facts: false
   tasks:
     - name: Run Tailscale Cert
