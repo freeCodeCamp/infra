@@ -17,7 +17,7 @@
 
     - name: Copy the .env file
       copy:
-        src: '{{ playbook_dir }}/files/api/.env'
+        src: '{{ playbook_dir }}/files/api/{{ api_env}}/.env'
         dest: /home/freecodecamp/freeCodeCamp/.env
         owner: freecodecamp
         group: freecodecamp
