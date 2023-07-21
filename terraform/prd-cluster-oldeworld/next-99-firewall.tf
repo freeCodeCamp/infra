@@ -68,7 +68,7 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
     [for i in linode_instance.prd_oldeworld_cltpor : i.id],
     [for i in linode_instance.prd_oldeworld_cltukr : i.id],
 
-    # News Test node.
-    linode_instance.prd_oldeworld_newstst.id
+    # All News Nodes.
+    [for i in linode_instance.prd_oldeworld_news : i.id],
   ])
 }
