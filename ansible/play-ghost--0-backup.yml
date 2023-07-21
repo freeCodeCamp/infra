@@ -1,0 +1,136 @@
+---
+- name: Backup Ghost Database and Content
+  hosts: "{{ variable_host | default('null') }}"
+  become: true
+  become_user: freecodecamp
+  vars:
+    this_host: '{{ inventory_hostname }}'
+  tasks:
+    - name: Ignore runs on Chinese and English Ghost Servers
+      set_fact:
+        ignore_run: true
+      when: "'chn' in this_host or 'eng' in this_host"
+
+    # Run a task group if the ignore_run variable is not set
+    - name: Execute on eligible Ghost instance
+      when: ignore_run is not defined
+      block:
+        - name: Install tools with apt
+          apt:
+            name: '{{ item }}'
+            state: present
+            update_cache: true
+          become: true
+          become_method: sudo
+          become_user: root
+          with_items:
+            - mysql-client
+          ignore_errors: true
+          register: ignore_errors_register
+
+        - name: Sanity checks for pre-requisites
+          shell:
+            cmd: |
+              set -o pipefail
+              source ~/.nvm/nvm.sh;
+              export ghost_installed=$(ghost --version | grep -E 'Ghost version:' | cut -d " " -f 3);
+              export ghost_cli_installed=$(ghost --version | grep -E 'Ghost-CLI version:' | cut -d " " -f 3);
+              if [[ $ghost_installed != '3.42.9' && $ghost_cli_installed != '1.24.0' ]]; then
+                echo "Ghost version is not 3.42.9 and Ghost CLI version is not 1.24.0";
+                exit 1;
+              else
+                echo "Ghost version is 3.42.9 and Ghost CLI version is 1.24.0";
+              fi;
+              if ! mysql -u"root" -p"{{ variable_mysql_db_root_password }}" -e "use ghost_prod;" --protocol=tcp &>/dev/null; then
+                echo "Could not connect to MySQL or the database ghost_prod does not exist";
+                exit 1;
+              else
+                echo "Connected to MySQL and the database ghost_prod exists";
+                exit 0;
+              fi;
+            chdir: /var/www/ghost
+            executable: /bin/bash
+          # no_log: true
+          register: sanity_checks
+          changed_when: sanity_checks.rc == 0
+
+        - name: Install Rclone # Using the latest version because apt has a very old version
+          shell:
+            rclone version || curl https://rclone.org/install.sh | sudo bash
+          become: true
+          become_method: sudo
+          ignore_errors: true
+          register: ignore_errors_register
+          changed_when: ignore_errors_register.rc == 0
+
+        - name: Create Rclone config for AWS S3
+          command:
+            rclone config create s3 s3 access_key_id={{
+            variable_aws_access_key_id }} secret_access_key={{
+            variable_aws_secret_access_key }} region=us-east-1
+            endpoint=https://s3.us-east-1.amazonaws.com provider=AWS
+          # no_log: true
+          register: create_rclone_config
+          changed_when: create_rclone_config.rc == 0
+
+        - name: Stop Ghost
+          shell:
+            cmd: |
+              set -o pipefail
+              source ~/.nvm/nvm.sh;
+              ghost stop;
+            chdir: /var/www/ghost
+            executable: /bin/bash
+
+        - name: Backup the Content and Config
+          shell:
+            cmd: |
+              set -o pipefail
+              rclone sync --update --use-server-modtime --copy-links /datadrive/content s3:{{
+              variable_s3_bucket_name }}/{{ this_host }}/content --exclude "/logs/**";
+              rclone copy --checksum ./config.production.json s3:{{ variable_s3_bucket_name }}/{{ this_host }}/;
+            chdir: /var/www/ghost
+            executable: /bin/bash
+          register: backup_content_and_config
+          changed_when: backup_content_and_config.rc == 0
+
+        - name: Backup the Database
+          shell:
+            cmd: |
+              set -o pipefail
+              mkdir -p ./backups;
+              mysqldump -u"root" -p"{{
+              variable_mysql_db_root_password
+              }}" --single-transaction --protocol=tcp --column-statistics=0 ghost_prod  > ./backups/mysql-backup-$(date +"%Y-%m-%d_%H-%M-%S").sql;
+              rclone sync --checksum ./backups s3:{{
+              variable_s3_bucket_name }}/{{ this_host }}/ --include "mysql-backup-*.sql";
+            chdir: $HOME/mysql
+            executable: /bin/bash
+          # no_log: true
+          register: backup_database
+          changed_when: backup_database.rc == 0
+
+        - name: Start Ghost
+          shell:
+            cmd: |
+              set -o pipefail
+              source ~/.nvm/nvm.sh;
+              ghost start;
+            chdir: /var/www/ghost
+            executable: /bin/bash
+
+        - name: Check for backups older than 15 days
+          find:
+            paths: $HOME/mysql/backups
+            recurse: false
+            patterns:
+              - 'mysql-backup-*.sql'
+            file_type: file
+            age: "{{ variable_age | default('15d') }}"
+          register: files_to_delete
+
+        - name: Remove backups older than 15 days
+          file:
+            path: '{{ item.path }}'
+            state: absent
+          with_items: '{{ files_to_delete.files }}'
