@@ -1,5 +1,5 @@
 ---
-- name: Update nvm to the latest version
+- name: Install or Update NVM
   shell: |
     curl --silent "https://api.github.com/repos/nvm-sh/nvm/releases/latest" |
     grep '"tag_name":' |
@@ -8,15 +8,18 @@
     bash
   args:
     executable: /bin/bash
-
-- name: Update Node.js to the latest version
+- name: Install or Update Node.js
   shell: |
     source ~/.nvm/nvm.sh
-    if [[ $(nvm version) == 'none' ]] ; then
-      nvm install --lts --latest-npm --default
+    if [[ {{ nodejs_version }} == "latest" ]]; then
+      if [[ $(nvm version) == 'none' ]] ; then
+        nvm install --lts --latest-npm --default
+      else
+        nvm install --lts --latest-npm --default --reinstall-packages-from=node
+      fi
     else
-      nvm install --lts --latest-npm --default --reinstall-packages-from=node
+      nvm install {{ nodejs_version }}
     fi
-    node --version | xargs npx -y cowsay 'hello from node'
+    echo "Node.js version $(node --version) installed."
   args:
     executable: /bin/bash

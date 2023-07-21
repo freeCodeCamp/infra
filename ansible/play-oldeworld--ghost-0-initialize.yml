@@ -1,0 +1,36 @@
+---
+- name: Initialize Olde World Cluster - Ghost
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  become_user: freecodecamp
+  gather_facts: false
+  tasks:
+    - name: Install or Update Node.js
+      include_role:
+        name: nodejs
+      vars:
+        nodejs_version: 'v14.21.3'
+
+    - name: Create a Database directories
+      file:
+        path: '{{ item }}'
+        state: directory
+        owner: freecodecamp
+        group: freecodecamp
+        mode: 0755
+      with_items:
+        - /home/freecodecamp/mysql
+        - /home/freecodecamp/mysql/data
+
+    - name: Create a docker-compose file
+      template:
+        src: ghost/docker-compose.yml.j2
+        dest: /home/freecodecamp/mysql/docker-compose.yml
+        owner: freecodecamp
+        group: freecodecamp
+        mode: 0644
+
+    - name: Start MySQL
+      command: docker compose up -d
+      args:
+        chdir: /home/freecodecamp/mysql
