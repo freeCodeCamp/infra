@@ -40,34 +40,34 @@ locals {
 // When removing an item, DO NOT change the IPAM number.
 locals {
   nws_instances = {
-    eng = { name = "eng", ipam_id = 1 }, # 10.0.0.101
-    chn = { name = "chn", ipam_id = 2 }, # 10.0.0.102
-    esp = { name = "esp", ipam_id = 3 }, # ...
-    ita = { name = "ita", ipam_id = 4 },
-    jpn = { name = "jpn", ipam_id = 5 },
-    kor = { name = "kor", ipam_id = 6 },
-    por = { name = "por", ipam_id = 7 },
-    ukr = { name = "ukr", ipam_id = 8 },
-    # ger = { name = "ger", ipam_id = 9 }
+    eng = { name = "eng", ipam_id = 0 }, # 10.0.0.100
+    chn = { name = "chn", ipam_id = 1 }, # 10.0.0.101
+    esp = { name = "esp", ipam_id = 2 }, # ...
+    ita = { name = "ita", ipam_id = 3 },
+    jpn = { name = "jpn", ipam_id = 4 },
+    kor = { name = "kor", ipam_id = 5 },
+    por = { name = "por", ipam_id = 6 },
+    ukr = { name = "ukr", ipam_id = 7 },
+    # ger = { name = "ger", ipam_id = 8 }
   }
 
   clt_config_meta = {
-    eng = { name = "eng", ipam_id = 0, node_count = local.clt_node_count },
-    chn = { name = "chn", ipam_id = 1, node_count = local.clt_node_count },
-    esp = { name = "esp", ipam_id = 2, node_count = local.clt_node_count },
-    ita = { name = "ita", ipam_id = 3, node_count = local.clt_node_count },
-    jpn = { name = "jpn", ipam_id = 4, node_count = local.clt_node_count },
-    # kor = { name = "kor", ipam_id = 5, node_count = local.clt_node_count },
-    por = { name = "por", ipam_id = 6, node_count = local.clt_node_count },
-    ukr = { name = "ukr", ipam_id = 7, node_count = local.clt_node_count },
-    ger = { name = "ger", ipam_id = 8, node_count = local.clt_node_count }
+    eng = { name = "eng", ipam_id = 0, node_count = local.clt_node_count },  # 10.0.0.40, 10.0.0.41, ...
+    chn = { name = "chn", ipam_id = 5, node_count = local.clt_node_count },  # 10.0.0.45, 10.0.0.46, ...
+    esp = { name = "esp", ipam_id = 10, node_count = local.clt_node_count }, # 10.0.0.50, 10.0.0.51, ...
+    ita = { name = "ita", ipam_id = 15, node_count = local.clt_node_count }, # 10.0.0.55, 10.0.0.56, ...
+    jpn = { name = "jpn", ipam_id = 20, node_count = local.clt_node_count },
+    # kor = { name = "kor", ipam_id = 6, node_count = local.clt_node_count },
+    por = { name = "por", ipam_id = 25, node_count = local.clt_node_count },
+    ukr = { name = "ukr", ipam_id = 30, node_count = local.clt_node_count },
+    ger = { name = "ger", ipam_id = 35, node_count = local.clt_node_count }
   }
 
   clt_instances = flatten([
     [for k, v in local.clt_config_meta : [
       for i in range(v.node_count) : {
         name     = v.name
-        ipam_id  = v.ipam_id + 1
+        ipam_id  = v.ipam_id + i
         instance = "${k}-${i}"
       }
     ]],

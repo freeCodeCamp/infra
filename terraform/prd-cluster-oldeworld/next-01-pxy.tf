@@ -56,8 +56,8 @@ resource "linode_instance_config" "prd_oldeworld_pxy_config" {
   interface {
     purpose = "vlan"
     label   = "oldeworld-vlan"
-    # This results in IPAM address like 10.0.0.11/24, 10.0.0.12/24, etc.
-    ipam_address = "${cidrhost("10.0.0.0/8", local.ipam_block_pxy + count.index + 1)}/24"
+    # Request the host IP for the machine
+    ipam_address = "${cidrhost("10.0.0.0/8", local.ipam_block_pxy + count.index)}/24"
   }
 
   connection {
