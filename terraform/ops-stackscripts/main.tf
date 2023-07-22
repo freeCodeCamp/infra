@@ -27,5 +27,5 @@ EOF
   images   = ["any/all"]
 
   is_public = var.public_stackscript
-  label     = "CloudInit"
+  label     = "CloudInitfreeCodeCamp"
 }

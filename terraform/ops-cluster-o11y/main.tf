@@ -3,7 +3,11 @@
 data "linode_stackscripts" "cloudinit_scripts" {
   filter {
     name   = "label"
-    values = ["CloudInit"]
+    values = ["CloudInitfreeCodeCamp"]
+  }
+  filter {
+    name   = "is_public"
+    values = ["false"]
   }
 }
 
