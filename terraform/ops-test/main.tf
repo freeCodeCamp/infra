@@ -70,7 +70,7 @@ resource "linode_instance_config" "ops_test_config" {
   # interface {
   #   purpose = "vlan"
   #   label   = "test-vlan"
-  #   # This results in IPAM address like 10.0.0.11/24, 10.0.0.12/24, etc.
+  #   # Request the host IP for the machine
   #   ipam_address = "${cidrhost("10.0.0.0/8", 10 + 1)}/24"
   # }
 

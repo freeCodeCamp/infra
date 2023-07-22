@@ -75,7 +75,7 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   interface {
     purpose = "vlan"
     label   = "o11y-vlan"
-    # This results in IPAM address like 10.0.0.11/24, 10.0.0.12/24, etc.
+    # Request the host IP for the machine
     ipam_address = "${cidrhost("10.0.0.0/8", 10 + count.index + 1)}/24"
   }
 
