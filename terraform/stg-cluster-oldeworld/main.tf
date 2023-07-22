@@ -3,7 +3,11 @@
 data "linode_stackscripts" "cloudinit_scripts" {
   filter {
     name   = "label"
-    values = ["CloudInit"]
+    values = ["CloudInitfreeCodeCamp"]
+  }
+  filter {
+    name   = "is_public"
+    values = ["false"]
   }
 }
 
@@ -27,42 +31,45 @@ locals {
 }
 
 locals {
-  clteng_node_count = local.clt_node_count
-  cltchn_node_count = local.clt_node_count
-  cltcnt_node_count = local.clt_node_count
-  cltesp_node_count = local.clt_node_count
-  cltger_node_count = local.clt_node_count
-  cltita_node_count = local.clt_node_count
-  cltjpn_node_count = local.clt_node_count
-  cltpor_node_count = local.clt_node_count
-  cltukr_node_count = local.clt_node_count
-}
-
-locals {
-  ipam_block_nginx  = 10 # 10.0.0.11, 10.0.0.12, ...
-  ipam_block_api    = 20
-  ipam_block_cltchn = 30 # 10.0.0.31, 10.0.0.32, ...
-  ipam_block_cltcnt = 35 # 10.0.0.36, 10.0.0.37, ...
-  ipam_block_clteng = 40
-  ipam_block_cltesp = 45
-  ipam_block_cltger = 50
-  ipam_block_cltita = 55
-  ipam_block_cltjpn = 60
-  ipam_block_cltpor = 65
-  ipam_block_cltukr = 70
-  ipam_block_news   = 150
+  ipam_block_pxy = 10  # 10.0.0.11, 10.0.0.12, ...
+  ipam_block_api = 20  # 10.0.0.21, 10.0.0.22, ...
+  ipam_block_clt = 40  # 10.0.0.41, 10.0.0.42, ...
+  ipam_block_nws = 100 # 10.0.0.100, 10.0.0.102, ...
 }
 
 // When removing an item, DO NOT change the IPAM number.
 locals {
-  ghost_instances = {
-    eng = { name = "eng", ipam_id = 1 },
-    chn = { name = "chn", ipam_id = 2 },
-    esp = { name = "esp", ipam_id = 3 },
+  nws_instances = {
+    eng = { name = "eng", ipam_id = 1 }, # 10.0.0.101
+    chn = { name = "chn", ipam_id = 2 }, # 10.0.0.102
+    esp = { name = "esp", ipam_id = 3 }, # ...
     ita = { name = "ita", ipam_id = 4 },
     jpn = { name = "jpn", ipam_id = 5 },
     kor = { name = "kor", ipam_id = 6 },
     por = { name = "por", ipam_id = 7 },
-    ukr = { name = "ukr", ipam_id = 8 }
+    ukr = { name = "ukr", ipam_id = 8 },
+    # ger = { name = "ger", ipam_id = 9 }
   }
+
+  clt_config_meta = {
+    eng = { name = "eng", ipam_id = 0, node_count = local.clt_node_count },
+    chn = { name = "chn", ipam_id = 1, node_count = local.clt_node_count },
+    esp = { name = "esp", ipam_id = 2, node_count = local.clt_node_count },
+    ita = { name = "ita", ipam_id = 3, node_count = local.clt_node_count },
+    jpn = { name = "jpn", ipam_id = 4, node_count = local.clt_node_count },
+    # kor = { name = "kor", ipam_id = 5, node_count = local.clt_node_count },
+    por = { name = "por", ipam_id = 6, node_count = local.clt_node_count },
+    ukr = { name = "ukr", ipam_id = 7, node_count = local.clt_node_count },
+    ger = { name = "ger", ipam_id = 8, node_count = local.clt_node_count }
+  }
+
+  clt_instances = flatten([
+    [for k, v in local.clt_config_meta : [
+      for i in range(v.node_count) : {
+        name     = v.name
+        ipam_id  = v.ipam_id + 1
+        instance = "${k}-${i}"
+      }
+    ]],
+  ])
 }

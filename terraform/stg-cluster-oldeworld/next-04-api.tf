@@ -1,13 +1,20 @@
 resource "linode_instance" "stg_oldeworld_api" {
-  count  = local.api_node_count
-  label  = "stg-vm-oldeworld-api-${count.index + 1}"
-  group  = "oldeworld_api" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  region = var.region
-  type   = "g6-standard-2"
+  count = local.api_node_count
+  label = "stg-vm-oldeworld-api-${count.index + 1}"
 
+  region     = var.region
+  type       = "g6-standard-2"
   private_ip = true
 
-  tags = ["stg", "oldeworld", "stg_oldeworld_api", "api"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  # NOTE:
+  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  tags = ["stg", "oldeworld", "api"]
+
+  # WARNING:
+  # Do not change, will delete and recreate all instances in the group
+  # NOTE:
+  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  group = "stg_oldeworld_api"
 }
 
 resource "linode_instance_disk" "stg_oldeworld_api_disk__boot" {

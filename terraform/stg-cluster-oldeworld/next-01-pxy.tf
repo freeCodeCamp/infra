@@ -1,13 +1,20 @@
 resource "linode_instance" "stg_oldeworld_pxy" {
-  count  = local.pxy_node_count
-  label  = "stg-vm-oldeworld-pxy-${count.index + 1}"
-  group  = "oldeworld_pxy" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  region = var.region
-  type   = "g6-standard-2"
+  count = local.pxy_node_count
+  label = "stg-vm-oldeworld-pxy-${count.index + 1}"
 
+  region     = var.region
+  type       = "g6-standard-2"
   private_ip = true
 
-  tags = ["stg", "oldeworld", "stg_oldeworld_pxy", "pxy"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  # NOTE:
+  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  tags = ["stg", "oldeworld", "pxy"]
+
+  # WARNING:
+  # Do not change, will delete and recreate all instances in the group
+  # NOTE:
+  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  group = "stg_oldeworld_pxy"
 }
 
 resource "linode_instance_disk" "stg_oldeworld_pxy_disk__boot" {
@@ -50,7 +57,7 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
     purpose = "vlan"
     label   = "oldeworld-vlan"
     # This results in IPAM address like 10.0.0.11/24, 10.0.0.12/24, etc.
-    ipam_address = "${cidrhost("10.0.0.0/8", local.ipam_block_nginx + count.index + 1)}/24"
+    ipam_address = "${cidrhost("10.0.0.0/8", local.ipam_block_pxy + count.index + 1)}/24"
   }
 
   connection {
