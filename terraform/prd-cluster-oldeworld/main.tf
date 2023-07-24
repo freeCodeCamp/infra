@@ -19,7 +19,7 @@ data "linode_domain" "ops_dns_domain" {
 
 data "hcp_packer_image" "linode_ubuntu" {
   bucket_name    = "linode-ubuntu"
-  channel        = "latest"
+  channel        = "golden"
   cloud_provider = "linode"
   region         = "us-east"
 }
@@ -61,6 +61,7 @@ locals {
     por = { name = "por", ipam_id = 25, node_count = local.clt_node_count },
     ukr = { name = "ukr", ipam_id = 30, node_count = local.clt_node_count },
     ger = { name = "ger", ipam_id = 35, node_count = local.clt_node_count }
+    cnt = { name = "cnt", ipam_id = 40, node_count = local.clt_node_count }
   }
 
   clt_instances = flatten([
