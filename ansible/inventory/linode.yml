@@ -27,6 +27,9 @@ groups:
   publish_leaders: "'publish_leader' in (tags|list)"
   publish_workers: "'publish_worker' in (tags|list)"
 
+  # Oldeworld Cluster -- ALL
+  oldeworld_all: "'oldeworld' in (tags|list)"
+
   # Oldeworld Cluster -- STG
   stg_oldeworld_all: "'stg' in (tags|list) and 'oldeworld' in (tags|list)"
   stg_oldeworld_api: "'stg_oldeworld_api' in (tags|list)"

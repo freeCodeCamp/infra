@@ -1,6 +1,6 @@
 ---
 - name: Initialize Olde World Cluster
-  hosts: '{{ variable_host | default("oldeworld_all") }}'
+  hosts: '{{ variable_host | default("null") }}'
   become: true
   roles:
     - ubuntu # Update the OS and reboot the server
