@@ -7,7 +7,7 @@
   vars:
     client_groups:
       ['chn', 'cnt', 'eng', 'esp', 'ger', 'ita', 'jpn', 'por', 'ukr']
-    client_hosts: ['1', '2']
+    client_hosts: ['0', '1']
     client_env: '{{ variable_client_env }}'
     agent_version: '{{ variable_agent_version | default("3.220.5") }}'
   tasks:
@@ -39,8 +39,8 @@
         agent_pat_token: "{{ lookup('env', 'AZURE_DEVOPS_PAT') }}"
       loop: '{{ client_groups | product(client_hosts) | list }}'
       when:
-        inventory_hostname == client_env + "-vm-oldeworld-clt" + item[0] + "-" +
-        item[1]
+        inventory_hostname == client_env + "-vm-oldeworld-clt-" + item[0] + "-"
+        + item[1]
 
     - name: Install azagent
       include_role:
@@ -57,5 +57,5 @@
           }}/vsts-agent-linux-x64-{{ agent_version }}.tar.gz'
       loop: '{{ client_groups | product(client_hosts) | list }}'
       when:
-        inventory_hostname == client_env + "-vm-oldeworld-clt" + item[0] + "-" +
-        item[1]
+        inventory_hostname == client_env + "-vm-oldeworld-clt-" + item[0] + "-"
+        + item[1]
