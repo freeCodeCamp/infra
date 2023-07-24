@@ -33,4 +33,4 @@ endif
 
 .PHONY: inventory
 inventory: check-linode-env-token
-	ansible-inventory -i inventory --graph -vvv
+	ansible-inventory -i inventory --graph -v
