@@ -1,9 +1,9 @@
 ---
 - name: Configure NGINX on the Olde World Cluster
-  hosts: '{{ variable_host | default("oldeworld_pxy") }}'
+  hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:
-    pxy_env: '{{ variable_env }}'
+    pxy_env: '{{ variable_pxy_env }}'
   roles:
     - dns # Configure ansible facts for networking info lookup
 
