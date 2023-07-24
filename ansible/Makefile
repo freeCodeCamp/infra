@@ -20,9 +20,16 @@ install:
 
 .PHONY: check-linode-env-token
 check-linode-env-token:
-	ifndef LINODE_API_TOKEN
-		$(error LINODE_API_TOKEN is undefined)
-	endif
+ifndef LINODE_API_TOKEN
+  include ../__scratchpad__/.env
+  export $(shell sed 's/=.*//' .env)
+endif
+
+.PHONY: check-linode-env-token
+check-linode-env-token:
+ifndef LINODE_API_TOKEN
+	$(error LINODE_API_TOKEN is undefined. Please set it in .env file or export it as an environment variable.)
+endif
 
 .PHONY: inventory
 inventory: check-linode-env-token
