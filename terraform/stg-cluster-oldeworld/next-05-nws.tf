@@ -65,7 +65,7 @@ resource "linode_instance_config" "stg_oldeworld_nws_config" {
   # eth1 is the private interface.
   interface {
     purpose = "vlan"
-    label   = "oldeworld-vlan"
+    label   = "stg-oldeworld-vlan"
     # Request the host IP for the machine
     ipam_address = "${cidrhost("10.0.0.0/8", tonumber(local.ipam_block_nws + each.value.ipam_id))}/24"
   }

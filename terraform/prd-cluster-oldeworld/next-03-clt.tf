@@ -55,7 +55,7 @@ resource "linode_instance_config" "prd_oldeworld_clt_config" {
   # eth1 is the private interface.
   interface {
     purpose = "vlan"
-    label   = "oldeworld-vlan"
+    label   = "prd-oldeworld-vlan"
     # Request the host IP for the machine
     ipam_address = "${cidrhost("10.0.0.0/8", tonumber(local.ipam_block_clt + each.value.ipam_id))}/24"
   }

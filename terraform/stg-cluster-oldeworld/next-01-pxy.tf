@@ -55,7 +55,7 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
   # eth1 is the private interface.
   interface {
     purpose = "vlan"
-    label   = "oldeworld-vlan"
+    label   = "stg-oldeworld-vlan"
     # Request the host IP for the machine
     ipam_address = "${cidrhost("10.0.0.0/8", local.ipam_block_pxy + count.index)}/24"
   }
