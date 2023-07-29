@@ -29,8 +29,3 @@
         owner: freecodecamp
         group: freecodecamp
         mode: 0644
-
-    - name: Start MySQL
-      command: docker compose up -d
-      args:
-        chdir: /home/freecodecamp/mysql
