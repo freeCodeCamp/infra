@@ -10,7 +10,7 @@
 
     - name: Update all packages
       ansible.builtin.apt:
-        upgrade: dist
+        upgrade: yes
         autoremove: true
         autoclean: true
 
@@ -32,6 +32,9 @@
           - unzip
           - vim
           - zip
+          - glances
+          - ncdu
+          - pv
 
     - name: Disable automatic and security updates
       ansible.builtin.apt:

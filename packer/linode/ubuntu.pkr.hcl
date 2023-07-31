@@ -4,6 +4,10 @@ packer {
       version = ">= 1.0.5"
       source  = "github.com/linode/linode"
     }
+    ansible = {
+      source  = "github.com/hashicorp/ansible"
+      version = ">= 1.1.0"
+    }
   }
 }
 
