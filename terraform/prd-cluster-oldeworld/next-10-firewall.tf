@@ -40,6 +40,15 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
   label = "prd-fw-oldeworld"
 
   inbound {
+    label    = "allow-ghost_from-anywhere"
+    ports    = "32323"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
+  inbound {
     label    = "allow-ssh_from-anywhere"
     ports    = "22"
     protocol = "TCP"

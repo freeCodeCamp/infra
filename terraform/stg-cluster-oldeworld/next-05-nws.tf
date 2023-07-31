@@ -133,9 +133,9 @@
 #   ttl_sec     = 120
 # }
 
-# resource "linode_database_mysql" "stg_oldeworld_nws_db" {
+# resource "linode_database_mysql" "stg_oldeworld_nws_db__mysql57" {
 #   engine_id = "mysql/5.7.39"
-#   label     = "stg-db-oldeworld-nws"
+#   label     = "stg-db-oldeworld-nws-mysql57"
 #   region    = var.region
 #   type      = "g6-standard-2"
 
@@ -146,12 +146,4 @@
 #   cluster_size     = 3
 #   replication_type = "asynch"
 #   ssl_connection   = true
-
-#   updates {
-#     day_of_week   = "saturday"
-#     duration      = 1
-#     frequency     = "monthly"
-#     hour_of_day   = 22
-#     week_of_month = 2
-#   }
 # }
