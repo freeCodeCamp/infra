@@ -90,6 +90,7 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
     updatedb_disabled = true
   }
 
+  kernel = "linode/grub2"
   booted = true
 }
 

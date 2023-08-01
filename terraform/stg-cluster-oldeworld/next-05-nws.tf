@@ -100,6 +100,7 @@
 #     updatedb_disabled = true
 #   }
 
+#   kernel = "linode/grub2"
 #   booted = true
 # }
 
