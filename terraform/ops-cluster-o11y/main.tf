@@ -31,7 +31,8 @@ resource "linode_instance" "ops_o11y_leaders" {
   region = var.region
   type   = "g6-standard-2"
 
-  private_ip = true
+  private_ip       = true
+  watchdog_enabled = false
 
   tags = ["ops", "o11y", "o11y_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
@@ -150,7 +151,8 @@ resource "linode_instance" "ops_o11y_workers" {
   region = var.region
   type   = "g6-standard-2"
 
-  private_ip = true
+  private_ip       = true
+  watchdog_enabled = false
 
   tags = ["ops", "o11y", "o11y_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }

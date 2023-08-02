@@ -31,9 +31,9 @@ resource "linode_instance" "prd_publish_leaders" {
   region = var.region
   type   = "g6-standard-2"
 
-  private_ip = true
-
-  tags = ["prd", "publish", "publish_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+  private_ip       = true
+  watchdog_enabled = false
+  tags             = ["prd", "publish", "publish_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
 
 resource "linode_instance_disk" "prd_publish_leaders_disk__boot" {
@@ -150,7 +150,8 @@ resource "linode_instance" "prd_publish_workers" {
   region = var.region
   type   = "g6-standard-4"
 
-  private_ip = true
+  private_ip       = true
+  watchdog_enabled = false
 
   tags = ["prd", "publish", "publish_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }

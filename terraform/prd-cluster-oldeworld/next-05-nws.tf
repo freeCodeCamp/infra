@@ -2,9 +2,10 @@ resource "linode_instance" "prd_oldeworld_nws" {
   for_each = local.nws_instances
   label    = "prd-vm-oldeworld-nws-${each.value.name}"
 
-  region     = var.region
-  type       = "g6-standard-2"
-  private_ip = true
+  region           = var.region
+  type             = "g6-standard-2"
+  private_ip       = true
+  watchdog_enabled = false
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory

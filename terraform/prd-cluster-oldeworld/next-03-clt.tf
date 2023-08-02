@@ -2,9 +2,10 @@ resource "linode_instance" "prd_oldeworld_clt" {
   for_each = { for i in local.clt_instances : i.instance => i }
   label    = "prd-vm-oldeworld-clt-${each.value.instance}"
 
-  region     = var.region
-  type       = "g6-standard-2"
-  private_ip = true
+  region           = var.region
+  type             = "g6-standard-2"
+  private_ip       = true
+  watchdog_enabled = false
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory

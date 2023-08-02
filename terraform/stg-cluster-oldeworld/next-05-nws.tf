@@ -5,6 +5,7 @@
 #   region     = var.region
 #   type       = "g6-standard-2"
 #   private_ip = true
+#   watchdog_enabled = false
 
 #   # NOTE:
 #   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
