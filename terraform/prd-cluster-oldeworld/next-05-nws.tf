@@ -100,6 +100,7 @@ resource "linode_instance_config" "prd_oldeworld_nws_config" {
     updatedb_disabled = true
   }
 
+  kernel = "linode/grub2"
   booted = true
 }
 

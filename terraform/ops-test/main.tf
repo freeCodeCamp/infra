@@ -19,7 +19,7 @@ data "linode_domain" "ops_dns_domain" {
 
 data "hcp_packer_image" "linode_ubuntu" {
   bucket_name    = "linode-ubuntu"
-  channel        = "latest"
+  channel        = "golden"
   cloud_provider = "linode"
   region         = "us-east"
 }
@@ -104,6 +104,7 @@ resource "linode_instance_config" "ops_test_config" {
     updatedb_disabled = true
   }
 
+  kernel = "linode/grub2"
   booted = true
 }
 
