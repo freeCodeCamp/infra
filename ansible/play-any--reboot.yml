@@ -2,7 +2,7 @@
 - name: Reboot a machine and wait for it to come back
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
-  become_user: root
+  become: true
   tasks:
     - name: Print uptime
       debug:
@@ -12,8 +12,8 @@
 
     - name: Reboot
       reboot:
-        reboot_msg: 'Reboot intiated by Ansible'
         test_command: uptime
         connect_timeout: 5
         reboot_timeout: 300
-        pre_reboot_delay: 0
+        pre_reboot_delay: 5
+        post_reboot_delay: 5
