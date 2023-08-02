@@ -1,0 +1,28 @@
+---
+- name: Update virtual machines
+  hosts: "{{ variable_host | default('null') }}"
+  serial: 3
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Update apt repo and cache
+      apt:
+        update_cache: yes
+        force_apt_get: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        force_apt_get: yes
+
+    - name: Autoclean old packages
+      apt:
+        autoclean: yes
+        force_apt_get: yes
+
+    - name: Autoremove unused packages
+      apt:
+        autoremove: yes
+        force_apt_get: yes
