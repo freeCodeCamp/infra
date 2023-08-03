@@ -61,6 +61,6 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     [for i in linode_instance.stg_oldeworld_clt : i.id],
 
     # All News Nodes.
-    # [for i in linode_instance.stg_oldeworld_nws : i.id],
+    [for i in linode_instance.stg_oldeworld_nws : i.id],
   ])
 }
