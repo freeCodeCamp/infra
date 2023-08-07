@@ -5,7 +5,7 @@ resource "linode_instance" "stg_oldeworld_clt" {
   region           = var.region
   type             = "g6-standard-2"
   private_ip       = true
-  watchdog_enabled = false
+  watchdog_enabled = true
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
