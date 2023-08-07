@@ -121,3 +121,13 @@ resource "linode_object_storage_bucket" "ops_staffwiki_bucket" {
   cluster = data.linode_object_storage_cluster.ops_staffwiki_osc__primary.id
   label   = "staffwiki"
 }
+
+resource "linode_object_storage_key" "ops_staffwiki_key" {
+  label = "staffwiki-default-key"
+
+  bucket_access {
+    bucket_name = linode_object_storage_bucket.ops_staffwiki_bucket.label
+    permissions = "read_write"
+    cluster     = data.linode_object_storage_cluster.ops_staffwiki_osc__primary.id
+  }
+}
