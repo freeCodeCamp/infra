@@ -32,7 +32,7 @@ resource "linode_instance" "prd_publish_leaders" {
   type   = "g6-standard-2"
 
   private_ip       = true
-  watchdog_enabled = false
+  watchdog_enabled = true
   tags             = ["prd", "publish", "publish_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
 
@@ -151,7 +151,7 @@ resource "linode_instance" "prd_publish_workers" {
   type   = "g6-standard-4"
 
   private_ip       = true
-  watchdog_enabled = false
+  watchdog_enabled = true
 
   tags = ["prd", "publish", "publish_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }

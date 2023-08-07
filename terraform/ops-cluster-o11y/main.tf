@@ -32,7 +32,7 @@ resource "linode_instance" "ops_o11y_leaders" {
   type   = "g6-standard-2"
 
   private_ip       = true
-  watchdog_enabled = false
+  watchdog_enabled = true
 
   tags = ["ops", "o11y", "o11y_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
@@ -152,7 +152,7 @@ resource "linode_instance" "ops_o11y_workers" {
   type   = "g6-standard-2"
 
   private_ip       = true
-  watchdog_enabled = false
+  watchdog_enabled = true
 
   tags = ["ops", "o11y", "o11y_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
 }
