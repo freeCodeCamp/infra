@@ -137,7 +137,7 @@ data "linode_object_storage_cluster" "ops_staffwiki_osc__primary" {
 
 resource "linode_object_storage_bucket" "ops_staffwiki_bucket" {
   cluster = data.linode_object_storage_cluster.ops_staffwiki_osc__primary.id
-  label   = "staffwiki"
+  label   = "staffwiki-1-${var.network_subdomain}-fccops"
 }
 
 resource "linode_object_storage_key" "ops_staffwiki_key" {
