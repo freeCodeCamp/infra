@@ -103,6 +103,24 @@ resource "linode_firewall" "ops_staffwiki_firewall" {
     ipv6     = ["::/0"]
   }
 
+  inbound {
+    label    = "allow-http"
+    ports    = "80"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
+  inbound {
+    label    = "allow-https"
+    ports    = "443"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
   # outbound { }
 
   inbound_policy  = "DROP"
