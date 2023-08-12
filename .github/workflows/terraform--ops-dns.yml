@@ -57,7 +57,7 @@ jobs:
           terraform_version: 1.4
 
       - name: Terraform Cloud Upload Configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@b5ae00d6ff4f940fc11ec6e70346e9c693590b5e # v1.0.3
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -65,7 +65,7 @@ jobs:
           speculative: true
 
       - name: Terraform Cloud Create Speculative Run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@b5ae00d6ff4f940fc11ec6e70346e9c693590b5e # v1.0.3
+        uses: hashicorp/tfc-workflows-github/actions/create-run@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -75,7 +75,7 @@ jobs:
           message: 'Triggered From GitHub Actions CI ${{ github.sha }}'
 
       - name: Terraform Cloud Plan Output
-        uses: hashicorp/tfc-workflows-github/actions/plan-output@b5ae00d6ff4f940fc11ec6e70346e9c693590b5e # v1.0.3
+        uses: hashicorp/tfc-workflows-github/actions/plan-output@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
         id: plan-output
         with:
           plan: ${{ steps.run.outputs.plan_id }}
@@ -119,14 +119,14 @@ jobs:
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
 
       - name: Terraform Cloud Upload Configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@b5ae00d6ff4f940fc11ec6e70346e9c693590b5e # v1.0.3
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
           directory: ${{ env.CONFIG_DIRECTORY }}
 
       - name: Terraform Cloud Create Run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@b5ae00d6ff4f940fc11ec6e70346e9c693590b5e # v1.0.3
+        uses: hashicorp/tfc-workflows-github/actions/create-run@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -134,7 +134,7 @@ jobs:
             ${{ steps.upload.outputs.configuration_version_id }}
           message: 'Triggered From GitHub Actions CI ${{ github.sha }}'
 
-      - uses: hashicorp/tfc-workflows-github/actions/apply-run@b5ae00d6ff4f940fc11ec6e70346e9c693590b5e # v1.0.3
+      - uses: hashicorp/tfc-workflows-github/actions/apply-run@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
         id: apply
         if:
           ${{
