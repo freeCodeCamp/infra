@@ -1,0 +1,7 @@
+linode_token = "<LinodeApiToken>"
+password = "<RootPassword>"
+
+hcp_client_id = "<HCPClientId>"
+hcp_client_secret = "<HCPClientSecret>"
+
+# Override any more variables from the variables.tf file here
