@@ -25,15 +25,17 @@ data "hcp_packer_image" "linode_ubuntu" {
 }
 
 locals {
-  pxy_node_count = 3
-  api_node_count = 3
-  clt_node_count = 2
+  pxy_node_count = 3 # number of proxy nodes
+  api_node_count = 3 # number of api nodes
+  jms_node_count = 3 # number of JAMStack nodes
+  clt_node_count = 2 # number of client nodes for EACH LANGUAGE!
 }
 
 locals {
   ipam_block_pxy = 10  # 10.0.0.11, 10.0.0.12, ...
   ipam_block_api = 20  # 10.0.0.21, 10.0.0.22, ...
   ipam_block_clt = 40  # 10.0.0.41, 10.0.0.42, ...
+  ipam_block_jms = 80  # 10.0.0.81, 10.0.0.82, ...
   ipam_block_nws = 100 # 10.0.0.100, 10.0.0.102, ...
 }
 
