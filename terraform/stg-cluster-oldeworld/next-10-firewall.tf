@@ -48,6 +48,26 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     ipv6     = ["::/0"]
   }
 
+  inbound {
+    label    = "allow-nomad-tcp_from-cluster"
+    ports    = "4646-4648"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      [for i in linode_instance.stg_oldeworld_jms : "${i.private_ip_address}/32"]
+    ])
+  }
+
+  inbound {
+    label    = "allow-nomad-udp_from-cluster"
+    ports    = "4648"
+    protocol = "UDP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      [for i in linode_instance.stg_oldeworld_jms : "${i.private_ip_address}/32"]
+    ])
+  }
+
   # outbound { }
 
   inbound_policy  = "DROP"
@@ -62,5 +82,8 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
 
     # All News Nodes.
     [for i in linode_instance.stg_oldeworld_nws : i.id],
+
+    # All JMS Nodes.
+    [for i in linode_instance.stg_oldeworld_jms : i.id],
   ])
 }
