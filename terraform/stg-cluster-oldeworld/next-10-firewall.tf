@@ -49,8 +49,8 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
   }
 
   inbound {
-    label    = "allow-nomad-tcp_from-cluster"
-    ports    = "4646-4648"
+    label    = "allow-all-tcp_from-cluster"
+    ports    = "1-65535"
     protocol = "TCP"
     action   = "ACCEPT"
     ipv4 = flatten([
@@ -59,8 +59,8 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
   }
 
   inbound {
-    label    = "allow-nomad-udp_from-cluster"
-    ports    = "4648"
+    label    = "allow-all-udp_from-cluster"
+    ports    = "1-65535"
     protocol = "UDP"
     action   = "ACCEPT"
     ipv4 = flatten([
