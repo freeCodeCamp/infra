@@ -12,19 +12,3 @@
 # -------------------------------------------------
 
 * @freecodecamp/dev-team
-
-# --- Owned by none (negate rule above) ---
-
-package.json
-package-lock.json
-
-# -------------------------------------------------
-# All files in the root are owned by dev team
-# -------------------------------------------------
-
-/* @freecodecamp/dev-team
-
-# --- Owned by none (negate rule above) ---
-
-/package.json
-/package-lock.json
