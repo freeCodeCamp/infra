@@ -54,7 +54,7 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     protocol = "TCP"
     action   = "ACCEPT"
     ipv4 = flatten([
-      [for i in linode_instance.stg_oldeworld_jms : "${i.private_ip_address}/32"]
+      ["10.0.0.0/8"]
     ])
   }
 
@@ -64,7 +64,7 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     protocol = "UDP"
     action   = "ACCEPT"
     ipv4 = flatten([
-      [for i in linode_instance.stg_oldeworld_jms : "${i.private_ip_address}/32"]
+      ["10.0.0.0/8"]
     ])
   }
 
