@@ -1,5 +1,5 @@
-resource "linode_instance" "ops_staffwiki" {
-  label = "ops-vm-staffwiki"
+resource "linode_instance" "ops_backoffice" {
+  label = "ops-vm-backoffice"
 
   region           = var.region
   type             = "g6-standard-2"
@@ -7,19 +7,19 @@ resource "linode_instance" "ops_staffwiki" {
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  tags = ["prd", "staffwiki"]
+  tags = ["ops", "backoffice"]
 
   # WARNING:
   # Do not change, will delete and recreate all instances in the group
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  group = "staffwiki"
+  group = "backoffice"
 }
 
-resource "linode_instance_disk" "ops_staffwiki_disk__boot" {
-  label     = "ops-vm-staffwiki-boot"
-  linode_id = linode_instance.ops_staffwiki.id
-  size      = linode_instance.ops_staffwiki.specs.0.disk
+resource "linode_instance_disk" "ops_backoffice_disk__boot" {
+  label     = "ops-vm-backoffice-boot"
+  linode_id = linode_instance.ops_backoffice.id
+  size      = linode_instance.ops_backoffice.specs.0.disk
 
   image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
   root_pass = var.password
@@ -28,19 +28,19 @@ resource "linode_instance_disk" "ops_staffwiki_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "staffwiki.${data.linode_domain.ops_dns_domain.domain}"
+        tf_hostname = "backoffice.${data.linode_domain.ops_dns_domain.domain}"
       })
     )
   }
 }
 
-resource "linode_instance_config" "ops_staffwiki_config" {
-  label     = "ops-vm-staffwiki-config"
-  linode_id = linode_instance.ops_staffwiki.id
+resource "linode_instance_config" "ops_backoffice_config" {
+  label     = "ops-vm-backoffice-config"
+  linode_id = linode_instance.ops_backoffice.id
 
   devices {
     sda {
-      disk_id = linode_instance_disk.ops_staffwiki_disk__boot.id
+      disk_id = linode_instance_disk.ops_backoffice_disk__boot.id
     }
   }
 
@@ -53,7 +53,7 @@ resource "linode_instance_config" "ops_staffwiki_config" {
     type     = "ssh"
     user     = "root"
     password = var.password
-    host     = linode_instance.ops_staffwiki.ip_address
+    host     = linode_instance.ops_backoffice.ip_address
   }
 
   # All of the provisioning should be done via cloud-init.
@@ -83,16 +83,24 @@ resource "linode_instance_config" "ops_staffwiki_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_staffwiki_dnsrecord__public" {
+resource "linode_domain_record" "ops_backoffice_dnsrecord__public" {
   domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.staffwiki.${var.network_subdomain}"
+  name        = "pub.backoffice.${var.network_subdomain}"
   record_type = "A"
-  target      = linode_instance.ops_staffwiki.ip_address
+  target      = linode_instance.ops_backoffice.ip_address
   ttl_sec     = 120
 }
 
-resource "linode_firewall" "ops_staffwiki_firewall" {
-  label = "ops-fw-staffwiki"
+resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
+  zone       = local.zone
+  name       = "pub.backoffice.${var.network_subdomain}.${local.zone}"
+  recordtype = "A"
+  target     = [linode_instance.ops_backoffice.ip_address]
+  ttl        = 120
+}
+
+resource "linode_firewall" "ops_backoffice_firewall" {
+  label = "ops-fw-backoffice"
 
   inbound {
     label    = "allow-ssh"
@@ -127,25 +135,6 @@ resource "linode_firewall" "ops_staffwiki_firewall" {
   outbound_policy = "ACCEPT"
 
   linodes = [
-    linode_instance.ops_staffwiki.id
+    linode_instance.ops_backoffice.id
   ]
-}
-
-data "linode_object_storage_cluster" "ops_staffwiki_osc__primary" {
-  id = "${var.region}-1"
-}
-
-resource "linode_object_storage_bucket" "ops_staffwiki_bucket" {
-  cluster = data.linode_object_storage_cluster.ops_staffwiki_osc__primary.id
-  label   = "staffwiki-1-${var.network_subdomain}-fccops"
-}
-
-resource "linode_object_storage_key" "ops_staffwiki_key" {
-  label = "staffwiki-default-key"
-
-  bucket_access {
-    bucket_name = linode_object_storage_bucket.ops_staffwiki_bucket.label
-    permissions = "read_write"
-    cluster     = data.linode_object_storage_cluster.ops_staffwiki_osc__primary.id
-  }
 }
