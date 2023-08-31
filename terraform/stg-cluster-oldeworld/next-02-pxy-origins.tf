@@ -37,3 +37,12 @@ resource "linode_domain_record" "stg_oldeworld_nb_pxy_dnsrecord__public" {
   target      = data.linode_nodebalancer.stg_oldeworld_nb_pxy.ipv4
   ttl_sec     = 120
 }
+
+resource "akamai_dns_record" "stg_oldeworld_nb_pxy_dnsrecord__public" {
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "oldeworld.stg.${var.network_subdomain}.${local.zone}"
+  target = [data.linode_nodebalancer.stg_oldeworld_nb_pxy.ipv4]
+}

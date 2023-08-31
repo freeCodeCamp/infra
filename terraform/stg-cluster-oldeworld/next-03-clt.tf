@@ -124,3 +124,36 @@ resource "linode_domain_record" "stg_oldeworld_clt_dnsrecord__private" {
   target      = linode_instance.stg_oldeworld_clt[each.key].private_ip_address
   ttl_sec     = 120
 }
+
+resource "akamai_dns_record" "stg_oldeworld_clt_dnsrecord__vlan" {
+  for_each = { for i in local.clt_instances : i.instance => i }
+
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "clt-${each.value.instance}.oldeworld.stg.${local.zone}"
+  target = [trimsuffix(linode_instance_config.stg_oldeworld_clt_config[each.key].interface[1].ipam_address, "/24")]
+}
+
+resource "akamai_dns_record" "stg_oldeworld_clt_dnsrecord__public" {
+  for_each = { for i in local.clt_instances : i.instance => i }
+
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "pub.clt-${each.value.instance}.oldeworld.stg.${var.network_subdomain}.${local.zone}"
+  target = [linode_instance.stg_oldeworld_clt[each.key].ip_address]
+}
+
+resource "akamai_dns_record" "stg_oldeworld_clt_dnsrecord__private" {
+  for_each = { for i in local.clt_instances : i.instance => i }
+
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "prv.clt-${each.value.instance}.oldeworld.stg.${local.zone}"
+  target = [linode_instance.stg_oldeworld_clt[each.key].private_ip_address]
+}
