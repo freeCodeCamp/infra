@@ -24,3 +24,6 @@ data "hcp_packer_image" "linode_ubuntu" {
   region         = "us-east"
 }
 
+locals {
+  zone = "freecodecamp.net"
+}
