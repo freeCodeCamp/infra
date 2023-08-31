@@ -41,3 +41,10 @@ __scratchpad__/
 
 # Ignore generated files
 manifest.json
+
+# Ansible
+ansible/files/
+ansible/inventory/hosts
+
+# Akamai
+.edgerc
