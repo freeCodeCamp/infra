@@ -93,10 +93,11 @@ resource "linode_domain_record" "ops_backoffice_dnsrecord__public" {
 
 resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
   zone       = local.zone
-  name       = "pub.backoffice.${var.network_subdomain}.${local.zone}"
   recordtype = "A"
-  target     = [linode_instance.ops_backoffice.ip_address]
   ttl        = 120
+
+  name   = "pub.backoffice.${var.network_subdomain}.${local.zone}"
+  target = [linode_instance.ops_backoffice.ip_address]
 }
 
 resource "linode_firewall" "ops_backoffice_firewall" {
