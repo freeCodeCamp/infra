@@ -1,3 +1,7 @@
+locals {
+  zone = "freecodecamp.net"
+}
+
 # This data source depends on the stackscript resource
 # which is created in terraform/ops-stackscripts/main.tf
 data "linode_stackscripts" "cloudinit_scripts" {
@@ -122,6 +126,24 @@ resource "linode_domain_record" "ops_test_dnsrecord__public" {
   record_type = "A"
   target      = linode_instance.ops_test.ip_address
   ttl_sec     = 120
+}
+
+resource "akamai_dns_record" "ops_test_records" {
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "test.${local.zone}"
+  target = [linode_instance.ops_test.ip_address]
+}
+
+resource "akamai_dns_record" "ops_test_dnsrecord__public" {
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "pub.test.${var.network_subdomain}.${local.zone}"
+  target = [linode_instance.ops_test.ip_address]
 }
 
 resource "linode_firewall" "ops_test_firewall" {
