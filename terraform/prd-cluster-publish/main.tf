@@ -1,3 +1,7 @@
+locals {
+  zone = "freecodecamp.net"
+}
+
 # This data source depends on the stackscript resource
 # which is created in terraform/ops-stackscripts/main.tf
 data "linode_stackscripts" "cloudinit_scripts" {
@@ -261,6 +265,39 @@ resource "linode_domain_record" "prd_publish_workers_dnsrecord__private" {
   record_type = "A"
   target      = linode_instance.prd_publish_workers[count.index].private_ip_address
   ttl_sec     = 120
+}
+
+resource "akamai_dns_record" "prd_publish_workers_dnsrecord__vlan" {
+  count = var.worker_node_count
+
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "wkr-${count.index + 1}.publish.prd.${local.zone}"
+  target = [trimsuffix(linode_instance_config.prd_publish_workers_config[count.index].interface[1].ipam_address, "/24")]
+}
+
+resource "akamai_dns_record" "prd_publish_workers_dnsrecord__public" {
+  count = var.worker_node_count
+
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "pub.wkr-${count.index + 1}.publish.prd.${var.network_subdomain}.${local.zone}"
+  target = [linode_instance.prd_publish_workers[count.index].ip_address]
+}
+
+resource "akamai_dns_record" "prd_publish_workers_dnsrecord__private" {
+  count = var.worker_node_count
+
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "prv.wkr-${count.index + 1}.publish.prd.${local.zone}"
+  target = [linode_instance.prd_publish_workers[count.index].private_ip_address]
 }
 
 resource "linode_firewall" "prd_publish_firewall" {
