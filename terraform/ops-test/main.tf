@@ -18,7 +18,7 @@ data "linode_stackscripts" "cloudinit_scripts" {
 # This data source depends on the domain resource
 # which is created in terraform/ops-dns/main.tf
 data "linode_domain" "ops_dns_domain" {
-  domain = "freecodecamp.net"
+  domain = local.zone
 }
 
 data "hcp_packer_image" "linode_ubuntu" {
