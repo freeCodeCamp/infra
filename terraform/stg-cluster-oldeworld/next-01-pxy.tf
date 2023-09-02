@@ -31,7 +31,7 @@ resource "linode_instance_disk" "stg_oldeworld_pxy_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "pxy-${count.index + 1}.oldeworld.stg.${data.linode_domain.ops_dns_domain.domain}"
+        tf_hostname = "pxy-${count.index + 1}.oldeworld.stg.${local.zone}"
       })
     )
   }
@@ -93,36 +93,6 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
 
   kernel = "linode/grub2"
   booted = true
-}
-
-resource "linode_domain_record" "stg_oldeworld_pxy_dnsrecord__vlan" {
-  count = local.pxy_node_count
-
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pxy-${count.index + 1}.oldeworld.stg"
-  record_type = "A"
-  target      = trimsuffix(linode_instance_config.stg_oldeworld_pxy_config[count.index].interface[1].ipam_address, "/24")
-  ttl_sec     = 120
-}
-
-resource "linode_domain_record" "stg_oldeworld_pxy_dnsrecord__public" {
-  count = local.pxy_node_count
-
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.pxy-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
-  record_type = "A"
-  target      = linode_instance.stg_oldeworld_pxy[count.index].ip_address
-  ttl_sec     = 120
-}
-
-resource "linode_domain_record" "stg_oldeworld_pxy_dnsrecord__private" {
-  count = local.pxy_node_count
-
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.pxy-${count.index + 1}.oldeworld.stg"
-  record_type = "A"
-  target      = linode_instance.stg_oldeworld_pxy[count.index].private_ip_address
-  ttl_sec     = 120
 }
 
 resource "akamai_dns_record" "stg_oldeworld_pxy_dnsrecord__vlan" {
