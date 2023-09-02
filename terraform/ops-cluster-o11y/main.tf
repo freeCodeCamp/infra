@@ -15,12 +15,6 @@ data "linode_stackscripts" "cloudinit_scripts" {
   }
 }
 
-# This data source depends on the domain resource
-# which is created in terraform/ops-dns/main.tf
-data "linode_domain" "ops_dns_domain" {
-  domain = local.zone
-}
-
 data "hcp_packer_image" "linode_ubuntu" {
   bucket_name    = "linode-ubuntu"
   channel        = "golden"
@@ -54,7 +48,7 @@ resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "ldr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}"
+        tf_hostname = "ldr-${count.index + 1}.o11y.${local.zone}"
       })
     )
   }
@@ -118,34 +112,37 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   booted = true
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__vlan" {
+resource "akamai_dns_record" "ops_o11y_leaders_dnsrecord__vlan" {
   count = var.leader_node_count
 
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "ldr-${count.index + 1}.o11y"
-  record_type = "A"
-  target      = trimsuffix(linode_instance_config.ops_o11y_leaders_config[count.index].interface[1].ipam_address, "/24")
-  ttl_sec     = 120
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "ldr-${count.index + 1}.o11y.${local.zone}"
+  target = [trimsuffix(linode_instance_config.ops_o11y_leaders_config[count.index].interface[1].ipam_address, "/24")]
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__public" {
+resource "akamai_dns_record" "ops_o11y_leaders_dnsrecord__public" {
   count = var.leader_node_count
 
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.ldr-${count.index + 1}.o11y.${var.network_subdomain}"
-  record_type = "A"
-  target      = linode_instance.ops_o11y_leaders[count.index].ip_address
-  ttl_sec     = 120
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "pub.ldr-${count.index + 1}.o11y.${var.network_subdomain}.${local.zone}"
+  target = [linode_instance.ops_o11y_leaders[count.index].ip_address]
 }
 
-resource "linode_domain_record" "ops_o11y_leaders_dnsrecord__private" {
+resource "akamai_dns_record" "ops_o11y_leaders_dnsrecord__private" {
   count = var.leader_node_count
 
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.ldr-${count.index + 1}.o11y"
-  record_type = "A"
-  target      = linode_instance.ops_o11y_leaders[count.index].private_ip_address
-  ttl_sec     = 120
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "prv.ldr-${count.index + 1}.o11y.${local.zone}"
+  target = [linode_instance.ops_o11y_leaders[count.index].private_ip_address]
 }
 
 resource "linode_instance" "ops_o11y_workers" {
@@ -174,7 +171,7 @@ resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "wkr-${count.index + 1}.o11y.${data.linode_domain.ops_dns_domain.domain}"
+        tf_hostname = "wkr-${count.index + 1}.o11y.${local.zone}"
       })
     )
   }
@@ -236,36 +233,6 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
 
   kernel = "linode/grub2"
   booted = true
-}
-
-resource "linode_domain_record" "ops_o11y_workers_dnsrecord__vlan" {
-  count = var.worker_node_count
-
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "wkr-${count.index + 1}.o11y"
-  record_type = "A"
-  target      = trimsuffix(linode_instance_config.ops_o11y_workers_config[count.index].interface[1].ipam_address, "/24")
-  ttl_sec     = 120
-}
-
-resource "linode_domain_record" "ops_o11y_workers_dnsrecord__public" {
-  count = var.worker_node_count
-
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.wkr-${count.index + 1}.o11y.${var.network_subdomain}"
-  record_type = "A"
-  target      = linode_instance.ops_o11y_workers[count.index].ip_address
-  ttl_sec     = 120
-}
-
-resource "linode_domain_record" "ops_o11y_workers_dnsrecord__private" {
-  count = var.worker_node_count
-
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "prv.wkr-${count.index + 1}.o11y"
-  record_type = "A"
-  target      = linode_instance.ops_o11y_workers[count.index].private_ip_address
-  ttl_sec     = 120
 }
 
 resource "akamai_dns_record" "ops_o11y_workers_dnsrecord__vlan" {
