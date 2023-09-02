@@ -1,3 +1,0 @@
-linode_token = "<LinodeApiToken>"
-
-# Override any more variables from the variables.tf file here
