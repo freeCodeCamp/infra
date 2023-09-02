@@ -15,12 +15,6 @@ data "linode_stackscripts" "cloudinit_scripts" {
   }
 }
 
-# This data source depends on the domain resource
-# which is created in terraform/ops-dns/main.tf
-data "linode_domain" "ops_dns_domain" {
-  domain = local.zone
-}
-
 data "hcp_packer_image" "linode_ubuntu" {
   bucket_name    = "linode-ubuntu"
   channel        = "golden"
@@ -49,7 +43,7 @@ resource "linode_instance_disk" "ops_test_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "test.${data.linode_domain.ops_dns_domain.domain}"
+        tf_hostname = "test.${local.zone}"
       })
     )
   }
@@ -110,22 +104,6 @@ resource "linode_instance_config" "ops_test_config" {
 
   kernel = "linode/grub2"
   booted = true
-}
-
-resource "linode_domain_record" "ops_test_records" {
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "test"
-  record_type = "A"
-  target      = linode_instance.ops_test.ip_address
-  ttl_sec     = 120
-}
-
-resource "linode_domain_record" "ops_test_dnsrecord__public" {
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "pub.test.${var.network_subdomain}"
-  record_type = "A"
-  target      = linode_instance.ops_test.ip_address
-  ttl_sec     = 120
 }
 
 resource "akamai_dns_record" "ops_test_records" {
