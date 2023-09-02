@@ -30,14 +30,6 @@ resource "linode_nodebalancer_node" "prd_oldeworld_nb_pxy_nodes__port_80" {
   label           = "prd-node-pxy-80-${count.index}"
 }
 
-resource "linode_domain_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
-  domain_id   = data.linode_domain.ops_dns_domain.id
-  name        = "oldeworld.prd.${var.network_subdomain}"
-  record_type = "A"
-  target      = data.linode_nodebalancer.prd_oldeworld_nb_pxy.ipv4
-  ttl_sec     = 120
-}
-
 resource "akamai_dns_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
   zone       = local.zone
   recordtype = "A"
