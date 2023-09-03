@@ -53,10 +53,9 @@ resource "linode_instance_config" "ops_test_config" {
   label     = "ops-vm-test-config"
   linode_id = linode_instance.ops_test.id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.ops_test_disk__boot.id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.ops_test_disk__boot.id
   }
 
   # eth0 is the public interface.
