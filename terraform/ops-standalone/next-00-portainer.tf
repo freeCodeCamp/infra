@@ -3,6 +3,7 @@ resource "linode_instance" "ops_backoffice" {
 
   region           = var.region
   type             = "g6-standard-2"
+  private_ip       = true
   watchdog_enabled = true
 
   # NOTE:
@@ -38,10 +39,9 @@ resource "linode_instance_config" "ops_backoffice_config" {
   label     = "ops-vm-backoffice-config"
   linode_id = linode_instance.ops_backoffice.id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.ops_backoffice_disk__boot.id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.ops_backoffice_disk__boot.id
   }
 
   # eth0 is the public interface.
@@ -90,6 +90,15 @@ resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
 
   name   = "pub.backoffice.${var.network_subdomain}.${local.zone}"
   target = [linode_instance.ops_backoffice.ip_address]
+}
+
+resource "akamai_dns_record" "stg_oldeworld_jms_dnsrecord__private" {
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "prv.backoffice.${local.zone}"
+  target = [linode_instance.ops_backoffice.private_ip_address]
 }
 
 resource "linode_firewall" "ops_backoffice_firewall" {
