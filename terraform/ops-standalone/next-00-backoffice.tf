@@ -92,6 +92,15 @@ resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
   target = [linode_instance.ops_backoffice.ip_address]
 }
 
+resource "akamai_dns_record" "ops_backoffice_dnsrecord__HOSTDEFAULT" {
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "backoffice.${local.zone}"
+  target = [linode_instance.ops_backoffice.private_ip_address]
+}
+
 resource "akamai_dns_record" "ops_backoffice_dnsrecord__private" {
   zone       = local.zone
   recordtype = "A"
@@ -107,33 +116,6 @@ resource "linode_firewall" "ops_backoffice_firewall" {
   inbound {
     label    = "allow-ssh"
     ports    = "22"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
-  inbound {
-    label    = "allow-http"
-    ports    = "80"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
-  inbound {
-    label    = "allow-https"
-    ports    = "443"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
-  inbound {
-    label    = "allow-https"
-    ports    = "443"
     protocol = "TCP"
     action   = "ACCEPT"
     ipv4     = ["0.0.0.0/0"]
