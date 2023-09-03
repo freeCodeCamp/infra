@@ -68,24 +68,6 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     ])
   }
 
-  inbound {
-    label    = "allow-all-http"
-    ports    = "80"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
-  inbound {
-    label    = "allow-all-https"
-    ports    = "443"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
   # outbound { }
 
   inbound_policy  = "DROP"
