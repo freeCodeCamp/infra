@@ -42,10 +42,9 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
   label     = "stg-vm-oldeworld-pxy-config"
   linode_id = linode_instance.stg_oldeworld_pxy[count.index].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.stg_oldeworld_pxy_disk__boot[count.index].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.stg_oldeworld_pxy_disk__boot[count.index].id
   }
 
   # eth0 is the public interface.

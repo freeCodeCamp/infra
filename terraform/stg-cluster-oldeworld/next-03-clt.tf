@@ -42,10 +42,9 @@ resource "linode_instance_config" "stg_oldeworld_clt_config" {
   label     = "stg-vm-oldeworld-clt-config"
   linode_id = linode_instance.stg_oldeworld_clt[each.key].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.stg_oldeworld_clt_disk__boot[each.key].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.stg_oldeworld_clt_disk__boot[each.key].id
   }
 
   # eth0 is the public interface.
