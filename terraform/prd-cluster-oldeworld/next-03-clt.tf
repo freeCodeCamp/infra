@@ -42,10 +42,9 @@ resource "linode_instance_config" "prd_oldeworld_clt_config" {
   label     = "prd-vm-oldeworld-clt-config"
   linode_id = linode_instance.prd_oldeworld_clt[each.key].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.prd_oldeworld_clt_disk__boot[each.key].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.prd_oldeworld_clt_disk__boot[each.key].id
   }
 
   # eth0 is the public interface.
