@@ -59,10 +59,9 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   label     = "ops-vm-o11y-ldr-config"
   linode_id = linode_instance.ops_o11y_leaders[count.index].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.ops_o11y_leaders_disk__boot[count.index].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.ops_o11y_leaders_disk__boot[count.index].id
   }
 
   # eth0 is the public interface.
@@ -182,10 +181,9 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
   label     = "ops-vm-o11y-wkr-config"
   linode_id = linode_instance.ops_o11y_workers[count.index].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.ops_o11y_workers_disk__boot[count.index].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.ops_o11y_workers_disk__boot[count.index].id
   }
 
   # eth0 is the public interface.
