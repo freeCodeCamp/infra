@@ -21,3 +21,10 @@ data "hcp_packer_image" "linode_ubuntu" {
   cloud_provider = "linode"
   region         = "us-east"
 }
+
+data "linode_instances" "stg_oldeworld_jms" {
+  filter {
+    name   = "group"
+    values = ["stg_oldeworld_jms"]
+  }
+}

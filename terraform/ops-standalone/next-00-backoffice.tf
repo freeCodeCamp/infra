@@ -92,7 +92,7 @@ resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
   target = [linode_instance.ops_backoffice.ip_address]
 }
 
-resource "akamai_dns_record" "stg_oldeworld_jms_dnsrecord__private" {
+resource "akamai_dns_record" "ops_backoffice_dnsrecord__private" {
   zone       = local.zone
   recordtype = "A"
   ttl        = 120
@@ -129,6 +129,25 @@ resource "linode_firewall" "ops_backoffice_firewall" {
     action   = "ACCEPT"
     ipv4     = ["0.0.0.0/0"]
     ipv6     = ["::/0"]
+  }
+
+  inbound {
+    label    = "allow-https"
+    ports    = "443"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
+  inbound {
+    label    = "allow-all-tcp-jms"
+    ports    = "1-65535"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"]
+    ])
   }
 
   # outbound { }
