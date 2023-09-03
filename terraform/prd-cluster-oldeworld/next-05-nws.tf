@@ -49,13 +49,14 @@ resource "linode_instance_config" "prd_oldeworld_nws_config" {
   label     = "prd-vm-oldeworld-nws-config"
   linode_id = linode_instance.prd_oldeworld_nws[each.key].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.prd_oldeworld_nws_disk__boot[each.key].id
-    }
-    sdb {
-      volume_id = linode_volume.prd_oldeworld_nws_volume__data[each.key].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.prd_oldeworld_nws_disk__boot[each.key].id
+  }
+
+  device {
+    device_name = "sdb"
+    volume_id   = linode_volume.prd_oldeworld_nws_volume__data[each.key].id
   }
 
   # eth0 is the public interface.

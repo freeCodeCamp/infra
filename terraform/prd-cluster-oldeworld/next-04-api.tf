@@ -42,10 +42,9 @@ resource "linode_instance_config" "prd_oldeworld_api_config" {
   label     = "prd-vm-oldeworld-api-config"
   linode_id = linode_instance.prd_oldeworld_api[count.index].id
 
-  devices {
-    sda {
-      disk_id = linode_instance_disk.prd_oldeworld_api_disk__boot[count.index].id
-    }
+  device {
+    device_name = "sda"
+    disk_id     = linode_instance_disk.prd_oldeworld_api_disk__boot[count.index].id
   }
 
   # eth0 is the public interface.
