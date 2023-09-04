@@ -47,4 +47,4 @@
 
 7. Add the container registry details to Portainer.
    
-8. Create the news stack in Portainer using the [news-stack.yml](./stacks/news/news-stack.yml) file. Ensure enviroment variables are set as needed.
+8. Create the news stack in Portainer using the [news-stack.yml](./apps/stacks/news/news-stack.yml) file. Ensure enviroment variables are set as needed.
