@@ -28,3 +28,10 @@ data "linode_instances" "stg_oldeworld_jms" {
     values = ["stg_oldeworld_jms"]
   }
 }
+
+data "linode_instances" "prd_oldeworld_jms" {
+  filter {
+    name   = "group"
+    values = ["prd_oldeworld_jms"]
+  }
+}

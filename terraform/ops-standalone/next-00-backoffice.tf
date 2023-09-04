@@ -128,7 +128,8 @@ resource "linode_firewall" "ops_backoffice_firewall" {
     protocol = "TCP"
     action   = "ACCEPT"
     ipv4 = flatten([
-      [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"]
+      [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"],
+      [for i in data.linode_instances.prd_oldeworld_jms.instances : "${i.private_ip_address}/32"]
     ])
   }
 
