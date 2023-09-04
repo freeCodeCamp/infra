@@ -27,12 +27,12 @@ services:
   #     - published: 4000
   #       <<: *port-config
   #   <<: *deploy-config
-  svc-nws-eng:
-    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
-    ports:
-      - published: 4001
-        <<: *port-config
-    <<: *deploy-config
+  # svc-nws-eng:
+  #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
+  #   ports:
+  #     - published: 4001
+  #       <<: *port-config
+  #   <<: *deploy-config
   svc-nws-chn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
     ports:
