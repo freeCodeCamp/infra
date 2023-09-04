@@ -5,9 +5,9 @@ x-deploy-config: &deploy-config
     replicas: 3
     placement:
       constraints:
-        - node.labels.jms == true
+        - node.labels.jms == ${DEPLOYMENT_ENV}
       preferences:
-        - spread: node.labels.jms == true
+        - spread: node.labels.jms == ${DEPLOYMENT_ENV}
 
 x-port-config: &port-config
   target: 3000
