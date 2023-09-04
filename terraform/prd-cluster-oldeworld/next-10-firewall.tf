@@ -57,6 +57,29 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
     ipv6     = ["::/0"]
   }
 
+  inbound {
+    label    = "allow-all-tcp_from-vlan"
+    ports    = "1-65535"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      ["10.0.0.0/8"]
+    ])
+  }
+
+  inbound {
+    label    = "allow-all-tcp-from-private-ip"
+    ports    = "1-65535"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      // Allow all ports from the backoffice instance private IP. Used for Docker Swarm management.
+      ["${data.linode_instances.ops_standalone_backoffice.instances[0].private_ip_address}/32"],
+
+      // Allow all ports from the private IP within the instance group. Used for Docker Swarm management.
+      [for i in linode_instance.prd_oldeworld_jms : "${i.private_ip_address}/32"],
+    ])
+  }
   # outbound { }
 
   inbound_policy  = "DROP"
@@ -71,5 +94,8 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
 
     # All News Nodes.
     [for i in linode_instance.prd_oldeworld_nws : i.id],
+
+    # All JMS Nodes.
+    [for i in linode_instance.prd_oldeworld_jms : i.id],
   ])
 }
