@@ -7,8 +7,8 @@
 1. Create docker swarm cluster as needed.
    
    ```shell
-    docker swarm init
-    docker swarm join-token manager
+   docker swarm init
+   docker swarm join-token manager
    ```
 2. Add manager nodes to the cluster.
 
@@ -23,22 +23,22 @@
    ```
    
    Add the following lines to the file:
-   ```txt
-    [Service]
-    ExecStart=
-    ExecStart=... -H tcp://<ip>:<port>
+   ```unit
+   [Service]
+   ExecStart=
+   ExecStart=... -H tcp://<ip>:<port>
    ```
 
    ```shell
-    sudo systemctl daemon-reload
-    sudo systemctl restart docker.service
+   sudo systemctl daemon-reload
+   sudo systemctl restart docker.service
    ```
  
 4. **Important:** Add labels to the nodes in the cluster. This will be used for placement constraints in the docker stack files.
 
    Add the following labels to the nodes that will run the JMS services:
    ```shell
-    docker node update --label-add "jms=true" <node-name>
+   docker node update --label-add "jms=true" <node-name>
    ```
    
 5. Deploy Portainer to the backoffice VM with docker compose. See details in the [Portainer README](./apps/backoffice/README.md).
