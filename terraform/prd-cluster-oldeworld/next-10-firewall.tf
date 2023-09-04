@@ -40,15 +40,6 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
   label = "prd-fw-oldeworld"
 
   inbound {
-    label    = "allow-ghost_from-anywhere"
-    ports    = "32323"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
-
-  inbound {
     label    = "allow-ssh_from-anywhere"
     ports    = "22"
     protocol = "TCP"
@@ -68,6 +59,16 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
   }
 
   inbound {
+    label    = "allow-all-udp_from-vlan"
+    ports    = "1-65535"
+    protocol = "UDP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      ["10.0.0.0/8"]
+    ])
+  }
+
+  inbound {
     label    = "allow-all-tcp-from-private-ip"
     ports    = "1-65535"
     protocol = "TCP"
@@ -79,6 +80,29 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
       // Allow all ports from the private IP within the instance group. Used for Docker Swarm management.
       [for i in linode_instance.prd_oldeworld_jms : "${i.private_ip_address}/32"],
     ])
+  }
+
+  inbound {
+    label    = "allow-all-udp-from-private-ip"
+    ports    = "1-65535"
+    protocol = "UDP"
+    action   = "ACCEPT"
+    ipv4 = flatten([
+      // Allow all ports from the backoffice instance private IP. Used for Docker Swarm management.
+      ["${data.linode_instances.ops_standalone_backoffice.instances[0].private_ip_address}/32"],
+
+      // Allow all ports from the private IP within the instance group. Used for Docker Swarm management.
+      [for i in linode_instance.prd_oldeworld_jms : "${i.private_ip_address}/32"],
+    ])
+  }
+
+  inbound {
+    label    = "allow-ghost_from-anywhere"
+    ports    = "32323"
+    protocol = "TCP"
+    action   = "ACCEPT"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
   }
   # outbound { }
 
