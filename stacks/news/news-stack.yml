@@ -15,16 +15,10 @@ x-port-config: &port-config
   mode: host
 
 services:
-  # svc-nws-tst:
-  #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-tst:latest
+  # svc-test:
+  #   image: ${DOCKER_REGISTRY}/ops/test:latest
   #   ports:
-  #     - published: 3999
-  #       <<: *port-config
-  #   <<: *deploy-config
-  # svc-nws-dev:
-  #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-dev:latest
-  #   ports:
-  #     - published: 4000
+  #     - published: 3000
   #       <<: *port-config
   #   <<: *deploy-config
   # svc-nws-eng:
