@@ -46,16 +46,12 @@
 
    > :warning: Warning :warning: These instructions may not work. Docker swarm is adding multiple networks to the services for some reason
    
-   Use the stack defined in [portainer-stack.yml](./apps/stacks/portainer/portainer-stack.yml).
+   Use the stack defined in [portainer-stack.yml](./stacks/portainer/portainer-stack.yml).
 
    ```shell
    sudo docker stack deploy -c portainer-stack.yml portainer
    ```
 
-7. Complete the Portainer setup wizard & add the cluster to Portainer.
+6. Complete the Portainer setup wizard & add the cluster to Portainer.
 
-8. Add the container registry details to Portainer.
-   
-9. Create the news stack in Portainer using the [news-stack.yml](./apps/stacks/news/news-stack.yml) file. Ideally you should use Git repo for the stack file.
-
-10. Ensure enviroment variables are set as needed.
+7. Add the container registry details to Portainer.
