@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  # CRON service
+  cronjob:
+    image: crazymax/swarm-cronjob
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - "TZ=UTC"
+      - "LOG_LEVEL=info"
+      - "LOG_JSON=false"
+    deploy:
+      placement:
+        constraints:
+          - "node.role == manager"
+
+  # Update service
+  shepherd:
+    image: mazzolino/shepherd
+    environment:
+      - "TZ=UTC"
+      - "FILTER_SERVICES=label=org.freecodecamp.jms=true"
+      - "IGNORELIST_SERVICES=oncall_shepherd oncall_cronjob oncall_cleanup portainer_agent portainer_portainer"
+      - "RUN_ONCE_AND_EXIT=true"
+      - "WITH_REGISTRY_AUTH=true"
+      - "VERBOSE=true"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/home/freecodecamp/.docker/config.json:/root/.docker/config.json"
+    deploy:
+      replicas: 0
+      restart_policy:
+        condition: none
+      labels:
+        - "swarm.cronjob.enable=true"
+        # Fire every hour, on the 45th minute mark
+        - "swarm.cronjob.schedule=45 0/1 * * *"
+        - "swarm.cronjob.skip-running=true"
+      placement:
+        constraints:
+          - "node.role == manager"
+
+  # Cleanup Service  
+  cleanup:
+    image: docker
+    command: [ "docker", "system", "prune", "-f" ]
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      mode: global
+      labels:
+        - "swarm.cronjob.enable=true"
+        # Fire every 8 hours, on the 15th minute mark
+        - "swarm.cronjob.schedule=15 0/8 * * *"
+        - "swarm.cronjob.skip-running=false"
+      restart_policy:
+        condition: none

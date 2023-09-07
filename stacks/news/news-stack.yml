@@ -9,6 +9,15 @@ x-deploy-config: &deploy-config
         - node.labels.jms.variant == ${DEPLOYMENT_ENV}
       preferences:
         - spread: node.labels.jms.variant == ${DEPLOYMENT_ENV}
+    update_config:
+      parallelism: 1
+      delay: 10s
+      order: start-first
+      failure_action: rollback
+      monitor: 1m
+      max_failure_ratio: 0.3
+    labels:
+      - org.freecodecamp.jms=true
 
 x-port-config: &port-config
   target: 3000
@@ -16,54 +25,84 @@ x-port-config: &port-config
   mode: host
 
 services:
+
+  # This is a test service to dial in the deploment
+  # of the news services.
+  
   # svc-test:
   #   image: ${DOCKER_REGISTRY}/ops/test:latest
   #   ports:
   #     - published: 3000
-  #       <<: *port-config
-  #   <<: *deploy-config
+  #       target: 3000
+  #       protocol: tcp
+  #       mode: host
+  #   deploy:
+  #     replicas: 3
+  #     placement:
+  #       constraints:
+  #         - node.labels.jms.enabled == true
+  #         - node.labels.jms.variant == ${DEPLOYMENT_ENV}
+  #       preferences:
+  #         - spread: node.labels.jms.variant == ${DEPLOYMENT_ENV}
+  #     update_config:
+  #       parallelism: 1
+  #       delay: 10s
+  #       order: start-first
+  #       failure_action: rollback
+  #       monitor: 1m
+  #       max_failure_ratio: 0.3
+  #     labels:
+  #       - org.freecodecamp.jms=test
+
   # svc-nws-eng:
   #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
   #   ports:
   #     - published: 4001
   #       <<: *port-config
   #   <<: *deploy-config
+  
   svc-nws-chn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
     ports:
       - published: 4002
         <<: *port-config
     <<: *deploy-config
+  
   svc-nws-esp:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-espanol:latest
     ports:
       - published: 4003
         <<: *port-config
     <<: *deploy-config
+  
   svc-nws-ita:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-italian:latest
     ports:
       - published: 4004
         <<: *port-config
     <<: *deploy-config
+  
   svc-nws-jpn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-japanese:latest
     ports:
       - published: 4005
         <<: *port-config
     <<: *deploy-config
+  
   svc-nws-kor:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-korean:latest
     ports:
       - published: 4006
         <<: *port-config
     <<: *deploy-config
+  
   svc-nws-por:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-portuguese:latest
     ports:
       - published: 4007
         <<: *port-config
     <<: *deploy-config
+  
   svc-nws-ukr:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-ukrainian:latest
     ports:

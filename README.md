@@ -36,22 +36,45 @@
  
 4. **Important:** Add labels to the nodes in the cluster. This will be used for placement constraints in the docker stack files.
 
-   Add the following labels to the nodes that will run the JMS services:
-   ```shell
-   docker node update --label-add "jms=dev" <node id for the staging    worker nodes>
-   docker node update --label-add "jms=org" <node id for the production worker nodes>
-   ```
-   
-5. **Important:** Deploy Portainer in `sudo` mode, because portainer needs to manage docker resources like networks and more. 
+   Add the following labels to the nodes:
 
-   > :warning: Warning :warning: These instructions may not work. Docker swarm is adding multiple networks to the services for some reason
+   - On the manager node that will run portainer
+   
+     ```shell
+     docker node update --label-add "portainer=true" <node id>
+     ```
+
+   - On all nodes that will run the JMS instances
+
+     ```shell
+     docker node update --label-add "jms.enabled=true" <node id>
+     ```
+
+   - On all staging nodes
+   
+     ```shell
+     docker node update --label-add "jms.variant=dev" <node id>
+     ```
+
+   - On all production nodes
+   
+     ```shell
+     docker node update --label-add "jms.variant=org" <node id>
+     ```
+5. Login to the private container registry.
+   
+6. **Important:** Deploy Portainer. 
+
+   > :warning: Warning :warning: These instructions may not work. Docker swarm is adding multiple networks to the services for some reason.
    
    Use the stack defined in [portainer-stack.yml](./stacks/portainer/portainer-stack.yml).
 
    ```shell
-   sudo docker stack deploy -c portainer-stack.yml portainer
+   docker stack deploy -c portainer-stack.yml portainer
    ```
 
-6. Complete the Portainer setup wizard & add the cluster to Portainer.
+7. Complete the Portainer setup wizard & add the cluster to Portainer.
 
-7. Add the container registry details to Portainer.
+8. Add the container registry details to Portainer.
+   
+9. Deploy all the remaining stacks via Portainer.

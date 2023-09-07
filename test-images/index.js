@@ -15,7 +15,7 @@ const server = http.createServer((req, res) => {
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/plain')
-    res.end('Hello World\n');
+    res.end('Hello World - Build v1\n');
 });
 
 server.listen(port, () => {
@@ -27,4 +27,3 @@ process.on('SIGINT', () => {
     server.close();
     process.exit();
 });
-
