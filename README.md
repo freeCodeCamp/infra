@@ -15,24 +15,6 @@
     ```shell
     docker swarm join --token <token> <ip>:<port>
     ```
-
-3. Enable the docker host API on one of the manager nodes in the cluster. This will be used by Portainer to manage the cluster.
-
-   ```shell
-   sudo systemctl edit docker.service
-   ```
-   
-   Add the following lines to the file:
-   ```unit
-   [Service]
-   ExecStart=
-   ExecStart=... -H tcp://<ip>:<port>
-   ```
-
-   ```shell
-   sudo systemctl daemon-reload
-   sudo systemctl restart docker.service
-   ```
  
 4. **Important:** Add labels to the nodes in the cluster. This will be used for placement constraints in the docker stack files.
 
@@ -65,7 +47,7 @@
    
 6. **Important:** Deploy Portainer. 
 
-   > :warning: Warning :warning: These instructions may not work. Docker swarm is adding multiple networks to the services for some reason.
+   ~~:warning: Warning :warning: These instructions may not work. Docker swarm is adding multiple networks to the services for some reason.~~
    
    Use the stack defined in [portainer-stack.yml](./stacks/portainer/portainer-stack.yml).
 
