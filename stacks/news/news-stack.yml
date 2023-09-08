@@ -12,10 +12,7 @@ x-deploy-config: &deploy-config
     update_config:
       parallelism: 1
       delay: 10s
-      order: start-first
       failure_action: rollback
-      monitor: 1m
-      max_failure_ratio: 0.3
     labels:
       - org.freecodecamp.jms=true
 
@@ -47,12 +44,9 @@ services:
   #     update_config:
   #       parallelism: 1
   #       delay: 10s
-  #       order: start-first
   #       failure_action: rollback
-  #       monitor: 1m
-  #       max_failure_ratio: 0.3
   #     labels:
-  #       - org.freecodecamp.jms=test
+  #       - org.freecodecamp.jms=true
 
   # svc-nws-eng:
   #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
@@ -60,7 +54,7 @@ services:
   #     - published: 4001
   #       <<: *port-config
   #   <<: *deploy-config
-  
+
   svc-nws-chn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
     ports:
