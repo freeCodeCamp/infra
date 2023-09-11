@@ -3,12 +3,12 @@ data "linode_nodebalancer" "prd_oldeworld_nb_pxy" {
 }
 
 data "linode_nodebalancer_config" "prd_oldeworld_nb_pxy_config__port_443" {
-  id              = 598263 # TODO: Find a way to get this ID dynamically
+  id              = 667462 # TODO: Find a way to get this ID dynamically
   nodebalancer_id = data.linode_nodebalancer.prd_oldeworld_nb_pxy.id
 }
 
 data "linode_nodebalancer_config" "prd_oldeworld_nb_pxy_config__port_80" {
-  id              = 598264 # TODO: Find a way to get this ID dynamically
+  id              = 667461 # TODO: Find a way to get this ID dynamically
   nodebalancer_id = data.linode_nodebalancer.prd_oldeworld_nb_pxy.id
 }
 
