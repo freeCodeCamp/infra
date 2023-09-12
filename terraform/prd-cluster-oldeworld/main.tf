@@ -32,7 +32,7 @@ data "linode_instances" "ops_standalone_backoffice" {
 }
 
 locals {
-  pxy_node_count = 3 # number of proxy nodes
+  pxy_node_count = 5 # number of proxy nodes
   api_node_count = 3 # number of api nodes
   clt_node_count = 2 # number of client nodes for EACH LANGUAGE!
   jms_node_count = 3 # number of JAMStack nodes
@@ -43,7 +43,7 @@ locals {
   ipam_block_api = 20  # 10.0.0.21, 10.0.0.22, ...
   ipam_block_clt = 40  # 10.0.0.41, 10.0.0.42, ...
   ipam_block_nws = 100 # 10.0.0.100, 10.0.0.102, ...
-  ipam_block_jms = 120  # 10.0.0.120, 10.0.0.121, ...
+  ipam_block_jms = 120 # 10.0.0.120, 10.0.0.121, ...
 }
 
 // When removing an item, DO NOT change the IPAM number.
