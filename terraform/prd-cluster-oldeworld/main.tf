@@ -32,7 +32,7 @@ data "linode_instances" "ops_standalone_backoffice" {
 }
 
 locals {
-  pxy_node_count = 5 # number of proxy nodes
+  pxy_node_count = 3 # number of proxy nodes
   api_node_count = 3 # number of api nodes
   clt_node_count = 2 # number of client nodes for EACH LANGUAGE!
   jms_node_count = 3 # number of JAMStack nodes
