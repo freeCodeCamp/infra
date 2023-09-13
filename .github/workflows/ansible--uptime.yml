@@ -31,20 +31,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
 
-      - name: Set up Python 3
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
       - name: Setup Ansible and Dependencies
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          pip install ansible
-          pip install -r requirements/python.txt
+          make install
           ansible --version
-          which ansible
-          ansible-galaxy collection install -r requirements/collections.yml
 
       - name: List Ansible Inventory
         working-directory: ${{ env.WORKING_DIR }}
