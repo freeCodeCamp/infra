@@ -1,19 +1,45 @@
 ---
 - name: Reboot a machine and wait for it to come back
-  hosts: '{{ variable_host | default("null") }}'
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
   gather_facts: true
   become: true
+  become_user: root
+  vars:
+    # Set force_reboot to True to force a reboot — mind the quotes!
+    force_reboot: '{{ variable_force_reboot | default(False) }}'
   tasks:
+    - name: Check if /var/run/reboot-required exists
+      register: reboot_required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+        get_checksum: false
+
     - name: Print uptime
       debug:
         msg:
           'Host machine {{ inventory_hostname }} has been up for {{
           ansible_facts.uptime_seconds/86400 }} days'
 
-    - name: Reboot
-      reboot:
-        test_command: uptime
+    # Reboot for the following reasons:
+    # 1. /var/run/reboot-required exists (e.g. kernel update)
+    # 2. Uptime is greater than 7 days
+    # 3. force_reboot is set to True
+    - name: Debug
+      ansible.builtin.debug:
+        msg: '
+          reboot_required.stat.exists: {{ reboot_required.stat.exists }}
+          ansible_facts.uptime_seconds: {{ ansible_facts.uptime_seconds }}
+          force_reboot: {{ force_reboot }}
+          '
+
+    - name: Conditionally reboot the machine
+      ansible.builtin.reboot:
         connect_timeout: 5
         reboot_timeout: 300
-        pre_reboot_delay: 5
-        post_reboot_delay: 5
+        pre_reboot_delay: 15
+        post_reboot_delay: 15
+        test_command: uptime
+      when:
+        reboot_required.stat.exists or ansible_facts.uptime_seconds > 604800 or
+        force_reboot == "True"
