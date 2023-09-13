@@ -15,7 +15,7 @@ help:
 install:
 	pip install ansible ansible-lint
 	pip install -r requirements/python.txt
-	ansible-galaxy install -r requirements/roles.yml
+	# ansible-galaxy install -r requirements/roles.yml
 	ansible-galaxy collection install -r requirements/collections.yml
 
 .PHONY: check-linode-env-token

@@ -1,0 +1,60 @@
+name: Ansible -- Uptime
+on:
+  workflow_dispatch:
+    inputs:
+      hosts:
+        description: 'The value for the variable hosts argument'
+        required: true
+        default: 'none'
+
+      verbosity:
+        description: 'The verbosity level for logs'
+        required: true
+        type: choice
+        default: ''
+        options:
+          - '-v'
+          - '-vv'
+          - '-vvv'
+
+jobs:
+  run_playbook:
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: './ansible'
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.11'
+
+      - name: Setup pip
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Install Ansible and other dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          make install
+
+      - name: Ansible Inventory
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          ansible-inventory --graph -v
+
+      - name: Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Ansible Playbook
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          ansible-playbook play-any--uptime.yml -e "variable_hosts=${{ github.event.inputs.hosts }}" ${{ github.event.inputs.verbosity }}
