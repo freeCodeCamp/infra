@@ -16,7 +16,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "This is a quick reminder that we can not accept pull requests from forks (including staff and prior contributors).\n\nThis repo is a \"special\" case because of how we build, test and deploy the codebase. If you are working on something, Please open a new pull request from a branch on this repository."
+              body: "Hey! We do not accept pull requests from forks (applicable to everyone, including staff and org members alike).\n\nThis code repository is a \"special\" case. While the code is open-source, we limit the scopes for automated builds, tests and deployments. If you are working on something, Please open a new pull request from a branch on this repository. If you need more help contact a member of the staff."
             })
             github.rest.pulls.update({
               pull_number: context.issue.number,
