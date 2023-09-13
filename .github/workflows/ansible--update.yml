@@ -2,42 +2,55 @@ name: Ansible -- Update
 
 on:
   workflow_dispatch:
-  # cron:
+    inputs:
+      hosts:
+        description: 'The value for the variable_host argument'
+        required: true
+        default: 'none'
+      verbosity:
+        description: 'The verbosity level for logs'
+        required: true
+        type: choice
+        default: '-v'
+        options:
+          - '-v'
+          - '-vv'
+          - '-vvv'
+      serial:
+        description: 'The value for the variable_serial argument'
+        required: true
+        default: 1
+        type: number
 
 jobs:
   run_playbook:
-    name: Run Ansible Playbook
+    name: Run Play
     runs-on: ubuntu-latest
     env:
       WORKING_DIR: './ansible'
-      # LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
-    strategy:
-      matrix:
-        vm_set:
-          - oldeworld_jms
-          - oldeworld_pxy
-          - oldeworld_nws
-          - oldeworld_api
-        vm_env:
-          # - prd
-          - stg
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
 
     steps:
-      # - name: Checkout
-      #   uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
 
-      # - name: Setup Ansible and Dependencies
-      #   working-directory: ${{ env.WORKING_DIR }}
-      #   run: |
-      #     make install
-      #     ansible --version
-
-      # - name: Set up SSH key
-      #   run: |
-      #     mkdir -p ~/.ssh/
-      #     echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
-      #     chmod 600 ~/.ssh/id_for_ansible.pem
-
-      - name: Echo the matrix
+      - name: Setup Ansible and Dependencies
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
-          echo "Job on: ${{ matrix.vm_env }}_${{ matrix.vm_set }}"
+          make install
+          ansible --version
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
+
+      - name: Play -- Update
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          ansible-playbook play-any--update.yml \
+          --private-key=~/.ssh/id_for_ansible.pem \
+          -e "variable_host=${{ github.event.inputs.hosts }}" \
+          -e "variable_serial=${{ github.event.inputs.serial }}" \
+          ${{ github.event.inputs.verbosity }}

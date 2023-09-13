@@ -1,0 +1,27 @@
+name: Ansible -- Uptime
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run_playbook:
+    name: Run Play
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: './ansible'
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+
+      - name: Setup Ansible and Dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          make install
+          ansible --version
+
+      - name: List Inventory
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          ansible-inventory --graph -v
