@@ -1,7 +1,6 @@
 name: Ansible -- Uptime
 
 on:
-  push:
   workflow_dispatch:
     inputs:
       hosts:
@@ -42,6 +41,14 @@ jobs:
         run: |
           ansible-inventory --graph -v
 
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
+
+      # The following step is only needed if you are using Tailscale,
+      # we are not using it just yet.
       # - name: Connect with Tailscale
       #   uses: tailscale/github-action@v2
       #   with:
@@ -49,7 +56,7 @@ jobs:
       #     oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
       #     tags: tag:ci
 
-      # - name: Ansible Playbook -- Uptime
-      #   working-directory: ${{ env.WORKING_DIR }}
-      #   run: |
-      #     ansible-playbook play-any--uptime.yml -e "variable_host=${{ github.event.inputs.hosts }}" ${{ github.event.inputs.verbosity }}
+      - name: Ansible Playbook -- Uptime
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          ansible-playbook play-any--uptime.yml --private-key=~/.ssh/id_for_ansible.pem -e "variable_host=${{ github.event.inputs.hosts }}" ${{ github.event.inputs.verbosity }}
