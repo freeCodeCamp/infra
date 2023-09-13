@@ -7,7 +7,6 @@ on:
         description: 'The value for the variable_host argument'
         required: true
         default: 'none'
-
       verbosity:
         description: 'The verbosity level for logs'
         required: true
@@ -17,6 +16,11 @@ on:
           - '-v'
           - '-vv'
           - '-vvv'
+      serial:
+        description: 'The value for the variable_serial argument'
+        required: true
+        default: 1
+        type: number
 
 jobs:
   run_playbook:
@@ -59,4 +63,8 @@ jobs:
       - name: Ansible Playbook -- Uptime
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          ansible-playbook play-any--uptime.yml --private-key=~/.ssh/id_for_ansible.pem -e "variable_host=${{ github.event.inputs.hosts }}" ${{ github.event.inputs.verbosity }}
+          ansible-playbook play-any--uptime.yml \
+          --private-key=~/.ssh/id_for_ansible.pem \
+          -e "variable_host=${{ github.event.inputs.hosts }}" \
+          -e "variable_serial=${{ github.event.inputs.serial }}" \
+          ${{ github.event.inputs.verbosity }}

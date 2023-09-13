@@ -1,0 +1,43 @@
+name: Ansible -- Update
+
+on:
+  workflow_dispatch:
+  # cron:
+
+jobs:
+  run_playbook:
+    name: Run Ansible Playbook
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: './ansible'
+      # LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+    strategy:
+      matrix:
+        vm_set:
+          - oldeworld_jms
+          - oldeworld_pxy
+          - oldeworld_nws
+          - oldeworld_api
+        vm_env:
+          # - prd
+          - stg
+
+    steps:
+      # - name: Checkout
+      #   uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
+
+      # - name: Setup Ansible and Dependencies
+      #   working-directory: ${{ env.WORKING_DIR }}
+      #   run: |
+      #     make install
+      #     ansible --version
+
+      # - name: Set up SSH key
+      #   run: |
+      #     mkdir -p ~/.ssh/
+      #     echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+      #     chmod 600 ~/.ssh/id_for_ansible.pem
+
+      - name: Echo the matrix
+        run: |
+          echo "Job on: ${{ matrix.vm_env }}_${{ matrix.vm_set }}"

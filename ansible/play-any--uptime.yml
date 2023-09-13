@@ -1,6 +1,6 @@
 ---
 - name: Check uptime on virtual machines
-  hosts: '{{ variable_host | default("none") }}'
+  hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
   become_user: root
   serial: '{{ variable_serial | default(1) }}'

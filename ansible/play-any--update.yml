@@ -1,7 +1,7 @@
 ---
 - name: Update virtual machines
   hosts: "{{ variable_host | default('null') }}"
-  serial: 3
+  serial: '{{ variable_serial | default(1) }}'
   gather_facts: false
   become: true
   become_user: root
