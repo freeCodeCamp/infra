@@ -1,0 +1,77 @@
+name: Ansible --05- Reboot
+
+on:
+  workflow_call:
+    inputs:
+      hosts:
+        description: 'The value for the variable_host argument'
+        type: string
+        required: true
+      verbosity:
+        description: 'The verbosity level for logs'
+        type: string
+      serial:
+        description: 'The value for the variable_serial argument'
+        type: number
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: 'The SSH private key for the Ansible user'
+        required: true
+      LINODE_TOKEN:
+        description: 'The Linode API token'
+        required: true
+  workflow_dispatch:
+    inputs:
+      hosts:
+        description: 'The value for the variable_host argument'
+        type: string
+        required: true
+        default: 'none'
+      verbosity:
+        description: 'The verbosity level for logs'
+        type: choice
+        required: true
+        default: '-v'
+        options:
+          - '-v'
+          - '-vv'
+          - '-vvv'
+      serial:
+        description: 'The value for the variable_serial argument'
+        type: number
+        required: true
+        default: 1
+
+jobs:
+  run_playbook:
+    name: Run Play
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+
+      - name: Setup Ansible and Dependencies
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
+        run: |
+          make install
+          ansible --version
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
+
+      - name: Play -- Reboot
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
+        run: |
+          ansible-playbook play-any--reboot.yml \
+          --private-key=~/.ssh/id_for_ansible.pem \
+          -e "variable_host=${{ inputs.hosts }}" \
+          -e "variable_serial=${{ inputs.serial }}" \
+          ${{ inputs.verbosity }}
