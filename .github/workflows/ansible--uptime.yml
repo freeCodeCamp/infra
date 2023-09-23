@@ -1,4 +1,4 @@
-name: Ansible - 04 - Uptime
+name: Ansible --04- Uptime
 
 on:
   workflow_call:

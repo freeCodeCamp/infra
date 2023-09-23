@@ -1,4 +1,4 @@
-name: Ansible - 02 - Run Workflows
+name: Ansible --02- Run Workflows
 
 on:
   workflow_dispatch:
@@ -6,20 +6,40 @@ on:
 jobs:
   uptime:
     name: Uptime
+    strategy:
+      matrix:
+        host_groups:
+          - ops_all
+          - stg_oldeworld_api
+          - prd_oldeworld_api
+          - stg_oldeworld_pxy
+          - prd_oldeworld_pxy
+          - stg_oldeworld_nws
+          - prd_oldeworld_nws
+          - prd_oldeworld_clt_eng
+          - prd_oldeworld_clt_chn
+          - prd_oldeworld_clt_cnt
+          - prd_oldeworld_clt_esp
+          - prd_oldeworld_clt_ger
+          - prd_oldeworld_clt_ita
+          - prd_oldeworld_clt_jpn
+          - prd_oldeworld_clt_por
+          - prd_oldeworld_clt_ukr
+
     uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
     with:
-      hosts: 'ops_all'
+      hosts: ${{ matrix.host_groups }}
       verbosity: '-vv'
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  update:
-    name: Update
-    uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
-    with:
-      hosts: 'ops_all'
-      verbosity: '-vv'
-    secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  # update:
+  #   name: Update
+  #   uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
+  #   with:
+  #     hosts: 'ops_all'
+  #     verbosity: '-vv'
+  #   secrets:
+  #     LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+  #     SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}

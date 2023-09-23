@@ -1,4 +1,4 @@
-name: Ansible - 03 - Update
+name: Ansible --03- Update
 
 on:
   workflow_call:
