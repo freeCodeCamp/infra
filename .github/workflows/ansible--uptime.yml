@@ -1,4 +1,4 @@
-name: Ansible -- Uptime
+name: Ansible - 04 - Uptime
 
 on:
   workflow_call:
@@ -13,6 +13,13 @@ on:
       serial:
         description: 'The value for the variable_serial argument'
         type: number
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: 'The SSH private key for the Ansible user'
+        required: true
+      LINODE_TOKEN:
+        description: 'The Linode API token'
+        required: true
   workflow_dispatch:
     inputs:
       hosts:
@@ -39,16 +46,15 @@ jobs:
   run_playbook:
     name: Run Play
     runs-on: ubuntu-latest
-    env:
-      WORKING_DIR: './ansible'
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Setup Ansible and Dependencies
-        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
         run: |
           make install
           ansible --version
@@ -60,10 +66,12 @@ jobs:
           chmod 600 ~/.ssh/id_for_ansible.pem
 
       - name: Play -- Uptime
-        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
         run: |
           ansible-playbook play-any--uptime.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e "variable_host=${{ github.event.inputs.hosts }}" \
-          -e "variable_serial=${{ github.event.inputs.serial }}" \
-          ${{ github.event.inputs.verbosity }}
+          -e "variable_host=${{ inputs.hosts }}" \
+          -e "variable_serial=${{ inputs.serial }}" \
+          ${{ inputs.verbosity }}

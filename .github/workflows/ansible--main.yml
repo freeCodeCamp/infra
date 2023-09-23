@@ -1,12 +1,25 @@
-name: Ansible -- Main Workflow
+name: Ansible - 02 - Run Workflows
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-uptime:
+  uptime:
+    name: Uptime
     uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
     with:
-      hosts: ops_all
+      hosts: 'ops_all'
       verbosity: '-vv'
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  update:
+    name: Update
+    uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
+    with:
+      hosts: 'ops_all'
+      verbosity: '-vv'
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}

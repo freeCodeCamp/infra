@@ -1,4 +1,4 @@
-name: Ansible -- List Inventory
+name: Ansible - 01 - List Inventory
 
 on:
   workflow_dispatch:
