@@ -1,4 +1,4 @@
-name: Ansible -- Uptime
+name: Ansible -- List Inventory
 
 on:
   workflow_dispatch:
