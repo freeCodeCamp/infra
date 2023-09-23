@@ -24,7 +24,7 @@ on:
 
 jobs:
   run_playbook:
-    name: Run Ansible Playbook
+    name: Run Play
     runs-on: ubuntu-latest
     env:
       WORKING_DIR: './ansible'
@@ -40,27 +40,13 @@ jobs:
           make install
           ansible --version
 
-      - name: List Ansible Inventory
-        working-directory: ${{ env.WORKING_DIR }}
-        run: |
-          ansible-inventory --graph -v
-
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh/
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
           chmod 600 ~/.ssh/id_for_ansible.pem
 
-      # The following step is only needed if you are using Tailscale,
-      # we are not using it just yet.
-      # - name: Connect with Tailscale
-      #   uses: tailscale/github-action@v2
-      #   with:
-      #     oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      #     oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      #     tags: tag:ci
-
-      - name: Ansible Playbook -- Uptime
+      - name: Play -- Uptime
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           ansible-playbook play-any--uptime.yml \
