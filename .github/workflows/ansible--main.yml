@@ -4,14 +4,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  run_playbook:
-    name: Run Play
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Run Uptime
-        uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
-        with:
-          hosts: ops_all
-          verbosity: '-vv'
+  run-uptime:
+    uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
+    with:
+      hosts: ops_all
+      verbosity: '-vv'
 
