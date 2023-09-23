@@ -2,6 +2,8 @@ name: Ansible --02- Run Workflows
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '5 12 * * 3,6' # 12:05 UTC on Wednesdays and Saturdays (6 hour maintenance window)
 
 jobs:
   uptime:
@@ -34,12 +36,62 @@ jobs:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  # update:
-  #   name: Update
-  #   uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
-  #   with:
-  #     hosts: 'ops_all'
-  #     verbosity: '-vv'
-  #   secrets:
-  #     LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
-  #     SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  update:
+    name: Update
+    needs: uptime
+    strategy:
+      matrix:
+        host_groups:
+          - ops_all
+          - stg_oldeworld_api
+          - prd_oldeworld_api
+          - stg_oldeworld_pxy
+          - prd_oldeworld_pxy
+          - stg_oldeworld_nws
+          - prd_oldeworld_nws
+          - prd_oldeworld_clt_eng
+          - prd_oldeworld_clt_chn
+          - prd_oldeworld_clt_cnt
+          - prd_oldeworld_clt_esp
+          - prd_oldeworld_clt_ger
+          - prd_oldeworld_clt_ita
+          - prd_oldeworld_clt_jpn
+          - prd_oldeworld_clt_por
+          - prd_oldeworld_clt_ukr
+    uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: ''
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+  reboot:
+    name: Reboot
+    needs: update
+    strategy:
+      matrix:
+        host_groups:
+          - ops_all
+          - stg_oldeworld_api
+          - prd_oldeworld_api
+          - stg_oldeworld_pxy
+          - prd_oldeworld_pxy
+          - stg_oldeworld_nws
+          - prd_oldeworld_nws
+          - prd_oldeworld_clt_eng
+          - prd_oldeworld_clt_chn
+          - prd_oldeworld_clt_cnt
+          - prd_oldeworld_clt_esp
+          - prd_oldeworld_clt_ger
+          - prd_oldeworld_clt_ita
+          - prd_oldeworld_clt_jpn
+          - prd_oldeworld_clt_por
+          - prd_oldeworld_clt_ukr
+    uses: freeCodeCamp/infra/.github/workflows/ansible--reboot.yml@main
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: '-v'
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
