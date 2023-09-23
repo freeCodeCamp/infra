@@ -1,16 +1,29 @@
 name: Ansible -- Uptime
 
 on:
+  workflow_call:
+    inputs:
+      hosts:
+        description: 'The value for the variable_host argument'
+        type: string
+        required: true
+      verbosity:
+        description: 'The verbosity level for logs'
+        type: string
+      serial:
+        description: 'The value for the variable_serial argument'
+        type: number
   workflow_dispatch:
     inputs:
       hosts:
         description: 'The value for the variable_host argument'
+        type: string
         required: true
         default: 'none'
       verbosity:
         description: 'The verbosity level for logs'
-        required: true
         type: choice
+        required: true
         default: '-v'
         options:
           - '-v'
@@ -18,9 +31,9 @@ on:
           - '-vvv'
       serial:
         description: 'The value for the variable_serial argument'
+        type: number
         required: true
         default: 1
-        type: number
 
 jobs:
   run_playbook:
