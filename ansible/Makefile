@@ -20,7 +20,7 @@ install:
 .PHONY: check-linode-env-token
 check-linode-env-token:
 ifndef LINODE_API_TOKEN
-  include ../__scratchpad__/.env
+  include ./.env
   export $(shell sed 's/=.*//' .env)
 endif
 

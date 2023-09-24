@@ -48,3 +48,6 @@ ansible/inventory/hosts
 
 # Akamai
 .edgerc
+
+# Secrets
+*.env
