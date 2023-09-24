@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
         # This is only for the GitHub Actions runner, not Terraform Cloud
       - name: Setup Terraform
@@ -46,7 +46,7 @@ jobs:
         if:
           always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome ==
           'success' || steps.fmt.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@86bff5a07ff7586127ad776f0ba1faceb4d5c4ab # v2
+        uses: GetTerminus/terraform-pr-commenter@7f94331232e2a9c9e94c80316e6dcd683aeaf0a4 # v3
         with:
           commenter_type: fmt
           commenter_input:
@@ -116,7 +116,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Terraform Cloud Upload Configuration
         uses: hashicorp/tfc-workflows-github/actions/upload-configuration@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
