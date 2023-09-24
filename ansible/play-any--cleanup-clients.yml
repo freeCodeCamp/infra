@@ -1,0 +1,19 @@
+---
+- name: Remove old releases
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: false
+  tasks:
+    - name: Capture directories older than 15 days
+      ansible.builtin.find:
+        paths: /home/freecodecamp/client/releases
+        recurse: false
+        file_type: directory
+        age: "{{ variable_age | default('15d') }}"
+      register: files_to_delete
+
+    - name: Remove directories older than 15 days
+      ansible.builtin.file:
+        path: '{{ item.path }}'
+        state: absent
+      with_items: '{{ files_to_delete.files }}'

@@ -1,0 +1,60 @@
+name: Ansible --06- Cleanup Clients
+
+on:
+  schedule:
+    - cron: '5 0 10,20 * *' # Run at 00:05 on the 10th and 20th of every month
+  workflow_dispatch:
+    inputs:
+      verbosity:
+        description: 'The verbosity level for logs'
+        type: choice
+        required: true
+        default: '-v'
+        options:
+          - '-v'
+          - '-vv'
+          - '-vvv'
+      serial:
+        description: 'The value for the variable_serial argument'
+        type: number
+        required: true
+        default: 1
+
+jobs:
+  run_playbook:
+    name: Run Play
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        host_groups:
+          - 'prd_oldeworld_clt'
+          - 'stg_oldeworld_clt'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+
+      - name: Setup Ansible and Dependencies
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
+        run: |
+          make install
+          ansible --version
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
+
+      - name: Play -- Cleanup Clients
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
+        run: |
+          ansible-playbook play-any--cleanup-clients.yml \
+          --private-key=~/.ssh/id_for_ansible.pem \
+          -e "variable_host=${{ matrix.host_groups }}" \
+          -e "variable_serial=${{ inputs.serial }}" \
+          ${{ inputs.verbosity }}
