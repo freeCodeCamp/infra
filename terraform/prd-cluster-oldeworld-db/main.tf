@@ -18,6 +18,7 @@ data "linode_instances" "prd_oldeworld_nws" {
     name = "group"
     values = [
       "prd_oldeworld_nws",
+      "ops_backoffice"
     ]
   }
 }

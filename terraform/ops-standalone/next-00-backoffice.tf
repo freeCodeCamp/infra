@@ -14,7 +14,9 @@ resource "linode_instance" "ops_backoffice" {
   # Do not change, will delete and recreate all instances in the group
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  group = "backoffice"
+  group = "ops_backoffice"
+
+  backups_enabled = true
 }
 
 resource "linode_instance_disk" "ops_backoffice_disk__boot" {

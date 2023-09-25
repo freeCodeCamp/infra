@@ -18,6 +18,7 @@ data "linode_instances" "stg_oldeworld_nws" {
     name = "group"
     values = [
       "stg_oldeworld_nws",
+      "ops_backoffice"
     ]
   }
 }
