@@ -3,17 +3,37 @@ SHELL := /bin/bash
 # Dynamically get all directories (stacks) in the current directory, excluding those starting with '__'
 STACKS := $(shell find . -maxdepth 1 -mindepth 1 -type d -not -name '__*' -exec basename {} \;)
 
-.PHONY: all $(STACKS)
+.PHONY: all upgrade fmt help $(STACKS)
 
-all: $(STACKS)
+all: help
 
-$(STACKS):
+help:
 	@echo ""
-	@echo ">>> Processing stack: $@ <<<"
+	@echo "Available tasks:"
 	@echo ""
-	@CURRENT_DIR=$(shell pwd) && \
-	cd $@ && \
-	terraform init -upgrade && \
-	terraform plan && \
-	cd $$CURRENT_DIR
+	@echo "  make upgrade    Run terraform init -upgrade and terraform plan on all stacks"
+	@echo "  make fmt        Run terraform fmt on all stacks"
+	@echo "  make help       Display this help message"
+	@echo ""
+	@echo "Stacks are:"
+	@echo ""
+	@for stack in $(STACKS); do \
+	  echo " $$stack"; \
+	done
+
+upgrade: $(STACKS)
+	@for stack in $(STACKS); do \
+		echo ""; \
+		echo ">>> Processing stack: $$stack <<<"; \
+		echo ""; \
+		cd $$stack && terraform init -upgrade && terraform plan && cd ..; \
+	done
+
+fmt: $(STACKS)
+	@for stack in $(STACKS); do \
+		echo ""; \
+		echo ">>> Formatting stack: $$stack <<<"; \
+		echo ""; \
+		cd $$stack && terraform fmt && cd ..; \
+	done
 
