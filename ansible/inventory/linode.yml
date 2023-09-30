@@ -44,7 +44,19 @@ groups:
   prd_oldeworld_pxy: "'prd_oldeworld_pxy' in (tags|list)"
   prd_oldeworld_nws: "'prd_oldeworld_nws' in (tags|list)"
 
-  # Oldeworld Cluster -- Clients by Language
+  # Oldeworld Cluster -- Clients by Language - STG
+  stg_oldeworld_clt_eng: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'eng' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_chn: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'chn' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_cnt: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'cnt' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_esp: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'esp' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_ger: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ger' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_ita: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ita' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_jpn: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'jpn' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_por: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'por' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_ukr: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ukr' in (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_swa: "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'swa' in (tags|list) and 'clt' in (tags|list)"
+
+  # Oldeworld Cluster -- Clients by Language - PRD
   prd_oldeworld_clt_eng: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'eng' in (tags|list) and 'clt' in (tags|list)"
   prd_oldeworld_clt_chn: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'chn' in (tags|list) and 'clt' in (tags|list)"
   prd_oldeworld_clt_cnt: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'cnt' in (tags|list) and 'clt' in (tags|list)"
@@ -54,6 +66,7 @@ groups:
   prd_oldeworld_clt_jpn: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'jpn' in (tags|list) and 'clt' in (tags|list)"
   prd_oldeworld_clt_por: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'por' in (tags|list) and 'clt' in (tags|list)"
   prd_oldeworld_clt_ukr: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'ukr' in (tags|list) and 'clt' in (tags|list)"
+  prd_oldeworld_clt_swa: "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'swa' in (tags|list) and 'clt' in (tags|list)"
 
 compose:
   ansible_ssh_host: ipv4[0]
