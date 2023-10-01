@@ -1,4 +1,4 @@
-name: Ansible --02- Run Workflows
+name: Ansible --02- Houskeeping
 
 on:
   workflow_dispatch:
@@ -66,17 +66,31 @@ jobs:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  reboot:
-    name: Reboot
+  reboot-web:
+    name: Reboot Web Proxies
     needs: update
+    strategy:
+      matrix:
+        host_groups:
+          - stg_oldeworld_pxy
+          - prd_oldeworld_pxy
+    uses: freeCodeCamp/infra/.github/workflows/ansible--reboot.yml@main
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: '-v'
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+  reboot:
+    name: Reboot Services
+    needs: reboot-web
     strategy:
       matrix:
         host_groups:
           - ops_all
           - stg_oldeworld_api
           - prd_oldeworld_api
-          - stg_oldeworld_pxy
-          - prd_oldeworld_pxy
           - stg_oldeworld_nws
           - prd_oldeworld_nws
           - prd_oldeworld_clt_eng
