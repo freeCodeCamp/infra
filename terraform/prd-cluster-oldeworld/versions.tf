@@ -7,7 +7,7 @@ terraform {
 
     hcp = {
       source  = "hashicorp/hcp"
-      version = "0.69.0"
+      version = "0.72.0"
     }
 
     akamai = {
