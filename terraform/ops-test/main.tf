@@ -22,6 +22,10 @@ data "hcp_packer_image" "linode_ubuntu" {
   region         = "us-east"
 }
 
+data "cloudflare_zone" "cf_zone" {
+  name = local.zone
+}
+
 resource "linode_instance" "ops_test" {
   label  = "ops-vm-test"
   group  = "test" # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
@@ -105,22 +109,24 @@ resource "linode_instance_config" "ops_test_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "ops_test_records" {
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+resource "cloudflare_record" "ops_test_records" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "test.${local.zone}"
-  target = [linode_instance.ops_test.ip_address]
+  name  = "test"
+  value = linode_instance.ops_test.ip_address
 }
 
-resource "akamai_dns_record" "ops_test_dnsrecord__public" {
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+resource "cloudflare_record" "ops_test_records__public" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "pub.test.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.ops_test.ip_address]
+  name  = "pub.test.${var.network_subdomain}"
+  value = linode_instance.ops_test.ip_address
 }
 
 resource "linode_firewall" "ops_test_firewall" {
