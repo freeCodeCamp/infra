@@ -19,7 +19,6 @@
     nomad_installed.stat.exists == false and
     docker_installed.stat.exists == true
 
-- name: Set up Nomad Systemd service
-  include_role:
-    name: nomad
-    tasks_from: config-systemd.yml
+- name: Done Installing
+  debug:
+    msg: "Done Installing Nomad, continue to configure with additional playbooks."

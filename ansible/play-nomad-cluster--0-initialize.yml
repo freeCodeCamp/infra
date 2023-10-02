@@ -1,6 +1,6 @@
 ---
 - name: Initialize Publications Cluster
-  hosts: publish_all
+  hosts: '{{ variable_host | default("null") }}'
   become: true
   roles:
     # - ubuntu # Update the OS and reboot the server

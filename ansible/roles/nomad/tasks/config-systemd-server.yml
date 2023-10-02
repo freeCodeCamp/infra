@@ -1,0 +1,5 @@
+---
+- name: Set up Nomad Systemd Server Service
+  template:
+    src: nomad-server.service.j2
+    dest: /etc/systemd/system/nomad.service

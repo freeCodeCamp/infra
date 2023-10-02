@@ -1,7 +1,7 @@
 ---
 - name: Set the Nomad version (pin to a specific version)
   set_fact:
-    nomad_version: 1.5.6
+    nomad_version: 1.6.2
 
 - name: Install Nomad from releases
   unarchive:

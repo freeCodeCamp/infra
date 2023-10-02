@@ -1,4 +1,4 @@
-datacenter = "dc-publish"
+datacenter = "dc-{{ lookup('env', 'FCC_ANSIBLE_NOMAD_ENVNAME') }}"
 data_dir   = "/opt/nomad"
 
 server {
@@ -6,7 +6,7 @@ server {
   bootstrap_expect = 3
 
   server_join {
-    retry_join = ["provider=linode tag_name=publish region=us-east address_type=private_v4 api_token={{ lookup('env', 'LINODE_API_TOKEN') }}"]
+    retry_join = ["provider=linode tag_name={{ lookup('env', 'FCC_ANSIBLE_NOMAD_ENVNAME') }} region=us-east address_type=private_v4 api_token={{ lookup('env', 'LINODE_API_TOKEN') }}"]
     retry_max = 3
     retry_interval = "15s"
   }
