@@ -22,10 +22,10 @@ groups:
   managers: "'o11y_leader' in (tags|list)"  # TODO: Refactor the naming of this group
   workers: "'o11y_worker' in (tags|list)"   # TODO: Refactor the naming of this group
 
-  # Publish Cluster
-  publish_all: "'publish' in (tags|list)"
-  publish_leaders: "'publish_leader' in (tags|list)"
-  publish_workers: "'publish_worker' in (tags|list)"
+  # mintworld Cluster
+  mintworld_all: "'mintworld' in (tags|list)"
+  mintworld_leaders: "'mintworld_leader' in (tags|list)"
+  mintworld_workers: "'mintworld_worker' in (tags|list)"
 
   # Oldeworld Cluster -- ALL
   oldeworld_all: "'oldeworld' in (tags|list)"

@@ -1,0 +1,37 @@
+---
+- name: Create Groups from Nomad Instances
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Add host to nomad_servers group if hostname contains ldr
+      add_host:
+        name: '{{ inventory_hostname }}'
+        groups: nomad_servers
+      when: '"ldr" in inventory_hostname'
+
+    - name: Add host to nomad_clients group if hostname contains wkr
+      add_host:
+        name: '{{ inventory_hostname }}'
+        groups: nomad_clients
+      when: '"wkr" in inventory_hostname'
+
+- name: Configure Nomad Servers
+  hosts: nomad_servers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Set up Nomad Server
+      include_role:
+        name: nomad
+        tasks_from: config-nomad-server.yml
+
+- name: Configure Nomad Clients
+  hosts: nomad_clients
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Set up Nomad Client
+      include_role:
+        name: nomad
+        tasks_from: config-nomad-client.yml

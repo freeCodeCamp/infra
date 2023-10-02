@@ -1,6 +1,6 @@
 ---
 - name: Stop Nomad Services
-  hosts: publish_all
+  hosts: '{{ variable_host | default("null") }}'
   become: true
   gather_facts: false
   tasks:
