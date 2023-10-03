@@ -11,7 +11,7 @@
   tasks:
     - name: Check if /var/run/reboot-required exists
       register: reboot_required
-      ansible.builtin.stat:
+      stat:
         path: /var/run/reboot-required
         get_checksum: false
 
@@ -26,12 +26,23 @@
     # 2. Uptime is greater than 7 days
     # 3. force_reboot is set to True
     - name: Debug
-      ansible.builtin.debug:
-        msg: '
-          reboot_required.stat.exists: {{ reboot_required.stat.exists }}
-          ansible_facts.uptime_seconds: {{ ansible_facts.uptime_seconds }}
-          force_reboot: {{ force_reboot }}
-          '
+      debug:
+        msg:
+          'Debug info: Reboot Required File Exists: {{
+          reboot_required.stat.exists }}, Uptime: {{
+          ansible_facts.uptime_seconds/86400 }} days, Force Reboot Flag: {{
+          force_reboot }}'
+
+    - name: Set Should Reboot
+      set_fact:
+        should_reboot:
+          '{{ reboot_required.stat.exists or ansible_facts.uptime_seconds >
+          604800 or force_reboot }}'
+
+    - name: Debug
+      debug:
+        msg: 'Rebooting the machine: {{ inventory_hostname }}'
+      when: should_reboot
 
     - name: Conditionally reboot the machine
       ansible.builtin.reboot:
@@ -40,6 +51,4 @@
         pre_reboot_delay: 15
         post_reboot_delay: 15
         test_command: uptime
-      when:
-        reboot_required.stat.exists or ansible_facts.uptime_seconds > 604800 or
-        force_reboot == "True"
+      when: should_reboot
