@@ -31,14 +31,23 @@ jobs:
     uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: '-vv'
+      verbosity: '-v'
+      serial: 3
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  wait-on-uptime:
+    name: Wait on Uptime
+    needs: uptime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 300 seconds
+        run: sleep 300
+
   update:
     name: Update
-    needs: uptime
+    needs: wait-on-uptime
     strategy:
       matrix:
         host_groups:
@@ -61,14 +70,23 @@ jobs:
     uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: ''
+      verbosity: '-v'
+      serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  wait-on-update:
+    name: Wait on Update
+    needs: update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 300 seconds
+        run: sleep 300
+
   reboot-web:
     name: Reboot Web Proxies
-    needs: update
+    needs: wait-on-update
     strategy:
       matrix:
         host_groups:
@@ -78,13 +96,22 @@ jobs:
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: '-v'
+      serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  wait-on-reboot-web:
+    name: Wait on Reboot (Web)
+    needs: reboot-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 300 seconds
+        run: sleep 300
+
   reboot:
     name: Reboot Services
-    needs: reboot-web
+    needs: wait-on-reboot-web
     strategy:
       matrix:
         host_groups:
@@ -106,6 +133,7 @@ jobs:
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: '-v'
+      serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
