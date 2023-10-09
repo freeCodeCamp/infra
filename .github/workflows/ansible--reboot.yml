@@ -72,6 +72,5 @@ jobs:
         run: |
           ansible-playbook play-any--reboot.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e "variable_host=${{ inputs.hosts }}" \
-          -e "variable_serial=${{ inputs.serial }}" \
+          -e '{"variable_host": "${{ inputs.hosts }}", "variable_serial": ${{ inputs.serial }}}' \
           ${{ inputs.verbosity }}
