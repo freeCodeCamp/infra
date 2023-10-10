@@ -18,22 +18,37 @@ help:
 	@echo "Stacks are:"
 	@echo ""
 	@for stack in $(STACKS); do \
-	  echo " $$stack"; \
+		echo " $$stack"; \
 	done
 
-upgrade: $(STACKS)
-	@for stack in $(STACKS); do \
+upgrade:
+	@if [ "$(filter-out $@,$(MAKECMDGOALS))" != "" ]; then \
+		stack=$(filter-out $@,$(MAKECMDGOALS)); \
 		echo ""; \
 		echo ">>> Processing stack: $$stack <<<"; \
 		echo ""; \
 		cd $$stack && terraform init -upgrade && terraform plan && cd ..; \
-	done
+	else \
+		for stack in $(STACKS); do \
+			echo ""; \
+			echo ">>> Processing stack: $$stack <<<"; \
+			echo ""; \
+			cd $$stack && terraform init -upgrade && terraform plan && cd ..; \
+		done \
+	fi
 
-fmt: $(STACKS)
-	@for stack in $(STACKS); do \
+fmt:
+	@if [ "$(filter-out $@,$(MAKECMDGOALS))" != "" ]; then \
+		stack=$(filter-out $@,$(MAKECMDGOALS)); \
 		echo ""; \
 		echo ">>> Formatting stack: $$stack <<<"; \
 		echo ""; \
 		cd $$stack && terraform fmt && cd ..; \
-	done
-
+	else \
+		for stack in $(STACKS); do \
+			echo ""; \
+			echo ">>> Formatting stack: $$stack <<<"; \
+			echo ""; \
+			cd $$stack && terraform fmt && cd ..; \
+		done \
+	fi
