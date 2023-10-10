@@ -55,6 +55,5 @@ jobs:
         run: |
           ansible-playbook play-any--cleanup-clients.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e "variable_host=${{ matrix.host_groups }}" \
-          -e "variable_serial=${{ inputs.serial }}" \
+          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": ${{ inputs.serial }}}' \
           ${{ inputs.verbosity }}
