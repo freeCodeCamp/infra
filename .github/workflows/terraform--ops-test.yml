@@ -22,10 +22,10 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  terraform-cloud-speculative-run:
+  terraform-format:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    name: Terraform Cloud Speculative Run
+    name: Terraform Format
     permissions:
       contents: read
       pull-requests: write
@@ -56,6 +56,39 @@ jobs:
           commenter_exitcode: ${{ steps.fmt.outputs.exitcode }}
           # This is the minimum version required to get the comment to show up
           terraform_version: 1.4
+
+  terraform-upgrade-test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Terraform Upgrade Test
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+
+        # This is only for the GitHub Actions runner, not Terraform Cloud
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
+
+      - name: Terraform Upgrade Test
+        run: make upgrade ops-test
+        working-directory: terraform
+
+
+  terraform-cloud-speculative-run:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Terraform Cloud Speculative Run
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Terraform Cloud Upload Configuration
         uses: hashicorp/tfc-workflows-github/actions/upload-configuration@a9b5237abdfa0d0510ad3444906147fa424bbdd9 # v1.0.4
