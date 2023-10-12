@@ -1,29 +1,25 @@
-name: TF--Linode-OPS-Test
+name: Terraform -- Linode-OPS-Test
 
 on:
   pull_request:
     branches:
       - main
     paths:
-      - 'terraform/ops-test/**'
+      - 'terraform/**'
   workflow_dispatch:
 
 defaults:
   run:
     shell: bash
-    working-directory: terraform/ops-test
 
 env:
-  TF_CLOUD_ORGANIZATION: freecodecamp
-  TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-  TF_WORKSPACE: tfws-ops-test
-  TF_LOG: ERROR
-  CONFIG_DIRECTORY: terraform/ops-test
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   terraform-format:
-    if: github.event_name == 'pull_request'
+    if:
+      github.event_name == 'pull_request' || github.event_name ==
+      'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Terraform Format
     permissions:
@@ -38,27 +34,14 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
 
-        # This is only for formatting check on GitHub Actions runner, not Terraform Cloud
       - name: Terraform Format
-        id: fmt
-        run: terraform fmt -check -recursive -diff
-
-      - name: Post Format
-        if:
-          always() && github.ref != 'refs/heads/main' && (steps.fmt.outcome ==
-          'success' || steps.fmt.outcome == 'failure')
-        uses: GetTerminus/terraform-pr-commenter@7f94331232e2a9c9e94c80316e6dcd683aeaf0a4 # v3
-        with:
-          commenter_type: fmt
-          commenter_input:
-            ${{ format('{0}{1}', steps.fmt.outputs.stdout,
-            steps.fmt.outputs.stderr) }}
-          commenter_exitcode: ${{ steps.fmt.outputs.exitcode }}
-          # This is the minimum version required to get the comment to show up
-          terraform_version: 1.4
+        run: make fmt
+        working-directory: terraform
 
   terraform-upgrade-test:
-    if: github.event_name == 'pull_request'
+    if:
+      github.event_name == 'pull_request' || github.event_name ==
+      'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Terraform Upgrade Test
     permissions:
@@ -72,19 +55,28 @@ jobs:
         # This is only for the GitHub Actions runner, not Terraform Cloud
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Upgrade Test
-        run: make upgrade ops-test
-        working-directory: terraform
-
+        run: terraform init -upgrade && terraform plan
+        working-directory: terraform/ops-test
 
   terraform-cloud-speculative-run:
-    if: github.event_name == 'pull_request'
+    if:
+      github.event_name == 'pull_request' || github.event_name ==
+      'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Terraform Cloud Speculative Run
     permissions:
       contents: read
       pull-requests: write
+    env:
+      TF_CLOUD_ORGANIZATION: freecodecamp
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+      TF_WORKSPACE: tfws-ops-test
+      TF_LOG: ERROR
+      CONFIG_DIRECTORY: terraform/ops-test
 
     steps:
       - name: Checkout
@@ -115,6 +107,7 @@ jobs:
           plan: ${{ steps.run.outputs.plan_id }}
 
       - name: Find Comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/find-comment@a54c31d7fa095754bfef525c0c8e5e5674c4b4b1 # v2
         id: fc
         with:
@@ -123,6 +116,7 @@ jobs:
           body-includes: Run Details - ${{ env.TF_WORKSPACE }}
 
       - name: Create or update comment
+        if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@c6c9a1a66007646a28c153e2a8580a5bad27bcfa # v3
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
