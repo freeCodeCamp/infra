@@ -94,13 +94,14 @@ resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
   target = [linode_instance.ops_backoffice.ip_address]
 }
 
-resource "akamai_dns_record" "ops_backoffice_dnsrecord__HOSTDEFAULT" {
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+resource "cloudflare_record" "ops_backoffice_dnsrecord__public" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "backoffice.${local.zone}"
-  target = [linode_instance.ops_backoffice.private_ip_address]
+  name  = "pub.backoffice.${var.network_subdomain}"
+  value = linode_instance.ops_backoffice.ip_address
 }
 
 resource "akamai_dns_record" "ops_backoffice_dnsrecord__private" {
@@ -110,6 +111,16 @@ resource "akamai_dns_record" "ops_backoffice_dnsrecord__private" {
 
   name   = "prv.backoffice.${local.zone}"
   target = [linode_instance.ops_backoffice.private_ip_address]
+}
+
+resource "cloudflare_record" "ops_backoffice_dnsrecord__private" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "prv.backoffice"
+  value = linode_instance.ops_backoffice.private_ip_address
 }
 
 resource "linode_firewall" "ops_backoffice_firewall" {
