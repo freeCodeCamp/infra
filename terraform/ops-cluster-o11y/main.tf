@@ -22,6 +22,10 @@ data "hcp_packer_image" "linode_ubuntu" {
   region         = "us-east"
 }
 
+data "cloudflare_zone" "cf_zone" {
+  name = local.zone
+}
+
 resource "linode_instance" "ops_o11y_leaders" {
   count  = var.leader_node_count
   label  = "ops-vm-o11y-ldr-${count.index + 1}"
@@ -48,7 +52,7 @@ resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "ldr-${count.index + 1}.o11y.${local.zone}"
+        tf_hostname = "ldr-${count.index + 1}.o11y"
       })
     )
   }
@@ -111,37 +115,40 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "ops_o11y_leaders_dnsrecord__vlan" {
+resource "cloudflare_record" "ops_o11y_leaders_dnsrecord__vlan" {
   count = var.leader_node_count
 
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "ldr-${count.index + 1}.o11y.${local.zone}"
-  target = [trimsuffix(linode_instance_config.ops_o11y_leaders_config[count.index].interface[1].ipam_address, "/24")]
+  name  = "ldr-${count.index + 1}.o11y"
+  value = trimsuffix(linode_instance_config.ops_o11y_leaders_config[count.index].interface[1].ipam_address, "/24")
 }
 
-resource "akamai_dns_record" "ops_o11y_leaders_dnsrecord__public" {
+resource "cloudflare_record" "ops_o11y_leaders_dnsrecord__public" {
   count = var.leader_node_count
 
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "pub.ldr-${count.index + 1}.o11y.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.ops_o11y_leaders[count.index].ip_address]
+  name  = "pub.ldr-${count.index + 1}.o11y.${var.network_subdomain}"
+  value = linode_instance.ops_o11y_leaders[count.index].ip_address
 }
 
-resource "akamai_dns_record" "ops_o11y_leaders_dnsrecord__private" {
+resource "cloudflare_record" "ops_o11y_leaders_dnsrecord__private" {
   count = var.leader_node_count
 
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "prv.ldr-${count.index + 1}.o11y.${local.zone}"
-  target = [linode_instance.ops_o11y_leaders[count.index].private_ip_address]
+  name  = "prv.ldr-${count.index + 1}.o11y"
+  value = linode_instance.ops_o11y_leaders[count.index].private_ip_address
 }
 
 resource "linode_instance" "ops_o11y_workers" {
@@ -170,7 +177,7 @@ resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
   stackscript_data = {
     userdata = base64encode(
       templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "wkr-${count.index + 1}.o11y.${local.zone}"
+        tf_hostname = "wkr-${count.index + 1}.o11y"
       })
     )
   }
@@ -233,37 +240,40 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "ops_o11y_workers_dnsrecord__vlan" {
+resource "cloudflare_record" "ops_o11y_workers_dnsrecord__vlan" {
   count = var.worker_node_count
 
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "wkr-${count.index + 1}.o11y.${local.zone}"
-  target = [trimsuffix(linode_instance_config.ops_o11y_workers_config[count.index].interface[1].ipam_address, "/24")]
+  name  = "wkr-${count.index + 1}.o11y"
+  value = trimsuffix(linode_instance_config.ops_o11y_workers_config[count.index].interface[1].ipam_address, "/24")
 }
 
-resource "akamai_dns_record" "ops_o11y_workers_dnsrecord__public" {
+resource "cloudflare_record" "ops_o11y_workers_dnsrecord__public" {
   count = var.worker_node_count
 
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "pub.wkr-${count.index + 1}.o11y.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.ops_o11y_workers[count.index].ip_address]
+  name  = "pub.wkr-${count.index + 1}.o11y.${var.network_subdomain}"
+  value = linode_instance.ops_o11y_workers[count.index].ip_address
 }
 
-resource "akamai_dns_record" "ops_o11y_workers_dnsrecord__private" {
+resource "cloudflare_record" "ops_o11y_workers_dnsrecord__private" {
   count = var.worker_node_count
 
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
 
-  name   = "prv.wkr-${count.index + 1}.o11y.${local.zone}"
-  target = [linode_instance.ops_o11y_workers[count.index].private_ip_address]
+  name  = "prv.wkr-${count.index + 1}.o11y"
+  value = linode_instance.ops_o11y_workers[count.index].private_ip_address
 }
 
 resource "linode_firewall" "ops_o11y_firewall" {

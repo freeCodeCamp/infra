@@ -61,3 +61,13 @@ variable "hcp_client_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "cloudflare_api_token" {
+  type        = string
+  description = "Cloudflare API Token"
+}
+
+variable "cloudflare_account_id" {
+  type        = string
+  description = "Cloudflare Account ID"
+}
