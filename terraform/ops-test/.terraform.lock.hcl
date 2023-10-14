@@ -37,6 +37,18 @@ provider "registry.terraform.io/hashicorp/hcp" {
     "h1:pKdX3ysuxC1ISAHRlYbNanYfi7ZagjiF9PF7ka4uBvg=",
     "h1:u3cRdkOv+FIRxtRYl1T19jmnCybaV9cb0pP9MC8K5Fc=",
     "h1:vtRHL4MEYOScPKerOe9kh9GyaRqocdMfJ6rAurAefEQ=",
+    "zh:01dd8141e637adc7f6abad42fac75cefbff2de21c1b6141dd88085797bfecb44",
+    "zh:0fa82a384b25a58b65523e0ea4768fa1212b1f5cfc0c9379d31162454fedcc9d",
+    "zh:169023ccb98b1926b855cba7e59480992b7d132cfc1d9ba5cf5317849140fe5a",
+    "zh:2f5dc4eac16634b605e317f8d50af26edb7288c5d2f5c5d3f05ee49803f5bd21",
+    "zh:3463622b54bcc76efd21745ceab1fd4f7be4a66244c1d89b2feb1512384c39a6",
+    "zh:3d746ec05be065f42f2e37c9102db319d8dd682523fcf504786ec6b67411511a",
+    "zh:5f422e8fa6d8abfdfc2430777bb506e2bed7300293fe0309dbb080721be0796d",
+    "zh:7c4d402399927294cb4df35a677a31a06ea1723af5c25e29c0daa51ea0dca958",
+    "zh:8058d3655bbebf26bda30473121f279de8890a2a28728450750cdfe6427d92bb",
+    "zh:9d5bc8c3c64e2652fb171da5e96b16f7b61b128679fad9f11c049f32e4469473",
+    "zh:a87156f283621e9ca1bacde0d25c158e1ad02ecf906fb3ec0d781b39d673dac5",
+    "zh:b37f877f92969528b1856c7f9dc5c257376498cb4bef07bff93ef4c9d1a94c8b",
   ]
 }
 
