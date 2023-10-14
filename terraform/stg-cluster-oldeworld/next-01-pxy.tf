@@ -94,39 +94,6 @@ resource "linode_instance_config" "stg_oldeworld_pxy_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "stg_oldeworld_pxy_dnsrecord__vlan" {
-  count = local.pxy_node_count
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "pxy-${count.index + 1}.oldeworld.stg.${local.zone}"
-  target = [trimsuffix(linode_instance_config.stg_oldeworld_pxy_config[count.index].interface[1].ipam_address, "/24")]
-}
-
-resource "akamai_dns_record" "stg_oldeworld_pxy_dnsrecord__public" {
-  count = local.pxy_node_count
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "pub.pxy-${count.index + 1}.oldeworld.stg.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.stg_oldeworld_pxy[count.index].ip_address]
-}
-
-resource "akamai_dns_record" "stg_oldeworld_pxy_dnsrecord__private" {
-  count = local.pxy_node_count
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "prv.pxy-${count.index + 1}.oldeworld.stg.${local.zone}"
-  target = [linode_instance.stg_oldeworld_pxy[count.index].private_ip_address]
-}
-
 resource "cloudflare_record" "stg_oldeworld_pxy_dnsrecord__vlan" {
   count = local.pxy_node_count
 

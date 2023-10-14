@@ -94,39 +94,6 @@ resource "linode_instance_config" "prd_oldeworld_clt_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "prd_oldeworld_clt_dnsrecord__vlan" {
-  for_each = { for i in local.clt_instances : i.instance => i }
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "clt-${each.value.instance}.oldeworld.prd.${local.zone}"
-  target = [trimsuffix(linode_instance_config.prd_oldeworld_clt_config[each.key].interface[1].ipam_address, "/24")]
-}
-
-resource "akamai_dns_record" "prd_oldeworld_clt_dnsrecord__public" {
-  for_each = { for i in local.clt_instances : i.instance => i }
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "pub.clt-${each.value.instance}.oldeworld.prd.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.prd_oldeworld_clt[each.key].ip_address]
-}
-
-resource "akamai_dns_record" "prd_oldeworld_clt_dnsrecord__private" {
-  for_each = { for i in local.clt_instances : i.instance => i }
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "prv.clt-${each.value.instance}.oldeworld.prd.${local.zone}"
-  target = [linode_instance.prd_oldeworld_clt[each.key].private_ip_address]
-}
-
 resource "cloudflare_record" "prd_oldeworld_clt_dnsrecord__vlan" {
   for_each = { for i in local.clt_instances : i.instance => i }
 

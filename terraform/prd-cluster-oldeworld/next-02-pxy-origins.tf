@@ -94,15 +94,6 @@ resource "linode_nodebalancer_node" "prd_oldeworld_nb_pxy_3_nodes__port_80" {
   label           = "prd-node-pxy-80-${count.index}"
 }
 
-resource "akamai_dns_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "oldeworld.prd.${var.network_subdomain}.${local.zone}"
-  target = [data.linode_nodebalancer.prd_oldeworld_nb_pxy.ipv4]
-}
-
 resource "cloudflare_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
   zone_id = data.cloudflare_zone.cf_zone.id
   type    = "A"

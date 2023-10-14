@@ -94,39 +94,6 @@ resource "linode_instance_config" "prd_oldeworld_api_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "prd_oldeworld_api_dnsrecord__vlan" {
-  count = local.api_node_count
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "api-${count.index + 1}.oldeworld.prd.${local.zone}"
-  target = [trimsuffix(linode_instance_config.prd_oldeworld_api_config[count.index].interface[1].ipam_address, "/24")]
-}
-
-resource "akamai_dns_record" "prd_oldeworld_api_dnsrecord__public" {
-  count = local.api_node_count
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "pub.api-${count.index + 1}.oldeworld.prd.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.prd_oldeworld_api[count.index].ip_address]
-}
-
-resource "akamai_dns_record" "prd_oldeworld_api_dnsrecord__private" {
-  count = local.api_node_count
-
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "prv.api-${count.index + 1}.oldeworld.prd.${local.zone}"
-  target = [linode_instance.prd_oldeworld_api[count.index].private_ip_address]
-}
-
 resource "cloudflare_record" "prd_oldeworld_api_dnsrecord__vlan" {
   count = local.api_node_count
 

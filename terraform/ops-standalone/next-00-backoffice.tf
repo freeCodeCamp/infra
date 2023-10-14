@@ -85,15 +85,6 @@ resource "linode_instance_config" "ops_backoffice_config" {
   booted = true
 }
 
-resource "akamai_dns_record" "ops_backoffice_dnsrecord__public" {
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "pub.backoffice.${var.network_subdomain}.${local.zone}"
-  target = [linode_instance.ops_backoffice.ip_address]
-}
-
 resource "cloudflare_record" "ops_backoffice_dnsrecord__public" {
   zone_id = data.cloudflare_zone.cf_zone.id
   type    = "A"
@@ -102,15 +93,6 @@ resource "cloudflare_record" "ops_backoffice_dnsrecord__public" {
 
   name  = "pub.backoffice.${var.network_subdomain}"
   value = linode_instance.ops_backoffice.ip_address
-}
-
-resource "akamai_dns_record" "ops_backoffice_dnsrecord__private" {
-  zone       = local.zone
-  recordtype = "A"
-  ttl        = 120
-
-  name   = "prv.backoffice.${local.zone}"
-  target = [linode_instance.ops_backoffice.private_ip_address]
 }
 
 resource "cloudflare_record" "ops_backoffice_dnsrecord__private" {
