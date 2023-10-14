@@ -10,11 +10,6 @@ terraform {
       version = "0.73.0"
     }
 
-    akamai = {
-      source  = "akamai/akamai"
-      version = "5.3.0"
-    }
-
     cloudflare = {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"

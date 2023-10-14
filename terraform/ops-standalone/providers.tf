@@ -8,11 +8,6 @@ provider "hcp" {
   project_id    = "377fca8e-97bb-4058-ae1b-2845bac3c6bc" # ops
 }
 
-provider "akamai" {
-  edgerc         = ".edgerc"
-  config_section = "default"
-}
-
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }

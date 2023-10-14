@@ -1,26 +1,6 @@
 # This file is maintained automatically by "terraform init".
 # Manual edits may be lost in future updates.
 
-provider "registry.terraform.io/akamai/akamai" {
-  version     = "5.3.0"
-  constraints = "5.3.0"
-  hashes = [
-    "h1:/ztm0q6P41MqTiGpphJujDoLITXqzSatzsJ6lXE8Lr0=",
-    "h1:2vb78Aa/1YeHUQUgUtljDR8fHBINneNLRvXw4OFtdQs=",
-    "h1:8mvPdyi1PCNyswwf+bhV9dTibwR4DLgmDLMMThNI6kY=",
-    "h1:9Agb7n2zTEQ761HX04p1WtPHu6qXiI49fasYZbuTFgI=",
-    "h1:BAYfkrz29ZRhkkhiJHXDx1PJQP2lKno6VJTl6cXg7kA=",
-    "h1:JVIigZrcRUvX0zu+dtP2uGC/ILJUfohjS6jPZEc9nxE=",
-    "h1:KnkxSC1nc3e/UOPzMyneG3KGeRhiJF5U5+mDsB2R9i8=",
-    "h1:ZC8INLUJkwk3ZSfio7sGxw9jsRvPUDHp/u2GOxjXaE4=",
-    "h1:fWEe5rK3YKQQAR7ItZq5Ip9AocwtJ7diMCYo5G12jhc=",
-    "h1:pBbacal9T8Rl4yOz5LpS9239DzE4zkTPrvt9eOdJDWs=",
-    "h1:sXRafq+b9KabGzbSAJ/uQ/A99ZVp7cCBsuRhqMc0Sok=",
-    "h1:snsK/NZ57odIDCZXCdQTpBO5Nja+3Yci8/bl5kmgGz0=",
-    "h1:tWgTF531O0SONc2xgPMA7ALBZN6R2QpBKNrXL38McwE=",
-  ]
-}
-
 provider "registry.terraform.io/cloudflare/cloudflare" {
   version     = "4.16.0"
   constraints = "~> 4.0"
