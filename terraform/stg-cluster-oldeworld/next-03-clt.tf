@@ -126,3 +126,39 @@ resource "akamai_dns_record" "stg_oldeworld_clt_dnsrecord__private" {
   name   = "prv.clt-${each.value.instance}.oldeworld.stg.${local.zone}"
   target = [linode_instance.stg_oldeworld_clt[each.key].private_ip_address]
 }
+
+resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__vlan" {
+  for_each = { for i in local.clt_instances : i.instance => i }
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "clt-${each.value.instance}.oldeworld.stg"
+  value = trimsuffix(linode_instance_config.stg_oldeworld_clt_config[each.key].interface[1].ipam_address, "/24")
+}
+
+resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__public" {
+  for_each = { for i in local.clt_instances : i.instance => i }
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "pub.clt-${each.value.instance}.oldeworld.stg.${var.network_subdomain}"
+  value = linode_instance.stg_oldeworld_clt[each.key].ip_address
+}
+
+resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__private" {
+  for_each = { for i in local.clt_instances : i.instance => i }
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "prv.clt-${each.value.instance}.oldeworld.stg"
+  value = linode_instance.stg_oldeworld_clt[each.key].private_ip_address
+}

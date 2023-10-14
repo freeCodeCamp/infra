@@ -38,3 +38,13 @@ resource "akamai_dns_record" "stg_oldeworld_nb_pxy_dnsrecord__public" {
   name   = "oldeworld.stg.${var.network_subdomain}.${local.zone}"
   target = [data.linode_nodebalancer.stg_oldeworld_nb_pxy.ipv4]
 }
+
+resource "cloudflare_record" "stg_oldeworld_nb_pxy_dnsrecord__public" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "oldeworld.stg.${var.network_subdomain}"
+  value = data.linode_nodebalancer.stg_oldeworld_nb_pxy.ipv4
+}
