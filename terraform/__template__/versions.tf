@@ -7,7 +7,7 @@ terraform {
 
     hcp = {
       source  = "hashicorp/hcp"
-      version = "0.72.2"
+      version = "0.73.0"
     }
   }
   required_version = ">= 1"
