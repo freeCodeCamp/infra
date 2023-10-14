@@ -138,3 +138,39 @@ resource "akamai_dns_record" "prd_oldeworld_nws_dnsrecord__private" {
   name   = "prv.nws-${each.value.name}.oldeworld.prd.${local.zone}"
   target = [linode_instance.prd_oldeworld_nws[each.key].private_ip_address]
 }
+
+resource "cloudflare_record" "prd_oldeworld_nws_dnsrecord__vlan" {
+  for_each = local.nws_instances
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "nws-${each.value.name}.oldeworld.prd"
+  value = trimsuffix(linode_instance_config.prd_oldeworld_nws_config[each.key].interface[1].ipam_address, "/24")
+}
+
+resource "cloudflare_record" "prd_oldeworld_nws_dnsrecord__public" {
+  for_each = local.nws_instances
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "pub.nws-${each.value.name}.oldeworld.prd.${var.network_subdomain}"
+  value = linode_instance.prd_oldeworld_nws[each.key].ip_address
+}
+
+resource "cloudflare_record" "prd_oldeworld_nws_dnsrecord__private" {
+  for_each = local.nws_instances
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "prv.nws-${each.value.name}.oldeworld.prd"
+  value = linode_instance.prd_oldeworld_nws[each.key].private_ip_address
+}

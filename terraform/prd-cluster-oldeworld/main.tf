@@ -22,6 +22,10 @@ data "hcp_packer_image" "linode_ubuntu" {
   region         = "us-east"
 }
 
+data "cloudflare_zone" "cf_zone" {
+  name = local.zone
+}
+
 data "linode_instances" "ops_standalone_backoffice" {
   filter {
     name = "label"

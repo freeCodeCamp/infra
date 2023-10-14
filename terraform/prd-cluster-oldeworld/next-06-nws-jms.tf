@@ -126,3 +126,39 @@ resource "akamai_dns_record" "prd_oldeworld_jms_dnsrecord__private" {
   name   = "prv.jms-${count.index + 1}.oldeworld.prd.${local.zone}"
   target = [linode_instance.prd_oldeworld_jms[count.index].private_ip_address]
 }
+
+resource "cloudflare_record" "prd_oldeworld_jms_dnsrecord__vlan" {
+  count = local.jms_node_count
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "jms-${count.index + 1}.oldeworld.prd"
+  value = trimsuffix(linode_instance_config.prd_oldeworld_jms_config[count.index].interface[1].ipam_address, "/24")
+}
+
+resource "cloudflare_record" "prd_oldeworld_jms_dnsrecord__public" {
+  count = local.jms_node_count
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "pub.jms-${count.index + 1}.oldeworld.prd.${var.network_subdomain}"
+  value = linode_instance.prd_oldeworld_jms[count.index].ip_address
+}
+
+resource "cloudflare_record" "prd_oldeworld_jms_dnsrecord__private" {
+  count = local.jms_node_count
+
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "prv.jms-${count.index + 1}.oldeworld.prd"
+  value = linode_instance.prd_oldeworld_jms[count.index].private_ip_address
+}

@@ -93,3 +93,22 @@ resource "linode_nodebalancer_node" "prd_oldeworld_nb_pxy_3_nodes__port_80" {
   address         = "${linode_instance.prd_oldeworld_pxy[count.index].private_ip_address}:80"
   label           = "prd-node-pxy-80-${count.index}"
 }
+
+resource "akamai_dns_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
+  zone       = local.zone
+  recordtype = "A"
+  ttl        = 120
+
+  name   = "oldeworld.prd.${var.network_subdomain}.${local.zone}"
+  target = [data.linode_nodebalancer.prd_oldeworld_nb_pxy.ipv4]
+}
+
+resource "cloudflare_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "A"
+  proxied = false
+  ttl     = 120
+
+  name  = "oldeworld.prd.${var.network_subdomain}"
+  value = data.linode_nodebalancer.prd_oldeworld_nb_pxy.ipv4
+}
