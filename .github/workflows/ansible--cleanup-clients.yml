@@ -17,8 +17,6 @@ on:
       serial:
         description: 'The value for the variable_serial argument'
         type: number
-        required: true
-        default: 1
 
 jobs:
   run_playbook:
@@ -55,5 +53,5 @@ jobs:
         run: |
           ansible-playbook play-any--cleanup-clients.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": ${{ inputs.serial }}}' \
+          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": "${{ inputs.serial:-1 }}"}' \
           ${{ inputs.verbosity }}
