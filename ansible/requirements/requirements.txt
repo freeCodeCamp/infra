@@ -2,5 +2,5 @@ ansible>=2.10.0
 ansible-lint>=6.17.0
 linode-api4>=5.5.1
 polling>=0.3.2
-types-requests==2.31.0.9
+types-requests==2.31.0.10
 ansible-specdoc>=0.0.13
