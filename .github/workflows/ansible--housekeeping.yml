@@ -18,6 +18,7 @@ jobs:
           - prd_oldeworld_pxy
           - stg_oldeworld_nws
           - prd_oldeworld_nws
+          - stg_oldeworld_clt
           - prd_oldeworld_clt_eng
           - prd_oldeworld_clt_chn
           - prd_oldeworld_clt_cnt
@@ -58,6 +59,7 @@ jobs:
           - prd_oldeworld_pxy
           - stg_oldeworld_nws
           - prd_oldeworld_nws
+          - stg_oldeworld_clt
           - prd_oldeworld_clt_eng
           - prd_oldeworld_clt_chn
           - prd_oldeworld_clt_cnt
@@ -67,6 +69,7 @@ jobs:
           - prd_oldeworld_clt_jpn
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
+
     uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
     with:
       hosts: ${{ matrix.host_groups }}
@@ -120,6 +123,7 @@ jobs:
           - prd_oldeworld_api
           - stg_oldeworld_nws
           - prd_oldeworld_nws
+          - stg_oldeworld_clt
           - prd_oldeworld_clt_eng
           - prd_oldeworld_clt_chn
           - prd_oldeworld_clt_cnt
@@ -129,6 +133,7 @@ jobs:
           - prd_oldeworld_clt_jpn
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
+
     uses: freeCodeCamp/infra/.github/workflows/ansible--reboot.yml@main
     with:
       hosts: ${{ matrix.host_groups }}
