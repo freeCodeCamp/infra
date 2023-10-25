@@ -1,0 +1,39 @@
+---
+- name: Install Azure DevOps Agent
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  become_user: freecodecamp
+  gather_facts: false
+  vars:
+    agent_version: '{{ variable_agent_version | default("3.220.5") }}'
+    dp_env: '{{ variable_dp_env | default("null") }}'
+    dp_group: '{{ variable_dp_group | default("null") }}'
+    dp_machine: '{{ variable_host | default("null") }}'
+  tasks:
+    - name: Uninstall and remove azagent
+      include_role:
+        name: azagent
+        tasks_from: delete-azagent.yml
+      vars:
+        agent_deploymentgroup_name: '{{ dp_env }}-dp-{{ dp_group }}'
+        agent_machine_name: '{{ dp_machine }}'
+        agent_project_name: 'freeCodeCamp'
+        agent_pat_token: "{{ lookup('env', 'AZURE_DEVOPS_PAT') }}"
+
+    - name: Install azagent
+      include_role:
+        name: azagent
+        tasks_from: install-azagent.yml
+      vars:
+        agent_deploymentgroup_name: '{{ dp_env }}-dp-{{ dp_group }}'
+        agent_machine_name: '{{ dp_machine }}'
+        agent_project_name: 'freeCodeCamp'
+        agent_pat_token: "{{ lookup('env', 'AZURE_DEVOPS_PAT') }}"
+        agent_download_url:
+          'https://vstsagentpackage.azureedge.net/agent/{{ agent_version
+          }}/vsts-agent-linux-x64-{{ agent_version }}.tar.gz'
+
+    - name: Update azagent environment
+      include_role:
+        name: azagent
+        tasks_from: update-azagent-env.yml
