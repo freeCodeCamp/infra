@@ -1,0 +1,8 @@
+---
+- name: Set up Consul Server
+  template:
+    src: consul-server.hcl.j2
+    dest: /etc/consul.d/consul.hcl
+    owner: consul
+    group: consul
+    mode: 0640

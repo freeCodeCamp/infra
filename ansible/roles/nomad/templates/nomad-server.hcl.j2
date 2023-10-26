@@ -1,13 +1,10 @@
-datacenter = "dc-{{ lookup('env', 'FCC_ANSIBLE_NOMAD_ENVNAME') }}"
+datacenter = "{{ lookup('env', 'FCC_ANSIBLE_DATACENTER_NAME') }}"
 data_dir   = "/opt/nomad"
+{% raw %}
+bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+{% endraw %}
 
 server {
   enabled          = true
   bootstrap_expect = 3
-
-  server_join {
-    retry_join = ["provider=linode tag_name={{ lookup('env', 'FCC_ANSIBLE_NOMAD_ENVNAME') }} region=us-east address_type=private_v4 api_token={{ lookup('env', 'LINODE_API_TOKEN') }}"]
-    retry_max = 3
-    retry_interval = "15s"
-  }
 }

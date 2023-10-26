@@ -24,8 +24,9 @@ groups:
 
   # mintworld Cluster
   mintworld_all: "'mintworld' in (tags|list)"
-  mintworld_leaders: "'mintworld_leader' in (tags|list)"
-  mintworld_workers: "'mintworld_worker' in (tags|list)"
+  mintworld_nomad_servers: "'nomad_svr' in (tags|list) and 'mintworld' in (tags|list)"
+  mintworld_consul_servers: "'consul_svr' in (tags|list) and 'mintworld' in (tags|list)"
+  mintworld_cluster_workers: "'cluster_wkr' in (tags|list) and 'mintworld' in (tags|list)"
 
   # Oldeworld Cluster -- ALL
   oldeworld_all: "'oldeworld' in (tags|list)"

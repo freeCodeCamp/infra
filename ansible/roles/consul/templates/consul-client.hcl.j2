@@ -1,0 +1,37 @@
+datacenter = "{{ lookup('env', 'FCC_ANSIBLE_DATACENTER_NAME') }}"
+data_dir   = "/opt/consul"
+encrypt    = "{{ lookup('env', 'FCC_ANSIBLE_CONSUL_GOSSIP_ENCRYPT_SECRET') }}"
+{% raw %}
+bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+{% endraw %}
+
+tls {
+  defaults {
+    ca_file = "/etc/consul.d/certs/consul-agent-ca.pem"
+
+    verify_incoming = true
+    verify_outgoing = true
+  }
+  internal_rpc {
+    verify_server_hostname = true
+  }
+}
+
+auto_encrypt {
+  tls = true
+}
+
+retry_join = [
+  {% for address in consul_server_addresses %}"{{ address }}"{{ "," if not loop.last }}{% endfor %}
+]
+
+recursors = ["1.1.1.1"]
+
+acl {
+  enabled                  = true
+  enable_token_persistence = true
+
+  # The default policy should be "deny", but start with allow while you're
+  # bootstrapping the ACL system.
+  default_policy           = "allow"
+}
