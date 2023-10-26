@@ -1,0 +1,40 @@
+---
+- name: Datacenter Cluster -- Pre-requisites
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  vars:
+    nomad_svr:
+      '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
+    consul_svr:
+      '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
+    cluster_wkr:
+      '{{ variable_cluster_workers_grp | default("mintworld_cluster_workers") }}'
+    include_ubuntu_updates:
+      '{{ variable_include_ubuntu_updates | default(false) }}'
+
+  tasks:
+    - name: Datacenter -- Install Pre-requisites
+      include_role:
+        name: ubuntu
+      when:
+        include_ubuntu_updates == true
+
+    - name: Datacenter -- DNS Configuration
+      include_role:
+        name: dns
+
+
+    - name: Datacenter -- Install Nomad Binary on Nomad Servers Nodes and Cluster Workers Nodes
+      include_role:
+        name: nomad
+      when:
+        inventory_hostname in groups[nomad_svr] or inventory_hostname in
+        groups[cluster_wkr]
+
+    - name: Datacenter -- Install Consul Binary on all Nodes
+      include_role:
+        name: consul
+
+    - name: Conclusion
+      debug:
+        msg: "Datacenter -- Pre-requisites Completed, continue with configuration plays."
