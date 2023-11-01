@@ -1,7 +1,10 @@
 SHELL := /bin/bash
 
-# Dynamically get all directories (stacks) in the current directory, excluding those starting with '__'
-STACKS := $(shell find . -maxdepth 1 -mindepth 1 -type d -not -name '__*' -exec basename {} \;)
+# Base directory for Terraform stacks
+TERRAFORM_BASE_DIR := ./terraform
+
+# Dynamically get all directories (stacks) in the TERRAFORM_BASE_DIR directory, excluding those starting with '__'
+STACKS := $(shell find $(TERRAFORM_BASE_DIR)/ -maxdepth 1 -mindepth 1 -type d -not -name '__*' -exec basename {} \;)
 
 .PHONY: all list upgrade fmt help
 
@@ -31,13 +34,13 @@ upgrade:
 	  echo ""; \
 	  echo ">>> Processing stack: $(STACK) <<<"; \
 	  echo ""; \
-	  cd $(STACK) && terraform init -upgrade && terraform plan && cd ..; \
+	  (cd $(TERRAFORM_BASE_DIR)/$(STACK) && terraform init -upgrade && terraform plan); \
 	else \
 	  for stack in $(STACKS); do \
 	    echo ""; \
 	    echo ">>> Processing stack: $$stack <<<"; \
 	    echo ""; \
-	    cd $$stack && terraform init -upgrade && terraform plan && cd ..; \
+	    (cd $(TERRAFORM_BASE_DIR)/$$stack && terraform init -upgrade && terraform plan); \
 	  done \
 	fi
 
@@ -46,13 +49,13 @@ fmt:
 	  echo ""; \
 	  echo ">>> Formatting stack: $(STACK) <<<"; \
 	  echo ""; \
-	  cd $(STACK) && terraform fmt && cd ..; \
+	  (cd $(TERRAFORM_BASE_DIR)/$(STACK) && terraform fmt); \
 	else \
 	  for stack in $(STACKS); do \
 	    echo ""; \
 	    echo ">>> Formatting stack: $$stack <<<"; \
 	    echo ""; \
-	    cd $$stack && terraform fmt && cd ..; \
+	    (cd $(TERRAFORM_BASE_DIR)/$$stack && terraform fmt); \
 	  done \
 	fi
 
