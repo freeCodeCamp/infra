@@ -130,4 +130,18 @@ jobs:
 
             **Details : <${{ steps.run.outputs.run_link }}>**
 
-            ###### :yellow_circle: **Warning:** Merging these changes WILL NOT trigger any further Terraform Cloud runs, you will need to APPLY these changes from your local workspace or TFC Dashboard.
+            <table>
+              <tr>
+                <td>
+                  Warning
+                </td>
+                <td>
+                  <p>
+                  This plan output may not reflect the impact on the Terraform project you are working on in this PR. The CI checks are just a sanity test to see if the versions in the lock file are valid and work.
+                </p>
+                  <p>
+                  Confirm the actual terraform plan by running the corresponding project on your machine or on TFC.
+                </p>
+                </td>
+              </tr>
+            </table>
