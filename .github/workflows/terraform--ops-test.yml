@@ -137,7 +137,7 @@ jobs:
                 </td>
                 <td>
                   <p>
-                    Please note that the `plan` output provided may not accurately reflect the impact on the Terraform project you are currently working on in this Pull Request. The CI checks are merely a sanity test to verify that the versions in the lock file are valid and functional.
+                    Please note that the plan output provided may not accurately reflect the impact on the Terraform project you are currently working on in this Pull Request. The CI checks are merely a sanity test to verify that the versions in the lock file are valid and functional.
                   </p>
                   <p>
                     Confirm the actual Terraform plan by running the corresponding project on your machine or on TFC.
