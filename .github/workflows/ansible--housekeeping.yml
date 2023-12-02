@@ -92,7 +92,7 @@ jobs:
         run: sleep 300
 
   reboot-web:
-    name: Reboot Web Proxies
+    name: Reboot Ingress
     needs: wait-on-update
     strategy:
       matrix:
@@ -117,7 +117,7 @@ jobs:
         run: sleep 300
 
   reboot:
-    name: Reboot Services
+    name: Reboot
     needs: wait-on-reboot-web
     strategy:
       matrix:
