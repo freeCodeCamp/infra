@@ -1,0 +1,22 @@
+---
+- name: Update Git Repository for Client Configs
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: false
+  tasks:
+    - name: Update Git Repository
+      git:
+        repo: https://github.com/freeCodeCamp/client-config.git
+        dest: /home/freecodecamp/client
+        clone: false
+        update: true
+        force: true
+        single_branch: true
+        version: master
+        accept_hostkey: true
+      register: git_update
+
+    - name: Check if Git Repository was Updated
+      debug:
+        msg: "Git Repository was updated, you should run the pipeline for a new deployment."
+      when: git_update.changed
