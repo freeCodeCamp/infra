@@ -9,7 +9,7 @@ help:
 	@echo "Targets:"
 	@echo "  help             Show this help message"
 	@echo "  install          Install ansible and ansible-lint"
-
+	@echo "  inventory        Generate inventory graph"
 
 .PHONY: install
 install:
@@ -19,17 +19,17 @@ install:
 
 .PHONY: check-linode-env-token
 check-linode-env-token:
-ifndef LINODE_API_TOKEN
-  include ./.env
-  export $(shell sed 's/=.*//' .env)
-endif
-
-.PHONY: check-linode-env-token
-check-linode-env-token:
-ifndef LINODE_API_TOKEN
-	$(error LINODE_API_TOKEN is undefined. Please set it in .env file or export it as an environment variable.)
-endif
+	@if [ ! -f .env ]; then \
+		echo "Error: .env file not found. Please ensure .env file exists in the current directory."; \
+		exit 1; \
+	fi
+	$(eval export $(shell cat .env | grep -v '^#' | sed 's/=.*//' | xargs))
+	@if [ -z "$${LINODE_API_TOKEN}" ]; then \
+		echo "Error: LINODE_API_TOKEN is undefined. Please set it in .env file or export it as an environment variable."; \
+		exit 1; \
+	fi
 
 .PHONY: inventory
 inventory: check-linode-env-token
 	ansible-inventory -i inventory --graph -v
+
