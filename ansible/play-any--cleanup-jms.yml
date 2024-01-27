@@ -1,0 +1,18 @@
+---
+- name: Cleanup JMS Clients
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: false
+  tasks:
+    - name: Cleanup JMS Client
+      shell: |
+        docker system prune --force
+      args:
+        chdir: '/home/freecodecamp'
+      register: result
+
+    - name: Show the status of running containers
+      debug:
+        msg: '{{ result.stdout }}'
+      when: result.stdout.find('error') == -1
+      failed_when: result.stdout.find('error') != -1
