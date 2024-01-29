@@ -37,6 +37,12 @@ resource "linode_instance" "stg_mintworld_leaders" {
   watchdog_enabled = true
 
   tags = ["stg", "mintworld", "mintworld_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "stg_mintworld_leaders_disk__boot" {
@@ -168,6 +174,12 @@ resource "linode_instance" "stg_mintworld_workers" {
   watchdog_enabled = true
 
   tags = ["stg", "mintworld", "mintworld_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "stg_mintworld_workers_disk__boot" {

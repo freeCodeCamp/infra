@@ -16,6 +16,12 @@ resource "linode_instance" "stg_oldeworld_nws" {
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   group = "stg_oldeworld_nws"
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "stg_oldeworld_nws_disk__boot" {

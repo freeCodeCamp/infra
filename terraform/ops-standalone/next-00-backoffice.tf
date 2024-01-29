@@ -17,6 +17,12 @@ resource "linode_instance" "ops_backoffice" {
   group = "ops_backoffice"
 
   backups_enabled = true
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "ops_backoffice_disk__boot" {

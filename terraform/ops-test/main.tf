@@ -33,6 +33,12 @@ resource "linode_instance" "ops_test" {
   type   = "g6-standard-2"
 
   tags = ["ops", "test"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "ops_test_disk__boot" {

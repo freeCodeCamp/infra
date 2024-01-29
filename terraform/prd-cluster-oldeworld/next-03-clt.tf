@@ -16,6 +16,12 @@ resource "linode_instance" "prd_oldeworld_clt" {
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   group = "prd_oldeworld_clt"
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "prd_oldeworld_clt_disk__boot" {

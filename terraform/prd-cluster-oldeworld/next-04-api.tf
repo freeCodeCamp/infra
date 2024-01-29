@@ -16,6 +16,12 @@ resource "linode_instance" "prd_oldeworld_api" {
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   group = "prd_oldeworld_api"
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "prd_oldeworld_api_disk__boot" {

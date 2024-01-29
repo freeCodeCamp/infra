@@ -37,6 +37,12 @@ resource "linode_instance" "ops_o11y_leaders" {
   watchdog_enabled = true
 
   tags = ["ops", "o11y", "o11y_leader"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "ops_o11y_leaders_disk__boot" {
@@ -168,6 +174,12 @@ resource "linode_instance" "ops_o11y_workers" {
   watchdog_enabled = true
 
   tags = ["ops", "o11y", "o11y_worker"] # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
+
+  lifecycle {
+    ignore_changes = [
+      migration_type
+    ]
+  }
 }
 
 resource "linode_instance_disk" "ops_o11y_workers_disk__boot" {
