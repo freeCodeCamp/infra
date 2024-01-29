@@ -34,6 +34,7 @@ jobs:
 
       - name: Terraform Format
         run: make fmt
+        working-directory: terraform
 
   terraform-upgrade-test:
     if:
