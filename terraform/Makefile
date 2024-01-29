@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 # Base directory for Terraform stacks
-TERRAFORM_BASE_DIR := ./terraform
+TERRAFORM_BASE_DIR := .
 
 # Dynamically get all directories (stacks) in the TERRAFORM_BASE_DIR directory, excluding those starting with '__'
 STACKS := $(shell find $(TERRAFORM_BASE_DIR)/ -maxdepth 1 -mindepth 1 -type d -not -name '__*' -exec basename {} \;)
