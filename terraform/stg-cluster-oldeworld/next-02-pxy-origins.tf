@@ -1,22 +1,30 @@
-data "linode_nodebalancer" "stg_oldeworld_nb_pxy" {
-  id = 388830 # TODO: Find a way to get this ID dynamically
+data linode_nodebalancers stg_oldeworld_pxy_nbs {
+  filter {
+    name = "label"
+    values = ["stg-nb-oldeworld-pxy"]
+  }
 }
 
-data "linode_nodebalancer_config" "stg_oldeworld_nb_pxy_config__port_443" {
-  id              = 597405 # TODO: Find a way to get this ID dynamically
-  nodebalancer_id = data.linode_nodebalancer.stg_oldeworld_nb_pxy.id
+data linode_nodebalancer_configs stg_oldeworld_pxy_nb_configs__port_443 {
+  nodebalancer_id = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].id
+  filter {
+    name = "port"
+    values = ["443"]
+  }
 }
 
-data "linode_nodebalancer_config" "stg_oldeworld_nb_pxy_config__port_80" {
-  id              = 597404 # TODO: Find a way to get this ID dynamically
-  nodebalancer_id = data.linode_nodebalancer.stg_oldeworld_nb_pxy.id
+data linode_nodebalancer_configs stg_oldeworld_pxy_nb_configs__port_80 {
+  nodebalancer_id = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].id
+  filter {
+    name = "port"
+    values = ["80"]
+  }
 }
-
 resource "linode_nodebalancer_node" "stg_oldeworld_nb_pxy_nodes__port_443" {
   count = local.pxy_node_count
 
-  nodebalancer_id = data.linode_nodebalancer.stg_oldeworld_nb_pxy.id
-  config_id       = data.linode_nodebalancer_config.stg_oldeworld_nb_pxy_config__port_443.id
+  nodebalancer_id = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].id
+  config_id       = data.linode_nodebalancer_configs.stg_oldeworld_pxy_nb_configs__port_443.nodebalancer_configs[0].id
   address         = "${linode_instance.stg_oldeworld_pxy[count.index].private_ip_address}:443"
   label           = "stg-node-pxy-443-${count.index}"
 }
@@ -24,8 +32,8 @@ resource "linode_nodebalancer_node" "stg_oldeworld_nb_pxy_nodes__port_443" {
 resource "linode_nodebalancer_node" "stg_oldeworld_nb_pxy_nodes__port_80" {
   count = local.pxy_node_count
 
-  nodebalancer_id = data.linode_nodebalancer.stg_oldeworld_nb_pxy.id
-  config_id       = data.linode_nodebalancer_config.stg_oldeworld_nb_pxy_config__port_80.id
+  nodebalancer_id = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].id
+  config_id       = data.linode_nodebalancer_configs.stg_oldeworld_pxy_nb_configs__port_80.nodebalancer_configs[0].id
   address         = "${linode_instance.stg_oldeworld_pxy[count.index].private_ip_address}:80"
   label           = "stg-node-pxy-80-${count.index}"
 }
@@ -37,5 +45,5 @@ resource "cloudflare_record" "stg_oldeworld_nb_pxy_dnsrecord__public" {
   ttl     = 120
 
   name  = "oldeworld.stg.${var.network_subdomain}"
-  value = data.linode_nodebalancer.stg_oldeworld_nb_pxy.ipv4
+  value = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].ipv4
 }
