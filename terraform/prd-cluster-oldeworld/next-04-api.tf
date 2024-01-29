@@ -92,6 +92,12 @@ resource "linode_instance_config" "prd_oldeworld_api_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "prd_oldeworld_api_dnsrecord__vlan" {

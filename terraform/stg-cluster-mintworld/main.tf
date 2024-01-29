@@ -113,6 +113,12 @@ resource "linode_instance_config" "stg_mintworld_leaders_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "stg_mintworld_leaders_dnsrecord__vlan" {
@@ -238,6 +244,12 @@ resource "linode_instance_config" "stg_mintworld_workers_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "stg_mintworld_workers_dnsrecord__vlan" {

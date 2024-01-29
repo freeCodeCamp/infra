@@ -104,6 +104,12 @@ resource "linode_instance_config" "stg_oldeworld_nws_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "stg_oldeworld_nws_dnsrecord__vlan" {

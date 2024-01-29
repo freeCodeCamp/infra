@@ -107,6 +107,12 @@ resource "linode_instance_config" "ops_test_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "ops_test_records" {

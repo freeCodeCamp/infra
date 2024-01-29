@@ -113,6 +113,12 @@ resource "linode_instance_config" "ops_o11y_leaders_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "ops_o11y_leaders_dnsrecord__vlan" {
@@ -238,6 +244,12 @@ resource "linode_instance_config" "ops_o11y_workers_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "ops_o11y_workers_dnsrecord__vlan" {

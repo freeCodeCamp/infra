@@ -83,6 +83,12 @@ resource "linode_instance_config" "ops_backoffice_config" {
 
   kernel = "linode/grub2"
   booted = true
+
+  lifecycle {
+    ignore_changes = [
+      booted
+    ]
+  }
 }
 
 resource "cloudflare_record" "ops_backoffice_dnsrecord__public" {
