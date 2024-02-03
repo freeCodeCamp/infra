@@ -1,5 +1,5 @@
 ---
-- name: Tailscale - Issue Cert
+- name: Tailscale - Add Cert for Tailscale Network (https access)
   hosts: '{{ variable_host | default("null") }}'
   become: true
   gather_facts: false

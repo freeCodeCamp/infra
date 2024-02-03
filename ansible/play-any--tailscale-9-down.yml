@@ -1,5 +1,5 @@
 ---
-- name: Tailscale - Disconnect
+- name: Tailscale - Disconnect from Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
   become: true
   gather_facts: true

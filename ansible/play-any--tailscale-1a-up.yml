@@ -1,5 +1,5 @@
 ---
-- name: Tailscale - Connect
+- name: Tailscale - Connect to Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
   become: true
   gather_facts: false

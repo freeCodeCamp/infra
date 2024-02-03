@@ -1,5 +1,5 @@
 ---
-- name: Tailscale - Start SSH
+- name: Tailscale - Connect to Tailscale Network with inbound SSH enabled
   hosts: '{{ variable_host | default("null") }}'
   become: true
   gather_facts: false
