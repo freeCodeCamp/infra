@@ -5,12 +5,15 @@
   vars:
     tailnet: "{{ variable_tailnet | default('freecodecamp.org.github') }}"
     purge_before_date:
-      "{{ variable_purge_before_date | default('1 hour ago') }}"
+      "{{ variable_purge_before_date | default('1hour') }}" # 1min, 23mins, 5months, 1year, etc.
   tasks:
     - name: Get the ISO date for Purge Before Data
-      command:
-        '{{ playbook_dir }}/scripts/get-iso-date.sh "{{ purge_before_date }}"'
+      shell:
+        cmd: '{{ playbook_dir }}/scripts/get-iso-date.sh {{ purge_before_date }}'
       register: seenbeforedate
+
+    - debug:
+        msg: '{{ seenbeforedate.stdout }}'
 
     - name: Remove Old Hosts
       command:
