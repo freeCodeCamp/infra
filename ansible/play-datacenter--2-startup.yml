@@ -3,64 +3,92 @@
   hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:
-    - nomad_svr: '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
-    - consul_svr: '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
-    - cluster_wkr: '{{ variable_cluster_workers_grp | default("mintworld_cluster_workers") }}'
-    - restart_services: '{{ variable_restart_services | default(false) }}'
+    nomad_svr:
+      '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
+    consul_svr:
+      '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
+    cluster_wkr:
+      '{{ variable_cluster_workers_grp | default("mintworld_cluster_workers") }}'
+    restart_services: '{{ variable_restart_services | default(false) }}'
 
   tasks:
     - name: Consul Servers - Startup Consul Services
+      when: inventory_hostname in groups[consul_svr]
       block:
         - name: Enable and Start Consul Services on Consul Servers
-          service: name=consul state=started enabled=yes
-          when: restart_services == false
+          when: not restart_services
+          service:
+            name: consul
+            state: started
+            enabled: true
 
         - name: Restart Consul Services on Consul Servers
-          service: name=consul state=restarted
-          when: restart_services == true
-      when: inventory_hostname in groups[consul_svr]
-
+          when: restart_services
+          service:
+            name: consul
+            state: restarted
 
     - name: Nomad Servers - Startup Consul and Nomad Services
+      when: inventory_hostname in groups[nomad_svr]
       block:
         - name: Enable and Start Consul Services on Nomad Servers
-          service: name=consul state=started enabled=yes
-          when: restart_services == false
+          when: not restart_services
+          service:
+            name: consul
+            state: started
+            enabled: true
 
         - name: Restart Consul Services on Nomad Servers
-          service: name=consul state=restarted
-          when: restart_services == true
+          when: restart_services
+          service:
+            name: consul
+            state: restarted
 
         - name: Enable and Start Nomad Services on Nomad Servers
-          service: name=nomad state=started enabled=yes
-          when: restart_services == false
+          when: not restart_services
+          service:
+            name: nomad
+            state: started
+            enabled: true
 
         - name: Restart Nomad Services on Nomad Servers
-          service: name=nomad state=restarted
-          when: restart_services == true
-      when: inventory_hostname in groups[nomad_svr]
+          when: restart_services
+          service:
+            name: nomad
+            state: restarted
 
-    - name: Nomad Servers - Startup NGINX Service for HTTP access (Web UI and API)
-      block:
-        - name: Start NGINX Service
-          command: docker compose -f /etc/nginx-nomad-http/docker-compose.yml up -d
-      when: inventory_hostname in groups[nomad_svr]
+    # - name: Nomad Servers - Startup NGINX Service for HTTP access (Web UI and API)
+    #   when: inventory_hostname in groups[nomad_svr]
+    #   block:
+    #     - name: Start NGINX Service
+    #       command: docker compose -f /etc/nginx-nomad-http/docker-compose.yml up -d
+    #       changed_when: docker_compose_result.rc == 0
 
-    - name: Startup Cluster Workers
-      block:
-        - name: Enable and Start Consul Services on Cluster Workers
-          service: name=consul state=started enabled=yes
-          when: restart_services == false
+    # - name: Startup Cluster Workers
+    #   when: inventory_hostname in groups[cluster_wkr]
+    #   block:
+    #     - name: Enable and Start Consul Services on Cluster Workers
+    #       when: not restart_services
+    #       service:
+    #         name: consul
+    #         state: started
+    #         enabled: true
 
-        - name: Restart Consul Services on Cluster Workers
-          service: name=consul state=restarted
-          when: restart_services == true
+    #     - name: Restart Consul Services on Cluster Workers
+    #       when: restart_services
+    #       service:
+    #         name: consul
+    #         state: restarted
 
-        - name: Enable and Start Nomad Services on Cluster Workers
-          service: name=nomad state=started enabled=yes
-          when: restart_services == false
+    #     - name: Enable and Start Nomad Services on Cluster Workers
+    #       when: not restart_services
+    #       service:
+    #         name: nomad
+    #         state: started
+    #         enabled: true
 
-        - name: Restart Nomad Services on Cluster Workers
-          service: name=nomad state=restarted
-          when: restart_services == true
-      when: inventory_hostname in groups[cluster_wkr]
+    #     - name: Restart Nomad Services on Cluster Workers
+    #       when: restart_services
+    #       service:
+    #         name: nomad
+    #         state: restarted

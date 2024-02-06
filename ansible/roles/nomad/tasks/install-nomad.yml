@@ -5,7 +5,9 @@
 
 - name: Install Nomad from releases
   unarchive:
-    src: https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_linux_amd64.zip
+    src:
+      https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{
+      nomad_version }}_linux_amd64.zip
     dest: /usr/local/bin
     remote_src: yes
     creates: /usr/local/bin/nomad
@@ -28,7 +30,7 @@
   user:
     name: nomad
     group: nomad
-    comment: "Nomad user"
+    comment: 'Nomad user'
     shell: /bin/false
     system: yes
     create_home: yes

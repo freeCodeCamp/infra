@@ -26,20 +26,26 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  consul_svr_count  = 3
-  nomad_svr_count   = 3
-  cluster_wkr_count = 5
+  count_svr_consul  = 3
+  count_svr_nomad   = 3
+  count_wkr_cluster = 5
 }
 
+# Private IPAM
 locals {
-  # Define the base IPs for the subnets - to be used for the CIDR blocks with prefix, ex. "10.0.64.0/18"
+  # Define the base IPs for the subnets
+  # to be used for the CIDR blocks with
+  # prefix, ex. "10.0.64.0/18"
   subnet_base_ips = [
     "10.0.0.0",
     "10.0.64.0",
     "10.0.128.0"
   ]
-  # Define the starting block for each type of server
-  ip_start_block_nomad_svr   = 10
-  ip_start_block_consul_svr  = 20
-  ip_start_block_cluster_wkr = 30
+
+  # ip_start_nlb_consul = 10 // L4 load balancer for consul
+  # ip_start_nlb_nomad  = 20 // L4 load balancer for nomad
+
+  ip_start_svr_consul  = 30 // Consul servers
+  ip_start_svr_nomad   = 40 // Nomad servers
+  ip_start_wkr_cluster = 50 // Nomad workers
 }

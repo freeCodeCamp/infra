@@ -1,6 +1,6 @@
 
 resource "aws_instance" "stg_mintworld_consul_svr" {
-  count         = local.consul_svr_count
+  count         = local.count_svr_consul
   ami           = data.hcp_packer_artifact.aws_ubuntu.external_identifier
   instance_type = "t3a.medium"
   key_name      = data.aws_key_pair.stg_ssh_service_user_key.key_name
@@ -9,15 +9,15 @@ resource "aws_instance" "stg_mintworld_consul_svr" {
   subnet_id                   = aws_subnet.stg_mintworld_subnet[count.index % length(aws_subnet.stg_mintworld_subnet)].id
   private_ip = cidrhost(
     "${element(local.subnet_base_ips, count.index % length(local.subnet_base_ips))}/18",
-    local.ip_start_block_consul_svr + floor(count.index / length(local.subnet_base_ips)) + 1
+    local.ip_start_svr_consul + floor(count.index / length(local.subnet_base_ips)) + 1
   )
 
   tags = merge(
     var.stack_tags,
     {
-      Name               = "stg-mintworld-consul-svr-${count.index + 1}"
-      Role               = "consul_svr"
-      Nomad_AutoJoin_Tag = "stg-mintworld-consul-svr"
+      Name                 = "stg-mintworld-consul-svr-${count.index + 1}"
+      Role                 = "consul_svr"
+      Cluster_AutoJoin_Tag = "stg-cluster-mintworld"
     }
   )
 

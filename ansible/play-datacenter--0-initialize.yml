@@ -14,22 +14,22 @@
 
   tasks:
     - name: Datacenter -- Install Pre-requisites
+      when: include_ubuntu_updates
       include_role:
         name: ubuntu
-      when:
-        include_ubuntu_updates == true
 
     - name: Datacenter -- DNS Configuration
       include_role:
         name: dns
 
-
-    - name: Datacenter -- Install Nomad Binary on Nomad Servers Nodes and Cluster Workers Nodes
-      include_role:
-        name: nomad
+    - name:
+        Datacenter -- Install Nomad Binary on Nomad Servers Nodes and Cluster
+        Workers Nodes
       when:
         inventory_hostname in groups[nomad_svr] or inventory_hostname in
         groups[cluster_wkr]
+      include_role:
+        name: nomad
 
     - name: Datacenter -- Install Consul Binary on all Nodes
       include_role:
@@ -37,4 +37,6 @@
 
     - name: Conclusion
       debug:
-        msg: "Datacenter -- Pre-requisites Completed, continue with configuration plays."
+        msg:
+          'Datacenter -- Pre-requisites Completed, continue with configuration
+          plays.'

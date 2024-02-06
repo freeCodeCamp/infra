@@ -1,7 +1,13 @@
-datacenter = "{{ lookup('env', 'FCC_ANSIBLE_DATACENTER_NAME') }}"
 data_dir   = "/opt/nomad"
+datacenter = "{{ lookup('env', 'FCC_ANSIBLE_DATACENTER_NAME') }}"
+
+bind_addr = "0.0.0.0"
 {% raw %}
-bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
+advertise {
+  http = "{{ GetInterfaceIP `ens5` }}"
+  rpc  = "{{ GetInterfaceIP `ens5` }}"
+  serf = "{{ GetInterfaceIP `ens5` }}"
+}
 {% endraw %}
 
 server {
