@@ -4,6 +4,11 @@ encrypt    = "{{ lookup('env', 'FCC_ANSIBLE_CONSUL_GOSSIP_ENCRYPT_SECRET') }}"
 {% raw %}
 bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
 {% endraw %}
+client_addr = "0.0.0.0"
+
+ports {
+  grpc = 8502
+}
 
 tls {
   defaults {
@@ -22,7 +27,8 @@ auto_encrypt {
 }
 
 retry_join = [
-  {% for address in consul_server_addresses %}"{{ address }}"{{ "," if not loop.last }}{% endfor %}
+  {% for address in consul_server_addresses %}"{{ address }}"{{ "," if not loop.last }}
+  {% endfor %}
 ]
 
 recursors = ["1.1.1.1"]

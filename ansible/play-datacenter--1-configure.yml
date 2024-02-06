@@ -66,12 +66,12 @@
         - name: Set up config for Nomad Servers
           include_role:
             name: nomad
-            tasks_from: config-nomad-server.yml
+            tasks_from: config-server--nomad.yml
 
         - name: Set up systemd services for Nomad on Servers
           include_role:
             name: nomad
-            tasks_from: config-systemd-server.yml
+            tasks_from: config-server--systemd.yml
 
         - name: List of Nomad Server addresses
           set_fact:
@@ -80,7 +80,7 @@
         - name: Set up NGINX proxy for HTTP traffic to Nomad on Nomad Servers
           include_role:
             name: nomad
-            tasks_from: config-nginx-nomad-http.yml
+            tasks_from: config-nginx--nomad-http.yml
       when: inventory_hostname in groups[nomad_svr]
 
     - name: Configure Nomad Clients
@@ -88,11 +88,16 @@
         - name: Set up config for Nomad Clients
           include_role:
             name: nomad
-            tasks_from: config-nomad-client.yml
+            tasks_from: config-client--nomad.yml
+
+        - name: Set up CNI plugin for Nomad Clients
+          include_role:
+            name: nomad
+            tasks_from: config-client--CNI_plugin.yml
 
         - name: Set up systemd services for Nomad on Clients
           include_role:
             name: nomad
-            tasks_from: config-systemd-client.yml
+            tasks_from: config-client--systemd.yml
       when:
         inventory_hostname in groups[cluster_wkr]

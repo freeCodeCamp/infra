@@ -32,7 +32,8 @@ auto_encrypt {
 }
 
 retry_join = [
-  {% for address in consul_server_addresses %}"{{ address }}"{{ "," if not loop.last }}{% endfor %}
+  {% for address in consul_server_addresses %}"{{ address }}"{{ "," if not loop.last }}
+  {% endfor %}
 ]
 
 recursors = ["1.1.1.1"]
