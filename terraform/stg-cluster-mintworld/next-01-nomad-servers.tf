@@ -17,6 +17,14 @@ resource "linode_instance" "stg_mintworld_nomad_svr" {
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   group = "stg_mintworld_nomad_svr"
 
+  metadata {
+    user_data = base64encode(
+      templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
+        tf_hostname = "nomad-svr-${count.index + 1}.mintworld.stg.${local.zone}"
+      })
+    )
+  }
+
   lifecycle {
     ignore_changes = [
       migration_type
@@ -32,15 +40,6 @@ resource "linode_instance_disk" "stg_mintworld_nomad_svr_disk__boot" {
 
   image     = data.hcp_packer_artifact.linode_ubuntu_artifact.external_identifier
   root_pass = var.password
-
-  stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
-  stackscript_data = {
-    userdata = base64encode(
-      templatefile("${path.root}/cloud-init--userdata.yml.tftpl", {
-        tf_hostname = "nomad-svr-${count.index + 1}.mintworld.stg.${local.zone}"
-      })
-    )
-  }
 }
 
 resource "linode_instance_config" "stg_mintworld_nomad_svr_config" {
@@ -96,7 +95,7 @@ resource "linode_instance_config" "stg_mintworld_nomad_svr_config" {
     updatedb_disabled = true
   }
 
-  kernel = "linode/grub2"
+  kernel = "linode/latest-64bit"
   booted = true
 
   lifecycle {
