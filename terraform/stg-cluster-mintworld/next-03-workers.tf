@@ -30,7 +30,7 @@ resource "linode_instance_disk" "stg_mintworld_cluster_wkr_disk__boot" {
   linode_id = linode_instance.stg_mintworld_cluster_wkr[count.index].id
   size      = linode_instance.stg_mintworld_cluster_wkr[count.index].specs.0.disk
 
-  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
+  image     = data.hcp_packer_artifact.linode_ubuntu_artifact.external_identifier
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
