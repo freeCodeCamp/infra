@@ -1,9 +1,20 @@
-variable "linode_token" {
-  description = "The Linode API Personal Access Token."
+variable "aws_access_key_id" {
+  description = "The value of the AWS Access Key ID."
   type        = string
   sensitive   = true
 }
 
+variable "aws_secret_access_key" {
+  description = "The value of the AWS Secret Access Key."
+  type        = string
+  sensitive   = true
+}
+
+variable "tailscale_auth_key" {
+  description = "The Tailscale authentication key."
+  type        = string
+  sensitive   = true
+}
 variable "password" {
   description = "The root password for the Linode instances."
   type        = string
@@ -11,7 +22,7 @@ variable "password" {
 
 variable "region" {
   description = "The name of the region in which to deploy instances."
-  default     = "us-east"
+  default     = "us-east-1"
   type        = string
 }
 
@@ -20,12 +31,6 @@ variable "network_subdomain" {
   type        = string
   sensitive   = true
 }
-
-# variable "image_id" {
-#   description = "The ID for the Linode image to be used in provisioning the instances"
-#   default     = "private/20789403"
-#   type        = string
-# }
 
 variable "hcp_client_id" {
   description = "The client ID for the HCP API."
@@ -47,4 +52,21 @@ variable "cloudflare_api_token" {
 variable "cloudflare_account_id" {
   type        = string
   description = "Cloudflare Account ID"
+}
+
+variable "user_data_replace_on_change" {
+  type        = bool
+  description = "Recreate instances on changes to UserData"
+}
+
+# -----------------------------------------------
+# define the tags for the resources in this stack
+# -----------------------------------------------
+variable "stack_tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources in this stack"
+  default = {
+    Environment = "stg"
+    Stack       = "mintworld"
+  }
 }

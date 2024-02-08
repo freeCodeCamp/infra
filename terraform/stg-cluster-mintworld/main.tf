@@ -5,25 +5,24 @@ locals {
 data "cloudflare_zone" "cf_zone" {
   name = local.zone
 }
+data "hcp_packer_artifact" "aws_ubuntu" {
+  bucket_name  = "aws-ubuntu"
+  channel_name = "golden"
+  platform     = "aws"
+  region       = var.region
+}
 
-# This data source depends on the stackscript resource
-# which is created in terraform/ops-stackscripts/main.tf
-data "linode_stackscripts" "cloudinit_scripts" {
+data "aws_key_pair" "stg_ssh_service_user_key" {
+  include_public_key = true
+
   filter {
-    name   = "label"
-    values = ["CloudInitfreeCodeCamp"]
-  }
-  filter {
-    name   = "is_public"
-    values = ["false"]
+    name   = "fingerprint"
+    values = ["83/jBIfPmZ0tkwonWcUgwo0smIhxwYWaGOZvr2tpz0E="]
   }
 }
 
-data "hcp_packer_image" "linode_ubuntu" {
-  bucket_name    = "linode-ubuntu"
-  channel        = "golden"
-  cloud_provider = "linode"
-  region         = "us-east"
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
 locals {
@@ -33,7 +32,14 @@ locals {
 }
 
 locals {
-  ipam_block_consul_svr  = 10 # 10.0.0.10, 10.0.0.11, ...
-  ipam_block_nomad_svr   = 30 # 10.0.0.30, 10.0.0.31, ...
-  ipam_block_cluster_wkr = 50 # 10.0.0.50, 10.0.0.51, ...
+  # Define the base IPs for the subnets - to be used for the CIDR blocks with prefix, ex. "10.0.64.0/18"
+  subnet_base_ips = [
+    "10.0.0.0",
+    "10.0.64.0",
+    "10.0.128.0"
+  ]
+  # Define the starting block for each type of server
+  ip_start_block_nomad_svr   = 10
+  ip_start_block_consul_svr  = 20
+  ip_start_block_cluster_wkr = 30
 }
