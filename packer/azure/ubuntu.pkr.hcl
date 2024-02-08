@@ -59,7 +59,7 @@ variable "vm_size" { default = "Standard_B2s" }
 variable "ssh_username" { default = "packer" } # This is the default username for provisioning and will be deleted after the build.
 
 # TODO: These should be configurable via environment variables.
-variable "scripts_dir" { default = "packer/azure/scripts" }
+variable "scripts_dir" { default = "azure/scripts" }
 
 locals {
   artifact_name = "${var.artifact_image_type}-${var.image_sku}-${var.location}-${formatdate("YYYYMMDD.hhmm", timestamp())}"
