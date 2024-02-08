@@ -1,0 +1,54 @@
+---
+- name: Install common packages on Ubuntu
+  hosts: all
+  become: true
+  become_method: sudo
+  gather_facts: false
+
+  tasks:
+    - name: Update apt package index
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Update all packages
+      ansible.builtin.apt:
+        upgrade: yes
+        autoremove: true
+        autoclean: true
+
+    - name: Install common packages
+      ansible.builtin.apt:
+        name: '{{ packages }}'
+        state: present
+        autoclean: true
+        autoremove: true
+        purge: true
+      vars:
+        packages:
+          - build-essential
+          - curl
+          - git
+          - htop
+          - software-properties-common
+          - tar
+          - unzip
+          - vim
+          - zip
+          - glances
+          - ncdu
+          - pv
+
+    - name: Disable automatic and security updates
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: absent
+      vars:
+        update_package_lists: false
+        allowed_origins:
+          - security
+          - updates
+          - proposed
+          - backports
+        package_blacklist:
+          - '*'
