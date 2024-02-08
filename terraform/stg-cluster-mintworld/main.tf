@@ -18,11 +18,12 @@ data "linode_stackscripts" "cloudinit_scripts" {
     values = ["false"]
   }
 }
-data "hcp_packer_artifact" "linode_ubuntu_artifact" {
-  platform     = "linode"
-  bucket_name  = "linode-ubuntu"
-  region       = "us-east"
-  channel_name = "latest"
+
+data "hcp_packer_image" "linode_ubuntu" {
+  bucket_name    = "linode-ubuntu"
+  channel        = "golden"
+  cloud_provider = "linode"
+  region         = "us-east"
 }
 
 locals {
