@@ -1,86 +1,143 @@
 packer {
+  required_version = "~> 1.10"
   required_plugins {
-    aws = {
-      version = "~> 1.0"
+    amazon = {
       source  = "github.com/hashicorp/amazon"
+      version = "~> 1"
     }
   }
 }
 
-locals {
-  image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}"
+// Skip creating the AMI, useful for testing
+variable "skip_create_ami" {
+  description = "Skip creating the AMI, useful for testing"
+  type        = bool
+  default     = false
 }
 
-variable "source_ami_filter_name" {
-  default = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+// The OS configuration for the build
+variable "aws_os_version" {
+  description = "The OS version to use for the build. Example: '22.04'"
+  type        = string
+  default     = "22.04"
+}
+variable "aws_os_flavor" {
+  description = "The OS flavor to use for the build. Example: 'ubuntu'"
+  type        = string
+  default     = "ubuntu"
+}
+variable "aws_os_arch" {
+  description = "The OS architecture to use for the build. Example: 'x86_64' or 'arm64'"
+  type        = string
+  default     = "x86_64"
 }
 
-variable "aws_instance_type" { default = "t3.medium" }
-variable "aws_region" { default = "us-east-1" }
-variable "aws_image_description" { default = "Ubuntu 22.04 LTS with Docker" }
-variable "aws_os_version" { default = "22.04" }
-variable "aws_os_flavor" { default = "ubuntu" }
-variable "scripts_dir" { default = "aws/general/scripts" }
-
+// The AWS configuration for the build
+variable "aws_instance_type" {
+  description = "The instance type to use for the build, from the AWS instance types list."
+  type        = string
+  default     = "t3a.medium"
+}
+variable "aws_region" {
+  description = "The AWS region to use for the build, from the AWS regions list."
+  type        = string
+  default     = "us-east-1"
+}
 variable "root_volume_size_gb" {
-  type    = number
-  default = 10
+  description = "The size of the root volume in GB"
+  type        = number
+  default     = 10
 }
-
 variable "ebs_delete_on_termination" {
   description = "Indicates whether the EBS volume is deleted on instance termination."
   type        = bool
   default     = true
 }
-
-variable "global_tags" {
-  description = "Tags to apply to everything"
-  type        = map(string)
-  default = {
-    "Project" = "Ubuntu Docker AMI"
-  }
+variable "shutdown_behavior" {
+  description = "The behavior when the instance is stopped."
+  type        = string
+  default     = "terminate"
+}
+variable "force_deregister" {
+  description = "Indicates whether to force deregister the AMI."
+  type        = bool
+  default     = true
+}
+variable "force_delete_snapshot" {
+  description = "Indicates whether to force delete the snapshot."
+  type        = bool
+  default     = true
 }
 
-variable "ami_tags" {
-  description = "Tags to apply to the AMI"
-  type        = map(string)
-  default     = {}
+// The SSH configuration for the build
+variable "ssh_username" {
+  description = "The username to use for SSH connections to the instance. Recommended: 'ubuntu' for Ubuntu AMIs, 'ec2-user' for Amazon Linux AMIs."
+  type        = string
+  default     = "ubuntu"
 }
 
-variable "snapshot_tags" {
-  description = "Tags to apply to the snapshot"
-  type        = map(string)
-  default     = {}
+// The directory containing the scripts to run
+variable "scripts_dir" {
+  description = "The directory containing the scripts to run"
+  type        = string
+  default     = "aws/general/scripts"
 }
 
+// The dynamic build configuration based on the variables
+locals {
+  image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}"
+
+  // The source AMI filter name, based on the OS flavor, version, and architecture
+  // Example: "ubuntu/images/hvm-ssd/ubuntu-*-22.04-*-server-*"
+  source_ami_filter_name = "${var.aws_os_flavor}/images/hvm-ssd/${var.aws_os_flavor}-*-${var.aws_os_version}-*-server-*"
+
+  image_description = "An ${var.aws_os_flavor} ${var.aws_os_version} ${var.aws_os_arch} - Server image with Docker installed."
+
+  ansible_env_vars = [
+    "ANSIBLE_HOST_KEY_CHECKING=False",
+    "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",
+    "ANSIBLE_STDOUT_CALLBACK=yaml"
+  ]
+  ansible_extra_args = [
+    "-v"
+  ]
+}
+
+// The source AMI for the build
 source "amazon-ebs" "ubuntu" {
-  region = var.aws_region
   source_ami_filter {
     filters = {
-      name                = var.source_ami_filter_name
+      architecture        = var.aws_os_arch
+      name                = local.source_ami_filter_name
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
-    owners      = ["099720109477"] // Canonical - Ubuntu Images
+    // owners      = ["099720109477"] // "Canonical - Ubuntu Images" is chargable ??
+    owners      = ["amazon"]
     most_recent = true
   }
-  instance_type = var.aws_instance_type
-  ssh_username  = "ubuntu"
-  ami_name      = "AMI-${var.aws_os_flavor}-${var.aws_os_version}-${local.image_version}"
 
-  tags = merge(
-    var.global_tags,
-    var.ami_tags,
-    {
-      "Name"          = "Ubuntu-Docker-${local.image_version}",
-      "OS_Version"    = "ubuntu-${var.aws_os_version}",
-      "Base_AMI_Name" = "{{ .SourceAMIName }}"
-    }
-  )
-  snapshot_tags = merge(
-    var.global_tags,
-    var.snapshot_tags,
-  )
+  skip_create_ami = var.skip_create_ami
+
+  instance_type   = var.aws_instance_type
+  region          = var.aws_region
+  ami_name        = "ami-${var.aws_os_flavor}-${var.aws_os_version}-${var.aws_os_arch}-${local.image_version}"
+  ami_description = local.image_description
+
+
+  shutdown_behavior     = var.shutdown_behavior
+  force_deregister      = var.force_deregister
+  force_delete_snapshot = var.force_delete_snapshot
+
+  ssh_username = var.ssh_username
+
+  tags = {
+    "Base_AMI_Name" = "{{ .SourceAMIName }}"
+    "Name"          = "Ubuntu-Docker-${local.image_version}",
+    "OS_Version"    = var.aws_os_version,
+    "OS_Flavor"     = string.title(var.aws_os_flavor),
+    "OS_Arch"       = var.aws_os_arch,
+  }
 
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
@@ -90,63 +147,37 @@ source "amazon-ebs" "ubuntu" {
   }
 }
 
+// The build configuration
 build {
   sources = [
     "source.amazon-ebs.ubuntu"
   ]
 
-  provisioner "ansible" {
-    playbook_file = "${var.scripts_dir}/ansible/install-common.yml"
-    user          = "ubuntu"
-    use_proxy     = false
-    ansible_env_vars = [
-      "ANSIBLE_HOST_KEY_CHECKING=False",
-      "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",
-      "ANSIBLE_STDOUT_CALLBACK=yaml"
-    ]
-    extra_arguments = [
-      "-v"
-    ]
+  provisioner "shell" {
+    inline = ["sleep 30"] // Wait for the instance to be ready
   }
 
   provisioner "ansible" {
-    playbook_file = "${var.scripts_dir}/ansible/reboot.yml"
-    user          = "ubuntu"
-    use_proxy     = false
-    ansible_env_vars = [
-      "ANSIBLE_HOST_KEY_CHECKING=False",
-      "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",
-      "ANSIBLE_STDOUT_CALLBACK=yaml"
-    ]
-    extra_arguments = [
-      "-v"
-    ]
+    playbook_file    = "${var.scripts_dir}/ansible/install-common.yml"
+    user             = var.ssh_username
+    use_proxy        = false
+    ansible_env_vars = local.ansible_env_vars
+    extra_arguments  = local.ansible_extra_args
   }
 
   provisioner "ansible" {
-    playbook_file = "${var.scripts_dir}/ansible/install-docker.yml"
-    user          = "ubuntu"
-    use_proxy     = false
-    ansible_env_vars = [
-      "ANSIBLE_HOST_KEY_CHECKING=False",
-      "ANSIBLE_PYTHON_INTERPRETER=/usr/bin/python3",
-      "ANSIBLE_STDOUT_CALLBACK=yaml"
-    ]
-    extra_arguments = [
-      "-v"
-    ]
-  }
-
-  post-processor "manifest" {
-    output     = "manifest.json"
-    strip_path = true
+    playbook_file    = "${var.scripts_dir}/ansible/install-docker.yml"
+    user             = var.ssh_username
+    use_proxy        = false
+    ansible_env_vars = local.ansible_env_vars
+    extra_arguments  = local.ansible_extra_args
   }
 
   hcp_packer_registry {
     bucket_name = "aws-ubuntu"
 
     description = <<EOT
-An Ubuntu 22.04 LTS - Server image with Docker installed.
+local.image_description
     EOT
 
     bucket_labels = {
@@ -154,13 +185,15 @@ An Ubuntu 22.04 LTS - Server image with Docker installed.
       "aws_region"        = var.aws_region
       "aws_os_flavor"     = var.aws_os_flavor
       "aws_os_version"    = var.aws_os_version
+      "aws_os_arch"       = var.aws_os_arch
     }
 
     build_labels = {
-      "os_ami_id"     = "ami-${var.aws_os_flavor}-${var.aws_os_version}-${local.image_version}"
+      "os_ami_id"     = "ami-${var.aws_os_flavor}-${var.aws_os_version}-${var.aws_os_arch}-${local.image_version}"
       "os_base_image" = "{{ .SourceAMI }}"
       "os_flavor"     = var.aws_os_flavor
       "os_version"    = var.aws_os_version
+      "os_arch"       = var.aws_os_arch
     }
   }
 }
