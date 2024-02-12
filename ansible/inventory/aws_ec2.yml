@@ -1,0 +1,33 @@
+plugin: amazon.aws.aws_ec2
+profile: "{{ lookup('env', 'AWS_PROFILE') | default('', true) }}"
+regions:
+  - us-east-1
+filters:
+  # All instances with their state as `running`
+  instance-state-name: running
+keyed_groups:
+  # Create groups based on the 'Role' tag
+  - key: tags['Role']
+    prefix: 'KEYED-BY-ROLE'
+    separator: '--'
+  # Create groups based on the 'Environment' tag
+  - key: tags['Environment']
+    prefix: 'KEYED-BY-ENV'
+    separator: '--'
+  # Create groups based on the 'Stack' tag
+  - key: tags['Stack']
+    prefix: 'KEYED-BY-STACK'
+    separator: '--'
+
+groups:
+  # mintworld Cluster
+  mintworld_all: "'mintworld' in (tags['Stack'])"
+  mintworld_nomad_servers: "'nomad_svr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
+  mintworld_consul_servers: "'consul_svr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
+  mintworld_cluster_workers: "'cluster_wkr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
+
+hostnames:
+  - tag:Name
+
+compose:
+  ansible_host: public_dns_name
