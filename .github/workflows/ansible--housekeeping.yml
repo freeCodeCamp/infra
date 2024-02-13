@@ -30,6 +30,7 @@ jobs:
           - prd_oldeworld_clt_jpn
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
+          - prd_oldeworld_clt_swa
 
     uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
     with:
@@ -73,6 +74,7 @@ jobs:
           - prd_oldeworld_clt_jpn
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
+          - prd_oldeworld_clt_swa
 
     uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
     with:
@@ -139,6 +141,7 @@ jobs:
           - prd_oldeworld_clt_jpn
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
+          - prd_oldeworld_clt_swa
 
     uses: freeCodeCamp/infra/.github/workflows/ansible--reboot.yml@main
     with:
