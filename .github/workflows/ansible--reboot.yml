@@ -49,7 +49,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        uses: actions/checkout@df0bcddf6d6823307c716b56a7ef9c3b25078874
 
       - name: Setup Ansible and Dependencies
         env:
