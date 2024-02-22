@@ -135,7 +135,7 @@ source "amazon-ebs" "ubuntu" {
     "Base_AMI_Name" = "{{ .SourceAMIName }}"
     "Name"          = "Ubuntu-Docker-${local.image_version}",
     "OS_Version"    = var.aws_os_version,
-    "OS_Flavor"     = string.title(var.aws_os_flavor),
+    "OS_Flavor"     = var.aws_os_flavor,
     "OS_Arch"       = var.aws_os_arch,
   }
 
