@@ -20,10 +20,6 @@ runcmd:
     sed -i '/preserve_hostname: false/c\preserve_hostname: true' /etc/cloud/cloud.cfg
     hostnamectl set-hostname ${tf_hostname}
     echo \"${tf_hostname}\" > /etc/hostname
-  # Install Tailscale and start SSH service
-  # - |
-  #   curl -fsSL https://tailscale.com/install.sh | sh
-  #   tailscale up --authkey ${tf_tailscale_auth_key} --hostname ${tf_tailscale_hostname} --force-reauth --ssh
   #
   # :-----------------------: WARNING :-----------------------:
   #
