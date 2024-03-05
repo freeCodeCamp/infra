@@ -5,7 +5,9 @@
 
 - name: Install Consul from releases
   unarchive:
-    src: https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{ consul_version }}_linux_amd64.zip
+    src:
+      https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{
+      consul_version }}_linux_amd64.zip
     dest: /usr/local/bin
     remote_src: yes
     creates: /usr/local/bin/consul
@@ -28,7 +30,7 @@
   user:
     name: consul
     group: consul
-    comment: "Consul user"
+    comment: 'Consul user'
     shell: /bin/false
     system: yes
     create_home: yes

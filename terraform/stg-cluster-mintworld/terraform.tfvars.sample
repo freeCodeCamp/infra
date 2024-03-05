@@ -1,4 +1,7 @@
-linode_token = "<LinodeApiToken>"
+aws_access_key_id = "<AWSAccessKeyID>"
+aws_secret_access_key = "<AWSSecretAccessKey>"
+
+tailscale_auth_key = "<TailscaleAuthKey>"
 password = "<RootPassword>"
 
 hcp_client_id = "<HCPClientId>"

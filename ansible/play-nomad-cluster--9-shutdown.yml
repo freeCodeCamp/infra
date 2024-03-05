@@ -1,8 +1,0 @@
----
-- name: Stop Nomad Services
-  hosts: '{{ variable_host | default("null") }}'
-  become: true
-  gather_facts: false
-  tasks:
-    - name: Stop Nomad Services
-      service: name=nomad state=stopped enabled=yes

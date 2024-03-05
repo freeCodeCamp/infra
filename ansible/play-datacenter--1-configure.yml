@@ -3,26 +3,34 @@
   hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:
-    - nomad_svr: '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
-    - consul_svr: '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
-    - cluster_wkr: '{{ variable_cluster_workers_grp | default("mintworld_cluster_workers") }}'
-    - restart_services: '{{ variable_restart_services | default(false) }}'
-    - nomad_server_port: '{{ variable_nomad_server_port | default(4646) }}'
+    ansible_aws_ssm_bucket_name: "{{ lookup('env', 'AWS_SSM_BUCKET_NAME') }}"
+    ansible_aws_ssm_region: "{{ lookup('env', 'AWS_SSM_REGION') }}"
+    nomad_svr:
+      '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
+    consul_svr:
+      '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
+    nomad_wkr:
+      '{{ variable_cluster_workers_grp | default("mintworld_nomad_workers") }}'
+    nomad_server_port: '{{ variable_nomad_server_port | default(4646) }}'
+    certificates_dir: '{{ variable_certificates_dir | default("files") }}'
 
   tasks:
     - name: Configure Consul Servers
+      when: inventory_hostname in groups[consul_svr]
       block:
         - name: Copy the Certificates to the Consul Servers
           copy:
-            src: '{{ variable_certificates_dir }}/consul/certs'
+            src: '{{ certificates_dir }}/consul/certs'
             dest: /etc/consul.d/
             owner: consul
             group: consul
-            mode: 0755
+            mode: '0755'
 
         - name: List of Consul Server addresses
           set_fact:
-            consul_server_addresses: '{{ groups[consul_svr] | map("extract", hostvars, ["ansible_fqdn"]) | list }}'
+            consul_server_addresses:
+              '{{ groups[consul_svr] | map("extract", hostvars,
+              ["ansible_fqdn"]) | list }}'
 
         - name: Set up config for Consul Servers
           include_role:
@@ -33,21 +41,25 @@
           include_role:
             name: consul
             tasks_from: config-systemd.yml
-      when: inventory_hostname in groups[consul_svr]
 
     - name: Configure Consul Clients
+      when:
+        inventory_hostname in groups[nomad_svr] or inventory_hostname in
+        groups[nomad_wkr]
       block:
         - name: Copy the CA Certificate to the Consul Clients
           copy:
-            src: '{{ variable_certificates_dir }}/consul/certs/consul-agent-ca.pem'
+            src: '{{ certificates_dir }}/consul/certs/consul-agent-ca.pem'
             dest: /etc/consul.d/certs/consul-agent-ca.pem
             owner: consul
             group: consul
-            mode: 0755
+            mode: '0755'
 
         - name: List of Consul Server addresses
           set_fact:
-            consul_server_addresses: '{{ groups[consul_svr] | map("extract", hostvars, ["ansible_fqdn"]) | list }}'
+            consul_server_addresses:
+              '{{ groups[consul_svr] | map("extract", hostvars,
+              ["ansible_fqdn"]) | list }}'
 
         - name: Set up config for Consul Clients
           include_role:
@@ -58,10 +70,9 @@
           include_role:
             name: consul
             tasks_from: config-systemd.yml
-      when:
-        inventory_hostname in groups[nomad_svr] or inventory_hostname in groups[cluster_wkr]
 
     - name: Configure Nomad Servers
+      when: inventory_hostname in groups[nomad_svr]
       block:
         - name: Set up config for Nomad Servers
           include_role:
@@ -75,15 +86,17 @@
 
         - name: List of Nomad Server addresses
           set_fact:
-            nomad_server_addresses: '{{ groups[nomad_svr] | map("extract", hostvars, ["ansible_fqdn"]) | list }}'
+            nomad_server_addresses:
+              '{{ groups[nomad_svr] | map("extract", hostvars, ["ansible_fqdn"])
+              | list }}'
 
-        - name: Set up NGINX proxy for HTTP traffic to Nomad on Nomad Servers
-          include_role:
-            name: nomad
-            tasks_from: config-nginx--nomad-http.yml
-      when: inventory_hostname in groups[nomad_svr]
+        # - name: Set up NGINX proxy for HTTP traffic to Nomad on Nomad Servers
+        # include_role:
+        #     name: nomad
+        #     tasks_from: config-nginx--nomad-http.yml
 
     - name: Configure Nomad Clients
+      when: inventory_hostname in groups[nomad_wkr]
       block:
         - name: Set up config for Nomad Clients
           include_role:
@@ -99,5 +112,3 @@
           include_role:
             name: nomad
             tasks_from: config-client--systemd.yml
-      when:
-        inventory_hostname in groups[cluster_wkr]

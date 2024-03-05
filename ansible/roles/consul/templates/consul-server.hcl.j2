@@ -2,16 +2,11 @@ datacenter = "{{ lookup('env', 'FCC_ANSIBLE_DATACENTER_NAME') }}"
 data_dir   = "/opt/consul"
 encrypt    = "{{ lookup('env', 'FCC_ANSIBLE_CONSUL_GOSSIP_ENCRYPT_SECRET') }}"
 
-server           = true
-bootstrap_expect = 3
-{% raw %}
-bind_addr = "{{ GetPrivateInterfaces | include \"network\" \"10.0.0.0/8\" | attr \"address\" }}"
-{% endraw %}
+bind_addr = "0.0.0.0"
 client_addr = "0.0.0.0"
-
-connect {
-  enabled = true
-}
+{% raw %}
+advertise_addr = "{{ GetInterfaceIP `ens5` }}"
+{% endraw %}
 
 tls {
   defaults {
@@ -38,15 +33,22 @@ retry_join = [
 
 recursors = ["1.1.1.1"]
 
-acl {
-  enabled                  = true
-  enable_token_persistence = true
+# acl {
+#   enabled                  = true
+#   enable_token_persistence = true
 
-  # The default policy should be "deny", but start with allow while you're
-  # bootstrapping the ACL system.
-  default_policy           = "allow"
-}
+#   # The default policy should be "deny", but start with allow while you're
+#   # bootstrapping the ACL system.
+#   default_policy           = "allow"
+# }
 
 ui_config {
+  enabled = true
+}
+
+server           = true
+bootstrap_expect = 3
+
+connect {
   enabled = true
 }
