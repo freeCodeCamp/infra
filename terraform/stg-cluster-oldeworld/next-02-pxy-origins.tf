@@ -1,22 +1,22 @@
-data linode_nodebalancers stg_oldeworld_pxy_nbs {
+data "linode_nodebalancers" "stg_oldeworld_pxy_nbs" {
   filter {
-    name = "label"
+    name   = "label"
     values = ["stg-nb-oldeworld-pxy"]
   }
 }
 
-data linode_nodebalancer_configs stg_oldeworld_pxy_nb_configs__port_443 {
+data "linode_nodebalancer_configs" "stg_oldeworld_pxy_nb_configs__port_443" {
   nodebalancer_id = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["443"]
   }
 }
 
-data linode_nodebalancer_configs stg_oldeworld_pxy_nb_configs__port_80 {
+data "linode_nodebalancer_configs" "stg_oldeworld_pxy_nb_configs__port_80" {
   nodebalancer_id = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["80"]
   }
 }

@@ -1,22 +1,22 @@
-data linode_nodebalancers prd_oldeworld_pxy_1_nbs {
+data "linode_nodebalancers" "prd_oldeworld_pxy_1_nbs" {
   filter {
-    name = "label"
+    name   = "label"
     values = ["prd-nb-oldeworld-pxy-1"]
   }
 }
 
-data linode_nodebalancer_configs prd_oldeworld_pxy_1_nb_configs__port_443 {
+data "linode_nodebalancer_configs" "prd_oldeworld_pxy_1_nb_configs__port_443" {
   nodebalancer_id = data.linode_nodebalancers.prd_oldeworld_pxy_1_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["443"]
   }
 }
 
-data linode_nodebalancer_configs prd_oldeworld_pxy_1_nb_configs__port_80 {
+data "linode_nodebalancer_configs" "prd_oldeworld_pxy_1_nb_configs__port_80" {
   nodebalancer_id = data.linode_nodebalancers.prd_oldeworld_pxy_1_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["80"]
   }
 }
@@ -39,25 +39,25 @@ resource "linode_nodebalancer_node" "prd_oldeworld_nb_pxy_1_nodes__port_80" {
   label           = "prd-node-pxy-80-${count.index}"
 }
 
-data linode_nodebalancers prd_oldeworld_pxy_2_nbs {
+data "linode_nodebalancers" "prd_oldeworld_pxy_2_nbs" {
   filter {
-    name = "label"
+    name   = "label"
     values = ["prd-nb-oldeworld-pxy-2"]
   }
 }
 
-data linode_nodebalancer_configs prd_oldeworld_pxy_2_nb_configs__port_443 {
+data "linode_nodebalancer_configs" "prd_oldeworld_pxy_2_nb_configs__port_443" {
   nodebalancer_id = data.linode_nodebalancers.prd_oldeworld_pxy_2_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["443"]
   }
 }
 
-data linode_nodebalancer_configs prd_oldeworld_pxy_2_nb_configs__port_80 {
+data "linode_nodebalancer_configs" "prd_oldeworld_pxy_2_nb_configs__port_80" {
   nodebalancer_id = data.linode_nodebalancers.prd_oldeworld_pxy_2_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["80"]
   }
 }
@@ -80,25 +80,25 @@ resource "linode_nodebalancer_node" "prd_oldeworld_nb_pxy_2_nodes__port_80" {
   label           = "prd-node-pxy-80-${count.index}"
 }
 
-data linode_nodebalancers prd_oldeworld_pxy_3_nbs {
+data "linode_nodebalancers" "prd_oldeworld_pxy_3_nbs" {
   filter {
-    name = "label"
+    name   = "label"
     values = ["prd-nb-oldeworld-pxy-3"]
   }
 }
 
-data linode_nodebalancer_configs prd_oldeworld_pxy_3_nb_configs__port_443 {
+data "linode_nodebalancer_configs" "prd_oldeworld_pxy_3_nb_configs__port_443" {
   nodebalancer_id = data.linode_nodebalancers.prd_oldeworld_pxy_3_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["443"]
   }
 }
 
-data linode_nodebalancer_configs prd_oldeworld_pxy_3_nb_configs__port_80 {
+data "linode_nodebalancer_configs" "prd_oldeworld_pxy_3_nb_configs__port_80" {
   nodebalancer_id = data.linode_nodebalancers.prd_oldeworld_pxy_3_nbs.nodebalancers[0].id
   filter {
-    name = "port"
+    name   = "port"
     values = ["80"]
   }
 }
