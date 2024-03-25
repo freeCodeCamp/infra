@@ -7,7 +7,7 @@ terraform {
 
     hcp = {
       source  = "hashicorp/hcp"
-      version = "0.82.0"
+      version = "0.84.1"
     }
 
     cloudflare = {
