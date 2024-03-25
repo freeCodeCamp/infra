@@ -30,7 +30,7 @@ resource "linode_instance_disk" "ops_backoffice_disk__boot" {
   linode_id = linode_instance.ops_backoffice.id
   size      = linode_instance.ops_backoffice.specs.0.disk
 
-  image     = data.hcp_packer_artifact.linode_ubuntu.id
+  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id

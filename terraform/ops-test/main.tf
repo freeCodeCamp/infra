@@ -15,11 +15,11 @@ data "linode_stackscripts" "cloudinit_scripts" {
   }
 }
 
-data "hcp_packer_artifact" "linode_ubuntu" {
-  bucket_name  = "linode-ubuntu"
-  channel_name = "golden"
-  platform     = "linode"
-  region       = "us-east"
+data "hcp_packer_image" "linode_ubuntu" {
+  bucket_name    = "linode-ubuntu"
+  channel        = "golden"
+  cloud_provider = "linode"
+  region         = "us-east"
 }
 
 data "cloudflare_zone" "cf_zone" {
@@ -46,7 +46,7 @@ resource "linode_instance_disk" "ops_test_disk__boot" {
   linode_id = linode_instance.ops_test.id
   size      = linode_instance.ops_test.specs.0.disk
 
-  image     = data.hcp_packer_artifact.linode_ubuntu.id
+  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
