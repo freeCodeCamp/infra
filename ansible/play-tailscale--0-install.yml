@@ -4,6 +4,8 @@
   become: true
   gather_facts: true
   vars:
+    ansible_aws_ssm_bucket_name: "{{ lookup('env', 'AWS_SSM_BUCKET_NAME') }}"
+    ansible_aws_ssm_region: "{{ lookup('env', 'AWS_SSM_REGION') }}"
     apt_keyring_path: /usr/share/keyrings/tailscale-archive-keyring.gpg
   tasks:
     - name: Install Tailscale Dependencies
@@ -19,18 +21,16 @@
 
     - name: Add Tailscale GPG Key
       apt_key:
-        url:
-          'https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower
-          }}/{{ ansible_distribution_release | lower }}.noarmor.gpg'
-        keyring: '{{ apt_keyring_path }}'
+        url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower
+          }}/{{ ansible_distribution_release | lower }}.noarmor.gpg"
+        keyring: "{{ apt_keyring_path }}"
         state: present
 
     - name: Add Tailscale APT Repository
       apt_repository:
-        repo:
-          'deb [signed-by={{ apt_keyring_path }}]
+        repo: "deb [signed-by={{ apt_keyring_path }}]
           https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}
-          {{ ansible_distribution_release | lower }} main'
+          {{ ansible_distribution_release | lower }} main"
         state: present
 
     - name: Install Tailscale
