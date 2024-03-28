@@ -4,8 +4,6 @@
   become: true
   gather_facts: true
   vars:
-    ansible_aws_ssm_bucket_name: "{{ lookup('env', 'AWS_SSM_BUCKET_NAME') }}"
-    ansible_aws_ssm_region: "{{ lookup('env', 'AWS_SSM_REGION') }}"
     apt_keyring_path: /usr/share/keyrings/tailscale-archive-keyring.gpg
   tasks:
     - name: Install Tailscale Dependencies
