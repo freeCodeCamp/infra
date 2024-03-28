@@ -3,16 +3,10 @@
   hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:
-    ansible_aws_ssm_bucket_name: "{{ lookup('env', 'AWS_SSM_BUCKET_NAME') }}"
-    ansible_aws_ssm_region: "{{ lookup('env', 'AWS_SSM_REGION') }}"
-    nomad_svr:
-      '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
-    consul_svr:
-      '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
-    nomad_wkr:
-      '{{ variable_cluster_workers_grp | default("mintworld_nomad_workers") }}'
-    include_ubuntu_updates:
-      '{{ variable_include_ubuntu_updates | default(false) }}'
+    nomad_svr: '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
+    consul_svr: '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
+    nomad_wkr: '{{ variable_cluster_workers_grp | default("mintworld_nomad_workers") }}'
+    include_ubuntu_updates: "{{ variable_include_ubuntu_updates | default(false) }}"
 
   tasks:
     - name: Datacenter -- Install Pre-requisites
@@ -27,8 +21,7 @@
     - name:
         Datacenter -- Install Nomad Binary on Nomad Servers Nodes and Cluster
         Workers Nodes
-      when:
-        inventory_hostname in groups[nomad_svr] or inventory_hostname in
+      when: inventory_hostname in groups[nomad_svr] or inventory_hostname in
         groups[nomad_wkr]
       include_role:
         name: nomad
@@ -40,5 +33,5 @@
     - name: Conclusion
       debug:
         msg:
-          'Datacenter -- Pre-requisites Completed, continue with configuration
-          plays.'
+          "Datacenter -- Pre-requisites Completed, continue with configuration
+          plays."

@@ -3,15 +3,10 @@
   hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:
-    ansible_aws_ssm_bucket_name: "{{ lookup('env', 'AWS_SSM_BUCKET_NAME') }}"
-    ansible_aws_ssm_region: "{{ lookup('env', 'AWS_SSM_REGION') }}"
-    nomad_svr:
-      '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
-    consul_svr:
-      '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
-    nomad_wkr:
-      '{{ variable_cluster_workers_grp | default("mintworld_nomad_workers") }}'
-    nomad_server_port: '{{ variable_nomad_server_port | default(4646) }}'
+    nomad_svr: '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
+    consul_svr: '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
+    nomad_wkr: '{{ variable_cluster_workers_grp | default("mintworld_nomad_workers") }}'
+    nomad_server_port: "{{ variable_nomad_server_port | default(4646) }}"
     certificates_dir: '{{ variable_certificates_dir | default("files") }}'
 
   tasks:
@@ -20,11 +15,11 @@
       block:
         - name: Copy the Certificates to the Consul Servers
           copy:
-            src: '{{ certificates_dir }}/consul/certs'
+            src: "{{ certificates_dir }}/consul/certs"
             dest: /etc/consul.d/
             owner: consul
             group: consul
-            mode: '0755'
+            mode: "0755"
 
         - name: List of Consul Server addresses
           set_fact:
@@ -43,17 +38,16 @@
             tasks_from: config-systemd.yml
 
     - name: Configure Consul Clients
-      when:
-        inventory_hostname in groups[nomad_svr] or inventory_hostname in
+      when: inventory_hostname in groups[nomad_svr] or inventory_hostname in
         groups[nomad_wkr]
       block:
         - name: Copy the CA Certificate to the Consul Clients
           copy:
-            src: '{{ certificates_dir }}/consul/certs/consul-agent-ca.pem'
+            src: "{{ certificates_dir }}/consul/certs/consul-agent-ca.pem"
             dest: /etc/consul.d/certs/consul-agent-ca.pem
             owner: consul
             group: consul
-            mode: '0755'
+            mode: "0755"
 
         - name: List of Consul Server addresses
           set_fact:
