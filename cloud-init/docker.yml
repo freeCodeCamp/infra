@@ -12,12 +12,14 @@ packages:
   - lsb-release
 users:
   - name: freecodecamp
-    groups: sudo
-    shell:  /bin/bash
-    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups:
+      - sudo
+      - docker
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_import_id:
       - gh:camperbot
-      - gh:raisedadead
+      - raisedadead
 runcmd:
   # This will install docker on the virtual machine and add the freeCodeCamp user to docker usergroup
   - sudo mkdir -p /etc/apt/keyrings
@@ -33,4 +35,4 @@ runcmd:
   - sudo systemctl start docker
   - sudo systemctl enable docker
   - sudo usermod -aG docker freecodecamp
-final_message: 'Setup complete'
+final_message: "Setup complete"
