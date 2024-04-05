@@ -1,14 +1,15 @@
 #cloud-config
 users:
   - name: freecodecamp
-    groups: sudo
-    shell:  /bin/bash
-    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups:
+      - sudo
+      - docker
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_import_id:
       - gh:camperbot
       - raisedadead
 runcmd:
-  - usermod -aG docker freecodecamp
   # Configure sshd
   - |
     sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
@@ -19,8 +20,7 @@ runcmd:
   - |
     sed -i '/preserve_hostname: false/c\preserve_hostname: true' /etc/cloud/cloud.cfg
     hostnamectl set-hostname ${tf_hostname}
-    echo \"${tf_hostname}\" > /etc/hostname
-  #
+    echo "${tf_hostname}" > /etc/hostname
   # :-----------------------: WARNING :-----------------------:
   #
   #   This next line should be the last command in the list,
@@ -28,4 +28,4 @@ runcmd:
   #
   # :-----------------------: WARNING :-----------------------:
   - systemctl restart sshd
-final_message: 'Setup complete'
+final_message: "Setup complete"
