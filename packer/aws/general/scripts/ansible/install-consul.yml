@@ -1,0 +1,84 @@
+---
+- name: Install Consul on Ubuntu
+  hosts: all
+  become: true
+  become_method: sudo
+  gather_facts: true
+
+  tasks:
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        autoclean: true
+        autoremove: true
+        purge: true
+
+    - name: Add HashiCorp GPG key
+      ansible.builtin.apt_key:
+        url: https://apt.releases.hashicorp.com/gpg
+        state: present
+
+    - name: Set fact for amd64 or arm64
+      set_fact:
+        arch: "{{ (ansible_architecture == 'x86_64') | ternary('amd64', 'arm64') }}"
+
+    - name: Add HashiCorp APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ arch }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+        state: present
+        update_cache: true
+
+    - name: Install Consul
+      ansible.builtin.apt:
+        name: consul
+        state: present
+        update_cache: true
+
+    - name: Check consul version
+      command: consul version
+      register: consul_version_output
+      changed_when: false
+      failed_when: "'Consul v' not in consul_version_output.stdout"
+
+    - name: Create a consul group
+      group:
+        name: consul
+        system: yes
+
+    - name: Create a consul user
+      user:
+        name: consul
+        group: consul
+        comment: "Consul user"
+        shell: /bin/false
+        system: yes
+        create_home: yes
+        home: /etc/consul.d
+
+    - name: Set the permissions on the consul home directory
+      file:
+        path: /etc/consul.d
+        state: directory
+        owner: consul
+        group: consul
+        mode: 0700
+
+    - name: Create a consul certificate directory
+      file:
+        path: /etc/consul.d/certs
+        state: directory
+        owner: consul
+        group: consul
+        mode: 0700
+
+    - name: Create a data directory
+      file:
+        path: /opt/consul
+        state: directory
+        owner: consul
+        group: consul
+        mode: 0755

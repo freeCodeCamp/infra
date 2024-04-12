@@ -15,23 +15,6 @@ variable "skip_create_ami" {
   default     = false
 }
 
-// The OS configuration for the build
-variable "aws_os_version" {
-  description = "The OS version to use for the build. Example: '22.04'"
-  type        = string
-  default     = "22.04"
-}
-variable "aws_os_flavor" {
-  description = "The OS flavor to use for the build. Example: 'ubuntu'"
-  type        = string
-  default     = "ubuntu"
-}
-variable "aws_os_arch" {
-  description = "The OS architecture to use for the build. Example: 'x86_64' or 'arm64'"
-  type        = string
-  default     = "x86_64"
-}
-
 // The AWS configuration for the build
 variable "aws_instance_type" {
   description = "The instance type to use for the build, from the AWS instance types list."
@@ -83,15 +66,23 @@ variable "scripts_dir" {
   default     = "aws/general/scripts"
 }
 
+// Parent Image
+data "hcp-packer-version" "ubuntu" {
+  bucket_name  = "aws-ubuntu"
+  channel_name = "golden"
+}
+data "hcp-packer-artifact" "ubuntu" {
+  bucket_name         = "aws-ubuntu"
+  version_fingerprint = data.hcp-packer-version.ubuntu.fingerprint
+  platform            = "aws"
+  region              = var.aws_region
+}
+
 // The dynamic build configuration based on the variables
 locals {
   image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}"
 
-  // The source AMI filter name, based on the OS flavor, version, and architecture
-  // Example: "ubuntu/images/hvm-ssd/ubuntu-*-22.04-*-server-*"
-  source_ami_filter_name = "${var.aws_os_flavor}/images/hvm-ssd/${var.aws_os_flavor}-*-${var.aws_os_version}-*-server-*"
-
-  image_description = "An ${var.aws_os_flavor} ${var.aws_os_version} ${var.aws_os_arch} - Server image with Docker installed."
+  image_description = "An Ubuntu Nomad Consul  - Server image with Docker installed."
 
   ansible_env_vars = [
     "ANSIBLE_HOST_KEY_CHECKING=False",
@@ -104,26 +95,14 @@ locals {
 }
 
 // The source AMI for the build
-source "amazon-ebs" "ubuntu" {
-  source_ami_filter {
-    filters = {
-      architecture        = var.aws_os_arch
-      name                = local.source_ami_filter_name
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    // owners      = ["099720109477"] // "Canonical - Ubuntu Images" is chargable ??
-    owners      = ["amazon"]
-    most_recent = true
-  }
-
+source "amazon-ebs" "nomad-consul" {
   skip_create_ami = var.skip_create_ami
 
   instance_type   = var.aws_instance_type
   region          = var.aws_region
-  ami_name        = "ami-${var.aws_os_flavor}-${var.aws_os_version}-${var.aws_os_arch}-${local.image_version}"
+  source_ami      = data.hcp-packer-artifact.ubuntu.external_identifier
+  ami_name        = "ami-nomad-consul-${local.image_version}"
   ami_description = local.image_description
-
 
   shutdown_behavior     = var.shutdown_behavior
   force_deregister      = var.force_deregister
@@ -132,12 +111,8 @@ source "amazon-ebs" "ubuntu" {
   ssh_username = var.ssh_username
 
   tags = {
-    "Name"          = "Ubuntu-Docker-${local.image_version}",
-    "OS_Version"    = var.aws_os_version,
-    "OS_Flavor"     = var.aws_os_flavor,
-    "OS_Arch"       = var.aws_os_arch,
-    "Base_AMI_ID"   = "{{ .SourceAMI }}"
-    "Base_AMI_Name" = "{{ .SourceAMIName }}"
+    "Base_AMI_Name" = data.hcp-packer-artifact.ubuntu.external_identifier,
+    "Name"          = "Ubuntu-NomadConsul-${local.image_version}",
   }
 
   launch_block_device_mappings {
@@ -151,7 +126,7 @@ source "amazon-ebs" "ubuntu" {
 // The build configuration
 build {
   sources = [
-    "source.amazon-ebs.ubuntu"
+    "source.amazon-ebs.nomad-consul"
   ]
 
   provisioner "shell" {
@@ -159,7 +134,7 @@ build {
   }
 
   provisioner "ansible" {
-    playbook_file    = "${var.scripts_dir}/ansible/install-common.yml"
+    playbook_file    = "${var.scripts_dir}/ansible/install-nomad.yml"
     user             = var.ssh_username
     use_proxy        = false
     ansible_env_vars = local.ansible_env_vars
@@ -167,7 +142,7 @@ build {
   }
 
   provisioner "ansible" {
-    playbook_file    = "${var.scripts_dir}/ansible/install-docker.yml"
+    playbook_file    = "${var.scripts_dir}/ansible/install-consul.yml"
     user             = var.ssh_username
     use_proxy        = false
     ansible_env_vars = local.ansible_env_vars
@@ -175,7 +150,7 @@ build {
   }
 
   hcp_packer_registry {
-    bucket_name = "aws-ubuntu"
+    bucket_name = "aws-nomad-consul"
 
     description = <<EOT
 local.image_description
@@ -184,17 +159,10 @@ local.image_description
     bucket_labels = {
       "aws_instance_type" = var.aws_instance_type
       "aws_region"        = var.aws_region
-      "aws_os_flavor"     = var.aws_os_flavor
-      "aws_os_version"    = var.aws_os_version
-      "aws_os_arch"       = var.aws_os_arch
     }
 
     build_labels = {
-      "os_ami_id"     = "ami-${var.aws_os_flavor}-${var.aws_os_version}-${var.aws_os_arch}-${local.image_version}"
       "os_base_image" = "{{ .SourceAMI }}"
-      "os_flavor"     = var.aws_os_flavor
-      "os_version"    = var.aws_os_version
-      "os_arch"       = var.aws_os_arch
     }
   }
 }

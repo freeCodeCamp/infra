@@ -1,0 +1,76 @@
+---
+- name: Install Nomad on Ubuntu
+  hosts: all
+  become: true
+  become_method: sudo
+  gather_facts: true
+
+  tasks:
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        autoclean: true
+        autoremove: true
+        purge: true
+
+    - name: Add HashiCorp GPG key
+      ansible.builtin.apt_key:
+        url: https://apt.releases.hashicorp.com/gpg
+        state: present
+
+    - name: Set fact for amd64 or arm64
+      set_fact:
+        arch: "{{ (ansible_architecture == 'x86_64') | ternary('amd64', 'arm64') }}"
+
+    - name: Add HashiCorp APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ arch }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+        state: present
+        update_cache: true
+
+    - name: Install Nomad
+      ansible.builtin.apt:
+        name: nomad
+        state: present
+        update_cache: true
+
+    - name: Check nomad version
+      ansible.builtin.command: nomad version
+      register: nomad_version_output
+      changed_when: false
+      failed_when: "'Nomad v' not in nomad_version_output.stdout"
+
+    - name: Create a nomad group
+      group:
+        name: nomad
+        system: yes
+
+    - name: Create a nomad user
+      ansible.builtin.user:
+        name: nomad
+        group: nomad
+        comment: "Nomad user"
+        shell: /bin/false
+        system: yes
+        create_home: yes
+        home: /etc/nomad.d
+
+    - name: Set the permissions on the nomad home directory
+      ansible.builtin.file:
+        path: /etc/nomad.d
+        state: directory
+        owner: nomad
+        group: nomad
+        mode: 0700
+
+    - name: Create a data directory
+      ansible.builtin.file:
+        path: /opt/nomad
+        state: directory
+        owner: nomad
+        group: nomad
+        mode: 0755
