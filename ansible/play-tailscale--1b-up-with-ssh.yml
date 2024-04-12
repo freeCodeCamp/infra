@@ -15,16 +15,13 @@
   vars:
     prefix: "{{ hostvars['localhost']['global_prefix'] }}"
   tasks:
-    - name: Debug Hostname with Prefix
-      debug:
-        msg: "{{ prefix }}-{{ inventory_hostname }}"
-
     - name: Add Tailscale to Network
       shell:
         cmd: |
           tailscale up \
           --authkey "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}" \
-          --hostname "{{ prefix }}-{{ inventory_hostname }}" \
+          --hostname "{{ inventory_hostname }}" \
+          --advertise-tags "tag:{{ prefix }}" \
           --force-reauth \
           --ssh
         executable: /bin/bash
