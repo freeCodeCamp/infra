@@ -76,6 +76,7 @@ module "stg_mw_consul_svr" {
   security_group_ids   = [module.stg_mw_network.out__sg_id]
   subnets              = module.stg_mw_network.out__subnets.private
   zone                 = local.zone
+  stack_tags           = var.stack_tags
 }
 
 module "stg_mw_nomad_svr" {
@@ -92,6 +93,7 @@ module "stg_mw_nomad_svr" {
   security_group_ids   = [module.stg_mw_network.out__sg_id]
   subnets              = module.stg_mw_network.out__subnets.private
   zone                 = local.zone
+  stack_tags           = var.stack_tags
 }
 
 module "stg_mw_nomad_wkr" {
@@ -108,4 +110,5 @@ module "stg_mw_nomad_wkr" {
   security_group_ids   = [module.stg_mw_network.out__sg_id]
   subnets              = module.stg_mw_network.out__subnets.private
   zone                 = local.zone
+  stack_tags           = var.stack_tags
 }
