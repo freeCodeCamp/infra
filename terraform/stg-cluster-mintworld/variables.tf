@@ -54,18 +54,6 @@ variable "cloudflare_account_id" {
   description = "Cloudflare Account ID"
 }
 
-variable "user_data_replace_on_change" {
-  type        = bool
-  description = "Recreate instances on changes to UserData"
-  default     = false
-}
-
-variable "enable_eip_on_launch_in_public_subnets" {
-  type        = bool
-  description = "Enable EIP assignment on launch in public subnets"
-  default     = false
-}
-
 # -----------------------------------------------
 # define the tags for the resources in this stack
 # -----------------------------------------------
