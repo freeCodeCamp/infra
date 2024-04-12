@@ -1,33 +1,28 @@
 ---
-- name: Generate Prefix for Hostnames
-  hosts: localhost
-  gather_facts: false
-  tasks:
-    - name: Generate a random string for the hostname prefix
-      set_fact:
-        global_prefix: "{{ query('community.general.random_string', upper=false, lower=false, override_special='0123456789ABCDEF', numbers=false) | first }}"
-      run_once: true
-
-- name: Tailscale - Connect to Tailscale Network with inbound SSH enabled
+- name: Tailscale - Connect to Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
   become: true
   gather_facts: false
-  vars:
-    prefix: "{{ hostvars['localhost']['global_prefix'] }}"
   tasks:
     - name: Add Tailscale to Network
       shell:
         cmd: |
           tailscale up \
           --authkey "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}" \
-          --hostname "{{ inventory_hostname }}" \
-          --advertise-tags "tag:{{ prefix }}" \
+          --hostname {{ inventory_hostname }} \
           --force-reauth \
+          --reset \
           --ssh
         executable: /bin/bash
       no_log: true
       changed_when: true
       ignore_errors: true
+      register: tailscale_up
+
+    - name: Print error message if Tailscale failed
+      debug:
+        msg: "{{ tailscale_up.stderr }}"
+      when: tailscale_up.rc != 0
 
     - name: Check if Tailscale is Connected
       shell:
