@@ -22,9 +22,9 @@ keyed_groups:
 groups:
   # mintworld Cluster
   mintworld_all: "'mintworld' in (tags['Stack'])"
-  mintworld_nomad_servers: "'nomad_svr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
-  mintworld_consul_servers: "'consul_svr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
-  mintworld_nomad_workers: "'nomad_wkr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
+  mintworld_nomad_servers: "'nomad-svr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
+  mintworld_consul_servers: "'consul-svr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
+  mintworld_nomad_workers: "'nomad-wkr' in (tags['Role']) and 'mintworld' in (tags['Stack'])"
 
 hostnames:
   - tag:Name # Use the 'Name' tag as the hostname, for ansible_hostname and inventory_hostname

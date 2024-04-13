@@ -4,6 +4,13 @@
   become: true
   gather_facts: false
   tasks:
+    - name: Check if Tailscale is Installed
+      shell:
+        cmd: |
+          tailscale --version
+        executable: /bin/bash
+      register: tailscale_version
+
     - name: Add Tailscale to Network
       shell:
         cmd: |
