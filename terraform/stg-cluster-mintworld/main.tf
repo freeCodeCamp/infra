@@ -77,6 +77,10 @@ module "stg_mw_consul_svr" {
   subnets              = module.stg_mw_network.out__subnets.private
   zone                 = local.zone
   stack_tags           = var.stack_tags
+
+  depends_on = [
+    module.stg_mw_network
+  ]
 }
 
 module "stg_mw_nomad_svr" {
@@ -94,6 +98,10 @@ module "stg_mw_nomad_svr" {
   subnets              = module.stg_mw_network.out__subnets.private
   zone                 = local.zone
   stack_tags           = var.stack_tags
+
+  depends_on = [
+    module.stg_mw_network
+  ]
 }
 
 module "stg_mw_nomad_wkr" {
@@ -111,4 +119,8 @@ module "stg_mw_nomad_wkr" {
   subnets              = module.stg_mw_network.out__subnets.private
   zone                 = local.zone
   stack_tags           = var.stack_tags
+
+  depends_on = [
+    module.stg_mw_network
+  ]
 }
