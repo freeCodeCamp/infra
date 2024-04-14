@@ -27,7 +27,8 @@ auto_encrypt {
 }
 
 retry_join = [
-  {% for address in consul_server_addresses %}"{{ address }}"{{ "," if not loop.last }}
+  {% for address in consul_server_addresses %}
+  "{{ address | trim }}"{{ "," if not loop.last }}
   {% endfor %}
 ]
 
