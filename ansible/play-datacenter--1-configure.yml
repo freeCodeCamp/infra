@@ -10,6 +10,10 @@
     certificates_dir: '{{ variable_certificates_dir | default("files") }}'
 
   tasks:
+    - name: Datacenter -- DNS Configuration
+      include_role:
+        name: dns
+
     - name: Configure Consul Servers
       when: inventory_hostname in groups[consul_svr]
       block:

@@ -14,10 +14,6 @@
       include_role:
         name: ubuntu
 
-    - name: Datacenter -- DNS Configuration
-      include_role:
-        name: dns
-
     - name:
         Datacenter -- Install Nomad Binary on Nomad Servers Nodes and Cluster
         Workers Nodes
