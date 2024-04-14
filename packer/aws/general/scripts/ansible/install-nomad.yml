@@ -6,37 +6,20 @@
   gather_facts: true
 
   tasks:
-    - name: Install prerequisite packages
-      ansible.builtin.apt:
-        name:
-          - curl
-          - gnupg
-          - lsb-release
-        state: present
-        autoclean: true
-        autoremove: true
-        purge: true
-
-    - name: Add HashiCorp GPG key
-      ansible.builtin.apt_key:
-        url: https://apt.releases.hashicorp.com/gpg
-        state: present
-
     - name: Set fact for amd64 or arm64
       set_fact:
         arch: "{{ (ansible_architecture == 'x86_64') | ternary('amd64', 'arm64') }}"
 
-    - name: Add HashiCorp APT repository
-      ansible.builtin.apt_repository:
-        repo: "deb [arch={{ arch }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
-        state: present
-        update_cache: true
-
-    - name: Install Nomad
-      ansible.builtin.apt:
-        name: nomad
-        state: present
-        update_cache: true
+    - name: Install Nomad from releases
+      unarchive:
+        src: https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{
+          nomad_version }}_linux_{{ arch }}.zip
+        dest: /usr/local/bin
+        remote_src: yes
+        creates: /usr/local/bin/nomad
+        owner: root
+        group: root
+        mode: 0755
 
     - name: Check nomad version
       ansible.builtin.command: nomad version

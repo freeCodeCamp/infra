@@ -3,11 +3,14 @@
   set_fact:
     nomad_version: 1.7.3
 
+- name: Set fact for amd64 or arm64
+  set_fact:
+    arch: "{{ (ansible_architecture == 'x86_64') | ternary('amd64', 'arm64') }}"
+
 - name: Install Nomad from releases
   unarchive:
-    src:
-      https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{
-      nomad_version }}_linux_amd64.zip
+    src: https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{
+      nomad_version }}_linux_{{ arch }}.zip
     dest: /usr/local/bin
     remote_src: yes
     creates: /usr/local/bin/nomad
@@ -30,7 +33,7 @@
   user:
     name: nomad
     group: nomad
-    comment: 'Nomad user'
+    comment: "Nomad user"
     shell: /bin/false
     system: yes
     create_home: yes

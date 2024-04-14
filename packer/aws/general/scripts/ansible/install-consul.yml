@@ -6,37 +6,21 @@
   gather_facts: true
 
   tasks:
-    - name: Install prerequisite packages
-      ansible.builtin.apt:
-        name:
-          - curl
-          - gnupg
-          - lsb-release
-        state: present
-        autoclean: true
-        autoremove: true
-        purge: true
-
-    - name: Add HashiCorp GPG key
-      ansible.builtin.apt_key:
-        url: https://apt.releases.hashicorp.com/gpg
-        state: present
-
     - name: Set fact for amd64 or arm64
       set_fact:
         arch: "{{ (ansible_architecture == 'x86_64') | ternary('amd64', 'arm64') }}"
 
-    - name: Add HashiCorp APT repository
-      ansible.builtin.apt_repository:
-        repo: "deb [arch={{ arch }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
-        state: present
-        update_cache: true
-
-    - name: Install Consul
-      ansible.builtin.apt:
-        name: consul
-        state: present
-        update_cache: true
+    - name: Install Consul from releases
+      unarchive:
+        src:
+          https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{
+          consul_version }}_linux_{{ arch }}.zip
+        dest: /usr/local/bin
+        remote_src: yes
+        creates: /usr/local/bin/consul
+        owner: root
+        group: root
+        mode: 0755
 
     - name: Check consul version
       command: consul version

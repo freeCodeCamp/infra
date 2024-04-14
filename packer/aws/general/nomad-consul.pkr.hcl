@@ -52,6 +52,19 @@ variable "force_delete_snapshot" {
   default     = true
 }
 
+// Nomad and Consul versions
+variable "nomad_version" {
+  description = "The version of Nomad to install."
+  type        = string
+  default     = "1.7.6"
+}
+
+variable "consul_version" {
+  description = "The version of Consul to install."
+  type        = string
+  default     = "1.18.1"
+}
+
 // The SSH configuration for the build
 variable "ssh_username" {
   description = "The username to use for SSH connections to the instance. Recommended: 'ubuntu' for Ubuntu AMIs, 'ec2-user' for Amazon Linux AMIs."
@@ -138,7 +151,12 @@ build {
     user             = var.ssh_username
     use_proxy        = false
     ansible_env_vars = local.ansible_env_vars
-    extra_arguments  = local.ansible_extra_args
+    extra_arguments = concat(
+      local.ansible_extra_args,
+      [
+        "-e", "nomad_version=${var.nomad_version}"
+      ]
+    )
   }
 
   provisioner "ansible" {
@@ -146,7 +164,12 @@ build {
     user             = var.ssh_username
     use_proxy        = false
     ansible_env_vars = local.ansible_env_vars
-    extra_arguments  = local.ansible_extra_args
+    extra_arguments = concat(
+      local.ansible_extra_args,
+      [
+        "-e", "consul_version=${var.consul_version}"
+      ]
+    )
   }
 
   hcp_packer_registry {
