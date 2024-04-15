@@ -3,6 +3,11 @@ job "http-echo" {
   datacenters = ["*"]
   type        = "service"
 
+  constraint {
+    attribute = "${meta.role}"
+    value     = "worker"
+  }
+
   group "grp-http-echo" {
     count = 10
 
@@ -13,8 +18,13 @@ job "http-echo" {
     }
 
     service {
-      name     = "svc-http-echo"
-      tags     = ["global", "http-echo"]
+      name = "svc-http-echo"
+      tags = [
+        "global",
+        "http-echo",
+        "traefik.enable=true",
+        "traefik.http.routers.http.rule=Path(`/http-echo`)"
+      ]
       port     = "http"
       provider = "consul"
 
