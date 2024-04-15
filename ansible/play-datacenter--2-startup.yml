@@ -9,7 +9,7 @@
     restart_services: "{{ variable_restart_services | default(false) }}"
 
   tasks:
-    - name: Consul Servers - Startup Consul Services
+    - name: Datacenter -- Consul Servers - Startup Consul Services
       when: inventory_hostname in groups[consul_svr]
       block:
         - name: Enable and Start Consul Services on Consul Servers
@@ -25,7 +25,7 @@
             name: consul
             state: restarted
 
-    - name: Nomad Servers - Startup Consul and Nomad Services
+    - name: Datacenter -- Nomad Servers - Startup Consul and Nomad Services
       when: inventory_hostname in groups[nomad_svr]
       block:
         - name: Enable and Start Consul Services on Nomad Servers
@@ -54,15 +54,15 @@
             name: nomad
             state: restarted
 
-    # - name: Nomad Servers - Startup NGINX Service for HTTP access (Web UI and API)
+    # - name: Datacenter -- Nomad Servers - Startup NGINX Service for HTTP access (Web UI and API)
     #   when: inventory_hostname in groups[nomad_svr]
     #   block:
     #     - name: Start NGINX Service
     #       command: docker compose -f /etc/nginx-nomad-http/docker-compose.yml up -d
     #       changed_when: docker_compose_result.rc == 0
 
-    - name: Startup Cluster Workers
       when: inventory_hostname in groups[nomad_wkr]
+    - name: Datacenter -- Workers & Web Servers - Startup Consul and Nomad Services
       block:
         - name: Enable and Start Consul Services on Cluster Workers
           when: not restart_services

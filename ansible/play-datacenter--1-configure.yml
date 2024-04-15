@@ -14,7 +14,7 @@
       include_role:
         name: dns
 
-    - name: Configure Consul Servers
+    - name: Datacenter -- Configure Consul Servers
       when: inventory_hostname in groups[consul_svr]
       block:
         - name: Copy the Certificates to the Consul Servers
@@ -41,7 +41,7 @@
             name: consul
             tasks_from: config-systemd.yml
 
-    - name: Configure Consul Clients
+    - name: Datacenter -- Configure Consul Clients
       when: inventory_hostname in groups[nomad_svr] or inventory_hostname in
         groups[nomad_wkr]
       block:
@@ -69,7 +69,7 @@
             name: consul
             tasks_from: config-systemd.yml
 
-    - name: Configure Nomad Servers
+    - name: Datacenter -- Configure Nomad Servers
       when: inventory_hostname in groups[nomad_svr]
       block:
         - name: Set up config for Nomad Servers
@@ -93,8 +93,8 @@
         #     name: nomad
         #     tasks_from: config-nginx--nomad-http.yml
 
-    - name: Configure Nomad Clients
       when: inventory_hostname in groups[nomad_wkr]
+    - name: Datacenter -- Configure Nomad Clients
       block:
         - name: Set up config for Nomad Clients
           include_role:
