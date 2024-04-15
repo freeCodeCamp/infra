@@ -12,4 +12,7 @@ advertise {
 
 client {
   enabled = true
+  meta {
+    "role" = "{{ nomad_client_role | default('worker') }}"
+  }
 }

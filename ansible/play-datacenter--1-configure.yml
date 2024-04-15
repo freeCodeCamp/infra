@@ -6,6 +6,7 @@
     nomad_svr: '{{ variable_nomad_servers_grp | default("mintworld_nomad_servers") }}'
     consul_svr: '{{ variable_consul_servers_grp | default("mintworld_consul_servers") }}'
     nomad_wkr: '{{ variable_cluster_workers_grp | default("mintworld_nomad_workers") }}'
+    web: '{{ variable_web_grp | default("mintworld_web") }}'
     nomad_server_port: "{{ variable_nomad_server_port | default(4646) }}"
     certificates_dir: '{{ variable_certificates_dir | default("files") }}'
 
@@ -43,7 +44,7 @@
 
     - name: Datacenter -- Configure Consul Clients
       when: inventory_hostname in groups[nomad_svr] or inventory_hostname in
-        groups[nomad_wkr]
+        groups[nomad_wkr] or inventory_hostname in groups[web]
       block:
         - name: Copy the CA Certificate to the Consul Clients
           copy:
@@ -93,9 +94,14 @@
         #     name: nomad
         #     tasks_from: config-nginx--nomad-http.yml
 
-      when: inventory_hostname in groups[nomad_wkr]
     - name: Datacenter -- Configure Nomad Clients
+      when: inventory_hostname in groups[nomad_wkr] or inventory_hostname in groups[web]
       block:
+        - name: Set up the role for Nomad Web Servers
+          set_fact:
+            nomad_client_role: "web"
+          when: inventory_hostname in groups[web]
+
         - name: Set up config for Nomad Clients
           include_role:
             name: nomad
