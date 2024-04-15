@@ -97,5 +97,24 @@ variable "stack_tags" {
 
 variable "zone" {
   description = "Cloudflare Zone to use for the instance"
-  type        = string
+  type = object({
+    name = string
+    id   = string
+  })
+
+  validation {
+    condition     = can(regex("^[a-z0-9]{32}$", var.zone.id))
+    error_message = "zone.id must be a valid Cloudflare Zone ID"
+  }
+
+  validation {
+    condition     = length(var.zone.name) > 0
+    error_message = "zone.name must be a non-empty string"
+  }
+}
+
+variable "create_dns_records__private" {
+  description = "Create DNS records for the private IP addresses of the instances"
+  type        = bool
+  default     = true
 }

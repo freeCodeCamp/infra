@@ -24,7 +24,7 @@ resource "aws_eip" "mw_eip_nat" {
   tags = merge(var.stack_tags, {
     Name = "${var.network_env}-mw-eip-nat-${
       replace(element(data.aws_availability_zones.available.names, count.index), "-", "")
-    }",
+    }"
   })
 }
 

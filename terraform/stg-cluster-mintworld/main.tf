@@ -2,6 +2,10 @@ locals {
   zone = "freecodecamp.net"
 }
 
+data "cloudflare_zone" "cf_zone" {
+  name = local.zone
+}
+
 data "hcp_packer_artifact" "aws_ami" {
   bucket_name  = "aws-nomad-consul"
   channel_name = "golden"
@@ -65,18 +69,28 @@ module "stg_mw_network" {
 module "stg_mw_consul_svr" {
   source = "./modules/instances"
 
-  instance_count       = local.count_svr_consul
-  instance_env         = "stg"
-  instance_prefix      = "consul-svr"
-  instance_type        = "t3a.medium"
-  hostNum_start        = local.hostNum_start_svr_consul
+  instance_count  = local.count_svr_consul
+  instance_env    = "stg"
+  instance_prefix = "consul-svr"
+  instance_type   = "t3a.medium"
+
   ami                  = data.hcp_packer_artifact.aws_ami.external_identifier
   key_name             = data.aws_key_pair.stg_ssh_service_user_key.key_name
   iam_instance_profile = data.aws_iam_instance_profile.stg_mw_instance_profile.name
-  security_group_ids   = [module.stg_mw_network.out__sg_id]
-  subnets              = module.stg_mw_network.out__subnets.private
-  zone                 = local.zone
-  stack_tags           = var.stack_tags
+
+  security_group_ids = [
+    module.stg_mw_network.out__mw_sg_id
+  ]
+
+  hostNum_start = local.hostNum_start_svr_consul
+  subnets       = module.stg_mw_network.out__subnets.private
+
+  zone = {
+    name = local.zone
+    id   = data.cloudflare_zone.cf_zone.id
+  }
+
+  stack_tags = var.stack_tags
 
   depends_on = [
     module.stg_mw_network
@@ -86,18 +100,28 @@ module "stg_mw_consul_svr" {
 module "stg_mw_nomad_svr" {
   source = "./modules/instances"
 
-  instance_count       = local.count_svr_nomad
-  instance_env         = "stg"
-  instance_prefix      = "nomad-svr"
-  instance_type        = "t3a.medium"
-  hostNum_start        = local.hostNum_start_svr_nomad
+  instance_count  = local.count_svr_nomad
+  instance_env    = "stg"
+  instance_prefix = "nomad-svr"
+  instance_type   = "t3a.medium"
+
   ami                  = data.hcp_packer_artifact.aws_ami.external_identifier
   key_name             = data.aws_key_pair.stg_ssh_service_user_key.key_name
   iam_instance_profile = data.aws_iam_instance_profile.stg_mw_instance_profile.name
-  security_group_ids   = [module.stg_mw_network.out__sg_id]
-  subnets              = module.stg_mw_network.out__subnets.private
-  zone                 = local.zone
-  stack_tags           = var.stack_tags
+
+  security_group_ids = [
+    module.stg_mw_network.out__mw_sg_id
+  ]
+
+  hostNum_start = local.hostNum_start_svr_nomad
+  subnets       = module.stg_mw_network.out__subnets.private
+
+  zone = {
+    name = local.zone
+    id   = data.cloudflare_zone.cf_zone.id
+  }
+
+  stack_tags = var.stack_tags
 
   depends_on = [
     module.stg_mw_network
@@ -107,18 +131,28 @@ module "stg_mw_nomad_svr" {
 module "stg_mw_nomad_wkr" {
   source = "./modules/instances"
 
-  instance_count       = local.count_wkr_nomad
-  instance_env         = "stg"
-  instance_prefix      = "nomad-wkr"
-  instance_type        = "t3a.medium"
-  hostNum_start        = local.hostNum_start_wkr_nomad
+  instance_count  = local.count_wkr_nomad
+  instance_env    = "stg"
+  instance_prefix = "nomad-wkr"
+  instance_type   = "t3a.medium"
+
   ami                  = data.hcp_packer_artifact.aws_ami.external_identifier
   key_name             = data.aws_key_pair.stg_ssh_service_user_key.key_name
   iam_instance_profile = data.aws_iam_instance_profile.stg_mw_instance_profile.name
-  security_group_ids   = [module.stg_mw_network.out__sg_id]
-  subnets              = module.stg_mw_network.out__subnets.private
-  zone                 = local.zone
-  stack_tags           = var.stack_tags
+
+  security_group_ids = [
+    module.stg_mw_network.out__mw_sg_id
+  ]
+
+  hostNum_start = local.hostNum_start_wkr_nomad
+  subnets       = module.stg_mw_network.out__subnets.private
+
+  zone = {
+    name = local.zone
+    id   = data.cloudflare_zone.cf_zone.id
+  }
+
+  stack_tags = var.stack_tags
 
   depends_on = [
     module.stg_mw_network

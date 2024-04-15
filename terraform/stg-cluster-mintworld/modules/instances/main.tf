@@ -1,7 +1,3 @@
-data "cloudflare_zone" "cf_zone" {
-  name = var.zone
-}
-
 resource "aws_instance" "mw_instance" {
   count         = var.instance_count
   ami           = var.ami
@@ -24,7 +20,7 @@ resource "aws_instance" "mw_instance" {
   )
 
   user_data_base64 = base64encode(templatefile("${path.module}/templates/cloud-init--userdata.yml.tftpl", {
-    tf_hostname = "${var.instance_prefix}-${count.index + 1}.mw.${var.instance_env}.${var.zone}"
+    tf_hostname = "${var.instance_prefix}-${count.index + 1}.mw.${var.instance_env}.${var.zone.name}"
   }))
   user_data_replace_on_change = var.user_data_replace_on_change
 
@@ -38,9 +34,9 @@ resource "aws_instance" "mw_instance" {
 }
 
 resource "cloudflare_record" "mw_instance_dnsrecord__private" {
-  count = length(aws_instance.mw_instance)
+  count = var.create_dns_records__private ? length(aws_instance.mw_instance) : 0
 
-  zone_id = data.cloudflare_zone.cf_zone.id
+  zone_id = var.zone.id
   type    = "A"
   proxied = false
   ttl     = 120

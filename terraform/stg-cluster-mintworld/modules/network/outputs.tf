@@ -1,6 +1,6 @@
 # Terraform outputs for the instances module
 
-output "out__sg_id" {
+output "out__mw_sg_id" {
   value       = aws_security_group.mw_sg.id
   description = "Security group for the Staging Mintworld VPC"
 }
