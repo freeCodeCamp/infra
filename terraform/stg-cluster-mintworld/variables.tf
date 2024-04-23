@@ -16,7 +16,7 @@ variable "tailscale_auth_key" {
   sensitive   = true
 }
 variable "password" {
-  description = "The root password for the Linode instances."
+  description = "The root password for the instances."
   type        = string
 }
 
