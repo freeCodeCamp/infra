@@ -33,8 +33,8 @@ jobs:
         uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3
 
       - name: Terraform Format
-        run: make fmt
-        working-directory: terraform
+        run: terraform fmt -check
+        working-directory: terraform/ops-test
 
   terraform-upgrade-test:
     if:
