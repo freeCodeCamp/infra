@@ -30,7 +30,7 @@ jobs:
 
         # This is only for the GitHub Actions runner, not Terraform Cloud
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@a1502cd9e758c50496cc9ac5308c4843bcd56d36 # v3
+        uses: hashicorp/setup-terraform@97f030cf6dc0b4f5e0da352c7bca9cca34579800 # v3
 
       - name: Terraform Format
         run: make fmt
@@ -52,7 +52,7 @@ jobs:
 
         # This is only for the GitHub Actions runner, not Terraform Cloud
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@a1502cd9e758c50496cc9ac5308c4843bcd56d36 # v3
+        uses: hashicorp/setup-terraform@97f030cf6dc0b4f5e0da352c7bca9cca34579800 # v3
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
