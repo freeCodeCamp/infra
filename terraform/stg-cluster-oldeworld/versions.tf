@@ -2,7 +2,7 @@ terraform {
   required_providers {
     linode = {
       source  = "linode/linode"
-      version = "2.20.0"
+      version = "2.20.1"
     }
 
     hcp = {
