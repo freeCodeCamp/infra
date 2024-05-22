@@ -9,6 +9,7 @@ jobs:
   uptime:
     name: Uptime
     strategy:
+      fail-fast: false
       matrix:
         host_groups:
           - ops_all
@@ -53,6 +54,7 @@ jobs:
     name: Update
     needs: wait-on-uptime
     strategy:
+      fail-fast: false
       matrix:
         host_groups:
           - ops_all
@@ -97,6 +99,7 @@ jobs:
     name: Reboot Ingress
     needs: wait-on-update
     strategy:
+      fail-fast: false
       matrix:
         host_groups:
           - stg_oldeworld_pxy
@@ -122,6 +125,7 @@ jobs:
     name: Reboot
     needs: wait-on-reboot-web
     strategy:
+      fail-fast: false
       matrix:
         host_groups:
           - ops_all
