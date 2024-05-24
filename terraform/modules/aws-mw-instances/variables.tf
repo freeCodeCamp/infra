@@ -118,3 +118,9 @@ variable "create_dns_records__private" {
   type        = bool
   default     = true
 }
+
+variable "create_dns_records__public" {
+  description = "Create DNS records for the public IP addresses of the instances"
+  type        = bool
+  default     = false
+}

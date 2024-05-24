@@ -9,12 +9,6 @@ variable "aws_secret_access_key" {
   type        = string
   sensitive   = true
 }
-
-variable "tailscale_auth_key" {
-  description = "The Tailscale authentication key."
-  type        = string
-  sensitive   = true
-}
 variable "password" {
   description = "The root password for the instances."
   type        = string

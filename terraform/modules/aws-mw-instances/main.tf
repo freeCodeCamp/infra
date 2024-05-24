@@ -1,4 +1,4 @@
-resource "aws_instance" "mw_instance" {
+resource "aws_instance" "instance" {
   count         = var.instance_count
   ami           = var.ami
   instance_type = var.instance_type
@@ -19,9 +19,11 @@ resource "aws_instance" "mw_instance" {
     var.hostNum_start + floor(count.index / length(var.subnets)) + 1
   )
 
-  user_data_base64 = base64encode(templatefile("${path.module}/templates/cloud-init--userdata.yml.tftpl", {
-    tf_hostname = "${var.instance_prefix}-${count.index + 1}.mw.${var.instance_env}.${var.zone.name}"
-  }))
+  user_data_base64 = base64encode(
+    templatefile("${path.module}/templates/cloud-init--userdata.yml.tftpl", {
+      tf_hostname = "${var.instance_prefix}-${count.index + 1}.mw.${var.instance_env}.${var.zone.name}"
+    })
+  )
   user_data_replace_on_change = var.user_data_replace_on_change
 
   tags = merge(
@@ -33,8 +35,8 @@ resource "aws_instance" "mw_instance" {
   )
 }
 
-resource "cloudflare_record" "mw_instance_dnsrecord__private" {
-  count = var.create_dns_records__private ? length(aws_instance.mw_instance) : 0
+resource "cloudflare_record" "instance_dnsrecord__private" {
+  count = var.create_dns_records__private ? length(aws_instance.instance) : 0
 
   zone_id = var.zone.id
   type    = "A"
@@ -42,7 +44,21 @@ resource "cloudflare_record" "mw_instance_dnsrecord__private" {
   ttl     = 120
 
   name  = "${var.instance_prefix}-${count.index + 1}.mw.${var.instance_env}"
-  value = aws_instance.mw_instance[count.index].private_ip
+  value = aws_instance.instance[count.index].private_ip
 
-  depends_on = [aws_instance.mw_instance]
+  depends_on = [aws_instance.instance]
+}
+
+resource "cloudflare_record" "instance_dnsrecord__public" {
+  count = var.create_dns_records__public ? length(aws_instance.instance) : 0
+
+  zone_id = var.zone.id
+  type    = "A"
+  proxied = true
+  ttl     = 120
+
+  name  = "${var.instance_prefix}-${count.index + 1}.mw.${var.instance_env}"
+  value = aws_instance.instance[count.index].public_ip
+
+  depends_on = [aws_instance.instance]
 }
