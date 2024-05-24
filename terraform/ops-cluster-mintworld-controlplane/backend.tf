@@ -2,7 +2,7 @@ terraform {
   cloud {
     organization = "freecodecamp"
     workspaces {
-      name    = "tfws-ops-mintworld-network"
+      name    = "tfws-ops-mintworld-controlplane"
       project = "AWS-PrimaryCloud"
     }
   }

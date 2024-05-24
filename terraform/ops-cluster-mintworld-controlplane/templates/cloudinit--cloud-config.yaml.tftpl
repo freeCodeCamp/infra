@@ -1,0 +1,33 @@
+#cloud-config
+disable_root: true
+ssh_pwauth: false
+allow_public_ssh_keys: true
+users:
+  - name: freecodecamp
+    groups:
+      - sudo
+      - docker
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_import_id:
+      - gh:camperbot
+      - gh:raisedadead
+preserve_hostname: true
+write_files:
+  - encoding: b64
+    path: /etc/nomad.d/nomad.hcl
+    content: ${tf__content_nomad_hcl}
+    owner: nomad:nomad
+    permissions: "0644"
+  - encoding: b64
+    path: /etc/systemd/system/nomad.service
+    content: ${tf__content_nomad_service}
+    owner: root:root
+    permissions: "0644"
+  - path: /etc/sysctl.d/bridge.conf
+    content: |
+      net.bridge.bridge-nf-call-arptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+    owner: root:root
+    permissions: "0644"

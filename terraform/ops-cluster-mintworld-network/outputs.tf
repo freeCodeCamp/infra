@@ -1,9 +1,5 @@
-output "out__sg_main" {
-  value = aws_security_group.sg_main
-}
-
-output "out__sg_web" {
-  value = aws_security_group.sg_web
+output "out__vpc" {
+  value = aws_vpc.vpc
 }
 
 output "out__subnets" {
@@ -21,6 +17,10 @@ output "out__subnets" {
   }
 }
 
-output "out__vpc" {
-  value = aws_vpc.vpc
+output "out__sg_main" {
+  value = aws_security_group.sg_main
 }
+
+# output "out__sg_web" {
+#   value = aws_security_group.sg_web
+# }
