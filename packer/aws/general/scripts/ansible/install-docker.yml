@@ -43,6 +43,6 @@
       register: docker_install
       changed_when: docker_install.stdout.find('Setting up docker-ce') != -1
 
-    - name: Install Docker Module for Python
-      ansible.builtin.pip:
-        name: docker
+    # - name: Install Docker Module for Python
+    #   ansible.builtin.pip:
+    #     name: docker

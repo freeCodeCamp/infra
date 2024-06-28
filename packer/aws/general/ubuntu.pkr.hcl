@@ -5,6 +5,10 @@ packer {
       source  = "github.com/hashicorp/amazon"
       version = "~> 1"
     }
+    ansible = {
+      version = "~> 1"
+      source  = "github.com/hashicorp/ansible"
+    }
   }
 }
 
@@ -17,9 +21,9 @@ variable "skip_create_ami" {
 
 // The OS configuration for the build
 variable "aws_os_version" {
-  description = "The OS version to use for the build. Example: '22.04'"
+  description = "The OS version to use for the build. Example: '24.04'"
   type        = string
-  default     = "22.04"
+  default     = "24.04"
 }
 variable "aws_os_flavor" {
   description = "The OS flavor to use for the build. Example: 'ubuntu'"
@@ -88,8 +92,8 @@ locals {
   image_version = "${formatdate("YYYYMMDD.hhmm", timestamp())}"
 
   // The source AMI filter name, based on the OS flavor, version, and architecture
-  // Example: "ubuntu/images/hvm-ssd/ubuntu-*-22.04-*-server-*"
-  source_ami_filter_name = "${var.aws_os_flavor}/images/hvm-ssd/${var.aws_os_flavor}-*-${var.aws_os_version}-*-server-*"
+  // Example: "ubuntu/images/*/ubuntu-*-24.04-*-server-*"
+  source_ami_filter_name = "${var.aws_os_flavor}/images/*/${var.aws_os_flavor}-*-${var.aws_os_version}-*-server-*"
 
   image_description = "An ${var.aws_os_flavor} ${var.aws_os_version} ${var.aws_os_arch} - Server image with Docker installed."
 
