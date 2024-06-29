@@ -7,7 +7,7 @@ variable "stack_tags" {
   }
 }
 
-resource "aws_iam_role" "stg_mw_instance_profile_role" {
+resource "aws_iam_role" "ops_instance_profile_role" {
   name               = "fCCSSMInstanceProfileRole"
   assume_role_policy = <<EOF
 {
@@ -31,12 +31,12 @@ EOF
   tags = var.stack_tags
 }
 
-resource "aws_iam_role_policy_attachment" "stg_mw_instance_profile_role_attachment" {
-  role       = aws_iam_role.stg_mw_instance_profile_role.name
+resource "aws_iam_role_policy_attachment" "ops_instance_profile_role_attachment" {
+  role       = aws_iam_role.ops_instance_profile_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-resource "aws_iam_instance_profile" "stg_mw_instance_profile" {
-  name = aws_iam_role.stg_mw_instance_profile_role.name
-  role = aws_iam_role.stg_mw_instance_profile_role.name
+resource "aws_iam_instance_profile" "ops_instance_profile" {
+  name = aws_iam_role.ops_instance_profile_role.name
+  role = aws_iam_role.ops_instance_profile_role.name
 }
