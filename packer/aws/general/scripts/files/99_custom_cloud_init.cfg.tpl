@@ -1,7 +1,6 @@
 #cloud-config
 # This file is uploaded to /etc/cloud/cloud.cfg.d/99_custom_cloud_init.cfg
 # and is used to configure cloud-init on the first boot of the instance.
-#cloud-config
 users:
   - name: freecodecamp
     groups:
