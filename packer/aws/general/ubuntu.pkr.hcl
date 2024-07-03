@@ -178,6 +178,17 @@ build {
     extra_arguments  = local.ansible_extra_args
   }
 
+  provisioner "file" {
+    source      = "${var.scripts_dir}/files/99_custom_cloud_init.cfg.tpl"
+    destination = "/tmp/99_custom_cloud_init.cfg"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "sudo mv /tmp/99_custom_cloud_init.cfg /etc/cloud/cloud.cfg.d/99_custom_cloud_init.cfg",
+    ]
+  }
+
   hcp_packer_registry {
     bucket_name = "aws-ubuntu"
 
