@@ -60,13 +60,19 @@ variable "force_delete_snapshot" {
 variable "nomad_version" {
   description = "The version of Nomad to install."
   type        = string
-  default     = "1.7.6"
+  default     = "1.8.1"
 }
 
 variable "consul_version" {
   description = "The version of Consul to install."
   type        = string
-  default     = "1.18.1"
+  default     = "1.19.0"
+}
+
+variable "cni_version" {
+  description = "The version of CNI to install."
+  type        = string
+  default     = "1.5.1"
 }
 
 // The SSH configuration for the build
@@ -172,6 +178,19 @@ build {
       local.ansible_extra_args,
       [
         "-e", "consul_version=${var.consul_version}"
+      ]
+    )
+  }
+
+  provisioner "ansible" {
+    playbook_file    = "${var.scripts_dir}/ansible/install-cni-plugins.yml"
+    user             = var.ssh_username
+    use_proxy        = false
+    ansible_env_vars = local.ansible_env_vars
+    extra_arguments = concat(
+      local.ansible_extra_args,
+      [
+        "-e", "cni_version=v${var.cni_version}"
       ]
     )
   }

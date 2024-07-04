@@ -1,0 +1,28 @@
+---
+- name: Install CNI plugins on Ubuntu
+  hosts: all
+  become: true
+  become_method: sudo
+  gather_facts: true
+
+  tasks:
+    - name: Set fact for amd64 or arm64
+      set_fact:
+        arch: "{{ (ansible_architecture == 'aarch64') | ternary('arm64', 'amd64') }}"
+
+    - name: Ensure /opt/cni/bin directory exists
+      file:
+        path: /opt/cni/bin
+        state: directory
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: Download and Extract CNI plugins
+      unarchive:
+        src: "https://github.com/containernetworking/plugins/releases/download/{{ cni_version }}/cni-plugins-linux-{{ arch }}-{{ cni_version }}.tgz"
+        dest: /opt/cni/bin
+        remote_src: yes
+        owner: root
+        group: root
+        mode: 0755
