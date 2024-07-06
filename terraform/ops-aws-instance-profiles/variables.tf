@@ -15,3 +15,12 @@ variable "region" {
   default     = "us-east-1"
   type        = string
 }
+
+variable "stack_tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources in this stack"
+  default = {
+    Environment = "ops"
+    Stack       = "common"
+  }
+}
