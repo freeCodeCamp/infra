@@ -1,10 +1,9 @@
 terraform {
-  backend "remote" {
-    hostname     = "app.terraform.io"
+  cloud {
     organization = "freecodecamp"
-
     workspaces {
-      name = "<@@template@@>"
+      name    = "<@@template@@>"
+      project = "<@@template@@>"
     }
   }
 }
