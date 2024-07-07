@@ -178,6 +178,14 @@ build {
     extra_arguments  = local.ansible_extra_args
   }
 
+  provisioner "ansible" {
+    playbook_file    = "${var.scripts_dir}/ansible/install-aws-cli.yml"
+    user             = var.ssh_username
+    use_proxy        = false
+    ansible_env_vars = local.ansible_env_vars
+    extra_arguments  = local.ansible_extra_args
+  }
+
   hcp_packer_registry {
     bucket_name = "aws-ubuntu"
 
