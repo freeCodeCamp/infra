@@ -42,6 +42,28 @@ resource "aws_iam_policy" "ec2ip_iam_policy_DescribeInstances" {
   })
 }
 
+resource "aws_iam_policy" "ec2ip_iam_policy_CreateTags_for_EC2Instances" {
+  name        = "fCCCreateTags"
+  description = "An IAM policy that allows EC2 instances to create tags"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ec2:CreateTags",
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:ec2:*:*:instance/*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2ip_iam_role_policy_attachment_CreateTags_for_EC2Instances" {
+  role       = aws_iam_role.ec2ip_iam_role.name
+  policy_arn = aws_iam_policy.ec2ip_iam_policy_CreateTags_for_EC2Instances.arn
+}
+
 resource "aws_iam_role_policy_attachment" "ec2ip_iam_role_policy_attachment_DescribeInstances" {
   role       = aws_iam_role.ec2ip_iam_role.name
   policy_arn = aws_iam_policy.ec2ip_iam_policy_DescribeInstances.arn
