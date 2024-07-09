@@ -1,18 +1,10 @@
 #cloud-config
-disable_root: true
-ssh_pwauth: false
-allow_public_ssh_keys: true
-users:
-  - name: freecodecamp
-    groups:
-      - sudo
-      - docker
-    shell: /bin/bash
-    sudo: "ALL=(ALL) NOPASSWD:ALL"
-    ssh_import_id:
-      - gh:camperbot
-      - gh:raisedadead
-preserve_hostname: true
+merge_how:
+  - name: list
+    settings: [append]
+  - name: dict
+    settings: [no_replace, recurse_list]
+
 write_files:
   - encoding: b64
     path: /etc/nomad.d/nomad.hcl

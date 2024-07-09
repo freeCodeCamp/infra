@@ -34,7 +34,7 @@ variable "instance_type" {
   type        = string
 }
 
-variable "nomad_cloud_auto_join_key" {
+variable "consul_cloud_auto_join_key" {
   description = "The key used to join the Nomad cluster."
   type        = string
 }

@@ -1,7 +1,3 @@
-locals {
-  prefix = "ops-mwcp"
-}
-
 // This enables SSM access + Cloud Auto-join, and should be pre-existing,
 // ensure that the role is created in the account.
 data "aws_iam_instance_profile" "instance_profile" {
@@ -44,4 +40,9 @@ data "aws_subnets" "subnets_prv" {
     Type  = "Private"
     Stack = "mintworld"
   }
+}
+
+locals {
+  prefix     = "ops-mwcp"
+  datacenter = "mintworld"
 }

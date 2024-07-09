@@ -1,20 +1,18 @@
 data_dir   = "/opt/nomad"
-datacenter = "${tf_datacenter_name}"
+datacenter = "${tf_datacenter}"
 
 bind_addr = "0.0.0.0"
 
 advertise {
-  http = "{{ GetInterfaceIP \"ens5\" }}"
-  rpc  = "{{ GetInterfaceIP \"ens5\" }}"
-  serf = "{{ GetInterfaceIP \"ens5\" }}"
+  http = "{{ GetInterfaceIP `ens5` }}"
+  rpc  = "{{ GetInterfaceIP `ens5` }}"
+  serf = "{{ GetInterfaceIP `ens5` }}"
 }
 
 server {
   enabled          = true
-  bootstrap_expect = "${tf_nomad_bootstrap_expect}"
-  server_join {
-    retry_join = ["provider=aws region=${tf_aws_region} tag_key=${tf_nomad_join_tag_key} tag_value=${tf_nomad_join_tag_value}"]
-  }
+  bootstrap_expect = ${tf_nomad_bootstrap_expect}
+  encrypt          = ""
 }
 
 telemetry {

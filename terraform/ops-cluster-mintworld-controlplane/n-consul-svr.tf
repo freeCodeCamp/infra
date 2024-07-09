@@ -1,14 +1,14 @@
 locals {
-  nomad_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
-  nomad_svr_count_min     = 3
-  nomad_svr_count_max     = 5
+  consul_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
+  consul_svr_count_min     = 3
+  consul_svr_count_max     = 5
 
   // WARNING: This key is used in scripts.
-  nomad_role_tag = "nomad-svr"
+  consul_role_tag = "consul-svr"
   // WARNING: This key is used in scripts.
 }
 
-data "cloudinit_config" "nomad_svr_cic" {
+data "cloudinit_config" "consul_svr_cic" {
   gzip          = false
   base64_encode = false
 
@@ -22,25 +22,14 @@ data "cloudinit_config" "nomad_svr_cic" {
     filename     = "cloudinit--cloud-config-02-consul.yml"
     content_type = "text/cloud-config"
     content = templatefile("${path.module}/templates/cloud-config/02-consul.yml.tftpl", {
-      tf__content_consul_hcl = base64encode(templatefile("${path.module}/templates/consul/client/consul.hcl.tftpl", {
-        tf_datacenter            = local.datacenter
-        tf_aws_region            = var.region
-        tf_consul_join_tag_key   = "ConsulCloudAutoJoinKey"
-        tf_consul_join_tag_value = var.consul_cloud_auto_join_key
+      tf__content_consul_hcl = base64encode(templatefile("${path.module}/templates/consul/server/consul.hcl.tftpl", {
+        tf_datacenter              = local.datacenter
+        tf_consul_bootstrap_expect = local.consul_svr_count_min
+        tf_aws_region              = var.region
+        tf_consul_join_tag_key     = "ConsulCloudAutoJoinKey"
+        tf_consul_join_tag_value   = var.consul_cloud_auto_join_key
       }))
-      tf__content_consul_service = filebase64("${path.module}/templates/consul/client/consul.service")
-    })
-  }
-
-  part {
-    filename     = "cloudinit--cloud-config-01-common.yml"
-    content_type = "text/cloud-config"
-    content = templatefile("${path.module}/templates/cloud-config/03-nomad.yml.tftpl", {
-      tf__content_nomad_hcl = base64encode(templatefile("${path.module}/templates/nomad/server/nomad.hcl.tftpl", {
-        tf_datacenter             = local.datacenter
-        tf_nomad_bootstrap_expect = local.nomad_svr_count_min
-      }))
-      tf__content_nomad_service = filebase64("${path.module}/templates/nomad/server/nomad.service")
+      tf__content_consul_service = filebase64("${path.module}/templates/consul/server/consul.service")
     })
   }
 
@@ -55,24 +44,16 @@ data "cloudinit_config" "nomad_svr_cic" {
     content_type = "text/x-shellscript"
     content = templatefile("${path.module}/templates/user-data/02-consul.sh.tftpl", {
       tf_datacenter = local.datacenter
-      tf_is_server  = "false"
-    })
-  }
-
-  part {
-    filename     = "cloudinit--startup-03-nomad.sh"
-    content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/templates/user-data/03-nomad.sh.tftpl", {
-      tf_datacenter = local.datacenter
+      tf_is_server  = "true"
     })
   }
 
 }
 
-resource "aws_launch_template" "nomad_svr_lt" {
-  name                    = "${local.prefix}-nomad-svr-lt"
+resource "aws_launch_template" "consul_svr_lt" {
+  name                    = "${local.prefix}-consul-svr-lt"
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
-  instance_type           = local.nomad_svr_instance_type
+  instance_type           = local.consul_svr_instance_type
   disable_api_termination = false
   key_name                = data.aws_key_pair.ssh_service_user_key.key_name
 
@@ -80,14 +61,15 @@ resource "aws_launch_template" "nomad_svr_lt" {
     name = data.aws_iam_instance_profile.instance_profile.name
   }
 
-  user_data = base64gzip(data.cloudinit_config.nomad_svr_cic.rendered)
+  user_data = base64gzip(data.cloudinit_config.consul_svr_cic.rendered)
 
   tag_specifications {
     resource_type = "instance"
     tags = merge(
       var.stack_tags,
       {
-        Role = local.nomad_role_tag
+        Role                   = local.consul_role_tag
+        ConsulCloudAutoJoinKey = var.consul_cloud_auto_join_key
       }
     )
   }
@@ -111,23 +93,23 @@ resource "aws_launch_template" "nomad_svr_lt" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-svr-lt"
-      Role = local.nomad_role_tag,
+      Name = "${local.prefix}-consul-svr-lt"
+      Role = local.consul_role_tag,
     }
   )
 }
 
-resource "aws_autoscaling_group" "nomad_svr_asg" {
+resource "aws_autoscaling_group" "consul_svr_asg" {
 
   launch_template {
-    id      = aws_launch_template.nomad_svr_lt.id
-    version = aws_launch_template.nomad_svr_lt.latest_version
+    id      = aws_launch_template.consul_svr_lt.id
+    version = aws_launch_template.consul_svr_lt.latest_version
   }
 
-  name                      = "${local.prefix}-nomad-svr-asg"
-  max_size                  = local.nomad_svr_count_max
-  min_size                  = local.nomad_svr_count_min
-  desired_capacity          = local.nomad_svr_count_min
+  name                      = "${local.prefix}-consul-svr-asg"
+  max_size                  = local.consul_svr_count_max
+  min_size                  = local.consul_svr_count_min
+  desired_capacity          = local.consul_svr_count_min
   health_check_grace_period = 180
   health_check_type         = "EC2"
   vpc_zone_identifier       = data.aws_subnets.subnets_prv.ids
@@ -152,5 +134,4 @@ resource "aws_autoscaling_group" "nomad_svr_asg" {
     }
   }
 
-  depends_on = [aws_autoscaling_group.consul_svr_asg]
 }
