@@ -186,6 +186,18 @@ build {
     extra_arguments  = local.ansible_extra_args
   }
 
+  provisioner "file" {
+    source      = "${var.scripts_dir}/others/fcc-logtool.sh"
+    destination = "/tmp/fcc-logtool.sh"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "sudo mv /tmp/fcc-logtool.sh /usr/local/bin/",
+      "sudo chmod +x /usr/local/bin/fcc-logtool.sh"
+    ]
+  }
+
   hcp_packer_registry {
     bucket_name = "aws-ubuntu"
 
