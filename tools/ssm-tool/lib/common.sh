@@ -45,24 +45,20 @@ check_aws_credentials() {
 
 find_instance_id() {
   local filters=("$@")
-  local query="Reservations[].Instances[] | [?State.Name != 'terminated'] | [].[InstanceId, State.Name, PrivateIpAddress, "
-  local tag_keys=""
+  local query="Reservations[].Instances[] | [?State.Name != 'terminated'] | [].[InstanceId, "
+  local tag_keys="Name"
   for filter in "${filters[@]}"; do
     if [[ $filter =~ Name=tag:([^,]+) ]]; then
-      tag_keys+="${BASH_REMATCH[1]} "
+      tag_keys+=" ${BASH_REMATCH[1]}"
     fi
   done
 
-  if [[ -n "$tag_keys" ]]; then
-    local tag_query=""
-    for key in $tag_keys; do
-      [[ -n "$tag_query" ]] && tag_query+=", "
-      tag_query+="join(', ', Tags[?Key=='$key'].Value || [''])"
-    done
-    query+="join(', ', [$tag_query])]"
-  else
-    query+="'']"
-  fi
+  local tag_query=""
+  for key in $tag_keys; do
+    [[ -n "$tag_query" ]] && tag_query+=", "
+    tag_query+="join(' ', Tags[?Key=='$key'].Value || ['-'])"
+  done
+  query+="$tag_query, State.Name, PrivateIpAddress]"
 
   local temp_file=$(mktemp)
   local aws_command="aws ec2 describe-instances"
@@ -84,10 +80,10 @@ find_instance_id() {
 
   instance_id=$(
     (
-      echo -e "Instance-Id\tState\tPrivate-IP\tTags"
+      echo -e "Instance-Id\tName\t${tag_keys#Name }\tState\tPrivate-IP"
       cat "$temp_file"
     ) |
-      column -t |
+      column -t | sort -k2 |
       fzf --header-lines=1 |
       awk '{print $1}'
   )
