@@ -1,5 +1,5 @@
 data_dir   = "/opt/nomad"
-datacenter = "${tf_datacenter_name}"
+datacenter = "${tf_datacenter}"
 
 bind_addr = "0.0.0.0"
 
@@ -11,6 +11,9 @@ advertise {
 
 client {
   enabled = true
+  meta {
+    "role" = "${tf_client_role}"
+  }
 }
 
 telemetry {
