@@ -26,7 +26,7 @@ data "cloudinit_config" "nomad_svr_cic" {
         tf_datacenter            = local.datacenter
         tf_aws_region            = var.region
         tf_consul_join_tag_key   = "ConsulCloudAutoJoinKey"
-        tf_consul_join_tag_value = var.consul_cloud_auto_join_key
+        tf_consul_join_tag_value = local.consul_cloud_auto_join_key
       }))
       tf__content_consul_service = filebase64("${path.module}/templates/consul/client/consul.service")
     })

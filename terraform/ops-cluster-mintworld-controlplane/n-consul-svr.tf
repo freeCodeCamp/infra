@@ -27,7 +27,7 @@ data "cloudinit_config" "consul_svr_cic" {
         tf_consul_bootstrap_expect = local.consul_svr_count_min
         tf_aws_region              = var.region
         tf_consul_join_tag_key     = "ConsulCloudAutoJoinKey"
-        tf_consul_join_tag_value   = var.consul_cloud_auto_join_key
+        tf_consul_join_tag_value   = local.consul_cloud_auto_join_key
       }))
       tf__content_consul_service = filebase64("${path.module}/templates/consul/server/consul.service")
     })
@@ -68,8 +68,11 @@ resource "aws_launch_template" "consul_svr_lt" {
     tags = merge(
       var.stack_tags,
       {
-        Role                   = local.consul_role_tag
-        ConsulCloudAutoJoinKey = var.consul_cloud_auto_join_key
+        Role = local.consul_role_tag
+
+        // WARNING: This key is used in scripts.
+        ConsulCloudAutoJoinKey = local.consul_cloud_auto_join_key
+        // WARNING: This key is used in scripts.
       }
     )
   }

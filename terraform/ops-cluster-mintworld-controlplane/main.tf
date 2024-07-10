@@ -43,6 +43,10 @@ data "aws_subnets" "subnets_prv" {
 }
 
 locals {
-  prefix     = "ops-mwctl"
-  datacenter = "mintworld"
+  prefix = "ops-mwctl"
+
+  // WARNING: This key is used in scripts.
+  datacenter                 = "mintworld"
+  consul_cloud_auto_join_key = "ops-mintworld-01"
+  // WARNING: This key is used in scripts.
 }
