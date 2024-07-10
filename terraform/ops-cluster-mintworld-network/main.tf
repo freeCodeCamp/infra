@@ -1,5 +1,5 @@
 locals {
-  prefix = "${var.deployment_identifier}-mw"
+  prefix = "ops-mwnet"
 
   # Define the CIDR prefix ranges for subnets:
   # Needing 6 subnets, 3 private and 3 public,
@@ -18,7 +18,7 @@ locals {
   stack_tags = merge(
     var.stack_tags,
     {
-      Environment = var.deployment_identifier
+      Environment = "ops"
     }
   )
 }

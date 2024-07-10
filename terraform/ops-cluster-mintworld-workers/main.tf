@@ -26,7 +26,7 @@ data "aws_key_pair" "ssh_service_user_key" {
 
 data "aws_vpc" "vpc" {
   tags = {
-    Name = "ops-mw-vpc"
+    Name = "ops-mwnet-vpc"
   }
 }
 
@@ -43,6 +43,6 @@ data "aws_subnets" "subnets_prv" {
 }
 
 locals {
-  prefix     = "ops-mwcp"
+  prefix     = "ops-mwwkr"
   datacenter = "mintworld"
 }

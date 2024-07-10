@@ -54,17 +54,6 @@ variable "region" {
 #   }
 # }
 
-variable "deployment_identifier" {
-  description = "Environment for the network resources (3 letters)"
-  type        = string
-  default     = "ops"
-
-  validation {
-    condition     = length(var.deployment_identifier) == 3
-    error_message = "deployment_identifier must be 3 characters long, ex: 'stg', 'prd'"
-  }
-}
-
 variable "enable_eip_on_launch_in_public_subnets" {
   description = "Whether to enable EIP on launch in the public subnets"
   type        = bool
