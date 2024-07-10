@@ -2,6 +2,7 @@ data_dir   = "/opt/nomad"
 datacenter = "${tf_datacenter}"
 
 bind_addr = "0.0.0.0"
+leave_on_terminate = true
 
 advertise {
   http = "{{ GetInterfaceIP `ens5` }}"
@@ -11,6 +12,8 @@ advertise {
 
 server {
   enabled          = true
+  node_gc_threshold = "5m"
+
   bootstrap_expect = ${tf_nomad_bootstrap_expect}
   encrypt          = ""
 }
