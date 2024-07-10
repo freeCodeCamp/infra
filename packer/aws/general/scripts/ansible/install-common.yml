@@ -29,15 +29,17 @@
           - build-essential
           - curl
           - git
+          - glances
           - htop
+          - lnav
+          - ncdu
+          - pv
+          - shellcheck
           - software-properties-common
           - tar
           - unzip
           - vim
           - zip
-          - glances
-          - ncdu
-          - pv
 
     - name: Disable automatic and security updates
       ansible.builtin.apt:
