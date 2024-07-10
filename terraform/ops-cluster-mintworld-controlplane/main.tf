@@ -11,7 +11,7 @@ data "aws_ec2_instance_type" "instance_type" {
 
 data "hcp_packer_artifact" "aws_ami" {
   bucket_name  = "aws-nomad-consul"
-  channel_name = "golden"
+  channel_name = "latest"
   platform     = "aws"
   region       = var.region
 }

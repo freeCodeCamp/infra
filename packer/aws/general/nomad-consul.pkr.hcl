@@ -92,7 +92,7 @@ variable "scripts_dir" {
 // Parent Image
 data "hcp-packer-version" "ubuntu" {
   bucket_name  = "aws-ubuntu"
-  channel_name = "golden"
+  channel_name = "latest"
 }
 data "hcp-packer-artifact" "ubuntu" {
   bucket_name         = "aws-ubuntu"
