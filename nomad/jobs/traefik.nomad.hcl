@@ -5,7 +5,7 @@ job "traefik" {
 
   constraint {
     attribute = "${meta.role}"
-    value     = "web"
+    value     = "worker-web"
   }
 
   group "traefik" {

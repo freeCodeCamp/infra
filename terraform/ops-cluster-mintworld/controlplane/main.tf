@@ -30,6 +30,18 @@ data "aws_vpc" "vpc" {
   }
 }
 
+data "aws_security_groups" "sg_main" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.vpc.id]
+  }
+
+  filter {
+    name   = "group-name"
+    values = ["ops-mwnet-sg"]
+  }
+}
+
 data "aws_subnets" "subnets_prv" {
   filter {
     name   = "vpc-id"

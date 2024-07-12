@@ -193,10 +193,10 @@ resource "aws_default_security_group" "dsg" {
   vpc_id = aws_vpc.vpc.id
 
   ingress {
-    protocol  = "-1"
-    self      = true
     from_port = 0
     to_port   = 0
+    protocol  = "-1"
+    self      = true
   }
 
   egress {
@@ -211,7 +211,7 @@ resource "aws_default_security_group" "dsg" {
 
 resource "aws_security_group" "sg_main" {
   name        = "${local.prefix}-sg"
-  description = "Security group for the Staging Mintworld VPC"
+  description = "Primary security group for the VPC"
   vpc_id      = aws_vpc.vpc.id
 
   ingress {

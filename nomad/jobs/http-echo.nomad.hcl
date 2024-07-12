@@ -5,7 +5,7 @@ job "http-echo" {
 
   constraint {
     attribute = "${meta.role}"
-    value     = "worker"
+    value     = "worker-stateless"
   }
 
   group "grp-http-echo" {

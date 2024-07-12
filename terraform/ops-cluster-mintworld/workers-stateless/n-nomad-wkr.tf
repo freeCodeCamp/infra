@@ -4,7 +4,7 @@ locals {
   nomad_wkr_count_max     = 10
 
   // WARNING: This key is used in scripts.
-  nomad_role_tag             = "nomad-wkr"
+  nomad_role_tag             = "nomad-wkr-stateless"
   consul_cloud_auto_join_key = "ops-mintworld-01"
   // WARNING: This key is used in scripts.
 }
@@ -39,7 +39,7 @@ data "cloudinit_config" "nomad_wkr_cic" {
     content = templatefile("${path.module}/templates/cloud-config/03-nomad.yml.tftpl", {
       tf__content_nomad_hcl = base64encode(templatefile("${path.module}/templates/nomad/client/nomad.hcl.tftpl", {
         tf_datacenter  = local.datacenter
-        tf_client_role = local.nomad_role_tag == "nomad-wkr" ? "worker" : "default"
+        tf_client_role = local.nomad_role_tag == "nomad-wkr-stateless" ? "worker-stateless" : "default"
       }))
       tf__content_nomad_service = filebase64("${path.module}/templates/nomad/client/nomad.service")
     })
@@ -70,17 +70,20 @@ data "cloudinit_config" "nomad_wkr_cic" {
 }
 
 resource "aws_launch_template" "nomad_wkr_lt" {
-  name                    = "${local.prefix}-nomad-wkr-lt"
+  name                    = "${local.prefix}-nomad-wkr-stateless-lt"
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
   instance_type           = local.nomad_wkr_instance_type
   disable_api_termination = false
-  key_name                = data.aws_key_pair.ssh_service_user_key.key_name
+  update_default_version  = true
+
+  vpc_security_group_ids = data.aws_security_groups.sg_main.ids
+
+  key_name  = data.aws_key_pair.ssh_service_user_key.key_name
+  user_data = base64gzip(data.cloudinit_config.nomad_wkr_cic.rendered)
 
   iam_instance_profile {
     name = data.aws_iam_instance_profile.instance_profile.name
   }
-
-  user_data = base64gzip(data.cloudinit_config.nomad_wkr_cic.rendered)
 
   tag_specifications {
     resource_type = "instance"
@@ -102,8 +105,6 @@ resource "aws_launch_template" "nomad_wkr_lt" {
     enabled = true
   }
 
-  update_default_version = true
-
   lifecycle {
     create_before_destroy = true
   }
@@ -111,7 +112,7 @@ resource "aws_launch_template" "nomad_wkr_lt" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-wkr-lt"
+      Name = "${local.prefix}-nomad-wkr-stateless-lt"
       Role = local.nomad_role_tag,
     }
   )
@@ -124,7 +125,7 @@ resource "aws_autoscaling_group" "nomad_wkr_asg" {
     version = aws_launch_template.nomad_wkr_lt.latest_version
   }
 
-  name                      = "${local.prefix}-nomad-wkr-asg"
+  name                      = "${local.prefix}-nomad-wkr-stateless-asg"
   max_size                  = local.nomad_wkr_count_max
   min_size                  = local.nomad_wkr_count_min
   desired_capacity          = local.nomad_wkr_count_min

@@ -55,13 +55,16 @@ resource "aws_launch_template" "consul_svr_lt" {
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
   instance_type           = local.consul_svr_instance_type
   disable_api_termination = false
-  key_name                = data.aws_key_pair.ssh_service_user_key.key_name
+  update_default_version  = true
+
+  vpc_security_group_ids = data.aws_security_groups.sg_main.ids
+
+  key_name  = data.aws_key_pair.ssh_service_user_key.key_name
+  user_data = base64gzip(data.cloudinit_config.consul_svr_cic.rendered)
 
   iam_instance_profile {
     name = data.aws_iam_instance_profile.instance_profile.name
   }
-
-  user_data = base64gzip(data.cloudinit_config.consul_svr_cic.rendered)
 
   tag_specifications {
     resource_type = "instance"
@@ -86,8 +89,6 @@ resource "aws_launch_template" "consul_svr_lt" {
   monitoring {
     enabled = true
   }
-
-  update_default_version = true
 
   lifecycle {
     create_before_destroy = true
