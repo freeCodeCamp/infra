@@ -193,7 +193,7 @@ resource "aws_default_security_group" "dsg" {
   vpc_id = aws_vpc.vpc.id
 
   ingress {
-    protocol  = -1
+    protocol  = "-1"
     self      = true
     from_port = 0
     to_port   = 0
@@ -234,68 +234,3 @@ resource "aws_security_group" "sg_main" {
 
   tags = merge(local.stack_tags, { Name = "${local.prefix}-sg" })
 }
-
-# resource "aws_security_group" "sg_web" {
-#   name        = "${local.prefix}-sg-web"
-#   description = "Security group for the Staging Mintworld VPC for Web Proxy"
-
-#   vpc_id = aws_vpc.vpc.id
-
-#   ingress {
-#     description      = "Allow traffic from the internet to the Web Proxy"
-#     from_port        = 80
-#     to_port          = 80
-#     protocol         = "tcp"
-#     cidr_blocks      = ["0.0.0.0/0"]
-#     ipv6_cidr_blocks = ["::/0"]
-#   }
-#   ingress {
-#     description      = "Allow traffic from the internet to the Web Proxy"
-#     from_port        = 443
-#     to_port          = 443
-#     protocol         = "tcp"
-#     cidr_blocks      = ["0.0.0.0/0"]
-#     ipv6_cidr_blocks = ["::/0"]
-#   }
-
-#   egress {
-#     description      = "Allow all outbound traffic to the internet"
-#     from_port        = 0
-#     to_port          = 0
-#     protocol         = "-1"
-#     cidr_blocks      = ["0.0.0.0/0"]
-#     ipv6_cidr_blocks = ["::/0"]
-#   }
-# }
-
-# resource "aws_eip" "eip_lb_web" {
-#   count = length(slice(local.subnet_cidr_prefixes, 3, 6))
-
-#   domain = "vpc"
-
-#   tags = merge(local.stack_tags, {
-#     Name = "${local.prefix}-eip-lb-web-${
-#       replace(element(data.aws_availability_zones.available.names, count.index), "-", "")
-#     }"
-#   })
-# }
-
-# resource "aws_lb" "lb_web" {
-#   name               = "${local.prefix}-lb-web"
-#   internal           = false
-#   load_balancer_type = "network"
-
-#   security_groups = [
-#     aws_security_group.sg_web.id
-#   ]
-
-#   dynamic "subnet_mapping" {
-#     for_each = aws_subnet.subnet_pub
-#     content {
-#       subnet_id     = subnet_mapping.value.id
-#       allocation_id = aws_eip.eip_lb_web[subnet_mapping.key].id
-#     }
-#   }
-
-#   tags = merge(local.stack_tags, { Name = "${local.prefix}-lb-web" })
-# }
