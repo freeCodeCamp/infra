@@ -28,9 +28,33 @@ variable "hcp_client_secret" {
   sensitive   = true
 }
 
+variable "tailscale_tailnet" {
+  description = "The Tailnet ID for the Tailscale network."
+  type        = string
+  sensitive   = true
+}
+
+variable "tailscale_oauth_client_id" {
+  description = "The OAuth client ID for the Tailscale network."
+  type        = string
+  sensitive   = true
+}
+
+variable "tailscale_oauth_client_secret" {
+  description = "The OAuth client secret for the Tailscale network."
+  type        = string
+  sensitive   = true
+}
+
 variable "instance_type" {
   description = "Default instance type."
   default     = "t3a.medium"
+  type        = string
+}
+
+variable "instance_type_prv_routers" {
+  description = "Instance type for private routers."
+  default     = "t3.nano"
   type        = string
 }
 

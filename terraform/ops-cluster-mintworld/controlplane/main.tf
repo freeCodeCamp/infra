@@ -9,8 +9,19 @@ data "aws_ec2_instance_type" "instance_type" {
   instance_type = var.instance_type
 }
 
+data "aws_ec2_instance_type" "instance_type_prv_routers" {
+  instance_type = var.instance_type_prv_routers
+}
+
 data "hcp_packer_artifact" "aws_ami" {
   bucket_name  = "aws-nomad-consul"
+  channel_name = "latest"
+  platform     = "aws"
+  region       = var.region
+}
+
+data "hcp_packer_artifact" "aws_ami_prv_routers" {
+  bucket_name  = "aws-ubuntu"
   channel_name = "latest"
   platform     = "aws"
   region       = var.region
@@ -50,6 +61,18 @@ data "aws_subnets" "subnets_prv" {
 
   tags = {
     Type  = "Private"
+    Stack = "mintworld"
+  }
+}
+
+data "aws_subnets" "subnets_pub" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.vpc.id]
+  }
+
+  tags = {
+    Type  = "Public"
     Stack = "mintworld"
   }
 }

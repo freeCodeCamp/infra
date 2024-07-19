@@ -1,11 +1,12 @@
 aws_access_key_id = "<AWSAccessKeyID>"
 aws_secret_access_key = "<AWSSecretAccessKey>"
 
-tailscale_auth_key = "<TailscaleAuthKey>"
-password = "<RootPassword>"
-
 hcp_client_id = "<HCPClientId>"
 hcp_client_secret = "<HCPClientSecret>"
+
+tailscale_tailnet = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+tailscale_oauth_client_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+tailscale_oauth_client_secret = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 cloudflare_api_token  = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 cloudflare_account_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"

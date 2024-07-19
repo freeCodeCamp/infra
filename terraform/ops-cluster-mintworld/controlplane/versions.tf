@@ -9,6 +9,11 @@ terraform {
       source  = "hashicorp/hcp"
       version = "0.82.0"
     }
+
+    tailscale = {
+      source  = "tailscale/tailscale"
+      version = "0.16.1"
+    }
   }
   required_version = ">= 1"
 }
