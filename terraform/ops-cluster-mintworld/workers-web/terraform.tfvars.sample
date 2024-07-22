@@ -1,0 +1,9 @@
+aws_access_key_id = "<AWSAccessKeyID>"
+aws_secret_access_key = "<AWSSecretAccessKey>"
+
+hcp_client_id = "<HCPClientId>"
+hcp_client_secret = "<HCPClientSecret>"
+
+cloudflare_api_token  = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+cloudflare_account_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Override any more variables from the variables.tf file here
