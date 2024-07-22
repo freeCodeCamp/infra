@@ -77,8 +77,13 @@ data "aws_subnets" "subnets_pub" {
   }
 }
 
+data "cloudflare_zone" "cf_zone" {
+  name = "freecodecamp.net"
+}
+
 locals {
-  prefix = "ops-mwctl"
+  prefix               = "ops-mwctl"
+  cloudflare_subdomain = "cp.mintworld"
 
   // WARNING: This key is used in scripts.
   datacenter                 = "mintworld"

@@ -16,6 +16,17 @@ variable "region" {
   type        = string
 }
 
+variable "instance_type" {
+  description = "Default instance type."
+  default     = "t3a.medium"
+  type        = string
+}
+
+variable "instance_type_prv_routers" {
+  description = "Instance type for private routers."
+  default     = "t3.nano"
+  type        = string
+}
 variable "hcp_client_id" {
   description = "The client ID for the HCP API."
   type        = string
@@ -46,16 +57,14 @@ variable "tailscale_oauth_client_secret" {
   sensitive   = true
 }
 
-variable "instance_type" {
-  description = "Default instance type."
-  default     = "t3a.medium"
+variable "cloudflare_api_token" {
   type        = string
+  description = "Cloudflare API Token"
 }
 
-variable "instance_type_prv_routers" {
-  description = "Instance type for private routers."
-  default     = "t3.nano"
+variable "cloudflare_account_id" {
   type        = string
+  description = "Cloudflare Account ID"
 }
 
 # -----------------------------------------------
