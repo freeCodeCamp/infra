@@ -33,12 +33,13 @@ data "cloudinit_config" "nomad_svr_cic" {
   }
 
   part {
-    filename     = "cloudinit--cloud-config-01-common.yml"
+    filename     = "cloudinit--cloud-config-03-nomad.yml"
     content_type = "text/cloud-config"
     content = templatefile("${path.module}/templates/cloud-config/03-nomad.yml.tftpl", {
       tf__content_nomad_hcl = base64encode(templatefile("${path.module}/templates/nomad/server/nomad.hcl.tftpl", {
         tf_datacenter             = local.datacenter
         tf_nomad_bootstrap_expect = local.nomad_svr_count_min
+        tf_consul_ui_url          = "http://${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}:8500"
       }))
       tf__content_nomad_service = filebase64("${path.module}/templates/nomad/server/nomad.service")
     })

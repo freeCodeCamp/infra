@@ -25,3 +25,10 @@ telemetry {
   publish_allocation_metrics = true
   publish_node_metrics       = true
 }
+
+ui {
+  enabled = true
+  consul {
+    ui_url = "${tf_consul_ui_url}"
+  }
+}
