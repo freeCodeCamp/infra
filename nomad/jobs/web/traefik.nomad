@@ -3,11 +3,6 @@ job "traefik" {
   datacenters = ["*"]
   type        = "system"
 
-  constraint {
-    attribute = "${meta.role}"
-    value     = "worker-web"
-  }
-
   group "traefik" {
 
     network {

@@ -48,3 +48,4 @@ ansible/inventory/hosts
 
 # Secrets
 *.env
+*.vars
