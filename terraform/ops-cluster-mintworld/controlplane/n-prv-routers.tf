@@ -52,7 +52,7 @@ data "cloudinit_config" "prv_routers_cic" {
 
 resource "aws_launch_template" "prv_routers_lt" {
   name                    = "${local.prefix}-prv-routers-lt"
-  image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
+  image_id                = data.hcp_packer_artifact.aws_ami_prv_routers.external_identifier
   instance_type           = local.prv_routers_instance_type
   disable_api_termination = false
   update_default_version  = true
