@@ -1,122 +1,141 @@
-locals {
-  prv_routers_instance_type = data.aws_ec2_instance_type.instance_type_prv_routers.id
-  prv_routers_count_min     = 3
-  prv_routers_count_max     = 5
-
-  // WARNING: This key is used in scripts.
-  tailscale_role_tag = "prv-routers"
-  // WARNING: This key is used in scripts.
-}
-
 resource "tailscale_tailnet_key" "tailscale_auth_key" {
-  reusable            = true
-  ephemeral           = true
-  preauthorized       = true
-  expiry              = 604800 // 7 days, an ideal time to rotate the AMI
-  description         = "Auto-Generated Auth Key Subnet Router"
-  recreate_if_invalid = "always"
-  tags                = ["tag:mintworld"]
+  reusable      = true
+  ephemeral     = true
+  preauthorized = true
+  expiry        = 604800 // 7 days, an ideal time to rotate the AMI
+  description   = "Auto-Generated Auth Key Subnet Router"
+  tags          = ["tag:mintworld"]
 }
 
-data "aws_subnet" "selected_subnets" {
-  count = length(concat(data.aws_subnets.subnets_prv.ids, data.aws_subnets.subnets_pub.ids))
-  id    = concat(data.aws_subnets.subnets_prv.ids, data.aws_subnets.subnets_pub.ids)[count.index]
-}
-
-data "cloudinit_config" "prv_routers_cic" {
-  gzip          = false
-  base64_encode = false
-
-  part {
-    filename     = "cloudinit--cloud-config-01-common.yml"
-    content_type = "text/cloud-config"
-    content      = file("${path.module}/templates/cloud-config/01-common.yml")
-  }
-
-  part {
-    filename     = "cloudinit--startup-01-common.sh"
-    content_type = "text/x-shellscript"
-    content      = file("${path.module}/templates/user-data/01-common.sh")
-  }
-
-  part {
-    filename     = "cloudinit--startup-04-tailscale.sh"
-    content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/templates/user-data/04-tailscale.sh.tftpl", {
-      tf_tailscale_authkey          = tailscale_tailnet_key.tailscale_auth_key.key
-      tf_tailscale_advertise_routes = join(",", [for s in data.aws_subnet.selected_subnets : s.cidr_block])
-    })
-  }
-
-}
-
-resource "aws_launch_template" "prv_routers_lt" {
-  name                    = "${local.prefix}-prv-routers-lt"
-  image_id                = data.hcp_packer_artifact.aws_ami_prv_routers.external_identifier
-  instance_type           = local.prv_routers_instance_type
-  disable_api_termination = false
-  update_default_version  = true
-
-  vpc_security_group_ids = data.aws_security_groups.sg_main.ids
-
-  key_name  = data.aws_key_pair.ssh_service_user_key.key_name
-  user_data = base64gzip(data.cloudinit_config.prv_routers_cic.rendered)
-
-  iam_instance_profile {
-    name = data.aws_iam_instance_profile.instance_profile.name
-  }
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(
-      var.stack_tags,
+resource "aws_iam_role" "ecs_execution_role" {
+  name = "fCCECSExecutionRole"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
       {
-        Role = local.tailscale_role_tag
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
       }
-    )
-  }
+    ]
+  })
 
-  metadata_options {
-    instance_metadata_tags = "enabled"
-    http_endpoint          = "enabled"
-    http_tokens            = "required"
+  tags = merge(
+    var.stack_tags,
+    {
+      Role = local.aws_tag__role_tailscale
+    }
+  )
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role" "ecs_task_role" {
+  name = "fCCECSTaskRole"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Role = local.aws_tag__role_tailscale
+    }
+  )
+}
+
+resource "aws_ecs_cluster" "prv_routers_cluster" {
+  name = "ts-prv-routers"
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Role = local.aws_tag__role_tailscale
+    }
+  )
+}
+
+resource "aws_ecs_task_definition" "prv_routers_task_definition" {
+  family                   = "ts-prv-routers"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+
+  execution_role_arn = aws_iam_role.ecs_execution_role.arn
+  task_role_arn      = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "ts-prv-routers"
+      image     = "tailscale/tailscale:latest"
+      cpu       = 256
+      memory    = 512
+      essential = true
+      environment = [
+        { name = "TS_ACCEPT_DNS", value = "true" },
+        { name = "TS_HOSTNAME", value = "prv-router" },
+        { name = "TS_AUTH_KEY", value = tailscale_tailnet_key.tailscale_auth_key.key },
+        { name = "TS_ROUTES", value = join(",", [for s in data.aws_subnet.all_subnets_details : s.cidr_block]) }
+      ]
+      linuxParameters = {
+        initProcessEnabled = true
+      }
+    }
+  ])
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Role = local.aws_tag__role_tailscale
+    }
+  )
+}
+
+resource "aws_ecs_service" "prv_routers_service" {
+  name            = "ts-prv-routers"
+  cluster         = aws_ecs_cluster.prv_routers_cluster.id
+  task_definition = aws_ecs_task_definition.prv_routers_task_definition.id
+  launch_type     = "FARGATE"
+  desired_count   = local.prv_routers_count_min
+
+  network_configuration {
+    subnets          = data.aws_subnets.subnets_prv.ids
+    assign_public_ip = false
+    security_groups  = data.aws_security_groups.sg_main.ids
   }
 
   lifecycle {
     create_before_destroy = true
   }
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  deployment_controller {
+    type = "ECS"
+  }
+
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-prv-routers-lt"
-      Role = local.tailscale_role_tag,
+      Role = local.aws_tag__role_tailscale
     }
   )
-}
-
-resource "aws_autoscaling_group" "prv_routers_asg" {
-
-  launch_template {
-    id      = aws_launch_template.prv_routers_lt.id
-    version = aws_launch_template.prv_routers_lt.latest_version
-  }
-
-  name                      = "${local.prefix}-prv-routers-asg"
-  max_size                  = local.prv_routers_count_max
-  min_size                  = local.prv_routers_count_min
-  desired_capacity          = local.prv_routers_count_min
-  health_check_grace_period = 180
-  health_check_type         = "EC2"
-  vpc_zone_identifier       = data.aws_subnets.subnets_prv.ids
-  wait_for_capacity_timeout = "10m"
-  termination_policies      = ["OldestInstance"]
-
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 70 // 2/3 of instances must be healthy
-    }
-  }
-
 }
