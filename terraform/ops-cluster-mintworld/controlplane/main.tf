@@ -77,16 +77,35 @@ data "aws_subnets" "subnets_pub" {
   }
 }
 
+data "aws_subnet" "all_subnets_details" {
+  for_each = toset(concat(data.aws_subnets.subnets_prv.ids, data.aws_subnets.subnets_pub.ids))
+  id       = each.value
+}
+
 data "cloudflare_zone" "cf_zone" {
   name = "freecodecamp.net"
 }
 
 locals {
-  prefix               = "ops-mwctl"
-  cloudflare_subdomain = "cp.mintworld"
+  prefix = "ops-mwctl"
 
-  // WARNING: This key is used in scripts.
+  consul_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
+  consul_svr_count_min     = 3
+  consul_svr_count_max     = 5
+
+  nomad_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
+  nomad_svr_count_min     = 3
+  nomad_svr_count_max     = 5
+
+  prv_routers_count_min = 1
+  prv_routers_count_max = 3
+
+  // WARNING: These are used in scripts - DO NOT CHANGE
   datacenter                 = "mintworld"
+  cloudflare_subdomain       = "controlplane.mw"
   consul_cloud_auto_join_key = "ops-mintworld-01"
-  // WARNING: This key is used in scripts.
+  aws_tag__role_nomad        = "nomad-svr"
+  aws_tag__role_consul       = "consul-svr"
+  aws_tag__role_tailscale    = "prv-tsrouter"
+  // WARNING: These are used in scripts - DO NOT CHANGE
 }

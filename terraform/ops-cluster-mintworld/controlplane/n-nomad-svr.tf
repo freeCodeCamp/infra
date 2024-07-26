@@ -1,13 +1,3 @@
-locals {
-  nomad_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
-  nomad_svr_count_min     = 3
-  nomad_svr_count_max     = 5
-
-  // WARNING: This key is used in scripts.
-  nomad_role_tag = "nomad-svr"
-  // WARNING: This key is used in scripts.
-}
-
 data "cloudinit_config" "nomad_svr_cic" {
   gzip          = false
   base64_encode = false
@@ -91,7 +81,7 @@ resource "aws_launch_template" "nomad_svr_lt" {
     tags = merge(
       var.stack_tags,
       {
-        Role = local.nomad_role_tag
+        Role = local.aws_tag__role_nomad
       }
     )
   }
@@ -114,7 +104,7 @@ resource "aws_launch_template" "nomad_svr_lt" {
     var.stack_tags,
     {
       Name = "${local.prefix}-nomad-svr-lt"
-      Role = local.nomad_role_tag,
+      Role = local.aws_tag__role_nomad,
     }
   )
 }

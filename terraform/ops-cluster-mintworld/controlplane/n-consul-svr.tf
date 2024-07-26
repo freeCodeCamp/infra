@@ -1,13 +1,3 @@
-locals {
-  consul_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
-  consul_svr_count_min     = 3
-  consul_svr_count_max     = 5
-
-  // WARNING: This key is used in scripts.
-  consul_role_tag = "consul-svr"
-  // WARNING: This key is used in scripts.
-}
-
 data "cloudinit_config" "consul_svr_cic" {
   gzip          = false
   base64_encode = false
@@ -71,7 +61,7 @@ resource "aws_launch_template" "consul_svr_lt" {
     tags = merge(
       var.stack_tags,
       {
-        Role = local.consul_role_tag
+        Role = local.aws_tag__role_consul
 
         // WARNING: This key is used in scripts.
         ConsulCloudAutoJoinKey = local.consul_cloud_auto_join_key
@@ -98,7 +88,7 @@ resource "aws_launch_template" "consul_svr_lt" {
     var.stack_tags,
     {
       Name = "${local.prefix}-consul-svr-lt"
-      Role = local.consul_role_tag,
+      Role = local.aws_tag__role_consul
     }
   )
 }
