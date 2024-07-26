@@ -1,14 +1,3 @@
-locals {
-  nomad_wkr_instance_type = data.aws_ec2_instance_type.instance_type.id
-  nomad_wkr_count_min     = 5
-  nomad_wkr_count_max     = 10
-
-  // WARNING: This key is used in scripts.
-  nomad_role_tag             = "nomad-wkr-stateless"
-  consul_cloud_auto_join_key = "ops-mintworld-01"
-  // WARNING: This key is used in scripts.
-}
-
 data "cloudinit_config" "nomad_wkr_cic" {
   gzip          = false
   base64_encode = false
@@ -39,7 +28,7 @@ data "cloudinit_config" "nomad_wkr_cic" {
     content = templatefile("${path.module}/templates/cloud-config/03-nomad.yml.tftpl", {
       tf__content_nomad_hcl = base64encode(templatefile("${path.module}/templates/nomad/client/nomad.hcl.tftpl", {
         tf_datacenter  = local.datacenter
-        tf_client_role = local.nomad_role_tag == "nomad-wkr-stateless" ? "worker-stateless" : "default"
+        tf_client_role = local.cluster_tag__client_role
       }))
       tf__content_nomad_service = filebase64("${path.module}/templates/nomad/client/nomad.service")
     })
@@ -90,7 +79,7 @@ resource "aws_launch_template" "nomad_wkr_lt" {
     tags = merge(
       var.stack_tags,
       {
-        Role = local.nomad_role_tag
+        Role = local.aws_tag__role_nomad
       }
     )
   }
@@ -113,7 +102,7 @@ resource "aws_launch_template" "nomad_wkr_lt" {
     var.stack_tags,
     {
       Name = "${local.prefix}-nomad-wkr-stateless-lt"
-      Role = local.nomad_role_tag,
+      Role = local.aws_tag__role_nomad,
     }
   )
 }

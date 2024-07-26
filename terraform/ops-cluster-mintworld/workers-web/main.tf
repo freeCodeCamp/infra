@@ -55,6 +55,16 @@ data "aws_subnets" "subnets_prv" {
 }
 
 locals {
-  prefix     = "ops-mwwkr"
-  datacenter = "mintworld"
+  prefix = "ops-mwweb"
+
+  nomad_web_instance_type = data.aws_ec2_instance_type.instance_type.id
+  nomad_web_count_min     = 3
+  nomad_web_count_max     = 5
+
+  // WARNING: These are used in scripts - DO NOT CHANGE
+  datacenter                 = "mintworld"
+  consul_cloud_auto_join_key = "ops-mintworld-01"
+  aws_tag__role_nomad        = "nomad-web"
+  cluster_tag__client_role   = "web"
+  // WARNING: These are used in scripts - DO NOT CHANGE
 }

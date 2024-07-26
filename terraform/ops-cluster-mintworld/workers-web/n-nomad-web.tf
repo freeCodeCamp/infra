@@ -1,15 +1,4 @@
-locals {
-  nomad_wkr_instance_type = data.aws_ec2_instance_type.instance_type.id
-  nomad_wkr_count_min     = 3
-  nomad_wkr_count_max     = 5
-
-  // WARNING: This key is used in scripts.
-  nomad_role_tag             = "nomad-wkr-web"
-  consul_cloud_auto_join_key = "ops-mintworld-01"
-  // WARNING: This key is used in scripts.
-}
-
-data "cloudinit_config" "nomad_wkr_cic" {
+data "cloudinit_config" "nomad_web_cic" {
   gzip          = false
   base64_encode = false
 
@@ -39,7 +28,7 @@ data "cloudinit_config" "nomad_wkr_cic" {
     content = templatefile("${path.module}/templates/cloud-config/03-nomad.yml.tftpl", {
       tf__content_nomad_hcl = base64encode(templatefile("${path.module}/templates/nomad/client/nomad.hcl.tftpl", {
         tf_datacenter  = local.datacenter
-        tf_client_role = local.nomad_role_tag == "nomad-wkr-web" ? "worker-web" : "default"
+        tf_client_role = local.cluster_tag__client_role
       }))
       tf__content_nomad_service = filebase64("${path.module}/templates/nomad/client/nomad.service")
     })
@@ -69,17 +58,17 @@ data "cloudinit_config" "nomad_wkr_cic" {
 
 }
 
-resource "aws_launch_template" "nomad_wkr_lt" {
-  name                    = "${local.prefix}-nomad-wkr-web-lt"
+resource "aws_launch_template" "nomad_web_lt" {
+  name                    = "${local.prefix}-nomad-web-lt"
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
-  instance_type           = local.nomad_wkr_instance_type
+  instance_type           = local.nomad_web_instance_type
   disable_api_termination = false
   update_default_version  = true
 
   vpc_security_group_ids = data.aws_security_groups.sg_main.ids
 
   key_name  = data.aws_key_pair.ssh_service_user_key.key_name
-  user_data = base64gzip(data.cloudinit_config.nomad_wkr_cic.rendered)
+  user_data = base64gzip(data.cloudinit_config.nomad_web_cic.rendered)
 
   iam_instance_profile {
     name = data.aws_iam_instance_profile.instance_profile.name
@@ -90,7 +79,7 @@ resource "aws_launch_template" "nomad_wkr_lt" {
     tags = merge(
       var.stack_tags,
       {
-        Role = local.nomad_role_tag
+        Role = local.aws_tag__role_nomad
       }
     )
   }
@@ -112,23 +101,23 @@ resource "aws_launch_template" "nomad_wkr_lt" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-wkr-web-lt"
-      Role = local.nomad_role_tag,
+      Name = "${local.prefix}-nomad-web-lt"
+      Role = local.aws_tag__role_nomad,
     }
   )
 }
 
-resource "aws_autoscaling_group" "nomad_wkr_asg" {
+resource "aws_autoscaling_group" "nomad_web_asg" {
 
   launch_template {
-    id      = aws_launch_template.nomad_wkr_lt.id
-    version = aws_launch_template.nomad_wkr_lt.latest_version
+    id      = aws_launch_template.nomad_web_lt.id
+    version = aws_launch_template.nomad_web_lt.latest_version
   }
 
-  name                      = "${local.prefix}-nomad-wkr-web-asg"
-  max_size                  = local.nomad_wkr_count_max
-  min_size                  = local.nomad_wkr_count_min
-  desired_capacity          = local.nomad_wkr_count_min
+  name                      = "${local.prefix}-nomad-web-asg"
+  max_size                  = local.nomad_web_count_max
+  min_size                  = local.nomad_web_count_min
+  desired_capacity          = local.nomad_web_count_min
   health_check_grace_period = 180
   health_check_type         = "EC2"
   vpc_zone_identifier       = data.aws_subnets.subnets_prv.ids

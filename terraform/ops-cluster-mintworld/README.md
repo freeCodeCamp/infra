@@ -1,15 +1,15 @@
 # Introduction
 
-This is a collection of Terraform workspaces that are ideally deployed in conjuction with each other. 
+This is a collection of Terraform workspaces that are designed to be deployed in conjunction with each other. 
 
-- [`network`](./network/): Creates a VPC, 3 Public subnets and 3 Private subnets. The subnets are spread accross 3 Availabitlity Zones in pairs. This allows creating resources in auto scaling groups (for high availability across AZs), etc. as needed using the subnets created here.
+- [`network`](./network/): Creates a VPC with 3 public subnets and 3 private subnets. The subnets are spread across 3 Availability Zones in pairs. This configuration allows for the creation of resources in auto scaling groups (for high availability across AZs) and other similar setups using the subnets created here.
 
-- [`controlplane`](./controlplane/): Creates a control plane for the cluster. This includes a set of Nomad and Consul servers deployed in auto scaling groups.
+- [`controlplane`](./controlplane/): Establishes a control plane for the cluster. This includes a set of Nomad and Consul servers deployed in auto scaling groups.
 
-  It includes an auto scaling group for Tailscale subnet routers for private access to the Nomad and Consul servers. Additionally, there is network load balancer mapped to a convenient DNS name that can be used to access the "controlplane" from developer machines connected via Tailscale.
+  It also includes an auto scaling group for Tailscale subnet routers, enabling private access to the Nomad and Consul servers. Furthermore, a network load balancer is mapped to a convenient DNS name, allowing access to the "controlplane" from developer machines connected via Tailscale.
 
-- [`workers-web`](./workers-web/): Creates a set of Nomad nodes that are used to run web servers like Traefik, etc. These are exclusively supposed to run as proxies for all apps in the cluster.
+- [`workers-web`](./workers-web/): Creates a set of Nomad nodes dedicated to running web servers such as Traefik. These nodes are exclusively intended to serve as proxies for all applications in the cluster.
 
-- [`workers-stateless`](./workers-stateless/): Creates a set of Nomad nodes that are used to run stateless applications like API servers, etc.
+- [`workers-stateless`](./workers-stateless/): Deploys a set of Nomad nodes designed to run stateless applications, such as API servers.
 
-The cluster is designed to be deployed in a single AWS region. However it is possible to deploy worker nodes in other regions.
+While the cluster is primarily designed for deployment in a single AWS region, it is possible to deploy worker nodes in other regions if needed.

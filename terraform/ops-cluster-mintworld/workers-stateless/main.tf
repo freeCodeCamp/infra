@@ -55,6 +55,16 @@ data "aws_subnets" "subnets_prv" {
 }
 
 locals {
-  prefix     = "ops-mwwkr"
-  datacenter = "mintworld"
+  prefix = "ops-mwwkr"
+
+  nomad_wkr_instance_type = data.aws_ec2_instance_type.instance_type.id
+  nomad_wkr_count_min     = 5
+  nomad_wkr_count_max     = 10
+
+  // WARNING: These are used in scripts - DO NOT CHANGE
+  datacenter                 = "mintworld"
+  consul_cloud_auto_join_key = "ops-mintworld-01"
+  aws_tag__role_nomad        = "nomad-wkr-stateless"
+  cluster_tag__client_role   = "stateless"
+  // WARNING: These are used in scripts - DO NOT CHANGE
 }
