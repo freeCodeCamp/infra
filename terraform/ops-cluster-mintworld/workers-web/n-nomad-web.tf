@@ -142,3 +142,48 @@ resource "aws_autoscaling_group" "nomad_web_asg" {
     }
   }
 }
+
+resource "aws_lb_target_group" "tg_nomad_web" {
+  name     = "${local.prefix}-tg-nomad-web"
+  port     = 8080
+  protocol = "TCP"
+  vpc_id   = data.aws_vpc.vpc.id
+
+  health_check {
+    path                = "/ping"
+    healthy_threshold   = 2
+    unhealthy_threshold = 10
+    timeout             = 5
+    interval            = 10
+  }
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Name = "${local.prefix}-tg-nomad-web"
+    }
+  )
+}
+
+resource "aws_lb_listener" "listener_nomad_web" {
+  load_balancer_arn = data.aws_lb.internal_lb.arn
+  port              = "8080"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_nomad_web.arn
+  }
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Name = "${local.prefix}-nomad-web"
+    }
+  )
+}
+
+resource "aws_autoscaling_attachment" "nomad_web_asg_attachment" {
+  autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
+  lb_target_group_arn    = aws_lb_target_group.tg_nomad_web.arn
+}

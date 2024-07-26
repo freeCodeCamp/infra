@@ -82,8 +82,8 @@ data "aws_subnet" "all_subnets_details" {
   id       = each.value
 }
 
-data "cloudflare_zone" "cf_zone" {
-  name = "freecodecamp.net"
+data "aws_lb" "internal_lb" {
+  name = "ops-mwnet-prv-lb"
 }
 
 locals {
@@ -102,7 +102,6 @@ locals {
 
   // WARNING: These are used in scripts - DO NOT CHANGE
   datacenter                 = "mintworld"
-  cloudflare_subdomain       = "controlplane.mw"
   consul_cloud_auto_join_key = "ops-mintworld-01"
   aws_tag__role_nomad        = "nomad-svr"
   aws_tag__role_consul       = "consul-svr"

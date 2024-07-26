@@ -22,16 +22,6 @@ variable "hcp_client_secret" {
   sensitive   = true
 }
 
-# variable "cloudflare_api_token" {
-#   type        = string
-#   description = "Cloudflare API Token"
-# }
-
-# variable "cloudflare_account_id" {
-#   type        = string
-#   description = "Cloudflare Account ID"
-# }
-
 variable "region" {
   description = "The name of the region in which to deploy instances."
   type        = string
@@ -58,6 +48,16 @@ variable "enable_eip_on_launch_in_public_subnets" {
   description = "Whether to enable EIP on launch in the public subnets"
   type        = bool
   default     = false
+}
+
+variable "cloudflare_api_token" {
+  type        = string
+  description = "Cloudflare API Token"
+}
+
+variable "cloudflare_account_id" {
+  type        = string
+  description = "Cloudflare Account ID"
 }
 
 # -----------------------------------------------

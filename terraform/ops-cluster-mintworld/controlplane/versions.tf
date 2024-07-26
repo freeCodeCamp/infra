@@ -14,11 +14,6 @@ terraform {
       source  = "tailscale/tailscale"
       version = "0.16.1"
     }
-
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "4.38.0"
-    }
   }
   required_version = ">= 1"
 }

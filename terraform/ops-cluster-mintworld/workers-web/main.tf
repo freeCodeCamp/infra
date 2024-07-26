@@ -54,6 +54,9 @@ data "aws_subnets" "subnets_prv" {
   }
 }
 
+data "aws_lb" "internal_lb" {
+  name = "ops-mwnet-prv-lb"
+}
 locals {
   prefix = "ops-mwweb"
 

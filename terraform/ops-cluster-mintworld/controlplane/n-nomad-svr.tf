@@ -29,7 +29,7 @@ data "cloudinit_config" "nomad_svr_cic" {
       tf__content_nomad_hcl = base64encode(templatefile("${path.module}/templates/nomad/server/nomad.hcl.tftpl", {
         tf_datacenter             = local.datacenter
         tf_nomad_bootstrap_expect = local.nomad_svr_count_min
-        tf_consul_ui_url          = "http://${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}:8500"
+        tf_consul_ui_url          = "http://prv.mintworld.freecodecamp.net:8500"
       }))
       tf__content_nomad_service = filebase64("${path.module}/templates/nomad/server/nomad.service")
     })
@@ -145,4 +145,47 @@ resource "aws_autoscaling_group" "nomad_svr_asg" {
   }
 
   depends_on = [aws_autoscaling_group.consul_svr_asg]
+}
+
+resource "aws_lb_target_group" "tg_nomad_svr" {
+  name     = "${local.prefix}-tg-nomad-svr"
+  port     = 4646
+  protocol = "TCP"
+  vpc_id   = data.aws_vpc.vpc.id
+
+  health_check {
+    path                = "/v1/agent/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 10
+    timeout             = 5
+    interval            = 10
+  }
+
+  tags = merge(
+    var.stack_tags, {
+      Name = "${local.prefix}-tg-nomad-svr"
+    }
+  )
+}
+
+resource "aws_lb_listener" "listener_nomad_http" {
+  load_balancer_arn = data.aws_lb.internal_lb.arn
+  port              = "4646"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_nomad_svr.arn
+  }
+
+  tags = merge(
+    var.stack_tags, {
+      Name = "${local.prefix}-nomad-http"
+    }
+  )
+}
+
+resource "aws_autoscaling_attachment" "nomad_svr_asg_attachment" {
+  autoscaling_group_name = aws_autoscaling_group.nomad_svr_asg.name
+  lb_target_group_arn    = aws_lb_target_group.tg_nomad_svr.arn
 }

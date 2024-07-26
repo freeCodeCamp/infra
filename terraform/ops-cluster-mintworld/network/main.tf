@@ -1,5 +1,6 @@
 locals {
-  prefix = "ops-mwnet"
+  prefix               = "ops-mwnet"
+  cloudflare_subdomain = "prv.mintworld"
 
   # Define the CIDR prefix ranges for subnets:
   # Needing 6 subnets, 3 private and 3 public,
@@ -21,6 +22,10 @@ locals {
       Environment = "ops"
     }
   )
+}
+
+data "cloudflare_zone" "cf_zone" {
+  name = "freecodecamp.net"
 }
 
 data "aws_availability_zones" "available" {
@@ -233,4 +238,26 @@ resource "aws_security_group" "sg_main" {
   }
 
   tags = merge(local.stack_tags, { Name = "${local.prefix}-sg" })
+}
+
+resource "aws_lb" "internal_lb" {
+  name               = "${local.prefix}-prv-lb"
+  internal           = true
+  load_balancer_type = "network"
+  security_groups    = [aws_security_group.sg_main.id]
+  subnets            = aws_subnet.subnet_prv.*.id
+
+  dns_record_client_routing_policy = "availability_zone_affinity"
+
+  tags = merge(local.stack_tags, { Name = "${local.prefix}-prv-lb" })
+}
+
+resource "cloudflare_record" "internal_lb_dnsrecord" {
+  zone_id = data.cloudflare_zone.cf_zone.id
+  type    = "CNAME"
+  proxied = false
+  ttl     = 120
+
+  name  = "${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}"
+  value = aws_lb.internal_lb.dns_name
 }

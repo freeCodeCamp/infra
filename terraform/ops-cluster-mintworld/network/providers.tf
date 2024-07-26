@@ -9,6 +9,6 @@ provider "hcp" {
   client_secret = var.hcp_client_secret
 }
 
-# provider "cloudflare" {
-#   api_token = var.cloudflare_api_token
-# }
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}

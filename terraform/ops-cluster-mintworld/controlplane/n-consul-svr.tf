@@ -127,5 +127,47 @@ resource "aws_autoscaling_group" "consul_svr_asg" {
       min_healthy_percentage = 70 // 2/3 of instances must be healthy
     }
   }
+}
 
+resource "aws_lb_target_group" "tg_consul_svr" {
+  name     = "${local.prefix}-tg-consul-svr"
+  port     = 8500
+  protocol = "TCP"
+  vpc_id   = data.aws_vpc.vpc.id
+
+  health_check {
+    path                = "/v1/agent/self"
+    healthy_threshold   = 2
+    unhealthy_threshold = 10
+    timeout             = 5
+    interval            = 10
+  }
+
+  tags = merge(
+    var.stack_tags, {
+      Name = "${local.prefix}-tg-consul-svr"
+    }
+  )
+}
+
+resource "aws_lb_listener" "listener_consul_http" {
+  load_balancer_arn = data.aws_lb.internal_lb.arn
+  port              = "8500"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_consul_svr.arn
+  }
+
+  tags = merge(
+    var.stack_tags, {
+      Name = "${local.prefix}-consul-http"
+    }
+  )
+}
+
+resource "aws_autoscaling_attachment" "consul_svr_asg_attachment" {
+  autoscaling_group_name = aws_autoscaling_group.consul_svr_asg.name
+  lb_target_group_arn    = aws_lb_target_group.tg_consul_svr.arn
 }
