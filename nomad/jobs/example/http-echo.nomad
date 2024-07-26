@@ -1,11 +1,20 @@
-job "http-echo" {
+job "job-http-echo" {
 
   datacenters = ["*"]
   type        = "service"
 
   constraint {
-    attribute = "${meta.role}"
-    value     = "worker-stateless"
+    attribute = "${node.class}"
+    value     = "stateless"
+  }
+
+  update {
+    max_parallel     = 3
+    canary           = 1
+    auto_revert      = true
+    auto_promote     = true
+    health_check     = "task_states"
+    min_healthy_time = "10s"
   }
 
   group "grp-http-echo" {
@@ -29,10 +38,12 @@ job "http-echo" {
       provider = "consul"
 
       check {
-        name     = "alive"
-        type     = "tcp"
-        interval = "10s"
-        timeout  = "2s"
+        name                   = "alive"
+        type                   = "http"
+        path                   = "/"
+        interval               = "3s"
+        timeout                = "5s"
+        success_before_passing = 3
       }
 
     }

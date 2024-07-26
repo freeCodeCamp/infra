@@ -1,14 +1,14 @@
-job "traefik" {
+job "job-traefik" {
 
   datacenters = ["*"]
   type        = "system"
 
   constraint {
-    attribute = "${meta.role}"
-    value     = "worker-web"
+    attribute = "${node.class}"
+    value     = "web"
   }
 
-  group "traefik" {
+  group "grp-traefik" {
 
     network {
       port "http" {
@@ -21,7 +21,7 @@ job "traefik" {
     }
 
     service {
-      name = "traefik"
+      name = "svc-traefik"
 
       check {
         name     = "alive"
@@ -32,11 +32,11 @@ job "traefik" {
       }
     }
 
-    task "traefik" {
+    task "tsk-traefik" {
       driver = "docker"
 
       config {
-        image        = "traefik:v2.2"
+        image        = "traefik:v3.1"
         network_mode = "host"
 
         volumes = [
@@ -46,34 +46,38 @@ job "traefik" {
 
       template {
         data = <<EOF
+[ping]
+  entryPoint = "http"
+
 [entryPoints]
-    [entryPoints.http]
-    address = ":8080"
-    [entryPoints.traefik]
-    address = ":8081"
+  [entryPoints.http]
+  address = ":8080"
+  [entryPoints.traefik]
+  address = ":8081"
 
 [api]
-    dashboard = true
-    insecure  = true
+  dashboard = true
+  insecure  = true
 
 # Enable Consul Catalog configuration backend.
 [providers.consulCatalog]
-    prefix           = "traefik"
-    exposedByDefault = false
+  prefix           = "traefik"
+  exposedByDefault = false
+  strictChecks = ["passing", "warning"]
+  watch = true
 
-    [providers.consulCatalog.endpoint]
-      address = "127.0.0.1:8500"
-      scheme  = "http"
+  [providers.consulCatalog.endpoint]
+    address = "127.0.0.1:8500"
+    scheme  = "http"
 EOF
 
         destination = "local/traefik.toml"
       }
 
       resources {
-        cpu    = 100
-        memory = 128
+        cpu    = 200
+        memory = 256
       }
     }
   }
 }
-
