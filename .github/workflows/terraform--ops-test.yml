@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
       - name: Terraform Cloud Upload Configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@34866d21f6856cca1fbca7c09c5644203aa83890 # v1.3.0
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@5bd1031f2e8da1d8db16b35519ecc5b15a99cf20 # v1.3.1
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -89,7 +89,7 @@ jobs:
           speculative: true
 
       - name: Terraform Cloud Create Speculative Run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@34866d21f6856cca1fbca7c09c5644203aa83890 # v1.3.0
+        uses: hashicorp/tfc-workflows-github/actions/create-run@5bd1031f2e8da1d8db16b35519ecc5b15a99cf20 # v1.3.1
         id: run
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -99,7 +99,7 @@ jobs:
           message: 'Triggered From GitHub Actions CI ${{ github.sha }}'
 
       - name: Terraform Cloud Plan Output
-        uses: hashicorp/tfc-workflows-github/actions/plan-output@34866d21f6856cca1fbca7c09c5644203aa83890 # v1.3.0
+        uses: hashicorp/tfc-workflows-github/actions/plan-output@5bd1031f2e8da1d8db16b35519ecc5b15a99cf20 # v1.3.1
         id: plan-output
         with:
           plan: ${{ steps.run.outputs.plan_id }}
