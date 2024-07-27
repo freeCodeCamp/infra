@@ -1,11 +1,26 @@
-job "http-echo" {
+job "job-http-echo" {
 
   datacenters = ["*"]
   type        = "service"
 
   constraint {
-    attribute = "${meta.role}"
-    value     = "worker-stateless"
+    attribute = "${node.class}"
+    value     = "stateless"
+  }
+
+  update {
+    max_parallel     = 3
+    auto_revert      = true
+    health_check     = "checks"
+    min_healthy_time = "15s"
+    healthy_deadline = "5m"
+  }
+
+  migrate {
+    max_parallel     = 3
+    health_check     = "checks"
+    min_healthy_time = "15s"
+    healthy_deadline = "5m"
   }
 
   group "grp-http-echo" {
@@ -20,19 +35,20 @@ job "http-echo" {
     service {
       name = "svc-http-echo"
       tags = [
-        "global",
-        "http-echo",
-        "traefik.enable=true",
-        "traefik.http.routers.http.rule=Path(`/http-echo`)"
+        "app-type=stateless",
+        "app-name=http-echo",
+        "traefik.enable=true"
       ]
       port     = "http"
       provider = "consul"
 
       check {
-        name     = "alive"
-        type     = "tcp"
-        interval = "10s"
-        timeout  = "2s"
+        name                   = "alive"
+        type                   = "http"
+        path                   = "/"
+        interval               = "10s"
+        timeout                = "2s"
+        success_before_passing = 3
       }
 
     }

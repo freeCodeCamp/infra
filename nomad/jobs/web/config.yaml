@@ -1,0 +1,41 @@
+entryPoints:
+  web:
+    address: ":80"
+    asDefault: true
+    transport:
+      lifeCycle:
+        requestAcceptGraceTimeout: "15s"
+        graceTimeOut: "10s"
+  traefik:
+    address: ":8081"
+  admin:
+    address: ":8082"
+
+ping:
+  entryPoint: "admin"
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  consulCatalog:
+    exposedByDefault: false
+    prefix: "traefik"
+    strictChecks: ["passing"]
+    watch: true
+    defaultRule: "Host(`{{ .Name }}.prv.mintworld.freecodecamp.net`)"
+    endpoint:
+      address: "127.0.0.1:8500"
+      scheme: "http"
+
+log:
+  level: "TRACE"
+  noColor: true
+  maxAge: 1
+
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    entryPoint: "admin"

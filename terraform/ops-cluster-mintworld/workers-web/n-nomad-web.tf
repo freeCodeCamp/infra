@@ -145,11 +145,12 @@ resource "aws_autoscaling_group" "nomad_web_asg" {
 
 resource "aws_lb_target_group" "tg_nomad_web" {
   name     = "${local.prefix}-tg-nomad-web"
-  port     = 8080
+  port     = 80
   protocol = "TCP"
   vpc_id   = data.aws_vpc.vpc.id
 
   health_check {
+    port                = 8082
     path                = "/ping"
     healthy_threshold   = 2
     unhealthy_threshold = 10
@@ -167,7 +168,7 @@ resource "aws_lb_target_group" "tg_nomad_web" {
 
 resource "aws_lb_listener" "listener_nomad_web" {
   load_balancer_arn = data.aws_lb.internal_lb.arn
-  port              = "8080"
+  port              = "80"
   protocol          = "TCP"
 
   default_action {
@@ -186,4 +187,49 @@ resource "aws_lb_listener" "listener_nomad_web" {
 resource "aws_autoscaling_attachment" "nomad_web_asg_attachment" {
   autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
   lb_target_group_arn    = aws_lb_target_group.tg_nomad_web.arn
+}
+
+resource "aws_lb_target_group" "tg_nomad_web_traefik" {
+  name     = "${local.prefix}-tg-nomad-web-traefik"
+  port     = 8081
+  protocol = "TCP"
+  vpc_id   = data.aws_vpc.vpc.id
+
+  health_check {
+    port                = 8082
+    path                = "/ping"
+    healthy_threshold   = 2
+    unhealthy_threshold = 10
+    timeout             = 5
+    interval            = 10
+  }
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Name = "${local.prefix}-tg-nomad-web-traefik"
+    }
+  )
+}
+
+resource "aws_lb_listener" "listener_nomad_web_traefik" {
+  load_balancer_arn = data.aws_lb.internal_lb.arn
+  port              = 8081
+  protocol          = "TCP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_nomad_web_traefik.arn
+  }
+
+  tags = merge(
+    var.stack_tags,
+    {
+      Name = "${local.prefix}-nomad-web-traefik"
+    }
+  )
+}
+
+resource "aws_autoscaling_attachment" "nomad_web_asg_attachment_traefik" {
+  autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
+  lb_target_group_arn    = aws_lb_target_group.tg_nomad_web_traefik.arn
 }
