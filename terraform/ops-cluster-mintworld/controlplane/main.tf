@@ -65,23 +65,6 @@ data "aws_subnets" "subnets_prv" {
   }
 }
 
-data "aws_subnets" "subnets_pub" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.vpc.id]
-  }
-
-  tags = {
-    Type  = "Public"
-    Stack = "mintworld"
-  }
-}
-
-data "aws_subnet" "all_subnets_details" {
-  for_each = toset(concat(data.aws_subnets.subnets_prv.ids, data.aws_subnets.subnets_pub.ids))
-  id       = each.value
-}
-
 data "aws_lb" "internal_lb" {
   name = "ops-mwnet-prv-lb"
 }
