@@ -69,6 +69,10 @@ resource "aws_ecs_cluster" "prv_routers_cluster" {
   )
 }
 
+resource "random_pet" "prv_routers_name" {
+  length = 1
+}
+
 resource "aws_ecs_task_definition" "prv_routers_task_definition" {
   family                   = "ts-prv-routers"
   network_mode             = "awsvpc"
@@ -88,9 +92,9 @@ resource "aws_ecs_task_definition" "prv_routers_task_definition" {
       essential = true
       environment = [
         { name = "TS_ACCEPT_DNS", value = "true" },
-        { name = "TS_HOSTNAME", value = "prv-router" },
+        { name = "TS_HOSTNAME", value = "prv-router-${random_pet.prv_routers_name.id}" },
         { name = "TS_AUTH_KEY", value = tailscale_tailnet_key.tailscale_auth_key.key },
-        { name = "TS_ROUTES", value = join(",", [for s in data.aws_subnet.all_subnets_details : s.cidr_block]) }
+        { name = "TS_ROUTES", value = data.aws_vpc.vpc.cidr_block }
       ]
       linuxParameters = {
         initProcessEnabled = true
