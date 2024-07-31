@@ -1,12 +1,8 @@
 job "job-http-echo" {
 
   datacenters = ["*"]
+  node_pool   = "stateless"
   type        = "service"
-
-  constraint {
-    attribute = "${node.class}"
-    value     = "stateless"
-  }
 
   update {
     max_parallel     = 3

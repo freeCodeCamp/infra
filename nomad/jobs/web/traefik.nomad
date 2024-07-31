@@ -1,12 +1,8 @@
 job "job-traefik" {
 
   datacenters = ["*"]
+  node_pool   = "web"
   type        = "system"
-
-  constraint {
-    attribute = "${node.class}"
-    value     = "web"
-  }
 
   update {
     max_parallel     = 1
