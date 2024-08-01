@@ -1,0 +1,22 @@
+#cloud-config
+merge_how:
+  - name: list
+    settings: [append]
+  - name: dict
+    settings: [no_replace, recurse_list]
+
+disable_root: true
+ssh_pwauth: false
+allow_public_ssh_keys: true
+
+users:
+  - name: freecodecamp
+    groups:
+      - sudo
+      - docker
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_import_id:
+      - gh:camperbot
+
+preserve_hostname: true
