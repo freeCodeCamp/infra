@@ -124,16 +124,7 @@ resource "aws_autoscaling_group" "nomad_web_asg" {
   wait_for_capacity_timeout = "10m"
   termination_policies      = ["OldestInstance"]
 
-  enabled_metrics = [
-    "GroupMinSize",
-    "GroupMaxSize",
-    "GroupDesiredCapacity",
-    "GroupInServiceInstances",
-    "GroupPendingInstances",
-    "GroupStandbyInstances",
-    "GroupTerminatingInstances",
-    "GroupTotalInstances"
-  ]
+  metrics_granularity = "1Minute"
 
   instance_refresh {
     strategy = "Rolling"
@@ -141,6 +132,14 @@ resource "aws_autoscaling_group" "nomad_web_asg" {
       min_healthy_percentage = 70 // 2/3 of instances must be healthy
     }
   }
+}
+
+resource "aws_autoscaling_lifecycle_hook" "nomad_drain_hook" {
+  name                   = "${local.prefix}-nomad-drain-hook"
+  autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
 }
 
 resource "aws_lb_target_group" "tg_nomad_web" {
