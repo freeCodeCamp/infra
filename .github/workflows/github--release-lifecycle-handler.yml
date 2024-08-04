@@ -1,0 +1,77 @@
+name: GitHub -- Release Lifecycle Handler Lambda
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: '20'
+
+      - name: Get current version from package.json
+        id: current_version
+        run: |
+          echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        working-directory: ./lambdas/lifecycle-handler
+
+      - name: Check if version was bumped
+        id: version_check
+        run: |
+          git fetch --all --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_VERSION=${LATEST_TAG#v}
+          CURRENT_VERSION=${{ steps.current_version.outputs.VERSION }}
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "Version was bumped from $LATEST_VERSION to $CURRENT_VERSION"
+            echo "BUMPED=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version was not bumped"
+            echo "BUMPED=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.version_check.outputs.BUMPED == 'true'
+        run: npm ci
+        working-directory: ./lambdas/lifecycle-handler
+
+      - name: Build and package lambda
+        if: steps.version_check.outputs.BUMPED == 'true'
+        run: npm run zip
+        working-directory: ./lambdas/lifecycle-handler
+
+      - name: Create Release
+        if: steps.version_check.outputs.BUMPED == 'true'
+        id: create_release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.current_version.outputs.VERSION }}
+          release_name:
+            Lifecycle Handler v${{ steps.current_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        if: steps.version_check.outputs.BUMPED == 'true'
+        uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./lambdas/lifecycle-handler/lifecycle-handler.zip
+          asset_name:
+            lifecycle-handler-${{ steps.current_version.outputs.VERSION }}.zip
+          asset_content_type: application/zip
+
+      - name: Notify if version was not bumped
+        if: steps.version_check.outputs.BUMPED == 'false'
+        run: |
+          echo "::warning::Version was not bumped. No release will be created."
