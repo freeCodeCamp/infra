@@ -1,0 +1,20 @@
+{
+  "name": "lifecycle-handler",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "zip": "zip -r lifecycle-handler.zip index.js node_modules",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
+  },
+  "license": "BSD-3-Clause",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-auto-scaling": "3.623.0",
+    "@aws-sdk/client-ec2": "3.623.0",
+    "@aws-sdk/client-ssm": "3.623.0"
+  }
+}
