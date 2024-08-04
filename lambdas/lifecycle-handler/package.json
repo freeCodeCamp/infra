@@ -1,0 +1,15 @@
+{
+  "name": "lifecycle-handler",
+  "version": "0.0.0",
+  "main": "index.js",
+  "scripts": {
+    "zip": "zip -r lifecycle-handler.zip ./src ./node_modules",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "license": "BSD-3-Clause",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-auto-scaling": "3.623.0",
+    "@aws-sdk/client-ec2": "3.623.0"
+  }
+}
