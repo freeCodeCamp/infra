@@ -48,28 +48,13 @@ jobs:
 
       - name: Create Release
         if: steps.version_check.outputs.BUMPED == 'true'
-        id: create_release
-        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.current_version.outputs.VERSION }}
-          release_name:
-            Lifecycle Handler v${{ steps.current_version.outputs.VERSION }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Asset
-        if: steps.version_check.outputs.BUMPED == 'true'
-        uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./lambdas/lifecycle-handler/lifecycle-handler.zip
-          asset_name:
-            lifecycle-handler-${{ steps.current_version.outputs.VERSION }}.zip
-          asset_content_type: application/zip
+        run: |
+          gh release create v${{ steps.current_version.outputs.VERSION }} \
+            --title "Lifecycle Handler v${{ steps.current_version.outputs.VERSION }}" \
+            --notes "Release notes for version ${{ steps.current_version.outputs.VERSION }}" \
+            ./lambdas/lifecycle-handler/lifecycle-handler.zip#lifecycle-handler-${{ steps.current_version.outputs.VERSION }}.zip
 
       - name: Notify if version was not bumped
         if: steps.version_check.outputs.BUMPED == 'false'
