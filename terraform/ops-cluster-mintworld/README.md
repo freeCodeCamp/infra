@@ -10,4 +10,6 @@ This is a collection of Terraform workspaces that are designed to be deployed in
 
 - [`workers-stateless`](./workers-stateless/): Deploys a set of Nomad nodes designed to run stateless applications, such as API servers.
 
+- [`lifecycle-handlers`](./lifecycle-handlers/): Creates a Lambda function that is triggered by the lifecycle of the ASG in the cluster. It is used to handle the creation and termination of the instances.
+
 While the cluster is primarily designed for deployment in a single AWS region, it is possible to deploy worker nodes in other regions if needed.
