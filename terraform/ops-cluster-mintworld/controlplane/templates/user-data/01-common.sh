@@ -43,10 +43,6 @@ fetch_metadata() {
   return 1
 }
 
-mark_instance_unhealthy() {
-  aws autoscaling set-instance-health --instance-id "$INSTANCE_ID" --health-status Unhealthy --region "$REGION"
-}
-
 # Update hostname and EC2 Instance Name
 update_hostname_and_name() {
   local NEW_HOSTNAME
