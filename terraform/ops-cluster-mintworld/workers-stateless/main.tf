@@ -56,6 +56,7 @@ data "aws_subnets" "subnets_prv" {
 
 locals {
   prefix = "ops-mwwkr"
+  infix  = "nmd-stateless"
 
   nomad_wkr_instance_type = data.aws_ec2_instance_type.instance_type.id
   nomad_wkr_count_min     = 5
@@ -64,7 +65,7 @@ locals {
   // WARNING: These are used in scripts - DO NOT CHANGE
   datacenter                 = "mintworld"
   consul_cloud_auto_join_key = "ops-mintworld-01"
-  aws_tag__role_nomad        = "nomad-wkr-stateless"
+  aws_tag__role_nomad        = "nmd-clt"
   cluster_tag__client_role   = "stateless"
   // WARNING: These are used in scripts - DO NOT CHANGE
 }

@@ -41,7 +41,7 @@ data "cloudinit_config" "consul_svr_cic" {
 }
 
 resource "aws_launch_template" "consul_svr_lt" {
-  name                    = "${local.prefix}-consul-svr-lt"
+  name                    = "${local.prefix}-${local.infix_consul}-lt"
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
   instance_type           = local.consul_svr_instance_type
   disable_api_termination = false
@@ -87,7 +87,7 @@ resource "aws_launch_template" "consul_svr_lt" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-consul-svr-lt"
+      Name = "${local.prefix}-${local.infix_consul}-lt"
       Role = local.aws_tag__role_consul
     }
   )
@@ -100,37 +100,72 @@ resource "aws_autoscaling_group" "consul_svr_asg" {
     version = aws_launch_template.consul_svr_lt.latest_version
   }
 
-  name                      = "${local.prefix}-consul-svr-asg"
+  name                      = "${local.prefix}-${local.infix_consul}-asg"
   max_size                  = local.consul_svr_count_max
   min_size                  = local.consul_svr_count_min
   desired_capacity          = local.consul_svr_count_min
-  health_check_grace_period = 180
-  health_check_type         = "EC2"
+  health_check_type         = "ELB"
+  health_check_grace_period = 300
   vpc_zone_identifier       = data.aws_subnets.subnets_prv.ids
   wait_for_capacity_timeout = "10m"
   termination_policies      = ["OldestInstance"]
 
-  enabled_metrics = [
-    "GroupMinSize",
-    "GroupMaxSize",
-    "GroupDesiredCapacity",
-    "GroupInServiceInstances",
-    "GroupPendingInstances",
-    "GroupStandbyInstances",
-    "GroupTerminatingInstances",
-    "GroupTotalInstances"
-  ]
-
+  metrics_granularity = "1Minute"
   instance_refresh {
     strategy = "Rolling"
     preferences {
-      min_healthy_percentage = 70 // 2/3 of instances must be healthy
+      min_healthy_percentage = 66
+      instance_warmup        = 180
     }
   }
 }
 
-resource "aws_lb_target_group" "tg_consul_svr" {
-  name     = "${local.prefix}-tg-consul-svr"
+resource "aws_cloudwatch_metric_alarm" "consul_svr_cma" {
+  alarm_name          = "${local.prefix}-${local.infix_consul}-cma"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "HealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = local.consul_svr_count_min
+  alarm_description   = "This metric monitors the number of healthy Consul servers"
+
+  dimensions = {
+    TargetGroup  = aws_lb_target_group.consul_svr_tg_8500.arn_suffix
+    LoadBalancer = data.aws_lb.internal_lb.arn_suffix
+  }
+
+  alarm_actions = [aws_autoscaling_policy.consul_svr_scale_up.arn]
+  ok_actions    = [aws_autoscaling_policy.consul_svr_scale_down.arn]
+}
+
+resource "aws_autoscaling_policy" "consul_svr_scale_up" {
+  name                   = "${local.prefix}-${local.infix_consul}-scale-up"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.consul_svr_asg.name
+}
+
+resource "aws_autoscaling_policy" "consul_svr_scale_down" {
+  name                   = "${local.prefix}-${local.infix_consul}-scale-down"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.consul_svr_asg.name
+}
+
+resource "aws_autoscaling_lifecycle_hook" "consul_svr_lc_hook" {
+  name                   = "${local.prefix}-${local.infix_consul}-lc-hook"
+  autoscaling_group_name = aws_autoscaling_group.consul_svr_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
+}
+
+resource "aws_lb_target_group" "consul_svr_tg_8500" {
+  name     = "${local.prefix}-${local.infix_consul}-tg-8500"
   port     = 8500
   protocol = "TCP"
   vpc_id   = data.aws_vpc.vpc.id
@@ -145,29 +180,29 @@ resource "aws_lb_target_group" "tg_consul_svr" {
 
   tags = merge(
     var.stack_tags, {
-      Name = "${local.prefix}-tg-consul-svr"
+      Name = "${local.prefix}-${local.infix_consul}-tg-8500"
     }
   )
 }
 
-resource "aws_lb_listener" "listener_consul_http" {
+resource "aws_lb_listener" "consul_svr_lblistner_8500" {
   load_balancer_arn = data.aws_lb.internal_lb.arn
   port              = "8500"
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.tg_consul_svr.arn
+    target_group_arn = aws_lb_target_group.consul_svr_tg_8500.arn
   }
 
   tags = merge(
     var.stack_tags, {
-      Name = "${local.prefix}-consul-http"
+      Name = "${local.prefix}-${local.infix_consul}-lblistner-8500"
     }
   )
 }
 
 resource "aws_autoscaling_attachment" "consul_svr_asg_attachment" {
   autoscaling_group_name = aws_autoscaling_group.consul_svr_asg.name
-  lb_target_group_arn    = aws_lb_target_group.tg_consul_svr.arn
+  lb_target_group_arn    = aws_lb_target_group.consul_svr_tg_8500.arn
 }

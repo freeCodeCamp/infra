@@ -59,7 +59,7 @@ data "cloudinit_config" "nomad_web_cic" {
 }
 
 resource "aws_launch_template" "nomad_web_lt" {
-  name                    = "${local.prefix}-nomad-web-lt"
+  name                    = "${local.prefix}-${local.infix}-lt"
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
   instance_type           = local.nomad_web_instance_type
   disable_api_termination = false
@@ -103,7 +103,7 @@ resource "aws_launch_template" "nomad_web_lt" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-web-lt"
+      Name = "${local.prefix}-${local.infix}-lt"
       Role = local.aws_tag__role_nomad
     }
   )
@@ -116,7 +116,7 @@ resource "aws_autoscaling_group" "nomad_web_asg" {
     version = aws_launch_template.nomad_web_lt.latest_version
   }
 
-  name                      = "${local.prefix}-nomad-web-asg"
+  name                      = "${local.prefix}-${local.infix}-asg"
   max_size                  = local.nomad_web_count_max
   min_size                  = local.nomad_web_count_min
   desired_capacity          = local.nomad_web_count_min
@@ -131,21 +131,22 @@ resource "aws_autoscaling_group" "nomad_web_asg" {
   instance_refresh {
     strategy = "Rolling"
     preferences {
-      min_healthy_percentage = 70 // 2/3 of instances must be healthy
+      min_healthy_percentage = 66
+      instance_warmup        = 180
     }
   }
 }
 
-resource "aws_autoscaling_lifecycle_hook" "nomad_drain_hook" {
-  name                   = "${local.prefix}-nomad-drain-hook"
+resource "aws_autoscaling_lifecycle_hook" "nomad_web_lc_hook" {
+  name                   = "${local.prefix}-${local.infix}-lc-hook"
   autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
   default_result         = "CONTINUE"
   heartbeat_timeout      = 300
   lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
 }
 
-resource "aws_lb_target_group" "tg_nomad_web" {
-  name     = "${local.prefix}-tg-nomad-web"
+resource "aws_lb_target_group" "nomad_web_tg_80" {
+  name     = "${local.prefix}-${local.infix}-tg-80"
   port     = 80
   protocol = "TCP"
   vpc_id   = data.aws_vpc.vpc.id
@@ -162,36 +163,36 @@ resource "aws_lb_target_group" "tg_nomad_web" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-tg-nomad-web"
+      Name = "${local.prefix}-${local.infix}-tg-80"
     }
   )
 }
 
-resource "aws_lb_listener" "listener_nomad_web" {
+resource "aws_lb_listener" "nomad_web_lblistner_80" {
   load_balancer_arn = data.aws_lb.internal_lb.arn
   port              = "80"
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.tg_nomad_web.arn
+    target_group_arn = aws_lb_target_group.nomad_web_tg_80.arn
   }
 
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-web"
+      Name = "${local.prefix}-${local.infix}-lblistner-80"
     }
   )
 }
 
 resource "aws_autoscaling_attachment" "nomad_web_asg_attachment" {
   autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
-  lb_target_group_arn    = aws_lb_target_group.tg_nomad_web.arn
+  lb_target_group_arn    = aws_lb_target_group.nomad_web_tg_80.arn
 }
 
-resource "aws_lb_target_group" "tg_nomad_web_traefik" {
-  name     = "${local.prefix}-tg-nomad-web-traefik"
+resource "aws_lb_target_group" "nomad_web_tg_traefik" {
+  name     = "${local.prefix}-${local.infix}-tg-traefik"
   port     = 8081
   protocol = "TCP"
   vpc_id   = data.aws_vpc.vpc.id
@@ -208,29 +209,29 @@ resource "aws_lb_target_group" "tg_nomad_web_traefik" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-tg-nomad-web-traefik"
+      Name = "${local.prefix}-${local.infix}-tg-traefik"
     }
   )
 }
 
-resource "aws_lb_listener" "listener_nomad_web_traefik" {
+resource "aws_lb_listener" "nomad_web_lblistner_traefik" {
   load_balancer_arn = data.aws_lb.internal_lb.arn
   port              = 8081
   protocol          = "TCP"
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.tg_nomad_web_traefik.arn
+    target_group_arn = aws_lb_target_group.nomad_web_tg_traefik.arn
   }
 
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-web-traefik"
+      Name = "${local.prefix}-${local.infix}-lblistner-traefik"
     }
   )
 }
 
 resource "aws_autoscaling_attachment" "nomad_web_asg_attachment_traefik" {
   autoscaling_group_name = aws_autoscaling_group.nomad_web_asg.name
-  lb_target_group_arn    = aws_lb_target_group.tg_nomad_web_traefik.arn
+  lb_target_group_arn    = aws_lb_target_group.nomad_web_tg_traefik.arn
 }
