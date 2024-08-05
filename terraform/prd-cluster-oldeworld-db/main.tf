@@ -15,7 +15,7 @@ provider "linode" {
 
 data "linode_instances" "prd_oldeworld_nws" {
   filter {
-    name = "group"
+    name = "tags"
     values = [
       "prd_oldeworld_nws",
       "ops_backoffice"

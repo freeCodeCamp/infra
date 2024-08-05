@@ -9,13 +9,7 @@ resource "linode_instance" "stg_oldeworld_jms" {
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  tags = ["stg", "oldeworld", "jms"]
-
-  # WARNING:
-  # Do not change, will delete and recreate all instances in the group
-  # NOTE:
-  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  group = "stg_oldeworld_jms"
+  tags = ["stg", "oldeworld", "jms", "stg_oldeworld_jms"]
 
   lifecycle {
     ignore_changes = [
@@ -30,7 +24,7 @@ resource "linode_instance_disk" "stg_oldeworld_jms_disk__boot" {
   linode_id = linode_instance.stg_oldeworld_jms[count.index].id
   size      = linode_instance.stg_oldeworld_jms[count.index].specs.0.disk
 
-  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
+  image     = data.hcp_packer_artifact.linode_ubuntu.external_identifier
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id

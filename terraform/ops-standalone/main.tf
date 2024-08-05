@@ -15,11 +15,11 @@ data "linode_stackscripts" "cloudinit_scripts" {
   }
 }
 
-data "hcp_packer_image" "linode_ubuntu" {
-  bucket_name    = "linode-ubuntu"
-  channel        = "golden"
-  cloud_provider = "linode"
-  region         = "us-east"
+data "hcp_packer_artifact" "linode_ubuntu" {
+  bucket_name  = "linode-ubuntu"
+  channel_name = "golden"
+  platform     = "linode"
+  region       = "us-east"
 }
 
 data "cloudflare_zone" "cf_zone" {
@@ -28,14 +28,14 @@ data "cloudflare_zone" "cf_zone" {
 
 data "linode_instances" "stg_oldeworld_jms" {
   filter {
-    name   = "group"
+    name   = "tags"
     values = ["stg_oldeworld_jms"]
   }
 }
 
 data "linode_instances" "prd_oldeworld_jms" {
   filter {
-    name   = "group"
+    name   = "tags"
     values = ["prd_oldeworld_jms"]
   }
 }

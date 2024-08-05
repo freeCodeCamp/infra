@@ -3,19 +3,13 @@ resource "linode_instance" "prd_oldeworld_clt" {
   label    = "prd-vm-oldeworld-clt-${each.value.instance}"
 
   region           = var.region
-  type             = "g6-standard-2"
+  type             = each.value.name == "eng" ? "g6-standard-4" : "g6-standard-2"
   private_ip       = true
   watchdog_enabled = true
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  tags = ["prd", "oldeworld", "clt", "${each.value.name}"]
-
-  # WARNING:
-  # Do not change, will delete and recreate all instances in the group
-  # NOTE:
-  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  group = "prd_oldeworld_clt"
+  tags = ["prd", "oldeworld", "clt", "prd_oldeworld_clt", "${each.value.name}"]
 
   lifecycle {
     ignore_changes = [
@@ -30,7 +24,7 @@ resource "linode_instance_disk" "prd_oldeworld_clt_disk__boot" {
   linode_id = linode_instance.prd_oldeworld_clt[each.key].id
   size      = linode_instance.prd_oldeworld_clt[each.key].specs.0.disk
 
-  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
+  image     = data.hcp_packer_artifact.linode_ubuntu.external_identifier
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id

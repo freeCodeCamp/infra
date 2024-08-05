@@ -15,7 +15,7 @@ provider "linode" {
 
 data "linode_instances" "stg_oldeworld_nws" {
   filter {
-    name = "group"
+    name = "tags"
     values = [
       "stg_oldeworld_nws",
       "ops_backoffice"

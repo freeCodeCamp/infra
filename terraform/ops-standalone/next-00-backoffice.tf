@@ -8,13 +8,7 @@ resource "linode_instance" "ops_backoffice" {
 
   # NOTE:
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  tags = ["ops", "backoffice"]
-
-  # WARNING:
-  # Do not change, will delete and recreate all instances in the group
-  # NOTE:
-  # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
-  group = "ops_backoffice"
+  tags = ["ops", "backoffice", "ops_backoffice"]
 
   backups_enabled = true
 
@@ -30,7 +24,7 @@ resource "linode_instance_disk" "ops_backoffice_disk__boot" {
   linode_id = linode_instance.ops_backoffice.id
   size      = linode_instance.ops_backoffice.specs.0.disk
 
-  image     = data.hcp_packer_image.linode_ubuntu.cloud_image_id
+  image     = data.hcp_packer_artifact.linode_ubuntu.external_identifier
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id
