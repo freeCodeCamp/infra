@@ -59,6 +59,7 @@ data "aws_lb" "internal_lb" {
 }
 locals {
   prefix = "ops-mwweb"
+  infix  = "nmd-web"
 
   nomad_web_instance_type = data.aws_ec2_instance_type.instance_type.id
   nomad_web_count_min     = 3
@@ -67,7 +68,7 @@ locals {
   // WARNING: These are used in scripts - DO NOT CHANGE
   datacenter                 = "mintworld"
   consul_cloud_auto_join_key = "ops-mintworld-01"
-  aws_tag__role_nomad        = "nomad-web"
+  aws_tag__role_nomad        = "nmd-clt"
   cluster_tag__client_role   = "web"
   // WARNING: These are used in scripts - DO NOT CHANGE
 }

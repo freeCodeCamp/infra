@@ -61,7 +61,7 @@ data "cloudinit_config" "nomad_svr_cic" {
 }
 
 resource "aws_launch_template" "nomad_svr_lt" {
-  name                    = "${local.prefix}-nomad-svr-lt"
+  name                    = "${local.prefix}-${local.infix_nomad}-lt"
   image_id                = data.hcp_packer_artifact.aws_ami.external_identifier
   instance_type           = local.nomad_svr_instance_type
   disable_api_termination = false
@@ -103,52 +103,87 @@ resource "aws_launch_template" "nomad_svr_lt" {
   tags = merge(
     var.stack_tags,
     {
-      Name = "${local.prefix}-nomad-svr-lt"
+      Name = "${local.prefix}-${local.infix_nomad}-lt"
       Role = local.aws_tag__role_nomad,
     }
   )
 }
 
 resource "aws_autoscaling_group" "nomad_svr_asg" {
-
   launch_template {
     id      = aws_launch_template.nomad_svr_lt.id
     version = aws_launch_template.nomad_svr_lt.latest_version
   }
 
-  name                      = "${local.prefix}-nomad-svr-asg"
+  name                      = "${local.prefix}-${local.infix_nomad}-asg"
   max_size                  = local.nomad_svr_count_max
   min_size                  = local.nomad_svr_count_min
   desired_capacity          = local.nomad_svr_count_min
-  health_check_grace_period = 180
-  health_check_type         = "EC2"
+  health_check_type         = "ELB"
+  health_check_grace_period = 300
   vpc_zone_identifier       = data.aws_subnets.subnets_prv.ids
   wait_for_capacity_timeout = "10m"
   termination_policies      = ["OldestInstance"]
 
-  enabled_metrics = [
-    "GroupMinSize",
-    "GroupMaxSize",
-    "GroupDesiredCapacity",
-    "GroupInServiceInstances",
-    "GroupPendingInstances",
-    "GroupStandbyInstances",
-    "GroupTerminatingInstances",
-    "GroupTotalInstances"
-  ]
+  metrics_granularity = "1Minute"
 
   instance_refresh {
     strategy = "Rolling"
     preferences {
-      min_healthy_percentage = 70 // 2/3 of instances must be healthy
+      min_healthy_percentage = 66
+      instance_warmup        = 180
     }
   }
 
   depends_on = [aws_autoscaling_group.consul_svr_asg]
 }
 
-resource "aws_lb_target_group" "tg_nomad_svr" {
-  name     = "${local.prefix}-tg-nomad-svr"
+resource "aws_cloudwatch_metric_alarm" "nomad_svr_cma" {
+  alarm_name          = "${local.prefix}-${local.infix_nomad}-cma"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "HealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = local.nomad_svr_count_min
+  alarm_description   = "This metric monitors the number of healthy Nomad servers"
+
+  dimensions = {
+    TargetGroup  = aws_lb_target_group.nomad_svr_tg_4646.arn_suffix
+    LoadBalancer = data.aws_lb.internal_lb.arn_suffix
+  }
+
+  alarm_actions = [aws_autoscaling_policy.nomad_svr_scale_up.arn]
+  ok_actions    = [aws_autoscaling_policy.nomad_svr_scale_down.arn]
+}
+
+resource "aws_autoscaling_policy" "nomad_svr_scale_up" {
+  name                   = "${local.prefix}-${local.infix_nomad}-scale-up"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.nomad_svr_asg.name
+}
+
+resource "aws_autoscaling_policy" "nomad_svr_scale_down" {
+  name                   = "${local.prefix}-${local.infix_nomad}-scale-down"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.nomad_svr_asg.name
+}
+
+resource "aws_autoscaling_lifecycle_hook" "nomad_svr_lc_hook" {
+  name                   = "${local.prefix}-${local.infix_nomad}-lc-hook"
+  autoscaling_group_name = aws_autoscaling_group.nomad_svr_asg.name
+  default_result         = "CONTINUE"
+  heartbeat_timeout      = 300
+  lifecycle_transition   = "autoscaling:EC2_INSTANCE_TERMINATING"
+}
+
+resource "aws_lb_target_group" "nomad_svr_tg_4646" {
+  name     = "${local.prefix}-${local.infix_nomad}-tg-4646"
   port     = 4646
   protocol = "TCP"
   vpc_id   = data.aws_vpc.vpc.id
@@ -163,29 +198,29 @@ resource "aws_lb_target_group" "tg_nomad_svr" {
 
   tags = merge(
     var.stack_tags, {
-      Name = "${local.prefix}-tg-nomad-svr"
+      Name = "${local.prefix}-${local.infix_nomad}-tg-4646"
     }
   )
 }
 
-resource "aws_lb_listener" "listener_nomad_http" {
+resource "aws_lb_listener" "nomad_svr_lblistner_4646" {
   load_balancer_arn = data.aws_lb.internal_lb.arn
   port              = "4646"
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.tg_nomad_svr.arn
+    target_group_arn = aws_lb_target_group.nomad_svr_tg_4646.arn
   }
 
   tags = merge(
     var.stack_tags, {
-      Name = "${local.prefix}-nomad-http"
+      Name = "${local.prefix}-${local.infix_nomad}-lblistner-4646"
     }
   )
 }
 
 resource "aws_autoscaling_attachment" "nomad_svr_asg_attachment" {
   autoscaling_group_name = aws_autoscaling_group.nomad_svr_asg.name
-  lb_target_group_arn    = aws_lb_target_group.tg_nomad_svr.arn
+  lb_target_group_arn    = aws_lb_target_group.nomad_svr_tg_4646.arn
 }
