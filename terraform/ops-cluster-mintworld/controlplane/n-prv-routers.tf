@@ -125,6 +125,7 @@ resource "aws_ecs_service" "prv_routers_service" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes        = [task_definition]
   }
 
   deployment_circuit_breaker {
