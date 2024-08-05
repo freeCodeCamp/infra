@@ -70,6 +70,15 @@ resource "aws_launch_template" "nomad_web_lt" {
   key_name  = data.aws_key_pair.ssh_service_user_key.key_name
   user_data = base64gzip(data.cloudinit_config.nomad_web_cic.rendered)
 
+  block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size           = 80
+      volume_type           = "gp3"
+      delete_on_termination = true
+    }
+  }
+
   iam_instance_profile {
     name = data.aws_iam_instance_profile.instance_profile.name
   }
