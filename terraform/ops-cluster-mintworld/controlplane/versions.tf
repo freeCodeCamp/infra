@@ -10,6 +10,16 @@ terraform {
       version = "0.82.0"
     }
 
+    cloudinit = {
+      source  = "hashicorp/cloudinit"
+      version = "2.3.2"
+    }
+
+    random = {
+      source  = "hashicorp/random"
+      version = "3.6.2"
+    }
+
     tailscale = {
       source  = "tailscale/tailscale"
       version = "0.16.1"
