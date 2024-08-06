@@ -11,6 +11,7 @@ const {
 } = require('@aws-sdk/client-ssm');
 
 const LAMBDA_TIMEOUT = 290; // 10 seconds less than the ASG lifecycle hook timeout
+const GLOBAL_TIMEOUT = LAMBDA_TIMEOUT * 1000; // Convert to milliseconds
 
 const asgClient = new AutoScalingClient({});
 const ec2Client = new EC2Client({});
@@ -19,14 +20,13 @@ const ssmClient = new SSMClient({});
 exports.handler = async (event) => {
   console.log('Received event:', JSON.stringify(event, null, 2));
 
+  const startTime = Date.now();
   const {
     LifecycleActionToken: lifecycleActionToken,
     AutoScalingGroupName: asgName,
     LifecycleHookName: lifecycleHookName,
     EC2InstanceId: instanceId
   } = event.detail;
-
-  const startTime = Date.now();
 
   try {
     const instance = await getEC2InstanceDetails(instanceId);
@@ -49,7 +49,10 @@ exports.handler = async (event) => {
       `Processing instance ${instanceId} (${instance.PrivateIpAddress})`
     );
 
-    const ssmCommand = buildSSMCommand();
+    const serviceType = determineServiceType(instance);
+    console.log(`Determined service type: ${serviceType}`);
+
+    const ssmCommand = buildSSMCommand(serviceType);
     const commandResult = await sendSSMCommand(instanceId, ssmCommand);
 
     await waitForCommandCompletion(
@@ -87,55 +90,86 @@ async function getEC2InstanceDetails(instanceId) {
   return Reservations?.[0]?.Instances?.[0];
 }
 
-function buildSSMCommand() {
-  return `
-    #!/bin/bash
-    set -e
+function determineServiceType(instance) {
+  const roleTag = instance.Tags.find((tag) => tag.Key === 'Role');
+  if (roleTag) {
+    if (roleTag.Value.includes('nmd-clt')) return 'nomad-client';
+    if (roleTag.Value.includes('nmd-svr')) return 'nomad-server';
+    if (roleTag.Value.includes('csl-svr')) return 'consul-server';
+  }
+  console.warn(
+    `Unable to determine specific service type for instance ${instance.InstanceId}. Proceeding with default handling.`
+  );
+  return 'unknown';
+}
 
-    sudo -u freecodecamp bash << 'EOF'
-    set -e
+function buildSSMCommand(serviceType) {
+  let serviceSpecificCommand;
 
-    echo "INFO: Starting Nomad drain process"
+  switch (serviceType) {
+    case 'nomad-client':
+      serviceSpecificCommand = `
+        echo "INFO: Starting Nomad client drain process"
 
-    if ! command -v nomad &> /dev/null; then
-        echo "ERROR: nomad command not found. PATH is: $PATH"
-        exit 1
-    fi
+        if ! command -v nomad &> /dev/null; then
+            echo "ERROR: nomad command not found. PATH is: $PATH"
+            exit 1
+        fi
 
-    echo "INFO: Found nomad at $(which nomad)"
-    echo "INFO: Checking Nomad agent status"
-    sudo systemctl status nomad || true
+        echo "INFO: Found nomad at $(which nomad)"
+        echo "INFO: Checking Nomad agent status"
+        sudo systemctl status nomad || true
 
-    echo "INFO: Last 20 lines of Nomad agent logs:"
-    sudo journalctl -u nomad -n 20 || true
+        echo "INFO: Last 20 lines of Nomad agent logs:"
+        sudo journalctl -u nomad -n 20 || true
 
-    echo "INFO: Attempting to list Nomad nodes"
-    nomad node status || echo "Failed to list Nomad nodes"
+        echo "INFO: Checking Nomad cluster health"
+        if ! nomad server members | grep -q "alive"; then
+          echo "ERROR: Nomad cluster is not healthy"
+          exit 1
+        fi
 
-    NODE_ID=$(nomad node status -self -t '{{ .ID }}')
+        echo "INFO: Attempting to list Nomad nodes"
+        nomad node status || echo "Failed to list Nomad nodes"
 
-    if [ -z "$NODE_ID" ]; then
-      echo "ERROR: Could not determine Nomad node ID for this instance"
-      exit 1
-    fi
+        NODE_ID=$(nomad node status -self -t '{{ .ID }}')
 
-    echo "INFO: Found Nomad node $NODE_ID"
-    echo "INFO: Starting drain process for node $NODE_ID"
-    nomad node drain -enable -deadline 5m "$NODE_ID"
+        if [ -z "$NODE_ID" ]; then
+          echo "ERROR: Could not determine Nomad node ID for this instance"
+          exit 1
+        fi
 
-    for i in {1..30}; do
-      if ! nomad node status "$NODE_ID" | grep -q 'Drain: true'; then
-        echo "INFO: Node $NODE_ID drain complete"
-        exit 0
-      fi
-      echo "INFO: Drain in progress, waiting..."
-      sleep 10
-    done
+        echo "INFO: Found Nomad node $NODE_ID"
+        echo "INFO: Starting drain process for node $NODE_ID"
+        nomad node drain -enable -deadline 5m "$NODE_ID"
 
-    echo "WARNING: Node $NODE_ID drain did not complete within the expected time"
-    exit 2
-    EOF
-  `;
+        for i in {1..30}; do
+          if ! nomad node status "$NODE_ID" | grep -q 'Drain: true'; then
+            echo "INFO: Node $NODE_ID drain complete"
+            exit 0
+          fi
+          echo "INFO: Drain in progress, waiting..."
+          sleep 10
+        done
+
+        echo "WARNING: Node $NODE_ID drain did not complete within the expected time"
+        exit 2
+      `;
+      break;
+
+    case 'nomad-server':
+    case 'consul-server':
+    default:
+      console.warn(
+        `Service type: ${serviceType}. Proceeding without special shutdown procedure.`
+      );
+      serviceSpecificCommand = `
+        echo "INFO: No specific shutdown procedure for this instance type."
+        echo "INFO: Proceeding with default instance termination."
+      `;
+  }
+
+  return serviceSpecificCommand;
 }
 
 async function sendSSMCommand(instanceId, command) {
@@ -144,7 +178,11 @@ async function sendSSMCommand(instanceId, command) {
       new SendCommandCommand({
         InstanceIds: [instanceId],
         DocumentName: 'AWS-RunShellScript',
-        Parameters: { commands: [command] }
+        Parameters: {
+          commands: [
+            `sudo -u freecodecamp bash -c "${command.replace(/"/g, '\\"')}"`
+          ]
+        }
       })
     );
     console.log('SSM Command sent:', commandResult.Command.CommandId);
@@ -167,11 +205,11 @@ async function waitForCommandCompletion(
   let lastHeartbeatTime = startTime;
 
   while (commandStatus === 'InProgress') {
-    if (Date.now() - startTime > LAMBDA_TIMEOUT * 1000) {
+    if (Date.now() - startTime > GLOBAL_TIMEOUT) {
       console.warn(
-        'Lambda execution time limit reached, but drain may still be in progress'
+        `Lambda execution time (${LAMBDA_TIMEOUT} seconds) nearly reached. Abandoning lifecycle action.`
       );
-      break;
+      throw new Error('Global timeout reached');
     }
 
     await new Promise((resolve) => setTimeout(resolve, 10000));
@@ -200,13 +238,13 @@ async function waitForCommandCompletion(
         commandStatus === 'Failed' ||
         invocationResult.StandardErrorContent.includes('ERROR:')
       ) {
-        console.error(
-          'SSM command failed or encountered an error. Check the logs above for details.'
+        throw new Error(
+          `SSM command failed or encountered an error. Status: ${commandStatus}, Error: ${invocationResult.StandardErrorContent}`
         );
-        return;
       }
     } catch (invocationError) {
       console.error('Failed to get command invocation:', invocationError);
+      throw invocationError;
     }
 
     if (Date.now() - lastHeartbeatTime > 240000) {

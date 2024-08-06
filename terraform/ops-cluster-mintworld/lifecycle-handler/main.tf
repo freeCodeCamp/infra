@@ -25,25 +25,8 @@ data "aws_subnets" "subnets_prv" {
   }
 }
 
-data "github_release" "lifecycle_handler" {
-  repository  = "infra"
-  owner       = "freeCodeCamp"
-  retrieve_by = "latest"
-}
-
-data "external" "lambda_package" {
-  program = ["bash", "-c", <<-EOT
-    URL="${data.github_release.lifecycle_handler.assets[0].browser_download_url}"
-    FILENAME="${path.module}/lambda_package.zip"
-    curl -L -o "$FILENAME" "$URL"
-    SHA256=$(sha256sum "$FILENAME" | awk '{print $1}')
-    echo "{\"filename\": \"$FILENAME\", \"sha256\": \"$SHA256\"}"
-  EOT
-  ]
-}
-
-resource "aws_iam_role" "nomad_drain_lambda_role" {
-  name = "fCCLambdaRoleDrainNomad"
+resource "aws_iam_role" "lh_iam_role" {
+  name = "fCCLifecycleHandlerRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -57,7 +40,7 @@ resource "aws_iam_role" "nomad_drain_lambda_role" {
   })
 
   inline_policy {
-    name = "fCCLambdaPolicyDrainNomad"
+    name = "fCCLifecycleHandlerPolicy"
     policy = jsonencode({
       Version = "2012-10-17"
       Statement = [{
@@ -78,20 +61,57 @@ resource "aws_iam_role" "nomad_drain_lambda_role" {
   }
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
-  role       = aws_iam_role.nomad_drain_lambda_role.name
+resource "aws_iam_role_policy_attachment" "lh_policy_attachment" {
+  role       = aws_iam_role.lh_iam_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_lambda_function" "nomad_drain_lambda" {
-  function_name = "${local.prefix}-nomad-drain-function"
-  role          = aws_iam_role.nomad_drain_lambda_role.arn
+data "external" "npm_install" {
+  program = ["bash", "-c", <<EOT
+    set -e
+
+    handle_error() {
+      echo "{\"error\": \"$1\"}" >&2
+      exit 1
+    }
+
+    {
+      curl -sSf -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash || handle_error "Failed to install nvm"
+
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" || handle_error "Failed to source nvm"
+
+      nvm install 20 || handle_error "Failed to install Node.js 20"
+      nvm use 20 || handle_error "Failed to use Node.js 20"
+
+      cd ${path.module}/lambda || handle_error "Failed to change to lambda directory"
+      npm ci || handle_error "npm ci failed"
+    } >&2
+
+    echo '{"status":"dependencies installed successfully"}'
+EOT
+  ]
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda"
+  output_path = "${path.module}/lambda/lifecycle-handler.zip"
+  excludes    = ["package.json", "package-lock.json"]
+
+  depends_on = [data.external.npm_install]
+}
+
+resource "aws_lambda_function" "lh_lambda" {
+  function_name = "${local.prefix}-lifecycle-handler"
+  description   = "Handles ASG lifecycle events for graceful shutdown"
+  role          = aws_iam_role.lh_iam_role.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
   timeout       = 300
 
-  filename         = data.external.lambda_package.result.filename
-  source_code_hash = data.external.lambda_package.result.sha256
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   vpc_config {
     subnet_ids         = data.aws_subnets.subnets_prv.ids
@@ -99,15 +119,16 @@ resource "aws_lambda_function" "nomad_drain_lambda" {
   }
 }
 
-resource "aws_cloudwatch_event_rule" "asg_lifecycle_termination" {
+resource "aws_cloudwatch_event_rule" "lh_asg_lifecycle_termination" {
   name        = "${local.prefix}-asg-lifecycle-termination"
-  description = "Capture ASG instance terminating events"
+  description = "Capture ASG Event - EC2 Instance-terminate Lifecycle Action"
 
   event_pattern = jsonencode({
     source      = ["aws.autoscaling"]
     detail-type = ["EC2 Instance-terminate Lifecycle Action"]
     detail = {
       AutoScalingGroupName = [
+        { wildcard = "ops-mwctl-*" },
         { wildcard = "ops-mwwkr-*" },
         { wildcard = "ops-mwweb-*" }
       ]
@@ -115,21 +136,21 @@ resource "aws_cloudwatch_event_rule" "asg_lifecycle_termination" {
   })
 }
 
-resource "aws_cloudwatch_event_target" "invoke_lambda" {
-  rule      = aws_cloudwatch_event_rule.asg_lifecycle_termination.name
+resource "aws_cloudwatch_event_target" "lh_invoke_lambda" {
+  rule      = aws_cloudwatch_event_rule.lh_asg_lifecycle_termination.name
   target_id = "InvokeLambda"
-  arn       = aws_lambda_function.nomad_drain_lambda.arn
+  arn       = aws_lambda_function.lh_lambda.arn
 }
 
-resource "aws_lambda_permission" "allow_eventbridge" {
+resource "aws_lambda_permission" "lh_allow_eventbridge" {
   statement_id  = "AllowExecutionFromEventBridge"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.nomad_drain_lambda.function_name
+  function_name = aws_lambda_function.lh_lambda.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.asg_lifecycle_termination.arn
+  source_arn    = aws_cloudwatch_event_rule.lh_asg_lifecycle_termination.arn
 }
 
-resource "aws_cloudwatch_log_group" "nomad_drain_lambda_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.nomad_drain_lambda.function_name}"
+resource "aws_cloudwatch_log_group" "lh_lambda_logs" {
+  name              = "/aws/lambda/${aws_lambda_function.lh_lambda.function_name}"
   retention_in_days = 14
 }

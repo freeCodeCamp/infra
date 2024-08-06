@@ -4,11 +4,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "zip": "zip -r lifecycle-handler.zip index.js node_modules",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "version:patch": "npm version patch --no-git-tag-version",
-    "version:minor": "npm version minor --no-git-tag-version",
-    "version:major": "npm version major --no-git-tag-version"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "license": "BSD-3-Clause",
   "description": "",
