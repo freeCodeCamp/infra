@@ -24,7 +24,7 @@ providers:
     prefix: "traefik"
     strictChecks: ["passing"]
     watch: true
-    defaultRule: "Host(`{{ .Name }}.service.consul`)"
+    defaultRule: "Host(`{{ .Name }}.prv.mintworld.freecodecamp.net`)"
     endpoint:
       address: "127.0.0.1:8500"
       scheme: "http"
