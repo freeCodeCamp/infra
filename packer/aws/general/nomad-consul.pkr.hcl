@@ -60,13 +60,13 @@ variable "force_delete_snapshot" {
 variable "nomad_version" {
   description = "The version of Nomad to install."
   type        = string
-  default     = "1.8.1"
+  default     = "1.8.2"
 }
 
 variable "consul_version" {
   description = "The version of Consul to install."
   type        = string
-  default     = "1.19.0"
+  default     = "1.19.1"
 }
 
 variable "cni_version" {
