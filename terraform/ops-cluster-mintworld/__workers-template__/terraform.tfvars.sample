@@ -1,6 +1,0 @@
-aws_access_key_id = "<AWSAccessKeyID>"
-aws_secret_access_key = "<AWSSecretAccessKey>"
-
-hcp_client_id = "<HCPClientId>"
-hcp_client_secret = "<HCPClientSecret>"
-# Override any more variables from the variables.tf file here
