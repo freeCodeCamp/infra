@@ -1,8 +1,0 @@
----
-- name: Set up Nomad Client
-  template:
-    src: nomad-client.hcl.j2
-    dest: /etc/nomad.d/nomad.hcl
-    owner: nomad
-    group: nomad
-    mode: 0644
