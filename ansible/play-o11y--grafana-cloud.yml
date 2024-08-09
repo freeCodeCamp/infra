@@ -1,0 +1,23 @@
+---
+- name: Grafana Cloud Setup
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: true
+
+  vars:
+    prometheus_push_endpoint:
+      "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
+    prometheus_username:
+      "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
+    prometheus_password:
+      "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
+    loki_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Loki') }}"
+    loki_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Loki') }}"
+    loki_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Loki') }}"
+
+  tasks:
+    - name: Install Alloy
+      ansible.builtin.include_role:
+        name: grafana.grafana.alloy
+      vars:
+        config: "{{ lookup('template', 'grafana-labs/config.alloy.j2') }}"
