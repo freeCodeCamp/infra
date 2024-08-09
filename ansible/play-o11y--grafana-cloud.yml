@@ -5,19 +5,69 @@
   gather_facts: true
 
   vars:
-    prometheus_push_endpoint:
-      "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
-    prometheus_username:
-      "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
-    prometheus_password:
-      "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
+    prometheus_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
+    prometheus_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
+    prometheus_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
     loki_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Loki') }}"
     loki_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Loki') }}"
     loki_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Loki') }}"
 
   tasks:
+    - name: Check if required environment variables are set
+      ansible.builtin.assert:
+        that:
+          - prometheus_push_endpoint != ""
+          - prometheus_username != ""
+          - prometheus_password != ""
+          - loki_push_endpoint != ""
+          - loki_username != ""
+          - loki_password != ""
+        fail_msg: "One or more required environment variables are not set. Please set all required variables."
+
     - name: Install Alloy
       ansible.builtin.include_role:
         name: grafana.grafana.alloy
       vars:
         config: "{{ lookup('template', 'grafana-labs/config.alloy.j2') }}"
+
+    - name: Add the Alloy user to the adm group
+      ansible.builtin.user:
+        name: alloy
+        groups: adm
+        append: true
+      notify: Reload Alloy service
+
+    - name: Check if NGINX is installed
+      ansible.builtin.command: which nginx
+      register: nginx_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Append NGINX config to Alloy config file
+      ansible.builtin.blockinfile:
+        path: /etc/alloy/config.alloy
+        prepend_newline: true
+        marker: "// {mark} ANSIBLE MANAGED BLOCK -- NGINX Integration"
+        block: |
+          local.file_match "logs_integrations_integrations_nginx" {
+            path_targets = [{
+              __address__ = "localhost",
+              __path__    = "/var/log/nginx/json_access.log",
+              host        = "freecodecamp.org",
+              instance    = constants.hostname,
+              job         = "integrations/nginx",
+            }]
+          }
+
+          loki.source.file "logs_integrations_integrations_nginx" {
+            targets    = local.file_match.logs_integrations_integrations_nginx.targets
+            forward_to = [loki.write.grafana_cloud_loki.receiver]
+          }
+      when: nginx_check.rc == 0
+      notify: Reload Alloy service
+
+  handlers:
+    - name: Reload Alloy service
+      ansible.builtin.systemd:
+        name: alloy
+        state: reloaded
