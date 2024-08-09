@@ -20,13 +20,6 @@ data "hcp_packer_artifact" "aws_ami" {
   region       = var.region
 }
 
-data "hcp_packer_artifact" "aws_ami_prv_routers" {
-  bucket_name  = "aws-ubuntu"
-  channel_name = "latest"
-  platform     = "aws"
-  region       = var.region
-}
-
 data "aws_key_pair" "ssh_service_user_key" {
   include_public_key = true
   filter {
@@ -70,7 +63,9 @@ data "aws_lb" "internal_lb" {
 }
 
 locals {
-  prefix = "ops-mwctl"
+  prefix       = "ops-mwctl"
+  infix_nomad  = "nmd-svr"
+  infix_consul = "csl-svr"
 
   consul_svr_instance_type = data.aws_ec2_instance_type.instance_type.id
   consul_svr_count_min     = 3
@@ -86,8 +81,8 @@ locals {
   // WARNING: These are used in scripts - DO NOT CHANGE
   datacenter                 = "mintworld"
   consul_cloud_auto_join_key = "ops-mintworld-01"
-  aws_tag__role_nomad        = "nomad-svr"
-  aws_tag__role_consul       = "consul-svr"
+  aws_tag__role_nomad        = "nmd-svr"
+  aws_tag__role_consul       = "csl-svr"
   aws_tag__role_tailscale    = "prv-tsrouter"
   // WARNING: These are used in scripts - DO NOT CHANGE
 }
