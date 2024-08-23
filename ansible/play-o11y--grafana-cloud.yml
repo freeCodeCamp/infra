@@ -37,37 +37,33 @@
         append: true
       notify: Reload Alloy service
 
-    - name: Check if NGINX is installed
-      ansible.builtin.command: which nginx
-      register: nginx_check
-      ignore_errors: true
-      changed_when: false
+    # - name: Check if NGINX is installed
+    #   ansible.builtin.command: which nginx
+    #   register: nginx_check
+    #   ignore_errors: true
+    #   changed_when: false
 
-    - name: Append NGINX config to Alloy config file
-      ansible.builtin.blockinfile:
-        path: /etc/alloy/config.alloy
-        prepend_newline: true
-        marker: "// {mark} ANSIBLE MANAGED BLOCK -- NGINX Integration"
-        block: |
-          //
-          //  Disabled for now
-          //
-          // local.file_match "logs_integrations_integrations_nginx" {
-          //   path_targets = [{
-          //     __address__ = "localhost",
-          //     __path__    = "/var/log/nginx/json_access.log",
-          //     host        = "freecodecamp.org",
-          //     instance    = constants.hostname,
-          //     job         = "integrations/nginx",
-          //   }]
-          // }
-          //
-          // loki.source.file "logs_integrations_integrations_nginx" {
-          //   targets    = local.file_match.logs_integrations_integrations_nginx.targets
-          //   forward_to = [loki.write.grafana_cloud_loki.receiver]
-          // }
-      when: nginx_check.rc == 0
-      notify: Reload Alloy service
+    # - name: Append NGINX config to Alloy config file
+    #   ansible.builtin.blockinfile:
+    #     path: /etc/alloy/config.alloy
+    #     prepend_newline: true
+    #     marker: "// {mark} ANSIBLE MANAGED BLOCK -- NGINX Integration"
+    #     block: |
+    #       local.file_match "logs_integrations_integrations_nginx" {
+    #         path_targets = [{
+    #           __address__ = "localhost",
+    #           __path__    = "/var/log/nginx/json_access.log",
+    #           host        = "freecodecamp.org",
+    #           instance    = constants.hostname,
+    #           job         = "integrations/nginx",
+    #         }]
+    #       }
+    #       loki.source.file "logs_integrations_integrations_nginx" {
+    #         targets    = local.file_match.logs_integrations_integrations_nginx.targets
+    #         forward_to = [loki.write.grafana_cloud_loki.receiver]
+    #       }
+    #   when: nginx_check.rc == 0
+    #   notify: Reload Alloy service
 
   handlers:
     - name: Reload Alloy service
