@@ -40,6 +40,7 @@ groups:
   stg_oldeworld_clt: "'stg_oldeworld_clt' in (tags|list)"
   stg_oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list)"
   stg_oldeworld_nws: "'stg_oldeworld_nws' in (tags|list)"
+  stg_oldeworld_jms: "'stg_oldeworld_jms' in (tags|list)"
 
   # Oldeworld Cluster -- PRD
   prd_oldeworld_all: "'prd' in (tags|list) and 'oldeworld' in (tags|list)"
@@ -47,6 +48,7 @@ groups:
   prd_oldeworld_clt: "'prd_oldeworld_clt' in (tags|list)"
   prd_oldeworld_pxy: "'prd_oldeworld_pxy' in (tags|list)"
   prd_oldeworld_nws: "'prd_oldeworld_nws' in (tags|list)"
+  prd_oldeworld_jms: "'prd_oldeworld_jms' in (tags|list)"
 
   # Oldeworld Cluster -- Clients by Language - STG
   stg_oldeworld_clt_eng:
