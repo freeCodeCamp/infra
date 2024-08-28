@@ -23,11 +23,11 @@ data "linode_instances" "stg_oldeworld_nws" {
   }
 }
 
-resource "linode_database_mysql" "stg_oldeworld_nws_db__mysql57" {
-  engine_id = "mysql/5.7.39"
-  label     = "stg-db-oldeworld-nws-mysql57"
+resource "linode_database_mysql" "stg_oldeworld_nws_db__mysql80" {
+  engine_id = "mysql/8.0.30"
+  label     = "stg-db-oldeworld-nws-mysql80"
   region    = var.region
-  type      = "g6-standard-2"
+  type      = "g6-dedicated-4"
 
   allow_list = flatten([
     [for i in data.linode_instances.stg_oldeworld_nws.instances : "${i.private_ip_address}/32"]
@@ -37,12 +37,11 @@ resource "linode_database_mysql" "stg_oldeworld_nws_db__mysql57" {
   replication_type = "asynch"
   ssl_connection   = true
 
-  # Do maintenance on every 2nd Saturday at 2am UTC, maximum maintenance window of 1 hour.
   updates {
-    day_of_week   = "saturday"
+    day_of_week   = "saturday"  // 2nd Saturday of the month
     duration      = 1
     frequency     = "monthly"
-    hour_of_day   = 2
+    hour_of_day   = 1           // 2:00am UTC
     week_of_month = 2
   }
 }
