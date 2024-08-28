@@ -108,8 +108,8 @@ resource "cloudflare_record" "prd_oldeworld_pxy_dnsrecord__vlan" {
   proxied = false
   ttl     = 120
 
-  name  = "pxy-${count.index + 1}.oldeworld.prd"
-  value = trimsuffix(linode_instance_config.prd_oldeworld_pxy_config[count.index].interface[1].ipam_address, "/24")
+  name    = "pxy-${count.index + 1}.oldeworld.prd"
+  content = trimsuffix(linode_instance_config.prd_oldeworld_pxy_config[count.index].interface[1].ipam_address, "/24")
 }
 
 resource "cloudflare_record" "prd_oldeworld_pxy_dnsrecord__public" {
@@ -120,8 +120,8 @@ resource "cloudflare_record" "prd_oldeworld_pxy_dnsrecord__public" {
   proxied = false
   ttl     = 120
 
-  name  = "pub.pxy-${count.index + 1}.oldeworld.prd.${var.network_subdomain}"
-  value = linode_instance.prd_oldeworld_pxy[count.index].ip_address
+  name    = "pub.pxy-${count.index + 1}.oldeworld.prd.${var.network_subdomain}"
+  content = linode_instance.prd_oldeworld_pxy[count.index].ip_address
 }
 
 resource "cloudflare_record" "prd_oldeworld_pxy_dnsrecord__private" {
@@ -132,6 +132,6 @@ resource "cloudflare_record" "prd_oldeworld_pxy_dnsrecord__private" {
   proxied = false
   ttl     = 120
 
-  name  = "prv.pxy-${count.index + 1}.oldeworld.prd"
-  value = linode_instance.prd_oldeworld_pxy[count.index].private_ip_address
+  name    = "prv.pxy-${count.index + 1}.oldeworld.prd"
+  content = linode_instance.prd_oldeworld_pxy[count.index].private_ip_address
 }

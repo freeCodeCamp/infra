@@ -259,8 +259,8 @@ resource "cloudflare_record" "internal_lb_dnsrecord" {
   proxied = false
   ttl     = 120
 
-  name  = "${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}"
-  value = aws_lb.internal_lb.dns_name
+  name    = "${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}"
+  content = aws_lb.internal_lb.dns_name
 }
 
 resource "cloudflare_record" "all__internal_lb_dnsrecord" {
@@ -269,6 +269,6 @@ resource "cloudflare_record" "all__internal_lb_dnsrecord" {
   proxied = false
   ttl     = 120
 
-  name  = "*.${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}"
-  value = aws_lb.internal_lb.dns_name
+  name    = "*.${local.cloudflare_subdomain}.${data.cloudflare_zone.cf_zone.name}"
+  content = aws_lb.internal_lb.dns_name
 }

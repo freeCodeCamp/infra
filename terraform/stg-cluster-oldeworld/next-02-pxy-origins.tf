@@ -44,6 +44,6 @@ resource "cloudflare_record" "stg_oldeworld_nb_pxy_dnsrecord__public" {
   proxied = false
   ttl     = 120
 
-  name  = "oldeworld.stg.${var.network_subdomain}"
-  value = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].ipv4
+  name    = "oldeworld.stg.${var.network_subdomain}"
+  content = data.linode_nodebalancers.stg_oldeworld_pxy_nbs.nodebalancers[0].ipv4
 }

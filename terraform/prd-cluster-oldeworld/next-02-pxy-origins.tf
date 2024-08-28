@@ -128,5 +128,5 @@ resource "cloudflare_record" "prd_oldeworld_nb_pxy_dnsrecord__public" {
   ttl     = 120
 
   name  = "oldeworld.prd.${var.network_subdomain}"
-  value = data.linode_nodebalancers.prd_oldeworld_pxy_1_nbs.nodebalancers[0].ipv4
+  content = data.linode_nodebalancers.prd_oldeworld_pxy_1_nbs.nodebalancers[0].ipv4
 }
