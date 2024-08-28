@@ -97,8 +97,8 @@ resource "cloudflare_record" "ops_backoffice_dnsrecord__public" {
   proxied = false
   ttl     = 120
 
-  name  = "pub.backoffice.${var.network_subdomain}"
-  value = linode_instance.ops_backoffice.ip_address
+  name    = "pub.backoffice.${var.network_subdomain}"
+  content = linode_instance.ops_backoffice.ip_address
 }
 
 resource "cloudflare_record" "ops_backoffice_dnsrecord__private" {
@@ -107,8 +107,8 @@ resource "cloudflare_record" "ops_backoffice_dnsrecord__private" {
   proxied = false
   ttl     = 120
 
-  name  = "prv.backoffice"
-  value = linode_instance.ops_backoffice.private_ip_address
+  name    = "prv.backoffice"
+  content = linode_instance.ops_backoffice.private_ip_address
 }
 
 resource "linode_firewall" "ops_backoffice_firewall" {

@@ -126,8 +126,8 @@ resource "cloudflare_record" "ops_test_records" {
   proxied = false
   ttl     = 120
 
-  name  = "test"
-  value = linode_instance.ops_test.ip_address
+  name    = "test"
+  content = linode_instance.ops_test.ip_address
 }
 
 resource "cloudflare_record" "ops_test_records__public" {
@@ -136,8 +136,8 @@ resource "cloudflare_record" "ops_test_records__public" {
   proxied = false
   ttl     = 120
 
-  name  = "pub.test.${var.network_subdomain}"
-  value = linode_instance.ops_test.ip_address
+  name    = "pub.test.${var.network_subdomain}"
+  content = linode_instance.ops_test.ip_address
 }
 
 resource "linode_firewall" "ops_test_firewall" {

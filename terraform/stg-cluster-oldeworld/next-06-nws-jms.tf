@@ -108,8 +108,8 @@ resource "cloudflare_record" "stg_oldeworld_jms_dnsrecord__vlan" {
   proxied = false
   ttl     = 120
 
-  name  = "jms-${count.index + 1}.oldeworld.stg"
-  value = trimsuffix(linode_instance_config.stg_oldeworld_jms_config[count.index].interface[1].ipam_address, "/24")
+  name    = "jms-${count.index + 1}.oldeworld.stg"
+  content = trimsuffix(linode_instance_config.stg_oldeworld_jms_config[count.index].interface[1].ipam_address, "/24")
 }
 
 resource "cloudflare_record" "stg_oldeworld_jms_dnsrecord__public" {
@@ -120,8 +120,8 @@ resource "cloudflare_record" "stg_oldeworld_jms_dnsrecord__public" {
   proxied = false
   ttl     = 120
 
-  name  = "pub.jms-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
-  value = linode_instance.stg_oldeworld_jms[count.index].ip_address
+  name    = "pub.jms-${count.index + 1}.oldeworld.stg.${var.network_subdomain}"
+  content = linode_instance.stg_oldeworld_jms[count.index].ip_address
 }
 
 resource "cloudflare_record" "stg_oldeworld_jms_dnsrecord__private" {
@@ -132,6 +132,6 @@ resource "cloudflare_record" "stg_oldeworld_jms_dnsrecord__private" {
   proxied = false
   ttl     = 120
 
-  name  = "prv.jms-${count.index + 1}.oldeworld.stg"
-  value = linode_instance.stg_oldeworld_jms[count.index].private_ip_address
+  name    = "prv.jms-${count.index + 1}.oldeworld.stg"
+  content = linode_instance.stg_oldeworld_jms[count.index].private_ip_address
 }

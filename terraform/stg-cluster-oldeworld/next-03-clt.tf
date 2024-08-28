@@ -108,8 +108,8 @@ resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__vlan" {
   proxied = false
   ttl     = 120
 
-  name  = "clt-${each.value.instance}.oldeworld.stg"
-  value = trimsuffix(linode_instance_config.stg_oldeworld_clt_config[each.key].interface[1].ipam_address, "/24")
+  name    = "clt-${each.value.instance}.oldeworld.stg"
+  content = trimsuffix(linode_instance_config.stg_oldeworld_clt_config[each.key].interface[1].ipam_address, "/24")
 }
 
 resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__public" {
@@ -120,8 +120,8 @@ resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__public" {
   proxied = false
   ttl     = 120
 
-  name  = "pub.clt-${each.value.instance}.oldeworld.stg.${var.network_subdomain}"
-  value = linode_instance.stg_oldeworld_clt[each.key].ip_address
+  name    = "pub.clt-${each.value.instance}.oldeworld.stg.${var.network_subdomain}"
+  content = linode_instance.stg_oldeworld_clt[each.key].ip_address
 }
 
 resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__private" {
@@ -132,6 +132,6 @@ resource "cloudflare_record" "stg_oldeworld_clt_dnsrecord__private" {
   proxied = false
   ttl     = 120
 
-  name  = "prv.clt-${each.value.instance}.oldeworld.stg"
-  value = linode_instance.stg_oldeworld_clt[each.key].private_ip_address
+  name    = "prv.clt-${each.value.instance}.oldeworld.stg"
+  content = linode_instance.stg_oldeworld_clt[each.key].private_ip_address
 }
