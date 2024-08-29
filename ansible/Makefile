@@ -15,7 +15,7 @@ help:
 install:
 	pip install -r requirements/requirements.txt
 	ansible-galaxy collection install -r requirements/collections.yml
-	# ansible-galaxy install -r requirements/roles.yml
+	ansible-galaxy role install -r requirements/roles.yml
 
 .PHONY: check-env-keys
 check-env-keys:
