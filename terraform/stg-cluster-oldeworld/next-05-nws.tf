@@ -3,7 +3,7 @@ resource "linode_instance" "stg_oldeworld_nws" {
   label    = "stg-vm-oldeworld-nws-${each.value.name}"
 
   region           = var.region
-  type             = "g6-standard-2"
+  type             = "g6-dedicated-4"
   private_ip       = true
   watchdog_enabled = true
 
@@ -40,7 +40,7 @@ resource "linode_instance_disk" "stg_oldeworld_nws_disk__boot" {
 resource "linode_volume" "stg_oldeworld_nws_volume__data" {
   for_each = local.nws_instances
   label    = "stg-vm-oldeworld-nws-${each.value.name}-data"
-  size     = 120
+  size     = 60
   region   = var.region
 }
 
