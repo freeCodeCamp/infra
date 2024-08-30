@@ -10,7 +10,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-auto-scaling": "3.637.0",
-    "@aws-sdk/client-ec2": "3.637.0",
+    "@aws-sdk/client-ec2": "3.641.0",
     "@aws-sdk/client-ssm": "3.637.0"
   }
 }
