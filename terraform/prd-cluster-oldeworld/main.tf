@@ -53,7 +53,7 @@ locals {
 // When removing an item, DO NOT change the IPAM number.
 locals {
   nws_instances = {
-    eng = { name = "eng", ipam_id = 0 }, # 10.0.0.100
+    # eng = { name = "eng", ipam_id = 0 }, # 10.0.0.100
     chn = { name = "chn", ipam_id = 1 }, # 10.0.0.101
     esp = { name = "esp", ipam_id = 2 }, # ...
     ita = { name = "ita", ipam_id = 3 },
