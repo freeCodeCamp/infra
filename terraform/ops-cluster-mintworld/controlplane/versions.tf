@@ -7,7 +7,7 @@ terraform {
 
     hcp = {
       source  = "hashicorp/hcp"
-      version = "0.95.1"
+      version = "0.96.0"
     }
 
     cloudinit = {
