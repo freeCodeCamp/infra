@@ -4,6 +4,7 @@ LABEL org.opencontainers.image.source=https://github.com/freecodecamp/infra
 LABEL org.opencontainers.image.description="A Gitpod image for the freeCodeCamp.org main repo."
 LABEL org.opencontainers.image.licenses=BSD-3-Clause
 
+# Install dependencies using Gitpod's install-packages script
 RUN sudo install-packages \
   # Core system libraries
   ca-certificates libc6 libgcc1 libstdc++6 \
@@ -31,4 +32,4 @@ RUN bash -c 'VERSION="20" \
 
 RUN echo "nvm use default &>/dev/null" >> ~/.bashrc.d/51-nvm-fix
 
-RUN npx -y playwright install
+RUN npx -y playwright install --with-deps chromium
