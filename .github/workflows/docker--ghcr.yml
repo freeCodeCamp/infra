@@ -20,7 +20,6 @@ jobs:
       matrix:
         images:
           - landing
-          - gitpod-fcc
 
     steps:
       - name: Checkout code
