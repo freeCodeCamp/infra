@@ -46,4 +46,4 @@ RUN bash -c 'VERSION="20" \
 
 RUN echo "nvm use default &>/dev/null" >> ~/.bashrc.d/51-nvm-fix
 
-RUN npx -y puppeteer browsers install chrome
+RUN npx -y playwright install
