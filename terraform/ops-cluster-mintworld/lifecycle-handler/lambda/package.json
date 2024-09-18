@@ -11,6 +11,6 @@
   "dependencies": {
     "@aws-sdk/client-auto-scaling": "3.651.1",
     "@aws-sdk/client-ec2": "3.651.1",
-    "@aws-sdk/client-ssm": "3.651.1"
+    "@aws-sdk/client-ssm": "3.653.0"
   }
 }
