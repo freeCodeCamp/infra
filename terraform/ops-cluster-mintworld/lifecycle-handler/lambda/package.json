@@ -9,8 +9,8 @@
   "license": "BSD-3-Clause",
   "description": "",
   "dependencies": {
-    "@aws-sdk/client-auto-scaling": "3.666.0",
-    "@aws-sdk/client-ec2": "3.666.0",
-    "@aws-sdk/client-ssm": "3.666.0"
+    "@aws-sdk/client-auto-scaling": "3.670.0",
+    "@aws-sdk/client-ec2": "3.670.0",
+    "@aws-sdk/client-ssm": "3.670.0"
   }
 }
