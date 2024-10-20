@@ -1,0 +1,67 @@
+---
+- name: Install common packages on Ubuntu
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Wait for apt locks to be released
+      ansible.builtin.shell: while fuser /var/lib/{{ item }}/lock >/dev/null 2>&1; do sleep 5; done
+      loop:
+        - dpkg
+        - apt/lists
+        - dpkg/lock-frontend
+      register: apt_lock_wait
+      changed_when: false
+      retries: 60
+      delay: 5
+      until: apt_lock_wait.rc == 0
+
+    - name: Remove unattended-upgrades
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: absent
+        lock_timeout: 600
+      register: remove_unattended
+      retries: 5
+      delay: 20
+      until: remove_unattended is success
+
+    - name: Update apt package index and install common packages
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - software-properties-common
+          - curl
+          - git
+          - tar
+          - unzip
+          - zip
+          - vim
+          - neovim
+          - htop
+          - glances
+          - ncdu
+        state: present
+        lock_timeout: 600
+        update_cache: true
+      register: install_packages
+      retries: 5
+      delay: 20
+      until: install_packages is success
+
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: full
+        autoremove: true
+        autoclean: true
+        lock_timeout: 600
+      register: upgrade_packages
+      retries: 5
+      delay: 20
+      until: upgrade_packages is success
+
+    - name: Clean up apt cache
+      ansible.builtin.apt:
+        autoclean: true
+        autoremove: true
+      changed_when: false

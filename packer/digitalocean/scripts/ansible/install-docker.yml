@@ -1,0 +1,85 @@
+---
+- name: Install Docker and Docker Compose on Ubuntu
+  hosts: all
+  become: true
+
+  vars:
+    docker_gpg_key_url: "https://download.docker.com/linux/ubuntu/gpg"
+    docker_repo_base_url: "https://download.docker.com/linux/ubuntu"
+    docker_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture }}"
+    docker_release: "{{ ansible_distribution_release }}"
+
+  tasks:
+    - name: Wait for apt locks to be released
+      ansible.builtin.shell: while fuser /var/lib/{{ item }}/lock >/dev/null 2>&1; do sleep 5; done
+      loop:
+        - dpkg
+        - apt/lists
+        - dpkg/lock-frontend
+      register: apt_lock_wait
+      changed_when: false
+      retries: 60
+      delay: 5
+      until: apt_lock_wait.rc == 0
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3-pip
+          - python3-setuptools
+          - software-properties-common
+          - virtualenv
+        state: present
+        lock_timeout: 600
+        update_cache: true
+      register: install_prerequisites
+      retries: 5
+      delay: 20
+      until: install_prerequisites is success
+
+    - name: Ensure /etc/apt/keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker's GPG key
+      ansible.builtin.get_url:
+        url: "{{ docker_gpg_key_url }}"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.asc] {{ docker_repo_base_url }} {{ docker_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Update apt cache (after adding Docker repository)
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    # - name: Install Docker Module for Python
+    #   ansible.builtin.pip:
+    #     name: docker
+
+    - name: Clean up apt cache
+      ansible.builtin.apt:
+        autoclean: true
+        autoremove: true
+      changed_when: false

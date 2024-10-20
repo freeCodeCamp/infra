@@ -1,0 +1,13 @@
+---
+- name: Reboot
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Reboot
+      ansible.builtin.reboot:
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 30
+        post_reboot_delay: 180
+        test_command: uptime
