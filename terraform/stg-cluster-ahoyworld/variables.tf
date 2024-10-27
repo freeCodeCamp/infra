@@ -25,3 +25,15 @@ variable "cloudflare_account_id" {
   type        = string
   description = "Cloudflare Account ID"
 }
+
+variable "network_subdomain" {
+  description = "The subdomain for the network."
+  type        = string
+  sensitive   = true
+}
+
+variable "ssh_terraform_ed25519_private_key" {
+  type        = string
+  description = "The private key for the terraform account."
+  sensitive   = true
+}

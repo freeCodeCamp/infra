@@ -23,6 +23,15 @@ data "cloudflare_zone" "cf_zone" {
 # }
 
 locals {
+  ssh_accounts = ["ssh-service-camperbot-ed25519", "ssh-service-terraform-ed25519"]
+}
+
+data "digitalocean_ssh_key" "stg_ssh_keys" {
+  for_each = toset(local.ssh_accounts)
+  name     = each.value
+}
+
+locals {
   pxy_node_count = 3 # number of proxy nodes
   api_node_count = 3 # number of api nodes
   clt_node_count = 2 # number of client nodes for EACH LANGUAGE!
@@ -30,46 +39,29 @@ locals {
 }
 
 locals {
-  ipam_block_pxy = 10  # 10.0.0.11, 10.0.0.12, ...
-  ipam_block_api = 20  # 10.0.0.21, 10.0.0.22, ...
-  ipam_block_clt = 40  # 10.0.0.41, 10.0.0.42, ...
-  ipam_block_nws = 100 # 10.0.0.100, 10.0.0.102, ...
-  ipam_block_jms = 120 # 10.0.0.120, 10.0.0.121, ...
-}
-
-// When removing an item, DO NOT change the IPAM number.
-locals {
   nws_instances = {
-    # eng = { name = "eng", ipam_id = 0 }, # 10.0.0.100
-    chn = { name = "chn", ipam_id = 1 }, # 10.0.0.101
-    esp = { name = "esp", ipam_id = 2 }, # ...
-    ita = { name = "ita", ipam_id = 3 },
-    jpn = { name = "jpn", ipam_id = 4 },
-    kor = { name = "kor", ipam_id = 5 },
-    por = { name = "por", ipam_id = 6 },
-    ukr = { name = "ukr", ipam_id = 7 },
-    # ger = { name = "ger", ipam_id = 8 }
+    # eng = { name = "eng" }
+    # i18n = { name = "i18n" }
   }
 
   clt_config_meta = {
-    eng = { name = "eng", ipam_id = 0, node_count = local.clt_node_count },  # 10.0.0.40, 10.0.0.41, ...
-    chn = { name = "chn", ipam_id = 5, node_count = local.clt_node_count },  # 10.0.0.45, 10.0.0.46, ...
-    esp = { name = "esp", ipam_id = 10, node_count = local.clt_node_count }, # 10.0.0.50, 10.0.0.51, ...
-    ita = { name = "ita", ipam_id = 15, node_count = local.clt_node_count }, # 10.0.0.55, 10.0.0.56, ...
-    jpn = { name = "jpn", ipam_id = 20, node_count = local.clt_node_count }, # 10.0.0.60, 10.0.0.61, ...
-    # kor = { name = "kor", ipam_id = 6, node_count = local.clt_node_count },
-    por = { name = "por", ipam_id = 25, node_count = local.clt_node_count }, # 10.0.0.65, 10.0.0.66, ...
-    ukr = { name = "ukr", ipam_id = 30, node_count = local.clt_node_count }, # 10.0.0.70, 10.0.0.71, ...
-    ger = { name = "ger", ipam_id = 35, node_count = local.clt_node_count }, # 10.0.0.75, 10.0.0.76, ...
-    cnt = { name = "cnt", ipam_id = 40, node_count = local.clt_node_count }  # 10.0.0.80, 10.0.0.81, ...
-    swa = { name = "swa", ipam_id = 45, node_count = local.clt_node_count }  # 10.0.0.85, 10.0.0.86, ...
+    eng = { name = "eng", node_count = local.clt_node_count },
+    chn = { name = "chn", node_count = local.clt_node_count },
+    esp = { name = "esp", node_count = local.clt_node_count },
+    ita = { name = "ita", node_count = local.clt_node_count },
+    jpn = { name = "jpn", node_count = local.clt_node_count },
+    # kor = { name = "kor", node_count = local.clt_node_count },
+    por = { name = "por", node_count = local.clt_node_count },
+    ukr = { name = "ukr", node_count = local.clt_node_count },
+    ger = { name = "ger", node_count = local.clt_node_count },
+    cnt = { name = "cnt", node_count = local.clt_node_count }
+    swa = { name = "swa", node_count = local.clt_node_count }
   }
 
   clt_instances = flatten([
     [for k, v in local.clt_config_meta : [
       for i in range(v.node_count) : {
         name     = v.name
-        ipam_id  = v.ipam_id + i
         instance = "${k}-${i}"
       }
     ]],
