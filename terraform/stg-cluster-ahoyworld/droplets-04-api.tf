@@ -1,7 +1,8 @@
 resource "digitalocean_droplet" "stg_ahoyworld_api" {
   count = local.api_node_count
-  name  = "stg-vm-ahoyworld-api-${count.index + 1}"
-  tags  = ["stg", "ahoyworld", "api", "stg_ahoyworld_api"]
+
+  name = "stg-vm-ahoyworld-api-${count.index + 1}"
+  tags = ["stg", "ahoyworld", digitalocean_tag.stg_tag_fw_internal.id, "api", "stg_ahoyworld_api"]
 
   image    = data.hcp_packer_artifact.do_ubuntu.external_identifier
   size     = "s-2vcpu-4gb"

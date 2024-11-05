@@ -1,7 +1,8 @@
 resource "digitalocean_droplet" "stg_ahoyworld_pxy" {
   count = local.pxy_node_count
-  name  = "stg-vm-ahoyworld-pxy-${count.index + 1}"
-  tags  = ["stg", "ahoyworld", "pxy", "stg_ahoyworld_pxy"]
+
+  name = "stg-vm-ahoyworld-pxy-${count.index + 1}"
+  tags = ["stg", "ahoyworld", digitalocean_tag.stg_tag_fw_external.id, "pxy", "stg_ahoyworld_pxy"]
 
   image    = data.hcp_packer_artifact.do_ubuntu.external_identifier
   size     = "s-2vcpu-4gb"

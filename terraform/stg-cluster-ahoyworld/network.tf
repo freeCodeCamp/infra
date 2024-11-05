@@ -1,3 +1,11 @@
+resource "digitalocean_tag" "stg_tag_fw_internal" {
+  name = "STGAWINT"
+}
+
+resource "digitalocean_tag" "stg_tag_fw_external" {
+  name = "STGAWEXT"
+}
+
 resource "digitalocean_vpc" "stg_vpc" {
   name        = "stg-ahoyworld-vpc"
   region      = "nyc3"
@@ -8,12 +16,7 @@ resource "digitalocean_vpc" "stg_vpc" {
 resource "digitalocean_firewall" "stg_fw_internal" {
   name = "stg-ahoyworld-fw-internal"
 
-  droplet_ids = flatten([
-    [for instance in digitalocean_droplet.stg_ahoyworld_clt : instance.id],
-    digitalocean_droplet.stg_ahoyworld_api[*].id,
-    [for instance in digitalocean_droplet.stg_ahoyworld_nws : instance.id],
-    digitalocean_droplet.stg_ahoyworld_jms[*].id,
-  ])
+  tags = [digitalocean_tag.stg_tag_fw_internal.id]
 
   inbound_rule {
     protocol   = "tcp"
@@ -40,21 +43,13 @@ resource "digitalocean_firewall" "stg_fw_internal" {
       "::/0",
     ]
   }
-
-  depends_on = [
-    digitalocean_droplet.stg_ahoyworld_clt,
-    digitalocean_droplet.stg_ahoyworld_api,
-    digitalocean_droplet.stg_ahoyworld_nws,
-    digitalocean_droplet.stg_ahoyworld_jms,
-  ]
 }
+
 
 resource "digitalocean_firewall" "stg_fw_external" {
   name = "stg-ahoyworld-fw-external"
 
-  droplet_ids = flatten([
-    digitalocean_droplet.stg_ahoyworld_pxy[*].id
-  ])
+  tags = [digitalocean_tag.stg_tag_fw_external.id]
 
   inbound_rule {
     protocol   = "tcp"
@@ -91,8 +86,4 @@ resource "digitalocean_firewall" "stg_fw_external" {
       "::/0",
     ]
   }
-
-  depends_on = [
-    digitalocean_droplet.stg_ahoyworld_pxy,
-  ]
 }

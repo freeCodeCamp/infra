@@ -2,7 +2,7 @@ resource "digitalocean_droplet" "stg_ahoyworld_clt" {
   for_each = { for i in local.clt_instances : i.instance => i }
 
   name = "stg-vm-ahoyworld-clt-${each.value.instance}"
-  tags = ["stg", "ahoyworld", "clt", "stg_ahoyworld_clt", "${each.value.name}"]
+  tags = ["stg", "ahoyworld", digitalocean_tag.stg_tag_fw_internal.id, "clt", "stg_ahoyworld_clt", "${each.value.name}"]
 
   image    = data.hcp_packer_artifact.do_ubuntu.external_identifier
   size     = "s-2vcpu-4gb"
