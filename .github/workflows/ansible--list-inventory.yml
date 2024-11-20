@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3b9b8c884f6b4bb4d5be2779c26374abadae0871
+        uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb
 
       - name: Setup Ansible and Dependencies
         working-directory: ${{ env.WORKING_DIR }}
