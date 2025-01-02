@@ -25,6 +25,6 @@ check-env-keys:
 	fi
 
 .PHONY: inventory
-inventory: check-env-keys
+inventory:
 	ansible-inventory -i inventory --graph -v
 
