@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-deploy-config: &deploy-config
   deploy:
     replicas: 3
@@ -54,49 +52,42 @@ services:
   #     - published: 4001
   #       <<: *port-config
   #   <<: *deploy-config
-
   svc-nws-chn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
     ports:
       - published: 4002
         <<: *port-config
     <<: *deploy-config
-  
   svc-nws-esp:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-espanol:latest
     ports:
       - published: 4003
         <<: *port-config
     <<: *deploy-config
-  
   svc-nws-ita:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-italian:latest
     ports:
       - published: 4004
         <<: *port-config
     <<: *deploy-config
-  
   svc-nws-jpn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-japanese:latest
     ports:
       - published: 4005
         <<: *port-config
     <<: *deploy-config
-  
   svc-nws-kor:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-korean:latest
     ports:
       - published: 4006
         <<: *port-config
     <<: *deploy-config
-  
   svc-nws-por:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-portuguese:latest
     ports:
       - published: 4007
         <<: *port-config
     <<: *deploy-config
-  
   svc-nws-ukr:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-ukrainian:latest
     ports:

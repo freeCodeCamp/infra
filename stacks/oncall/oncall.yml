@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # CRON service
   cronjob:
@@ -44,7 +42,7 @@ services:
   # Cleanup Service  
   cleanup:
     image: docker
-    command: [ "docker", "system", "prune", "-f" ]
+    command: [ "docker", "system", "prune", "--volumes", "--all", "-f" ]
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
     deploy:
