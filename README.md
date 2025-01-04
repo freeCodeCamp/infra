@@ -1,62 +1,73 @@
-# news-config
+# docker-swarm-config
 
-> Temporary docker stack configs before we move to Nomad
+> Docker stack configs for our Docker swarm clusters
 
 ## Usage
 
-1. Create docker swarm cluster as needed.
-   
+1. On manager node - Create docker swarm cluster (if needed).
+
    ```shell
    docker swarm init
    docker swarm join-token manager
    ```
-2. Add worker nodes to the cluster.
+
+2. On worker nodes - Join the cluster (if needed).
 
     ```shell
     docker swarm join --token <token> <ip>:<port>
     ```
  
-4. **Important:** Add labels to the nodes in the cluster. This will be used for placement constraints in the docker stack files.
+3. On all nodes - Add labels to the nodes in the cluster. 
 
-   Add the following labels to the nodes:
+   > [!IMPORTANT]
+   > Labels are used for placement constraints in the docker stack templates.
 
-   - On the manager node that will run portainer
+   Here are some example lables for the nodes. Adjust as needed
+
+   - On the manager node
    
      ```shell
+     # Label for the portainer stack
      docker node update --label-add "portainer=true" <node id>
      ```
 
-   - On all nodes that will run the JMS instances
+   - On the worker nodes
+
+     JAMStack news
 
      ```shell
+     # Common 
      docker node update --label-add "jms.enabled=true" <node id>
-     ```
-
-   - On all staging nodes
    
-     ```shell
+     # Environment specific
      docker node update --label-add "jms.variant=dev" <node id>
-     ```
-
-   - On all production nodes
-   
-     ```shell
      docker node update --label-add "jms.variant=org" <node id>
      ```
-5. Login to the private container registry.
-   
-6. **Important:** Deploy Portainer. 
 
-   ~~:warning: Warning :warning: These instructions may not work. Docker swarm is adding multiple networks to the services for some reason.~~
+     API
+     
+     ```shell
+     # Common 
+     docker node update --label-add "api.enabled=true" <node id>
    
-   Use the stack defined in [portainer-stack.yml](./stacks/portainer/portainer-stack.yml).
+     # Environment specific
+     docker node update --label-add "api.variant=dev" <node id>
+     docker node update --label-add "api.variant=org" <node id>
+     ```
+   
+4. Deploy Portainer. 
+
+   > [!WARNING]
+   > ~~These instructions may not work. Docker swarm is adding multiple networks to the services for some reason.~~
+   > 
+   > Use the stack defined in [portainer.yml](./stacks/portainer/portainer.yml).
 
    ```shell
-   docker stack deploy -c portainer-stack.yml portainer
+   docker stack deploy -c portainer.yml portainer
    ```
 
-7. Complete the Portainer setup wizard & add the cluster to Portainer.
+5. Complete the Portainer setup wizard & add the cluster to Portainer.
 
-8. Add the container registry details to Portainer.
-   
-9. Deploy all the remaining stacks via Portainer.
+6. Add the container registry details to Portainer.
+
+7. Deploy all the remaining stacks via Portainer. Note that you should not manage the portainer stack from within Portainer UI.
