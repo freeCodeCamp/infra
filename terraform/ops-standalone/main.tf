@@ -39,3 +39,17 @@ data "linode_instances" "prd_oldeworld_jms" {
     values = ["prd_oldeworld_jms"]
   }
 }
+
+data "linode_instances" "stg_oldeworld_api" {
+  filter {
+    name   = "tags"
+    values = ["stg_oldeworld_api", "new"]
+  }
+}
+
+data "linode_instances" "prd_oldeworld_api" {
+  filter {
+    name   = "tags"
+    values = ["prd_oldeworld_api", "new"]
+  }
+}
