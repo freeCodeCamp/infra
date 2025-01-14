@@ -8,7 +8,6 @@
 
    ```shell
    docker swarm init
-   docker swarm join-token manager
    ```
 
 2. On worker nodes - Join the cluster (if needed).
@@ -16,6 +15,8 @@
     ```shell
     docker swarm join --token <token> <ip>:<port>
     ```
+
+    Get the token if needed, by running `docker swarm join-token worker`
  
 3. On all nodes - Add labels to the nodes in the cluster. 
 
@@ -24,10 +25,11 @@
 
    Here are some example lables for the nodes. Adjust as needed
 
+   - Get the node ids using `docker node ls` on the manager node.
+
    - On the manager node
    
      ```shell
-     # Label for the portainer stack
      docker node update --label-add "portainer=true" <node id>
      ```
 
@@ -36,10 +38,10 @@
      JAMStack news
 
      ```shell
-     # Common 
      docker node update --label-add "jms.enabled=true" <node id>
+     ```
    
-     # Environment specific
+     ```shell
      docker node update --label-add "jms.variant=dev" <node id>
      docker node update --label-add "jms.variant=org" <node id>
      ```
@@ -47,10 +49,10 @@
      API
      
      ```shell
-     # Common 
      docker node update --label-add "api.enabled=true" <node id>
-   
-     # Environment specific
+     ```
+
+     ```shell
      docker node update --label-add "api.variant=dev" <node id>
      docker node update --label-add "api.variant=org" <node id>
      ```
@@ -58,9 +60,8 @@
 4. Deploy Portainer. 
 
    > [!WARNING]
-   > ~~These instructions may not work. Docker swarm is adding multiple networks to the services for some reason.~~
    > 
-   > Use the stack defined in [portainer.yml](./stacks/portainer/portainer.yml).
+   > Copy the stack defined in [portainer.yml](./stacks/portainer/portainer.yml) to the manager node and deploy it.
 
    ```shell
    docker stack deploy -c portainer.yml portainer
