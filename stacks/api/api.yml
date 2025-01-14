@@ -1,0 +1,109 @@
+x-env-config: &env-config
+  environment:
+    # -- Runtime
+    - NODE_ENV=${NODE_ENV:-production}
+    - FREECODECAMP_NODE_ENV=${FREECODECAMP_NODE_ENV:-production}
+    - PORT=${PORT:-3000}
+    - HOST=${HOST:-0.0.0.0}
+    # -- Database
+    - MONGOHQ_URL=${MONGOHQ_URL}
+    # -- Logging
+    - FCC_API_LOG_LEVEL=${FCC_API_LOG_LEVEL:-info}
+    - SENTRY_DSN=${SENTRY_DSN}
+    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+    # -- Debugging
+    # - FCC_ENABLE_SENTRY_ROUTES=${FCC_ENABLE_SENTRY_ROUTES:-false}
+    # - FCC_ENABLE_SWAGGER_UI=${FCC_ENABLE_SWAGGER_UI:-false}
+    # -- Auth0 - OAuth 2.0 Credentials
+    - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+    - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
+    - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+    # Session, Cookie and JWT encryption strings
+    - JWT_SECRET=${JWT_SECRET}
+    - COOKIE_SECRET=${COOKIE_SECRET}
+    - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.freecodecamp.org}
+    # -- Email
+    - EMAIL_PROVIDER=${EMAIL_PROVIDER:-ses}
+    - SES_REGION=${SES_REGION:-us-east-1}
+    - SES_ID=${SES_ID}
+    - SES_SECRET=${SES_SECRET}
+    # -- Feature Flags
+    # - FCC_ENABLE_EXAM_ENVIRONMENT=${FCC_ENABLE_EXAM_ENVIRONMENT:-false}
+    # - FCC_ENABLE_SHADOW_CAPTURE=${FCC_ENABLE_SHADOW_CAPTURE:-false}
+    # -- Analytics
+    - GROWTHBOOK_URI=${GROWTHBOOK_URI}
+    - GROWTHBOOK_FASTIFY_API_HOST=${GROWTHBOOK_FASTIFY_API_HOST}
+    - GROWTHBOOK_FASTIFY_CLIENT_KEY=${GROWTHBOOK_FASTIFY_CLIENT_KEY}
+    # -- Application Paths
+    - HOME_LOCATION=${HOME_LOCATION:-'https://www.freecodecamp.org'}
+    - API_LOCATION=${API_LOCATION:-'https://api.freecodecamp.org'}
+    # -- Donations
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+
+services:
+  # API service
+  svc-api:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/learn-api:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.labels.api.enabled == true
+          - node.labels.api.variant == ${DEPLOYMENT_ENV}
+        preferences:
+          - spread: node.id # Spread tasks across all nodes
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      # Two replicas per worker node
+      replicas: 6
+      resources:
+        limits:
+          cpus: ${CPU_LIMIT:-1}
+          memory: ${MEMORY_LIMIT:-1G}
+      # Updating is disabled for now, its handled via the deployment pipelines
+      # labels:
+      #   - org.freecodecamp.autoupdate=true
+    networks:
+      - network-api
+    <<: *env-config
+
+  svc-caddy:
+    image: caddy:latest
+    deploy:
+      mode: global
+      placement:
+        constraints: 
+        - node.labels.api.enabled == true
+      ports:
+        - target: 80
+          published: 80
+          protocol: tcp
+          mode: host
+      configs:
+        - source: caddyfile
+          target: /etc/caddy/Caddyfile
+      networks:
+        - network-api
+
+configs:
+  caddyfile:
+    data: |
+      {
+          auto_https off    # Disable automatic HTTPS
+      }
+      :80 {
+          reverse_proxy svc-api:3000 {
+              lb_policy round_robin
+              health_uri /health
+              health_interval 10s
+              health_timeout 2s
+          }
+      }
+
+networks:
+  network-api:
+    driver: overlay
