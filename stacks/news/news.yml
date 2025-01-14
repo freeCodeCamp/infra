@@ -2,6 +2,7 @@ x-deploy-config: &deploy-config
   deploy:
     replicas: 3
     placement:
+      max_replicas_per_node: 1
       constraints:
         - node.labels.jms.enabled == true
         - node.labels.jms.variant == ${DEPLOYMENT_ENV}
