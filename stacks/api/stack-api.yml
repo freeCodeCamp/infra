@@ -73,36 +73,26 @@ services:
 
   svc-caddy:
     image: caddy:latest
+    configs:
+      - source: Caddyfile-config
+        target: /etc/caddy/Caddyfile
     deploy:
       mode: global
       placement:
         constraints: 
         - node.labels.api.enabled == true
-      ports:
-        - target: 80
-          published: 80
-          protocol: tcp
-          mode: host
-      configs:
-        - source: caddyfile
-          target: /etc/caddy/Caddyfile
-      networks:
-        - network-api
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+    networks:
+      - network-api
 
 configs:
-  caddyfile:
-    data: |
-      {
-          auto_https off    # Disable automatic HTTPS
-      }
-      :80 {
-          reverse_proxy svc-api:3000 {
-              lb_policy round_robin
-              health_uri /health
-              health_interval 10s
-              health_timeout 2s
-          }
-      }
+  Caddyfile-config:
+    name: ${CADDY_CONFIG_NAME:-Caddyfile-API-v20250115-01}
+    external: true
 
 networks:
   network-api:
