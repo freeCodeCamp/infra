@@ -61,10 +61,10 @@
 
    > [!WARNING]
    > 
-   > Copy the stack defined in [portainer.yml](./stacks/portainer/portainer.yml) to the manager node and deploy it.
+   > Copy the stack defined in [stack-portainer.yml](./stacks/portainer/stack-portainer.yml) to the manager node and deploy it.
 
    ```shell
-   docker stack deploy -c portainer.yml portainer
+   docker stack deploy -c stack-portainer.yml portainer
    ```
 
 5. Complete the Portainer setup wizard & add the cluster to Portainer.
