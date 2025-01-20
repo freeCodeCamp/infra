@@ -5,19 +5,21 @@
 :80 {
     reverse_proxy svc-api:3000 {
         # Load balancing
-        lb_policy round_robin
-        
+        lb_policy least_conn
+
         # Health check
         health_uri /status/ping
-        health_interval 10s
-        health_timeout 2s
+        health_interval 30s
+        health_passes 2
+        health_fails 2
+        health_timeout 5s
 
         # Forward original client IP and protocol information
-        header_up X-Real-IP {remote}
-        header_up X-Forwarded-For {remote}
+        header_up X-Real-IP {http.request.header.CF-Connecting-IP|{remote}}
+        header_up X-Forwarded-For {http.request.header.CF-Connecting-IP|{remote}}
         header_up X-Forwarded-Proto {scheme}
         header_up X-Forwarded-Host {host}
-        
+
         # Preserve original headers
         header_up Host {upstream_host}
     }
