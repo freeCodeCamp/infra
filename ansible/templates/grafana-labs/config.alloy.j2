@@ -1,3 +1,25 @@
+prometheus.remote_write "metrics_service" {
+  endpoint {
+    url = "{{ prometheus_push_endpoint }}"
+
+    basic_auth {
+      username = "{{ prometheus_username }}"
+      password = "{{ prometheus_password }}"
+    }
+  }
+}
+
+loki.write "grafana_cloud_loki" {
+  endpoint {
+    url = "{{ loki_push_endpoint }}"
+
+    basic_auth {
+      username = "{{ loki_username }}"
+      password = "{{ loki_password }}"
+    }
+  }
+}
+
 prometheus.exporter.self "integrations_alloy_health" { }
 
 discovery.relabel "integrations_alloy_health" {
@@ -21,13 +43,13 @@ prometheus.scrape "integrations_alloy_health" {
 }
 
 prometheus.relabel "integrations_alloy_health" {
-	forward_to = [prometheus.remote_write.metrics_service.receiver]
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
 
-	rule {
-		source_labels = ["__name__"]
-		regex         = "alloy_build_info|alloy_component_controller_evaluating|alloy_component_controller_running_components|alloy_component_dependencies_wait_seconds|alloy_component_dependencies_wait_seconds_bucket|alloy_component_evaluation_seconds|alloy_component_evaluation_seconds_bucket|alloy_component_evaluation_seconds_count|alloy_component_evaluation_seconds_sum|alloy_component_evaluation_slow_seconds|alloy_config_hash|alloy_resources_machine_rx_bytes_total|alloy_resources_machine_tx_bytes_total|alloy_resources_process_cpu_seconds_total|alloy_resources_process_resident_memory_bytes|cluster_node_gossip_health_score|cluster_node_gossip_proto_version|cluster_node_gossip_received_events_total|cluster_node_info|cluster_node_lamport_time|cluster_node_peers|cluster_node_update_observers|cluster_transport_rx_bytes_total|cluster_transport_rx_packet_queue_length|cluster_transport_rx_packets_failed_total|cluster_transport_rx_packets_total|cluster_transport_stream_rx_bytes_total|cluster_transport_stream_rx_packets_failed_total|cluster_transport_stream_rx_packets_total|cluster_transport_stream_tx_bytes_total|cluster_transport_stream_tx_packets_failed_total|cluster_transport_stream_tx_packets_total|cluster_transport_streams|cluster_transport_tx_bytes_total|cluster_transport_tx_packet_queue_length|cluster_transport_tx_packets_failed_total|cluster_transport_tx_packets_total|exporter_send_failed_spans_ratio_total|exporter_sent_spans_ratio_total|go_gc_duration_seconds_count|go_goroutines|go_memstats_heap_inuse_bytes|processor_batch_batch_send_size_ratio_bucket|processor_batch_metadata_cardinality_ratio|processor_batch_timeout_trigger_send_ratio_total|prometheus_remote_storage_bytes_total|prometheus_remote_storage_highest_timestamp_in_seconds|prometheus_remote_storage_metadata_bytes_total|prometheus_remote_storage_queue_highest_sent_timestamp_seconds|prometheus_remote_storage_samples_failed_total|prometheus_remote_storage_samples_retried_total|prometheus_remote_storage_samples_total|prometheus_remote_storage_sent_batch_duration_seconds_bucket|prometheus_remote_storage_sent_batch_duration_seconds_count|prometheus_remote_storage_sent_batch_duration_seconds_sum|prometheus_remote_storage_shards|prometheus_remote_storage_shards_max|prometheus_remote_storage_shards_min|prometheus_remote_write_wal_samples_appended_total|prometheus_remote_write_wal_storage_active_series|receiver_accepted_spans_ratio_total|receiver_refused_spans_ratio_total|rpc_server_duration_milliseconds_bucket|scrape_duration_seconds|up"
-		action        = "keep"
-	}
+  rule {
+    source_labels = ["__name__"]
+    regex         = "alloy_build_info|alloy_component_controller_evaluating|alloy_component_controller_running_components|alloy_component_dependencies_wait_seconds|alloy_component_dependencies_wait_seconds_bucket|alloy_component_evaluation_seconds|alloy_component_evaluation_seconds_bucket|alloy_component_evaluation_seconds_count|alloy_component_evaluation_seconds_sum|alloy_component_evaluation_slow_seconds|alloy_config_hash|alloy_resources_machine_rx_bytes_total|alloy_resources_machine_tx_bytes_total|alloy_resources_process_cpu_seconds_total|alloy_resources_process_resident_memory_bytes|cluster_node_gossip_health_score|cluster_node_gossip_proto_version|cluster_node_gossip_received_events_total|cluster_node_info|cluster_node_lamport_time|cluster_node_peers|cluster_node_update_observers|cluster_transport_rx_bytes_total|cluster_transport_rx_packet_queue_length|cluster_transport_rx_packets_failed_total|cluster_transport_rx_packets_total|cluster_transport_stream_rx_bytes_total|cluster_transport_stream_rx_packets_failed_total|cluster_transport_stream_rx_packets_total|cluster_transport_stream_tx_bytes_total|cluster_transport_stream_tx_packets_failed_total|cluster_transport_stream_tx_packets_total|cluster_transport_streams|cluster_transport_tx_bytes_total|cluster_transport_tx_packet_queue_length|cluster_transport_tx_packets_failed_total|cluster_transport_tx_packets_total|exporter_send_failed_spans_ratio_total|exporter_sent_spans_ratio_total|go_gc_duration_seconds_count|go_goroutines|go_memstats_heap_inuse_bytes|processor_batch_batch_send_size_ratio_bucket|processor_batch_metadata_cardinality_ratio|processor_batch_timeout_trigger_send_ratio_total|prometheus_remote_storage_bytes_total|prometheus_remote_storage_highest_timestamp_in_seconds|prometheus_remote_storage_metadata_bytes_total|prometheus_remote_storage_queue_highest_sent_timestamp_seconds|prometheus_remote_storage_samples_failed_total|prometheus_remote_storage_samples_retried_total|prometheus_remote_storage_samples_total|prometheus_remote_storage_sent_batch_duration_seconds_bucket|prometheus_remote_storage_sent_batch_duration_seconds_count|prometheus_remote_storage_sent_batch_duration_seconds_sum|prometheus_remote_storage_shards|prometheus_remote_storage_shards_max|prometheus_remote_storage_shards_min|prometheus_remote_write_wal_samples_appended_total|prometheus_remote_write_wal_storage_active_series|receiver_accepted_spans_ratio_total|receiver_refused_spans_ratio_total|rpc_server_duration_milliseconds_bucket|scrape_duration_seconds|up"
+    action        = "keep"
+  }
 }
 
 logging {
@@ -60,28 +82,6 @@ loki.relabel "logs_integrations_integrations_alloy_health" {
   rule {
     target_label = "job"
     replacement  = "integrations/alloy"
-  }
-}
-
-prometheus.remote_write "metrics_service" {
-  endpoint {
-    url = "{{ prometheus_push_endpoint }}"
-
-    basic_auth {
-      username = "{{ prometheus_username }}"
-      password = "{{ prometheus_password }}"
-    }
-  }
-}
-
-loki.write "grafana_cloud_loki" {
-  endpoint {
-    url = "{{ loki_push_endpoint }}"
-
-    basic_auth {
-      username = "{{ loki_username }}"
-      password = "{{ loki_password }}"
-    }
   }
 }
 

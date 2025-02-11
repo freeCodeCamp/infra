@@ -22,13 +22,19 @@
           - loki_push_endpoint != ""
           - loki_username != ""
           - loki_password != ""
-        fail_msg: "One or more required environment variables are not set. Please set all required variables."
+        fail_msg:
+          "One or more required environment variables are not set. Please set
+          all required variables."
 
     - name: Install Alloy
       ansible.builtin.include_role:
         name: grafana.grafana.alloy
       vars:
+        # --- DO NOT CHANGE ---
+        # Do not change 'config' to 'alloy_config' if the linter complains,
+        # You can ignore it, since we are using a template to generate the config.
         config: "{{ lookup('template', 'grafana-labs/config.alloy.j2') }}"
+        # --- DO NOT CHANGE ---
 
     - name: Add the Alloy user to the adm group
       ansible.builtin.user:
