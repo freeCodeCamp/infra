@@ -1,108 +1,101 @@
+x-port-config: &port-config
+  target: 3000
+  protocol: tcp
+  mode: host
+x-deploy-config: &deploy-config
+  deploy:
+    replicas: 3
+    update_config:
+      parallelism: 1
+      delay: 10s
+      failure_action: rollback
+      monitor: 30s
+      max_failure_ratio: 0.3
+    restart_policy:
+      condition: on-failure
+    resources:
+      limits:
+        cpus: ${CPU_LIMIT:-1}
+        memory: ${MEMORY_LIMIT:-1G}
+      reservations:
+        memory: 512M
+    placement:
+      max_replicas_per_node: 1
+      constraints:
+        - node.labels.api.enabled == true
+        - node.labels.api.variant == ${DEPLOYMENT_ENV}
+      preferences:
+        - spread: node.labels.api.variant == ${DEPLOYMENT_ENV}
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "100m"
+      max-file: "5"
+      compress: "true"
+      # tag: "{{.Name}}/{{.ImageName}}/{{.ID}}"
+      labels: "app=api,env=${DEPLOYMENT_ENV}"
+  healthcheck:
+    test:
+      [
+        "CMD-SHELL",
+        "curl -f http://localhost:${PORT:-3000}/status/ping?checker=${HEALTHCHECK_CHECKER:-swarm-manager} || exit 1",
+      ]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    start_interval: 5s
+  environment:
+    # -- Runtime
+    - NODE_ENV=${NODE_ENV:-production}
+    - FREECODECAMP_NODE_ENV=${FREECODECAMP_NODE_ENV:-production}
+    - PORT=${PORT:-3000}
+    - HOST=${HOST:-0.0.0.0}
+    # -- Database
+    - MONGOHQ_URL=${MONGOHQ_URL}
+    # -- Logging
+    - FCC_API_LOG_LEVEL=${FCC_API_LOG_LEVEL:-info}
+    - SENTRY_DSN=${SENTRY_DSN}
+    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+    # -- Debugging
+    # - FCC_ENABLE_SENTRY_ROUTES=${FCC_ENABLE_SENTRY_ROUTES:-false}
+    # - FCC_ENABLE_SWAGGER_UI=${FCC_ENABLE_SWAGGER_UI:-false}
+    # -- Auth0 - OAuth 2.0 Credentials
+    - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+    - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
+    - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+    # Session, Cookie and JWT encryption strings
+    - JWT_SECRET=${JWT_SECRET}
+    - COOKIE_SECRET=${COOKIE_SECRET}
+    - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.freecodecamp.org}
+    # -- Email
+    - EMAIL_PROVIDER=${EMAIL_PROVIDER:-ses}
+    - SES_REGION=${SES_REGION:-us-east-1}
+    - SES_ID=${SES_ID}
+    - SES_SECRET=${SES_SECRET}
+    # -- Feature Flags
+    # - FCC_ENABLE_EXAM_ENVIRONMENT=${FCC_ENABLE_EXAM_ENVIRONMENT:-false}
+    # - FCC_ENABLE_SHADOW_CAPTURE=${FCC_ENABLE_SHADOW_CAPTURE:-false}
+    # -- Analytics
+    - GROWTHBOOK_FASTIFY_API_HOST=${GROWTHBOOK_FASTIFY_API_HOST}
+    - GROWTHBOOK_FASTIFY_CLIENT_KEY=${GROWTHBOOK_FASTIFY_CLIENT_KEY}
+    # -- Application Paths
+    - HOME_LOCATION=${HOME_LOCATION:-'https://www.freecodecamp.org'}
+    - API_LOCATION=${API_LOCATION:-'https://api.freecodecamp.org'}
+    # -- Donations
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+
 services:
-  # API service
-  svc-api:
+  svc-api-alpha:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/learn-api:${DEPLOYMENT_VERSION}
-    deploy:
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
-        window: 120s
-      update_config:
-        parallelism: 1
-        order: start-first
-        failure_action: rollback
-        delay: 10s
-      replicas: 6 # Two replicas per worker node
-      resources:
-        limits:
-          cpus: ${CPU_LIMIT:-1}
-          memory: ${MEMORY_LIMIT:-1G}
-      placement:
-        constraints:
-          - node.labels.api.enabled == true
-          - node.labels.api.variant == ${DEPLOYMENT_ENV}
-        preferences:
-          - spread: node.id # Spread tasks across all nodes
-    networks:
-      - network-api
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
-        compress: "true"
-        labels: ${DEPLOYMENT_ENV}
-        # tag: "{{.Name}}/{{.ImageName}}/{{.ID}}"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/status/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    environment:
-      # -- Runtime
-      - NODE_ENV=${NODE_ENV:-production}
-      - FREECODECAMP_NODE_ENV=${FREECODECAMP_NODE_ENV:-production}
-      - PORT=${PORT:-3000}
-      - HOST=${HOST:-0.0.0.0}
-      # -- Database
-      - MONGOHQ_URL=${MONGOHQ_URL}
-      # -- Logging
-      - FCC_API_LOG_LEVEL=${FCC_API_LOG_LEVEL:-info}
-      - SENTRY_DSN=${SENTRY_DSN}
-      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
-      # -- Debugging
-      # - FCC_ENABLE_SENTRY_ROUTES=${FCC_ENABLE_SENTRY_ROUTES:-false}
-      # - FCC_ENABLE_SWAGGER_UI=${FCC_ENABLE_SWAGGER_UI:-false}
-      # -- Auth0 - OAuth 2.0 Credentials
-      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
-      - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
-      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
-      # Session, Cookie and JWT encryption strings
-      - JWT_SECRET=${JWT_SECRET}
-      - COOKIE_SECRET=${COOKIE_SECRET}
-      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.freecodecamp.org}
-      # -- Email
-      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-ses}
-      - SES_REGION=${SES_REGION:-us-east-1}
-      - SES_ID=${SES_ID}
-      - SES_SECRET=${SES_SECRET}
-      # -- Feature Flags
-      # - FCC_ENABLE_EXAM_ENVIRONMENT=${FCC_ENABLE_EXAM_ENVIRONMENT:-false}
-      # - FCC_ENABLE_SHADOW_CAPTURE=${FCC_ENABLE_SHADOW_CAPTURE:-false}
-      # -- Analytics
-      - GROWTHBOOK_FASTIFY_API_HOST=${GROWTHBOOK_FASTIFY_API_HOST}
-      - GROWTHBOOK_FASTIFY_CLIENT_KEY=${GROWTHBOOK_FASTIFY_CLIENT_KEY}
-      # -- Application Paths
-      - HOME_LOCATION=${HOME_LOCATION:-'https://www.freecodecamp.org'}
-      - API_LOCATION=${API_LOCATION:-'https://api.freecodecamp.org'}
-      # -- Donations
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-
-  svc-caddy:
-    image: caddy:latest
-    configs:
-      - source: Caddyfile-config
-        target: /etc/caddy/Caddyfile
-    deploy:
-      mode: global
-      placement:
-        constraints:
-          - node.labels.api.enabled == true
     ports:
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
-    networks:
-      - network-api
+      - published: 2345
+        <<: *port-config
+    <<: *deploy-config
 
-configs:
-  Caddyfile-config:
-    name: ${CADDY_CONFIG_NAME}
-    external: true
-
-networks:
-  network-api:
-    driver: overlay
+  svc-api-bravo:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/learn-api:${DEPLOYMENT_VERSION}
+    ports:
+      - published: 2346
+        <<: *port-config
+    <<: *deploy-config
