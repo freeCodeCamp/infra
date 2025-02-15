@@ -105,3 +105,4 @@ dist
 
 # Environment variables
 *.env
+*.asc
