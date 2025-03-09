@@ -52,7 +52,8 @@ jobs:
         working-directory: './ansible'
         run: |
           SERIAL_VALUE=${{ inputs.serial || 1 }}  # Default value of 1 if inputs.serial is not set
-          ansible-playbook play-any--cleanup-clients.yml \
+          ansible-playbook -i inventory/linode.yml \
+          play-any--cleanup-clients.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": '$SERIAL_VALUE'}' \
           ${{ inputs.verbosity }}

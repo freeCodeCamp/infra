@@ -33,7 +33,7 @@ jobs:
           - prd_oldeworld_clt_ukr
           - prd_oldeworld_clt_swa
 
-    uses: freeCodeCamp/infra/.github/workflows/ansible--uptime.yml@main
+    uses: ./.github/workflows/ansible--uptime.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: '-v'
@@ -78,7 +78,7 @@ jobs:
           - prd_oldeworld_clt_ukr
           - prd_oldeworld_clt_swa
 
-    uses: freeCodeCamp/infra/.github/workflows/ansible--update.yml@main
+    uses: ./.github/workflows/ansible--update.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: '-v'
@@ -104,7 +104,7 @@ jobs:
         host_groups:
           - stg_oldeworld_pxy
           - prd_oldeworld_pxy
-    uses: freeCodeCamp/infra/.github/workflows/ansible--reboot.yml@main
+    uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: '-v'
@@ -147,7 +147,7 @@ jobs:
           - prd_oldeworld_clt_ukr
           - prd_oldeworld_clt_swa
 
-    uses: freeCodeCamp/infra/.github/workflows/ansible--reboot.yml@main
+    uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: '-v'

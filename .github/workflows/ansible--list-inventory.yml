@@ -24,4 +24,4 @@ jobs:
       - name: List Inventory
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          ansible-inventory --graph -v
+          ansible-inventory -i inventory/linode.yml --graph -v
