@@ -70,7 +70,8 @@ jobs:
           LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
         working-directory: './ansible'
         run: |
-          ansible-playbook play-any--update.yml \
+          ansible-playbook -i inventory/linode.yml \
+          play-any--update.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e '{"variable_host": "${{ inputs.hosts }}", "variable_serial": ${{ inputs.serial }}}' \
           ${{ inputs.verbosity }}
