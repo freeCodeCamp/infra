@@ -1,0 +1,33 @@
+---
+- name: Deploy Oldeworld Cluster - API
+  hosts: "{{ variable_host | default('null') }}"
+  serial: "{{ variable_serial | default(1) }}"
+  gather_facts: false
+  vars:
+    git_source_branch: "{{ variable_branch_name | default('null') }}"
+  tasks:
+    - name: Build the server
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          pm2 stop all
+          git status
+          git clean -f
+          git fetch --all --prune
+          git checkout {{ git_source_branch }}
+          git reset --hard origin/{{ git_source_branch }}
+          git status
+          npm i -g pnpm@9
+          pnpm clean:packages
+          pnpm clean:server
+          pnpm install
+          pnpm prebuild
+          pnpm build:curriculum
+          pnpm build:server
+          pnpm reload:server
+          pm2 ls
+          pm2 save
+        chdir: /home/freecodecamp/freeCodeCamp
+        executable: /bin/bash
