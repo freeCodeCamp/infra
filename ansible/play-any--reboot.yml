@@ -15,40 +15,65 @@
         path: /var/run/reboot-required
         get_checksum: false
 
-    - name: Print uptime
-      debug:
-        msg:
-          'Host machine {{ inventory_hostname }} has been up for {{
-          ansible_facts.uptime_seconds/86400 }} days'
-
     # Reboot for the following reasons:
     # 1. /var/run/reboot-required exists (e.g. kernel update)
     # 2. Uptime is greater than 7 days
     # 3. force_reboot is set to True
-    - name: Debug
+    - name: Display Status
       debug:
         msg:
-          'Debug info: Reboot Required File Exists: {{
-          reboot_required.stat.exists }}, Uptime: {{
-          ansible_facts.uptime_seconds/86400 }} days, Force Reboot Flag: {{
-          force_reboot }}'
+          - 'Debug info:'
+          - '  Force Reboot Flag: {{ force_reboot }}'
+          - '  Reboot Required File Exists: {{ reboot_required.stat.exists }}'
+          - '  Uptime: {{ ansible_facts.uptime_seconds/86400 }} days'
 
     - name: Set Should Reboot
       set_fact:
-        should_reboot:
-          '{{ reboot_required.stat.exists or ansible_facts.uptime_seconds >
-          604800 or force_reboot }}'
+        should_reboot: >-
+          {% if force_reboot %} true {% elif reboot_required.stat.exists %} true
+          {% elif ansible_facts.uptime_seconds > 604800 %} true {% else %} false
+          {% endif %}
+        reboot_reason: >-
+          {%- set reasons = [] -%} {%- if force_reboot -%}
+            {%- set reasons = reasons + ['manual force reboot requested'] -%}
+          {%- endif -%} {%- if reboot_required.stat.exists -%}
+            {%- set reasons = reasons + ['kernel update or package requires
+          reboot'] -%} {%- endif -%} {%- if ansible_facts.uptime_seconds >
+          604800 -%}
+            {%- set reasons = reasons + ['system uptime exceeds 7 days'] -%}
+          {%- endif -%} {%- if reasons|length == 0 -%}
+            No reboot needed
+          {%- else -%}
+            {{ reasons|join(', ') }}
+          {%- endif -%}
 
-    - name: Debug
+    - name: Print Reboot Reason
       debug:
-        msg: 'Rebooting the machine: {{ inventory_hostname }}'
+        msg:
+          'Rebooting the machine: {{ inventory_hostname }} - Reason: {{
+          reboot_reason }}'
       when: should_reboot
 
-    - name: Conditionally reboot the machine
-      ansible.builtin.reboot:
-        connect_timeout: 5
-        reboot_timeout: 300
-        pre_reboot_delay: 15
-        post_reboot_delay: 15
-        test_command: uptime
+    - name: Conditionally Reboot
+      block:
+        - name: Reboot machine
+          ansible.builtin.reboot:
+            connect_timeout: 60
+            reboot_timeout: 600
+            pre_reboot_delay: 5
+            post_reboot_delay: 30
+            test_command: uptime
+            msg: 'Reboot initiated by Ansible'
+          register: reboot_result
+          ignore_unreachable: true
+
+        - name: Wait for machine to become reachable again
+          wait_for_connection:
+            delay: 10
+            timeout: 300
+
+        - name: Gather facts after reboot
+          setup:
+
       when: should_reboot
+      ignore_errors: '{{ ansible_check_mode }}'
