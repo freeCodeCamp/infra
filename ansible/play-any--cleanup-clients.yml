@@ -3,17 +3,33 @@
   hosts: "{{ variable_host | default('null') }}"
   serial: '{{ variable_serial | default(1) }}'
   gather_facts: false
+  vars:
+    dry_run: '{{ variable_dry_run | default(false) }}'
   tasks:
-    - name: Capture directories older than 15 days
+    - name: Get all release directories
       ansible.builtin.find:
         paths: /home/freecodecamp/client/releases
         recurse: false
         file_type: directory
-        age: "{{ variable_age | default('15d') }}"
-      register: files_to_delete
+      register: all_releases
 
-    - name: Remove directories older than 15 days
+    - name: Sort releases by modification time
+      ansible.builtin.set_fact:
+        sorted_releases:
+          "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
+
+    - name: Get releases to delete (excluding last 3)
+      ansible.builtin.set_fact:
+        releases_to_delete: '{{ sorted_releases[3:] }}'
+
+    - name: Log releases to be deleted
+      ansible.builtin.debug:
+        msg: 'Would delete release: {{ item.path }}'
+      with_items: '{{ releases_to_delete }}'
+
+    - name: Remove old releases
       ansible.builtin.file:
         path: '{{ item.path }}'
         state: absent
-      with_items: '{{ files_to_delete.files }}'
+      with_items: '{{ releases_to_delete }}'
+      when: not dry_run

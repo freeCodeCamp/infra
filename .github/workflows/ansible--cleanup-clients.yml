@@ -17,6 +17,11 @@ on:
       serial:
         description: 'The value for the variable_serial argument'
         type: number
+      dry_run:
+        description: 'Run in dry-run mode to see what would be deleted'
+        type: boolean
+        required: true
+        default: false
 
 jobs:
   run_playbook:
@@ -55,5 +60,5 @@ jobs:
           ansible-playbook -i inventory/linode.yml \
           play-any--cleanup-clients.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": '$SERIAL_VALUE'}' \
+          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": '$SERIAL_VALUE', "variable_dry_run": '${{ inputs.dry_run }}'}' \
           ${{ inputs.verbosity }}
