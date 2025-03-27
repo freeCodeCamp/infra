@@ -24,7 +24,7 @@
 
     - name: Log releases to be deleted
       ansible.builtin.debug:
-        msg: 'Would delete release: {{ item.path }}'
+        var: item.path | basename
       with_items: '{{ releases_to_delete }}'
 
     - name: Remove old releases
