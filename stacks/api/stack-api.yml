@@ -51,6 +51,7 @@ x-deploy-config: &deploy-config
     - FREECODECAMP_NODE_ENV=${FREECODECAMP_NODE_ENV:-production}
     - PORT=${PORT:-3000}
     - HOST=${HOST:-0.0.0.0}
+    - DEPLOYMENT_VERSION=${DEPLOYMENT_VERSION:-unset}
     # -- Database
     - MONGOHQ_URL=${MONGOHQ_URL}
     # -- Logging
