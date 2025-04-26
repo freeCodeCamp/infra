@@ -11,7 +11,7 @@ resource "linode_instance" "stg_oldeworld_api" {
   # Value should use '_' as sepratator for compatibility with Ansible Dynamic Inventory
   tags = concat(
     ["stg", "oldeworld", "api", "stg_oldeworld_api"],
-    count.index > 2 ? ["new_api"] : []
+    count.index < 3 ? ["old_api"] : ["new_api"]
   )
 
   lifecycle {
