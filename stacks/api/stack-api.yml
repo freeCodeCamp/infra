@@ -26,13 +26,44 @@ x-deploy-config: &deploy-config
         - node.labels.api.variant == ${DEPLOYMENT_ENV}
       preferences:
         - spread: node.labels.api.variant == ${DEPLOYMENT_ENV}
+  # logging:
+  #   driver: "json-file"
+  #   options:
+  #     max-size: "100m"
+  #     max-file: "5"
+  #     compress: "true"
+  #     labels: "service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}"
+
   logging:
-    driver: "json-file"
+    driver: loki
     options:
-      max-size: "100m"
-      max-file: "5"
-      compress: "true"
-      labels: "service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}"
+      loki-url: ${LOKI_URL}
+      loki-external-labels: service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}
+      loki-pipeline-stages: |
+        - json:
+            expressions:
+              # top-level
+              level:        level
+              timestamp:    time
+              pid:          pid
+              hostname:     hostname
+              msg:          msg
+              # under "req"
+              method:       req.REQ_METHOD
+              url:          req.REQ_URL
+              ip:           req.REQ_IP
+              user_agent:   req.REQ_USER_AGENT
+              country:      req.REQ_COUNTRY
+              query:        req.REQ_QUERY
+              id:           req.REQ_ID
+              # under "res"
+              status:       res.RES_STATUS_CODE
+              response_time: res.RES_RESPONSE_TIME
+        - labels:
+              level:
+              hostname:
+              method:
+              status:
   healthcheck:
     test:
       [
@@ -55,6 +86,7 @@ x-deploy-config: &deploy-config
     - MONGOHQ_URL=${MONGOHQ_URL}
     # -- Logging
     - FCC_API_LOG_LEVEL=${FCC_API_LOG_LEVEL:-info}
+    - FCC_API_LOG_TRANSPORT=${FCC_API_LOG_TRANSPORT:-default}
     - SENTRY_DSN=${SENTRY_DSN}
     - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
     # -- Debugging
