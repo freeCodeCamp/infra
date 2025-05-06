@@ -32,8 +32,7 @@ x-deploy-config: &deploy-config
       max-size: "100m"
       max-file: "5"
       compress: "true"
-      # tag: "{{.Name}}/{{.ImageName}}/{{.ID}}"
-      labels: "app=api,env=${DEPLOYMENT_ENV}"
+      labels: "service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}"
   healthcheck:
     test:
       [
