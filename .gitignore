@@ -106,3 +106,5 @@ dist
 # Environment variables
 *.env
 *.asc
+
+debug-*.yml
