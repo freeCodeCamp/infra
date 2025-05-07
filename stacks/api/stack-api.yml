@@ -58,7 +58,7 @@ x-deploy-config: &deploy-config
               id:           req.REQ_ID
               # under "res"
               status:       res.RES_STATUS_CODE
-              response_time: res.RES_RESPONSE_TIME
+              response_time: res.RES_ELAPSED_TIME
         - labels:
               level:
               hostname:
