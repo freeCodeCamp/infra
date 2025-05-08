@@ -1,0 +1,84 @@
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 100m
+    memory: 512Mi
+
+serviceAccount:
+  name: o11y-grafana
+  annotations: {}
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3000"
+
+envFromSecret: "o11y-secrets"
+
+admin:
+  existingSecret: "o11y-secrets"
+  userKey: "GRAFANA_ADMIN_USER"
+  passwordKey: "GRAFANA_ADMIN_PASSWORD"
+
+grafana.ini:
+  users:
+    auto_assign_org_role: Admin
+  paths:
+    data: /var/lib/grafana/
+    logs: /var/log/grafana
+    plugins: /var/lib/grafana/plugins
+    provisioning: /etc/grafana/provisioning
+  server:
+    domain: o11y.freecodecamp.net
+    root_url: https://o11y.freecodecamp.net/grafana
+    serve_from_sub_path: true
+  auth.github:
+    enabled: true
+    allow_sign_up: true
+    auto_login: false
+    scopes: user:email,read:org
+    skip_org_role_sync: true
+    allow_assign_grafana_admin: true
+    role_attribute_path: GrafanaAdmin
+    auth_url: https://github.com/login/oauth/authorize
+    token_url: https://github.com/login/oauth/access_token
+    api_url: https://api.github.com/user
+    allowed_organizations: $__env{GRAFANA_GITHUB_ORG_NAME}
+    team_ids: $__env{GRAFANA_GITHUB_TEAM_ADMIN_ID}
+    client_id: $__env{GRAFANA_GITHUB_CLIENT_ID}
+    client_secret: $__env{GRAFANA_GITHUB_CLIENT_SECRET}
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki-gateway.o11y.svc.cluster.local
+        basicAuth: true
+        basicAuthUser: loki
+        secureJsonData:
+          basicAuthPassword: $__env{LOKI_GATEWAY_PASSWORD}
+          httpHeaderValue1: $__env{LOKI_TENANT_ID}
+        jsonData:
+          httpHeaderName1: X-Scope-OrgID
+        isDefault: true
+
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-kube-prometheus-prometheus.o11y.svc.cluster.local:9090
+        isDefault: false
+        jsonData:
+          httpMethod: POST
+          exemplarTraceIdDestinations:
+            - datasourceUid: tempo
+              name: trace_id

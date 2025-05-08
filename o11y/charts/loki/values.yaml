@@ -1,0 +1,190 @@
+deploymentMode: Distributed
+
+global:
+  extraEnvFrom:
+    - secretRef:
+        name: o11y-secrets
+
+loki:
+  auth_enabled: true
+
+  storage:
+    type: s3
+    bucketNames:
+      chunks: "net.freecodecamp.o11y.01"
+      ruler: "net.freecodecamp.o11y.01"
+      admin: "net.freecodecamp.o11y.01"
+    s3:
+      endpoint: "nyc3.digitaloceanspaces.com"
+      region: "nyc3"
+      s3forcepathstyle: true
+      insecure: false
+      access_key_id: ""
+      secret_access_key: ""
+
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  commonConfig:
+    replication_factor: 3
+    ring:
+      kvstore:
+        store: memberlist
+
+  ingesterConfig:
+    chunk_encoding: snappy
+
+  querierConfig:
+    max_concurrent: 4
+
+  pattern_ingester:
+    enabled: true
+
+  limits_config:
+    allow_structured_metadata: true
+    retention_period: 90d
+    retention_stream:
+      - selector: '{namespace="o11y"}'
+        priority: 1
+        period: 180d
+
+  gateway:
+    enabled: true
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 50m
+        memory: 128Mi
+    basic_auth:
+      enabled: true
+      username: loki
+
+serviceAccount:
+  create: true
+  name: o11y-loki
+
+ingester:
+  replicas: 3
+  zoneAwareReplication:
+    enabled: false
+  persistence:
+    enabled: true
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 768Mi
+    limits:
+      cpu: 300m
+      memory: 1.5Gi
+
+distributor:
+  replicas: 2
+  maxUnavailable: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
+
+querier:
+  replicas: 2
+  maxUnavailable: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 768Mi
+    limits:
+      cpu: 300m
+      memory: 1.5Gi
+
+queryFrontend:
+  replicas: 2
+  maxUnavailable: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 150m
+      memory: 512Mi
+
+queryScheduler:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
+
+compactor:
+  enabled: true
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 30Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+ruler:
+  enabled: false
+
+write:
+  replicas: 0
+
+read:
+  replicas: 0
+
+backend:
+  replicas: 0
+
+chunksCache:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
+
+indexGateway:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
+
+patternIngester:
+  enabled: true
+  replicas: 3
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
