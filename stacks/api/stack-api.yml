@@ -39,6 +39,7 @@ x-deploy-config: &deploy-config
     options:
       loki-url: ${LOKI_URL}
       loki-external-labels: service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}
+      loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-Scope-v20250508-0001}
       loki-pipeline-stages: |
         - json:
             expressions:
