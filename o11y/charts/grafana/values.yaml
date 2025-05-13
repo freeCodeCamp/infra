@@ -6,11 +6,11 @@ persistence:
 
 resources:
   requests:
-    cpu: 50m
-    memory: 256Mi
+    cpu: 500m
+    memory: 1Gi
   limits:
-    cpu: 100m
-    memory: 512Mi
+    cpu: 1
+    memory: 2Gi
 
 serviceAccount:
   name: o11y-grafana

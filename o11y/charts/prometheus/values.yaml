@@ -13,11 +13,11 @@ alertmanager:
               storage: 10Gi # Adjust as needed
     resources:
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 300m
+        memory: 656Mi
       limits:
-        cpu: 200m
-        memory: 512Mi
+        cpu: 600m
+        memory: 1Gi
 
 prometheus:
   enabled: true
@@ -52,11 +52,11 @@ nodeExporter:
 kubeStateMetrics:
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 165m
+      memory: 248Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 330m
+      memory: 512Mi
 
 # Other components like kube-proxy-metrics, etc., can also have resources defined if needed.
 # For now, focusing on the main ones.
@@ -64,8 +64,8 @@ kubeStateMetrics:
 prometheusOperator:
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 170m
+      memory: 251Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 340m
+      memory: 512Mi

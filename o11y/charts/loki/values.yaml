@@ -59,8 +59,8 @@ loki:
     enabled: true
     resources:
       requests:
-        cpu: 25m
-        memory: 64Mi
+        cpu: 15m
+        memory: 32Mi
       limits:
         cpu: 50m
         memory: 128Mi
@@ -81,21 +81,21 @@ ingester:
     size: 50Gi
   resources:
     requests:
-      cpu: 100m
-      memory: 768Mi
+      cpu: 650m
+      memory: 1.75Gi
     limits:
-      cpu: 300m
-      memory: 1.5Gi
+      cpu: 1
+      memory: 2.5Gi
 
 distributor:
   replicas: 2
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 50m
+      cpu: 75m
       memory: 128Mi
     limits:
-      cpu: 150m
+      cpu: 200m
       memory: 256Mi
 
 querier:
@@ -103,10 +103,10 @@ querier:
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 100m
+      cpu: 400m
       memory: 768Mi
     limits:
-      cpu: 300m
+      cpu: 800m
       memory: 1.5Gi
 
 queryFrontend:
@@ -114,18 +114,18 @@ queryFrontend:
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 150m
+      cpu: 100m
       memory: 512Mi
+    limits:
+      cpu: 200m
+      memory: 768Mi
 
 queryScheduler:
   enabled: true
   replicas: 2
   resources:
     requests:
-      cpu: 50m
+      cpu: 75m
       memory: 128Mi
     limits:
       cpu: 150m
@@ -139,11 +139,11 @@ compactor:
     size: 30Gi
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
+      cpu: 200m
       memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 512Mi
 
 ruler:
   enabled: false
@@ -183,8 +183,8 @@ patternIngester:
   replicas: 3
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 25m
+      memory: 64Mi
     limits:
       cpu: 150m
       memory: 256Mi
