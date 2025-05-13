@@ -49,3 +49,13 @@ ansible/inventory/hosts
 # Secrets
 *.env
 .envrc
+
+.kubeconfig.yaml
+*.crt
+*.key
+*.txt
+
+secrets.overrides.yaml
+
+
+o11y/defaults/
