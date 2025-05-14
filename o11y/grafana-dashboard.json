@@ -34,10 +34,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -73,6 +69,8 @@
             "type": "loki",
             "uid": "${LOKI_DATASOURCE}"
           },
+          "direction": "backward",
+          "editorMode": "code",
           "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json [${__range}]))",
           "queryType": "range",
           "refId": "A"
@@ -141,6 +139,8 @@
             "type": "loki",
             "uid": "${LOKI_DATASOURCE}"
           },
+          "direction": "backward",
+          "editorMode": "code",
           "expr": "avg(avg_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_ELAPSED_TIME > 0 | unwrap res_RES_ELAPSED_TIME [${__interval}]))",
           "queryType": "range",
           "refId": "A"
@@ -162,10 +162,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -201,6 +197,8 @@
             "type": "loki",
             "uid": "${LOKI_DATASOURCE}"
           },
+          "direction": "backward",
+          "editorMode": "code",
           "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 200 and res_RES_STATUS_CODE < 300 [${__range}]))",
           "queryType": "range",
           "refId": "A"
@@ -221,11 +219,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
+                "color": "orange"
               }
             ]
           }
@@ -261,6 +255,8 @@
             "type": "loki",
             "uid": "${LOKI_DATASOURCE}"
           },
+          "direction": "backward",
+          "editorMode": "code",
           "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 400 and res_RES_STATUS_CODE < 500 [${__range}]))",
           "queryType": "range",
           "refId": "A"
@@ -281,11 +277,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
+                "color": "red"
               }
             ]
           }
@@ -321,6 +313,8 @@
             "type": "loki",
             "uid": "${LOKI_DATASOURCE}"
           },
+          "direction": "backward",
+          "editorMode": "code",
           "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 500 and res_RES_STATUS_CODE < 600 [${__range}]))",
           "queryType": "range",
           "refId": "A"
@@ -603,6 +597,49 @@
       ],
       "title": "Raw Application Logs",
       "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${LOKI_DATASOURCE}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
+      "id": 10,
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${LOKI_DATASOURCE}"
+          },
+          "editorMode": "code",
+          "expr": "{service=\"api\", variant=\"$variant\"} | json | res_RES_STATUS_CODE=~\"401|403|4xx|5xx\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Filtered Error Logs (401, 403, etc.)",
+      "type": "logs"
     }
   ],
   "preload": false,
@@ -627,8 +664,8 @@
       },
       {
         "current": {
-          "text": ["org"],
-          "value": ["org"]
+          "text": "org",
+          "value": "org"
         },
         "includeAll": false,
         "label": "Variant",
