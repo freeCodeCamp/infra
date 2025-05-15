@@ -597,156 +597,10 @@
       ],
       "title": "Raw Application Logs",
       "type": "logs"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "${LOKI_DATASOURCE}"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
-        "y": 38
-      },
-      "id": 10,
-      "options": {
-        "dedupStrategy": "none",
-        "enableInfiniteScrolling": false,
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "pluginVersion": "12.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${LOKI_DATASOURCE}"
-          },
-          "editorMode": "code",
-          "expr": "{service=\"api\", variant=\"$variant\"} | json | res_RES_STATUS_CODE=~\"401|403|4xx|5xx\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Filtered Error Logs (401, 403, etc.)",
-      "type": "logs"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "${LOKI_DATASOURCE}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "rgba(33, 150, 243, 1)",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
-        "y": 50
-      },
-      "id": 11,
-      "options": {
-        "layers": [
-          {
-            "config": {
-              "attribution": "OpenStreetMap",
-              "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            },
-            "name": "OpenStreetMap",
-            "opacity": 1,
-            "type": "xyz",
-            "uid": "osm-base-layer-xyz-map"
-          },
-          {
-            "config": {
-              "data": {
-                "locationField": "req_REQ_IP",
-                "locationMode": "auto",
-                "source": {
-                  "refId": "A"
-                }
-              },
-              "showLegend": true,
-              "style": {
-                "color": {
-                  "field": "Value",
-                  "mode": "scheme",
-                  "scheme": "interpolateBlues"
-                },
-                "opacity": 0.7,
-                "size": {
-                  "field": "Value",
-                  "max": 20,
-                  "min": 5,
-                  "mode": "field"
-                }
-              }
-            },
-            "name": "Requests by IP",
-            "type": "markers",
-            "uid": "markers-layer-requests-by-ip-map"
-          }
-        ],
-        "view": {
-          "id": "default",
-          "lat": 20,
-          "lon": 0,
-          "zoom": 1.5
-        }
-      },
-      "pluginVersion": "12.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${LOKI_DATASOURCE}"
-          },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | req_REQ_IP != \"\" [${__range}])) by (req_REQ_IP)",
-          "legendFormat": "{{req_REQ_IP}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Requests by IP",
-      "type": "geomap"
     }
   ],
   "preload": false,
-  "refresh": "",
+  "refresh": "30s",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
@@ -791,7 +645,7 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
