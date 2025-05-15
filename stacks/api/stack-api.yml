@@ -46,8 +46,6 @@ x-deploy-config: &deploy-config
               # top-level
               level:        level
               timestamp:    time
-              pid:          pid
-              hostname:     hostname
               msg:          msg
               # under "req"
               method:       req.REQ_METHOD
@@ -62,9 +60,10 @@ x-deploy-config: &deploy-config
               response_time: res.RES_ELAPSED_TIME
         - labels:
               level:
-              hostname:
               method:
               status:
+              url:
+              msg:
   healthcheck:
     test:
       [
