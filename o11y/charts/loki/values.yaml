@@ -42,7 +42,12 @@ loki:
     chunk_encoding: snappy
 
   querierConfig:
-    max_concurrent: 4
+    max_concurrent: 32
+    cache_config:
+      enable_fifocache: true
+      default_validity: 24h
+      fifocache:
+        max_size_mb: 1024
 
   pattern_ingester:
     enabled: true
@@ -81,8 +86,8 @@ ingester:
     size: 50Gi
   resources:
     requests:
-      cpu: 650m
-      memory: 1.75Gi
+      cpu: 750m
+      memory: 1.5Gi
     limits:
       cpu: 1
       memory: 2.5Gi
@@ -93,7 +98,7 @@ distributor:
   resources:
     requests:
       cpu: 75m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 200m
       memory: 256Mi
@@ -103,8 +108,8 @@ querier:
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 400m
-      memory: 768Mi
+      cpu: 350m
+      memory: 640Mi
     limits:
       cpu: 800m
       memory: 1.5Gi
@@ -112,10 +117,16 @@ querier:
 queryFrontend:
   replicas: 2
   maxUnavailable: 1
+  config:
+    cache_config:
+      enable_fifocache: true
+      default_validity: 24h
+      fifocache:
+        max_size_mb: 1024
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 384Mi
     limits:
       cpu: 200m
       memory: 768Mi
@@ -134,6 +145,10 @@ queryScheduler:
 compactor:
   enabled: true
   replicas: 1
+  config:
+    working_directory: /data/loki/compactor
+    compaction_interval: 5m
+    max_compaction_parallelism: 1
   persistence:
     enabled: true
     size: 30Gi
@@ -170,13 +185,19 @@ chunksCache:
 indexGateway:
   enabled: true
   replicas: 1
+  config:
+    index_cache_config:
+      enable_fifocache: true
+      fifocache:
+        max_size_bytes: "256MB"
+        validity: "24h"
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 150m
-      memory: 256Mi
+      memory: 512Mi
 
 patternIngester:
   enabled: true
