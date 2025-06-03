@@ -1,0 +1,42 @@
+---
+- name: Initialize Oldeworld Cluster - Node.js
+  hosts: '{{ variable_host | default("null") }}'
+  serial: 1
+  become: true
+  become_user: freecodecamp
+  gather_facts: false
+  tasks:
+    - name: Install or Update Node.js
+      include_role:
+        name: nodejs
+      vars:
+        nodejs_version: '{{ variable_nodejs_version | default("v22") }}'
+
+    - name: Get the Node.js version
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          node -v
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      register: node_version_output
+
+    - name: Set the Node.js version fact
+      set_fact:
+        node_version: '{{ node_version_output.stdout }}'
+
+    - name: Install Global Dependencies
+      shell:
+        cmd: |
+          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
+          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          npm i -g npm pnpm pm2
+          pm2 install pm2-logrotate
+          pm2 update
+          pm2 resurrect
+          pm2 save
+        chdir: /home/freecodecamp
+        executable: /bin/bash
