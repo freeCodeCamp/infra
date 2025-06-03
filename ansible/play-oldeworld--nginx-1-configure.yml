@@ -1,5 +1,5 @@
 ---
-- name: Configure NGINX on the Olde World Cluster
+- name: Configure NGINX on the Oldeworld Cluster
   hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:

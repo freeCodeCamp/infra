@@ -1,5 +1,5 @@
 ---
-- name: Initialize Olde World Cluster - Ghost
+- name: Initialize Oldeworld Cluster - Ghost
   hosts: '{{ variable_host | default("null") }}'
   become: true
   become_user: freecodecamp

@@ -1,5 +1,5 @@
 ---
-- name: Startup NGINX on the Olde World Cluster
+- name: Startup NGINX on the Oldeworld Cluster
   hosts: '{{ variable_host | default("null") }}'
   become: true
   serial: 1

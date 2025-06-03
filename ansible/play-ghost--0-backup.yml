@@ -7,13 +7,19 @@
   become_method: sudo
   vars:
     lang_code: "{{ inventory_hostname.split('-')[-1] }}"
-    backup_root_dir: "{{ variable_mysql_backup_root_dir | default('/datadrive') }}"
-    mysql_backup_dir: "{{ backup_root_dir }}/mysql_backups"
-    backup_date: "{{ ansible_date_time.year }}-{{ ansible_date_time.month }}-{{ ansible_date_time.day }}"
-    s3_base_path: "{{ variable_s3_bucket_name }}/Linode-Backups/{{ lang_code }}/{{ backup_date }}"
-    ghost_version: "3.42.9"
-    ghost_cli_version: "1.26.1"
-    backup_retention_days: "{{ variable_backup_retention_days | default('15') }}"
+    backup_root_dir:
+      "{{ variable_mysql_backup_root_dir | default('/datadrive') }}"
+    mysql_backup_dir: '{{ backup_root_dir }}/mysql_backups'
+    backup_date:
+      '{{ ansible_date_time.year }}-{{ ansible_date_time.month }}-{{
+      ansible_date_time.day }}'
+    s3_base_path:
+      '{{ variable_s3_bucket_name }}/Linode-Backups/{{ lang_code }}/{{
+      backup_date }}'
+    ghost_version: '3.42.9'
+    ghost_cli_version: '1.26.1'
+    backup_retention_days:
+      "{{ variable_backup_retention_days | default('15') }}"
     max_retries: 3
     retry_delay: 5
 
@@ -28,7 +34,7 @@
   roles:
     - role: rolehippie.rclone
       vars:
-        rclone_version: "1.67.0"
+        rclone_version: '1.67.0'
       become: true
       become_method: sudo
       become_user: root
@@ -40,7 +46,9 @@
 
     - name: Set database name
       set_fact:
-        db_name: "{% if lang_code == 'eng' %}ghost_prod{% else %}ghost_{{ lang_code }}{% endif %}"
+        db_name:
+          "{% if lang_code == 'eng' %}ghost_prod{% else %}ghost_{{ lang_code
+          }}{% endif %}"
 
     - name: Execute backup tasks
       block:
@@ -64,10 +72,12 @@
           when: not ignore_run
           assert:
             that:
-              - ghost_version_output.stdout is search('Ghost version:' + ' ' + ghost_version)
-              - ghost_version_output.stdout is search('Ghost-CLI version:' + ' ' + ghost_cli_version)
-            fail_msg: "Ghost or Ghost CLI version mismatch"
-            success_msg: "Ghost and Ghost CLI versions are correct"
+              - ghost_version_output.stdout is search('Ghost version:' + ' ' +
+                ghost_version)
+              - ghost_version_output.stdout is search('Ghost-CLI version:' + ' '
+                + ghost_cli_version)
+            fail_msg: 'Ghost or Ghost CLI version mismatch'
+            success_msg: 'Ghost and Ghost CLI versions are correct'
 
         - name: Check if Rclone config for AWS S3 exists
           shell:
@@ -92,9 +102,9 @@
 
         - name: Create backup directory
           file:
-            path: "{{ mysql_backup_dir }}"
+            path: '{{ mysql_backup_dir }}'
             state: directory
-            mode: "0755"
+            mode: '0755'
 
         - name: Stop Ghost
           become: true
@@ -115,7 +125,7 @@
               --column-statistics=0 \
               --set-gtid-purged=OFF \
               {{ db_name }} > mysql-backup-{{ lang_code }}-$(date +"%Y-%m-%d_%H-%M-%S").sql
-            chdir: "{{ mysql_backup_dir }}"
+            chdir: '{{ mysql_backup_dir }}'
             executable: /bin/bash
           register: backup_database
           changed_when: backup_database.rc == 0
@@ -134,8 +144,8 @@
                 executable: /bin/bash
               register: backup_content
               changed_when: backup_content.stdout is search("Transferred")
-              retries: "{{ max_retries }}"
-              delay: "{{ retry_delay }}"
+              retries: '{{ max_retries }}'
+              delay: '{{ retry_delay }}'
               until: backup_content is success
 
             - name: Copy config file
@@ -148,8 +158,8 @@
                 executable: /bin/bash
               register: backup_config
               changed_when: backup_config.stdout is search("Transferred")
-              retries: "{{ max_retries }}"
-              delay: "{{ retry_delay }}"
+              retries: '{{ max_retries }}'
+              delay: '{{ retry_delay }}'
               until: backup_config is success
 
             - name: Sync database backup to S3
@@ -160,12 +170,12 @@
                   --include "mysql-backup-{{ lang_code }}-*.sql" \
                   --checksum \
                   --s3-no-check-bucket
-                chdir: "{{ mysql_backup_dir }}"
+                chdir: '{{ mysql_backup_dir }}'
                 executable: /bin/bash
               register: sync_database_backup
               changed_when: sync_database_backup.stdout is search("Transferred")
-              retries: "{{ max_retries }}"
-              delay: "{{ retry_delay }}"
+              retries: '{{ max_retries }}'
+              delay: '{{ retry_delay }}'
               until: sync_database_backup is success
 
             - name: Verify backup integrity
@@ -182,17 +192,17 @@
           block:
             - name: Find backups older than {{ backup_retention_days }} days
               find:
-                paths: "{{ mysql_backup_dir }}"
-                patterns: "mysql-backup-*.sql"
-                age: "{{ backup_retention_days }}d"
+                paths: '{{ mysql_backup_dir }}'
+                patterns: 'mysql-backup-*.sql'
+                age: '{{ backup_retention_days }}d'
                 file_type: file
               register: old_backups
 
             - name: Remove old backups
               file:
-                path: "{{ item.path }}"
+                path: '{{ item.path }}'
                 state: absent
-              loop: "{{ old_backups.files }}"
+              loop: '{{ old_backups.files }}'
               when: old_backups.files | length > 0
 
       rescue:

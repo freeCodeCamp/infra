@@ -1,5 +1,5 @@
 ---
-- name: Setup NGINX on Olde World Cluster
+- name: Setup NGINX on Oldeworld Cluster
   hosts: '{{ variable_host | default("null") }}'
   become: true
   roles:

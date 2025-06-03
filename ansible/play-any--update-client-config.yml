@@ -18,5 +18,7 @@
 
     - name: Check if Git Repository was Updated
       debug:
-        msg: "Git Repository was updated, you should run the pipeline for a new deployment."
+        msg:
+          'Git Repository was updated, you should run the pipeline for a new
+          deployment.'
       when: git_update.changed

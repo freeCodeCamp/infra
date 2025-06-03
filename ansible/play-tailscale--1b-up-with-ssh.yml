@@ -28,7 +28,7 @@
 
     - name: Print error message if Tailscale failed
       debug:
-        msg: "{{ tailscale_up.stderr }}"
+        msg: '{{ tailscale_up.stderr }}'
       when: tailscale_up.rc != 0
 
     - name: Check if Tailscale is Connected

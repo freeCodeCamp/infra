@@ -5,14 +5,17 @@
   gather_facts: true
 
   vars:
-    prometheus_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
-    prometheus_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
-    prometheus_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
+    prometheus_push_endpoint:
+      "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
+    prometheus_username:
+      "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
+    prometheus_password:
+      "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
     loki_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Loki') }}"
     loki_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Loki') }}"
     loki_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Loki') }}"
-    is_enabled_metrics: "{{ variable_is_enabled_metrics | default(True) }}"
-    is_enabled_logs: "{{ variable_is_enabled_logs | default(False) }}"
+    is_enabled_metrics: '{{ variable_is_enabled_metrics | default(True) }}'
+    is_enabled_logs: '{{ variable_is_enabled_logs | default(False) }}'
 
   tasks:
     - name: Check if required environment variables are set
@@ -25,8 +28,8 @@
           - loki_username != ""
           - loki_password != ""
         fail_msg:
-          "One or more required environment variables are not set. Please set
-          all required variables."
+          'One or more required environment variables are not set. Please set
+          all required variables.'
 
     - name: Check if Alloy service is enabled
       ansible.builtin.command: systemctl is-enabled alloy
@@ -42,7 +45,7 @@
 
     - name: Exit if checks fail
       ansible.builtin.fail:
-        msg: "Checks failed. Please check the logs for more information."
+        msg: 'Checks failed. Please check the logs for more information.'
       when: docker_check.rc != 0 or alloy_service_check.rc != 0
 
     - name: Setup Docker integration
@@ -53,7 +56,8 @@
           ansible.builtin.blockinfile:
             path: /etc/alloy/config.alloy
             prepend_newline: true
-            marker: "// {mark} ANSIBLE MANAGED BLOCK -- Docker Integration - Metrics"
+            marker:
+              '// {mark} ANSIBLE MANAGED BLOCK -- Docker Integration - Metrics'
             block: |
               {{ lookup('template', 'grafana-labs/docker.metrics.config.alloy.j2') }}
 
@@ -62,7 +66,8 @@
           ansible.builtin.blockinfile:
             path: /etc/alloy/config.alloy
             prepend_newline: true
-            marker: "// {mark} ANSIBLE MANAGED BLOCK -- Docker Integration - Logs"
+            marker:
+              '// {mark} ANSIBLE MANAGED BLOCK -- Docker Integration - Logs'
             block: |
               {{ lookup('template', 'grafana-labs/docker.logs.config.alloy.j2') }}
 
@@ -75,8 +80,8 @@
         - name: Change the user to root in Alloy service user
           ansible.builtin.lineinfile:
             path: /etc/systemd/system/alloy.service
-            regexp: "^User=alloy"
-            line: "User=root"
+            regexp: '^User=alloy'
+            line: 'User=root'
             state: present
 
         - name: Reload the systemd daemon

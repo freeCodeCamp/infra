@@ -5,9 +5,12 @@
   gather_facts: true
 
   vars:
-    prometheus_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
-    prometheus_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
-    prometheus_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
+    prometheus_push_endpoint:
+      "{{ lookup('env', 'GRAFANA_CLOUD_URL_Prometheus') }}"
+    prometheus_username:
+      "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Prometheus') }}"
+    prometheus_password:
+      "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Prometheus') }}"
     loki_push_endpoint: "{{ lookup('env', 'GRAFANA_CLOUD_URL_Loki') }}"
     loki_username: "{{ lookup('env', 'GRAFANA_CLOUD_USERNAME_Loki') }}"
     loki_password: "{{ lookup('env', 'GRAFANA_CLOUD_API_KEY_Loki') }}"
@@ -23,8 +26,8 @@
           - loki_username != ""
           - loki_password != ""
         fail_msg:
-          "One or more required environment variables are not set. Please set
-          all required variables."
+          'One or more required environment variables are not set. Please set
+          all required variables.'
 
     - name: Install Alloy
       ansible.builtin.include_role:
