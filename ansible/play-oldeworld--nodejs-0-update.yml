@@ -34,9 +34,13 @@
           printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           npm i -g npm pnpm pm2
+          sleep 2
           pm2 install pm2-logrotate
+          sleep 2
           pm2 update
+          sleep 2
           pm2 resurrect
+          sleep 2
           pm2 save
         chdir: /home/freecodecamp
         executable: /bin/bash
