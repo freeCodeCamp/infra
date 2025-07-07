@@ -1,30 +1,50 @@
 SHELL := /bin/bash
-
 .DEFAULT_GOAL := help
 
+# Virtual environment
+VENV := .venv
+ANSIBLE := $(VENV)/bin/ansible
+
+# Use uv if available, fallback to pip
+UV := $(shell command -v uv 2>/dev/null)
+ifdef UV
+    PIP := uv pip
+else
+    PIP := $(VENV)/bin/pip
+endif
+
 .PHONY: help
-help:
-	@echo "Usage: make [Target] [Environment Variables]"
-	@echo ""
-	@echo "Targets:"
-	@echo "  help             Show this help message"
-	@echo "  install          Install ansible and ansible-lint"
-	@echo "  inventory        Generate inventory graph"
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-15s %s\n", $$1, $$2}'
+
+$(VENV): ## Create virtual environment
+ifdef UV
+	uv venv $(VENV)
+else
+	python3 -m venv $(VENV)
+endif
 
 .PHONY: install
-install:
-	pip install -r requirements/requirements.txt
-	ansible-galaxy collection install -r requirements/collections.yml
-	ansible-galaxy role install -r requirements/roles.yml
+install: $(VENV) ## Install dependencies
+ifdef UV
+	cd $(VENV) && $(PIP) install -r ../requirements/requirements.txt
+else
+	$(PIP) install -r requirements/requirements.txt
+endif
+	$(ANSIBLE)-galaxy collection install -r requirements/collections.yml
+	$(ANSIBLE)-galaxy role install -r requirements/roles.yml
 
-.PHONY: check-env-keys
-check-env-keys:
-	@if [ ! -f .env ]; then \
-		echo "Error: .env file not found. Please ensure .env file exists in the current directory."; \
-		exit 1; \
-	fi
 
 .PHONY: inventory
-inventory:
-	ansible-inventory -i inventory --graph -v
+inventory: $(VENV) ## Show inventory graph
+	$(ANSIBLE)-inventory -i inventory --graph -v
 
+
+.PHONY: clean
+clean: ## Remove virtual environment
+	rm -rf $(VENV)
+
+.PHONY: activate
+activate: $(VENV) ## Show activation command
+	@echo "To activate the virtual environment, run:"
+	@echo "source $(VENV)/bin/activate"
