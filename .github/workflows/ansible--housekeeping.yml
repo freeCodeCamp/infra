@@ -6,8 +6,29 @@ on:
     - cron: '5 0 * * 3,6' # 00:05 UTC on Wednesdays and Saturdays (6 hour maintenance window)
 
 jobs:
+  test:
+    name: Ansible Test
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: './ansible'
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+    steps:
+      - name: Validate Inventory
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          source .venv/bin/activate
+          HOST_COUNT=$(ansible-inventory -i inventory/linode.yml --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
+          if [ "$HOST_COUNT" -eq 0 ]; then
+            echo "ERROR: No hosts found in inventory - would run against localhost"
+            exit 1
+          fi
+          echo "Inventory validation passed: $HOST_COUNT hosts found"
+
   uptime:
     name: Uptime
+    needs: test
     strategy:
       fail-fast: false
       matrix:

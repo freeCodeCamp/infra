@@ -43,7 +43,21 @@ jobs:
         working-directory: './ansible'
         run: |
           make install
+          source .venv/bin/activate
           ansible --version
+
+      - name: Validate Inventory
+        env:
+          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+        working-directory: './ansible'
+        run: |
+          source .venv/bin/activate
+          HOST_COUNT=$(ansible-inventory -i inventory/linode.yml --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
+          if [ "$HOST_COUNT" -eq 0 ]; then
+            echo "ERROR: No hosts found in inventory - would run against localhost"
+            exit 1
+          fi
+          echo "Inventory validation passed: $HOST_COUNT hosts found"
 
       - name: Set up SSH key
         run: |
@@ -56,6 +70,7 @@ jobs:
           LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
         working-directory: './ansible'
         run: |
+          source .venv/bin/activate
           SERIAL_VALUE=${{ inputs.serial || 1 }}  # Default value of 1 if inputs.serial is not set
           ansible-playbook -i inventory/linode.yml \
           play-any--cleanup-clients.yml \

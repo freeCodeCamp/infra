@@ -1,11 +1,34 @@
-name: Ansible --01- List Inventory
+name: Ansible Test
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      inventory:
+        description: 'Inventory file to test'
+        type: choice
+        required: true
+        default: 'linode.yml'
+        options:
+          - 'linode.yml'
+      verbosity:
+        description: 'Verbosity level for logs'
+        type: choice
+        required: true
+        default: '-v'
+        options:
+          - '-v'
+          - '-vv'
+          - '-vvv'
 
 jobs:
-  run_playbook:
-    name: Run Play
+  test:
+    name: Ansible Test
     runs-on: ubuntu-latest
     env:
       WORKING_DIR: './ansible'
@@ -19,6 +42,20 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           make install
+
+      - name: Test venv isolation (should fail)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          if ansible --version >/dev/null 2>&1; then
+            echo "ERROR: ansible found in system PATH - venv isolation failed"
+            exit 1
+          else
+            echo "Good - ansible not in system PATH"
+          fi
+
+      - name: Test venv activation (should pass)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
           source .venv/bin/activate
           ansible --version
 
@@ -35,8 +72,8 @@ jobs:
           fi
           echo "Inventory validation passed: $HOST_COUNT hosts found"
 
-      - name: List Inventory
+      - name: Test connection to random VM
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           source .venv/bin/activate
-          ansible-inventory -i inventory/linode.yml --graph -v
+          make test INVENTORY=${{ inputs.inventory }}

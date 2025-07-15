@@ -57,6 +57,7 @@ jobs:
         working-directory: './ansible'
         run: |
           make install
+          source .venv/bin/activate
           ansible --version
 
       - name: Set up SSH key
@@ -70,6 +71,7 @@ jobs:
           LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
         working-directory: './ansible'
         run: |
+          source .venv/bin/activate
           ansible-playbook -i inventory/linode.yml \
           play-any--update.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
