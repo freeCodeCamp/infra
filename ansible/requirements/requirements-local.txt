@@ -1,0 +1,2 @@
+# Ansible core (for local development only - pre-installed on CI runners)
+ansible>=2.10.0

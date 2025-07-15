@@ -1,0 +1,13 @@
+name: 'Wait'
+description: 'Wait for specified seconds'
+inputs:
+  seconds:
+    description: 'Number of seconds to wait'
+    required: true
+    default: '300'
+runs:
+  using: 'composite'
+  steps:
+    - name: Wait for ${{ inputs.seconds }} seconds
+      shell: bash
+      run: sleep ${{ inputs.seconds }}

@@ -1,0 +1,35 @@
+name: 'Setup Ansible'
+description: 'Install ansible dependencies (uses system ansible on CI runners)'
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Ansible Dependencies
+      working-directory: './ansible'
+      shell: bash
+      run: |
+        # Sanity checks for CI environment
+        if ! command -v python3 >/dev/null 2>&1; then
+          echo "ERROR: python3 not found - required for ansible dependencies"
+          exit 1
+        fi
+        
+        if ! command -v pip >/dev/null 2>&1; then
+          echo "ERROR: pip not found - required for installing dependencies"
+          exit 1
+        fi
+        
+        if ! command -v ansible >/dev/null 2>&1; then
+          echo "ERROR: ansible not found - should be pre-installed on GitHub runners"
+          exit 1
+        fi
+        
+        echo "Pre-flight checks passed: python3, pip, and ansible are available"
+        
+        # Install ansible dependencies (ansible itself pre-installed on CI)
+        pip install --user -r requirements/requirements.txt
+        
+        # Install ansible collections and roles for CI (system ansible)
+        ansible-galaxy collection install -r requirements/collections.yml
+        ansible-galaxy role install -r requirements/roles.yml
+        
+        ansible --version
