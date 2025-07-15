@@ -30,11 +30,11 @@
     - name: Set Should Reboot
       set_fact:
         should_reboot: >-
-          {% if force_reboot %} true {% elif reboot_required.stat.exists %} true
-          {% elif ansible_facts.uptime_seconds > 604800 %} true {% else %} false
-          {% endif %}
+          {{ (force_reboot | bool) or
+             (reboot_required.stat.exists) or
+             (ansible_facts.uptime_seconds > 604800) }}
         reboot_reason: >-
-          {%- set reasons = [] -%} {%- if force_reboot -%}
+          {%- set reasons = [] -%} {%- if force_reboot | bool -%}
             {%- set reasons = reasons + ['manual force reboot requested'] -%}
           {%- endif -%} {%- if reboot_required.stat.exists -%}
             {%- set reasons = reasons + ['kernel update or package requires
