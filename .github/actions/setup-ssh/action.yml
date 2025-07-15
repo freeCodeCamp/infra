@@ -1,0 +1,15 @@
+name: 'Setup SSH Key'
+description: 'Configure SSH private key for ansible authentication'
+inputs:
+  ssh-private-key:
+    description: 'SSH private key content'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up SSH key
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh/
+        echo "${{ inputs.ssh-private-key }}" > ~/.ssh/id_for_ansible.pem
+        chmod 600 ~/.ssh/id_for_ansible.pem

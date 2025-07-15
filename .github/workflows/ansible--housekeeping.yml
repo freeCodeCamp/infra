@@ -6,8 +6,27 @@ on:
     - cron: '5 0 * * 3,6' # 00:05 UTC on Wednesdays and Saturdays (6 hour maintenance window)
 
 jobs:
+  test:
+    name: Ansible Test
+    runs-on: ubuntu-latest
+    env:
+      WORKING_DIR: './ansible'
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+
+      - name: Setup Ansible Dependencies
+        uses: ./.github/actions/setup-ansible
+
+      - name: Validate Inventory
+        uses: ./.github/actions/validate-inventory
+        with:
+          inventory: linode.yml
+
   uptime:
     name: Uptime
+    needs: test
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +67,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for 300 seconds
-        run: sleep 300
+        uses: ./.github/actions/wait
+        with:
+          seconds: '300'
 
   update:
     name: Update
@@ -93,7 +114,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for 300 seconds
-        run: sleep 300
+        uses: ./.github/actions/wait
+        with:
+          seconds: '300'
 
   reboot-web:
     name: Reboot Ingress
@@ -119,7 +142,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for 300 seconds
-        run: sleep 300
+        uses: ./.github/actions/wait
+        with:
+          seconds: '300'
 
   reboot:
     name: Reboot
