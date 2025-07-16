@@ -26,12 +26,15 @@ on:
           - '-vv'
           - '-vvv'
 
+defaults:
+  run:
+    working-directory: './ansible'
+
 jobs:
   test:
     name: Ansible CI Test
     runs-on: ubuntu-latest
     env:
-      WORKING_DIR: './ansible'
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
 
     steps:
@@ -47,7 +50,6 @@ jobs:
           inventory: ${{ inputs.inventory || 'linode.yml' }}
 
       - name: Test Basic Ansible Commands
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           # Test ansible commands work with installed dependencies
           ansible --version
