@@ -3,12 +3,15 @@ name: Ansible --01- List Inventory
 on:
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: './ansible'
+
 jobs:
   run_playbook:
     name: Run Play
     runs-on: ubuntu-latest
     env:
-      WORKING_DIR: './ansible'
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
 
     steps:
@@ -16,18 +19,13 @@ jobs:
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
       - name: Setup Ansible and Dependencies
-        env:
-          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
         uses: ./.github/actions/setup-ansible
 
       - name: Validate Inventory
-        env:
-          LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
         uses: ./.github/actions/validate-inventory
         with:
           inventory: linode.yml
 
       - name: List Inventory
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           ansible-inventory -i inventory/linode.yml --graph -v

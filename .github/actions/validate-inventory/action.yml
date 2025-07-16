@@ -1,17 +1,18 @@
 name: 'Validate Inventory'
 description: 'Validate ansible inventory has hosts to prevent localhost execution'
+
 inputs:
   inventory:
-    description: 'Inventory file name'
+    description: 'Ansible inventory file name (e.g., linode.yml)'
     required: true
+
 runs:
   using: 'composite'
   steps:
-    - name: Validate Inventory
-      working-directory: './ansible'
+    - name: Validate Ansible Inventory
       shell: bash
       run: |
-        HOST_COUNT=$(ansible-inventory -i inventory/${{ inputs.inventory }} --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
+        HOST_COUNT=$(ansible-inventory -i ansible/inventory/${{ inputs.inventory }} --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
         if [ "$HOST_COUNT" -eq 0 ]; then
           echo "ERROR: No hosts found in inventory - would run against localhost"
           exit 1

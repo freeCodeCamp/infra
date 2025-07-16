@@ -1,10 +1,12 @@
 name: 'Wait'
 description: 'Wait for specified seconds'
+
 inputs:
   seconds:
-    description: 'Number of seconds to wait'
+    description: 'Number of seconds to wait between operations'
     required: true
     default: '300'
+
 runs:
   using: 'composite'
   steps:

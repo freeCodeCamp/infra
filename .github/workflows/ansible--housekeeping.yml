@@ -5,12 +5,15 @@ on:
   schedule:
     - cron: '5 0 * * 3,6' # 00:05 UTC on Wednesdays and Saturdays (6 hour maintenance window)
 
+defaults:
+  run:
+    working-directory: './ansible'
+
 jobs:
   test:
     name: Ansible Test
     runs-on: ubuntu-latest
     env:
-      WORKING_DIR: './ansible'
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
     steps:
       - name: Checkout
@@ -66,6 +69,9 @@ jobs:
     needs: uptime
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+
       - name: Wait for 300 seconds
         uses: ./.github/actions/wait
         with:
@@ -113,6 +119,9 @@ jobs:
     needs: update
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+
       - name: Wait for 300 seconds
         uses: ./.github/actions/wait
         with:
@@ -141,6 +150,9 @@ jobs:
     needs: reboot-web
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+
       - name: Wait for 300 seconds
         uses: ./.github/actions/wait
         with:
