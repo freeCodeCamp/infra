@@ -17,7 +17,7 @@ jobs:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        uses: actions/checkout@v4
 
       - name: Setup Ansible Dependencies
         uses: ./.github/actions/setup-ansible
@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        uses: actions/checkout@v4
 
       - name: Wait for 300 seconds
         uses: ./.github/actions/wait
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        uses: actions/checkout@v4
 
       - name: Wait for 300 seconds
         uses: ./.github/actions/wait
@@ -151,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+        uses: actions/checkout@v4
 
       - name: Wait for 300 seconds
         uses: ./.github/actions/wait
