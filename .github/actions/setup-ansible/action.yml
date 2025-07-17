@@ -1,35 +1,36 @@
 name: 'Setup Ansible'
-description: 'Install ansible dependencies (uses system ansible on CI runners)'
+description: 'Install ansible & other dependencies'
 
 runs:
   using: 'composite'
   steps:
-    - name: Setup Ansible Dependencies
+    - name: Setup UV
       shell: bash
       run: |
-        # Sanity checks for CI environment
-        if ! command -v python3 >/dev/null 2>&1; then
-          echo "ERROR: python3 not found - required for ansible dependencies"
+        # Install uv if not available
+        if ! command -v uv >/dev/null 2>&1; then
+          echo "Installing uv..."
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        fi
+
+        # Verify uv is available
+        if ! command -v uv >/dev/null 2>&1; then
+          echo "ERROR: uv installation failed"
           exit 1
         fi
-        
-        if ! command -v pip >/dev/null 2>&1; then
-          echo "ERROR: pip not found - required for installing dependencies"
-          exit 1
-        fi
-        
-        if ! command -v ansible >/dev/null 2>&1; then
-          echo "ERROR: ansible not found - should be pre-installed on GitHub runners"
-          exit 1
-        fi
-        
-        echo "Pre-flight checks passed: python3, pip, and ansible are available"
-        
-        # Install ansible dependencies (ansible itself pre-installed on CI)
-        pip install --user -r ansible/requirements/requirements.txt
-        
-        # Install ansible collections and roles for CI (system ansible)
-        ansible-galaxy collection install -r ansible/requirements/collections.yml
-        ansible-galaxy role install -r ansible/requirements/roles.yml
-        
+
+        echo "uv version: $(uv --version)"
+
+    - name: Setup Ansible and Dependencies
+      shell: bash
+      run: |
+        # Use uv to install ansible and dependencies (matches local setup)
+        uv sync
+
+        # Activate venv and install ansible collections/roles
+        source .venv/bin/activate
+        ansible-galaxy install -r requirements.yml
+
+        # Verify ansible is working
         ansible --version

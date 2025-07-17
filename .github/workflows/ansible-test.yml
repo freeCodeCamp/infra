@@ -52,6 +52,7 @@ jobs:
       - name: Test Basic Ansible Commands
         run: |
           # Test ansible commands work with installed dependencies
+          source .venv/bin/activate
           ansible --version
           ansible-lint --version
           ansible-inventory --help >/dev/null

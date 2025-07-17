@@ -28,4 +28,5 @@ jobs:
 
       - name: List Inventory
         run: |
+          source .venv/bin/activate
           ansible-inventory -i inventory/linode.yml --graph -v

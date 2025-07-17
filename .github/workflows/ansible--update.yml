@@ -67,6 +67,7 @@ jobs:
 
       - name: Play -- Update
         run: |
+          source .venv/bin/activate
           ansible-playbook -i inventory/linode.yml \
           play-any--update.yml \
           --private-key=~/.ssh/id_for_ansible.pem \

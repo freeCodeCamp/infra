@@ -58,6 +58,7 @@ jobs:
 
       - name: Play -- Cleanup Clients
         run: |
+          source .venv/bin/activate
           SERIAL_VALUE=${{ inputs.serial || 1 }}  # Default value of 1 if inputs.serial is not set
           ansible-playbook -i inventory/linode.yml \
           play-any--cleanup-clients.yml \

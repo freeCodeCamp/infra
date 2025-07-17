@@ -4,14 +4,6 @@ SHELL := /bin/bash
 # Virtual environment
 VENV := .venv
 
-# Use uv if available, fallback to pip
-UV := $(shell command -v uv 2>/dev/null)
-ifdef UV
-    PIP := uv pip
-else
-    PIP := $(VENV)/bin/pip
-endif
-
 .PHONY: help
 help: ## Show this help
 	@echo "Usage: make [target]"
@@ -19,34 +11,25 @@ help: ## Show this help
 	@echo "Targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "LOCAL DEVELOPMENT WORKFLOW:"
-	@echo "  1. make install                     # Install ansible + deps in venv"
+	@echo "UV-BASED WORKFLOW:"
+	@echo "  1. make install                     # Install ansible + deps with uv"
 	@echo "  2. source $(VENV)/bin/activate      # Activate venv"
 	@echo "  3. make test                        # Test connection"
 	@echo "  4. ansible-playbook ...             # Run playbooks"
-	@echo ""
-	@echo "CI/GitHub Actions use system ansible + composite actions"
-
-$(VENV): ## Create virtual environment
-ifdef UV
-	uv venv $(VENV)
-else
-	python3 -m venv $(VENV)
-endif
 
 .PHONY: install
-install: $(VENV) ## Install ansible and dependencies (local development only)
-ifdef UV
-	cd $(VENV) && $(PIP) install -r ../requirements/requirements.txt -r ../requirements/requirements-local.txt
-else
-	$(PIP) install -r requirements/requirements.txt -r requirements/requirements-local.txt
-endif
-	$(VENV)/bin/ansible-galaxy collection install -r requirements/collections.yml --collections-path $(VENV)/lib/python*/site-packages/ansible_collections
-	$(VENV)/bin/ansible-galaxy role install -r requirements/roles.yml --roles-path $(VENV)/share/ansible/roles
+install: ## Install ansible and dependencies using uv
+	@if ! command -v uv >/dev/null 2>&1; then \
+		echo "ERROR: uv not found. Please install uv first:"; \
+		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		exit 1; \
+	fi
+	uv sync
+	source $(VENV)/bin/activate && ansible-galaxy install -r requirements.yml
 
 .PHONY: clean
-clean: ## Remove virtual environment
-	rm -rf $(VENV)
+clean: ## Remove virtual environment and ansible directories
+	rm -rf $(VENV) .ansible
 
 .PHONY: activate
 activate: $(VENV) ## Show activation command
