@@ -1,12 +1,23 @@
-name: Ansible --06- Cleanup Clients
+name: Ansible CI Test
 
 on:
-  schedule:
-    - cron: '5 12 10,20 * *' # Run at 12:05 on the 10th and 20th of every month
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
+      inventory:
+        description: 'Inventory file to validate'
+        type: choice
+        required: true
+        default: 'linode.yml'
+        options:
+          - 'linode.yml'
       verbosity:
-        description: 'The verbosity level for logs'
+        description: 'Verbosity level for logs'
         type: choice
         required: true
         default: '-v'
@@ -14,30 +25,17 @@ on:
           - '-v'
           - '-vv'
           - '-vvv'
-      serial:
-        description: 'The value for the variable_serial argument'
-        type: number
-      dry_run:
-        description: 'Run in dry-run mode to see what would be deleted'
-        type: boolean
-        required: true
-        default: false
 
 defaults:
   run:
     working-directory: './ansible'
 
 jobs:
-  run_playbook:
-    name: Run Play
+  test:
+    name: Ansible CI Test
     runs-on: ubuntu-latest
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
-    strategy:
-      matrix:
-        host_groups:
-          - 'prd_oldeworld_clt'
-          - 'stg_oldeworld_clt'
 
     steps:
       - name: Checkout
@@ -72,19 +70,21 @@ jobs:
           # Verify ansible is working
           ansible --version
 
-      - name: Configure SSH Private Key
-        shell: bash
+      - name: Test Basic Ansible Commands
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+          # Test ansible commands work with installed dependencies
+          source .venv/bin/activate
+          ansible --version
+          ansible-lint --version
+          ansible-inventory --help >/dev/null
+          echo "SUCCESS: All ansible commands working with CI setup"
 
-      - name: Play -- Cleanup Clients
+      - name: Validate Ansible Inventory
         run: |
           source .venv/bin/activate
-          SERIAL_VALUE=${{ inputs.serial || 1 }}  # Default value of 1 if inputs.serial is not set
-          ansible-playbook -i inventory/linode.yml \
-          play-any--cleanup-clients.yml \
-          --private-key=~/.ssh/id_for_ansible.pem \
-          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": '$SERIAL_VALUE', "variable_dry_run": '${{ inputs.dry_run }}'}' \
-          ${{ inputs.verbosity }}
+          HOST_COUNT=$(ansible-inventory -i inventory/${{ inputs.inventory }} --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
+          if [ "$HOST_COUNT" -eq 0 ]; then
+            echo "ERROR: No hosts found in inventory - would run against localhost"
+            exit 1
+          fi
+          echo "Inventory validation passed: $HOST_COUNT hosts found"

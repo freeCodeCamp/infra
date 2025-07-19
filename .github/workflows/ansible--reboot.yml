@@ -57,16 +57,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - name: Setup Ansible and Dependencies
-        uses: ./.github/actions/setup-ansible
+      - name: Setup UV
+        run: |
+          # Install uv if not available
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "Installing uv..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
 
-      - name: Set up SSH key
-        uses: ./.github/actions/setup-ssh
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Verify uv is available
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "ERROR: uv installation failed"
+            exit 1
+          fi
+
+          echo "uv version: $(uv --version)"
+
+      - name: Setup Ansible and Dependencies
+        run: |
+          # Use uv to install ansible and dependencies (matches local setup)
+          uv sync
+
+          # Activate venv and install ansible collections/roles
+          source .venv/bin/activate
+          ansible-galaxy install -r requirements.yml
+
+          # Verify ansible is working
+          ansible --version
+
+      - name: Configure SSH Private Key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
 
       - name: Play -- Reboot
         run: |
+          source .venv/bin/activate
           ansible-playbook -i inventory/linode.yml \
           play-any--reboot.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
