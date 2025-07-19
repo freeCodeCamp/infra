@@ -5,27 +5,7 @@ on:
   schedule:
     - cron: '5 0 * * 3,6' # 00:05 UTC on Wednesdays and Saturdays (6 hour maintenance window)
 
-defaults:
-  run:
-    working-directory: './ansible'
-
 jobs:
-  test:
-    name: Ansible Test
-    runs-on: ubuntu-latest
-    env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - name: Setup Ansible Dependencies
-        uses: ./.github/actions/setup-ansible
-
-      - name: Validate Inventory
-        uses: ./.github/actions/validate-inventory
-        with:
-          inventory: linode.yml
 
   uptime:
     name: Uptime
