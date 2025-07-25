@@ -9,7 +9,6 @@ jobs:
 
   uptime:
     name: Uptime
-    needs: test
     strategy:
       fail-fast: false
       matrix:
