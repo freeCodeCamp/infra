@@ -52,9 +52,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Wait for 300 seconds
-        uses: ./.github/actions/wait
-        with:
-          seconds: '300'
+        run: sleep 300
 
   update:
     name: Update
@@ -102,9 +100,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Wait for 300 seconds
-        uses: ./.github/actions/wait
-        with:
-          seconds: '300'
+        run: sleep 300
 
   reboot-web:
     name: Reboot Ingress
@@ -133,9 +129,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Wait for 300 seconds
-        uses: ./.github/actions/wait
-        with:
-          seconds: '300'
+        run: sleep 300
 
   reboot:
     name: Reboot
