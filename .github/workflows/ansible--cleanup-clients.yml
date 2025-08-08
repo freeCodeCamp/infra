@@ -2,7 +2,7 @@ name: Ansible --06- Cleanup Clients
 
 on:
   schedule:
-    - cron: '5 12 10,20 * *' # Run at 12:05 on the 10th and 20th of every month
+    - cron: '5 12 8,16,24 * *' # Run at 12:05 on the 8th, 16th, and 24th of every month
   workflow_dispatch:
     inputs:
       verbosity:
