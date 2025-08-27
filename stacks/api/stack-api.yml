@@ -23,22 +23,22 @@ x-deploy-config: &deploy-config
       max_replicas_per_node: 1
       constraints:
         - node.labels.api.enabled == true
-        - node.labels.api.variant == ${DEPLOYMENT_ENV}
+        - node.labels.api.variant == ${DEPLOYMENT_TLD}
       preferences:
-        - spread: node.labels.api.variant == ${DEPLOYMENT_ENV}
+        - spread: node.labels.api.variant == ${DEPLOYMENT_TLD}
   # logging:
   #   driver: "json-file"
   #   options:
   #     max-size: "100m"
   #     max-file: "5"
   #     compress: "true"
-  #     labels: "service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}"
+  #     labels: "service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}"
 
   logging:
     driver: loki
     options:
       loki-url: ${LOKI_URL}
-      loki-external-labels: service=api,app=learn-api,variant=${DEPLOYMENT_ENV},version=${DEPLOYMENT_VERSION}
+      loki-external-labels: service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}
       loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-Scope-v20250508-0001}
       loki-pipeline-stages: |
         - json:
@@ -82,6 +82,7 @@ x-deploy-config: &deploy-config
     - PORT=${PORT:-3000}
     - HOST=${HOST:-0.0.0.0}
     - DEPLOYMENT_VERSION=${DEPLOYMENT_VERSION:-unset}
+    - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
     # -- Database
     - MONGOHQ_URL=${MONGOHQ_URL}
     # -- Logging
@@ -119,14 +120,14 @@ x-deploy-config: &deploy-config
 
 services:
   svc-api-alpha:
-    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/learn-api:${DEPLOYMENT_VERSION}
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_TLD}/learn-api:${DEPLOYMENT_VERSION}
     ports:
       - published: 2345
         <<: *port-config
     <<: *deploy-config
 
   svc-api-bravo:
-    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/learn-api:${DEPLOYMENT_VERSION}
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_TLD}/learn-api:${DEPLOYMENT_VERSION}
     ports:
       - published: 2346
         <<: *port-config
