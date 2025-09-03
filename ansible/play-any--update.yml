@@ -6,11 +6,31 @@
   become: true
   become_user: root
   tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        connect_timeout: 60
+        sleep: 5
+        delay: 5
+        timeout: 300
+
     - name: Update apt repo and cache
-      apt:
-        update_cache: yes
-        force_apt_get: yes
-        cache_valid_time: 3600
+      block:
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+            force_apt_get: yes
+            cache_valid_time: 3600
+            update_cache_retries: 10
+            update_cache_retry_max_delay: 30
+      rescue:
+        - name: Clean apt cache and retry
+          shell: apt-get clean && apt-get update
+          retries: 3
+          delay: 10
+
+    - name: Wait before upgrading
+      pause:
+        seconds: 5
 
     - name: Upgrade all packages
       apt:
