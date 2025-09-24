@@ -1,0 +1,61 @@
+services:
+  # CRON service
+  svc-cronjob:
+    image: crazymax/swarm-cronjob:latest
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - "TZ=UTC"
+      # Set log level to "debug" because we want to see
+      # detailed updates about the jobs
+      - "LOG_LEVEL=debug"
+      - "LOG_JSON=false"
+    deploy:
+      placement:
+        constraints:
+          - "node.role == manager"
+
+  # Update service
+  svc-update:
+    image: mazzolino/shepherd
+    environment:
+      - "TZ=UTC"
+      - "FILTER_SERVICES=label=org.freecodecamp.autoupdate"
+      - "RUN_ONCE_AND_EXIT=true"
+      - "WITH_REGISTRY_AUTH=true"
+      - "VERBOSE=true"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/home/freecodecamp/.docker/config.json:/root/.docker/config.json:ro"
+    deploy:
+      mode: replicated
+      replicas: 0
+      restart_policy:
+        condition: none
+      labels:
+        - "swarm.cronjob.enable=true"
+        - "swarm.cronjob.replicas=1"
+        # Fire every hour, on the 45th minute mark
+        - "swarm.cronjob.schedule=0 45 0/1 * * *"
+        # Fire every 1 minute -- for testing
+        # - "swarm.cronjob.schedule=* * * * *"
+        - "swarm.cronjob.skip-running=true"
+      placement:
+        constraints:
+          - "node.role == manager"
+
+  # Cleanup Service
+  svc-cleanup:
+    image: docker
+    command: ["docker", "system", "prune", "--volumes", "--all", "-f"]
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      mode: global
+      labels:
+        - "swarm.cronjob.enable=true"
+        # Fire every 6 hours, on the 15th minute mark
+        - "swarm.cronjob.schedule=0 15 0/6 * * *"
+        - "swarm.cronjob.skip-running=false"
+      restart_policy:
+        condition: none

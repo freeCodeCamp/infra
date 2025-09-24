@@ -1,0 +1,101 @@
+x-deploy-config: &deploy-config
+  deploy:
+    replicas: 3
+    placement:
+      max_replicas_per_node: 1
+      constraints:
+        - node.labels.jms.enabled == true
+        - node.labels.jms.variant == ${DEPLOYMENT_ENV}
+      preferences:
+        - spread: node.labels.jms.variant == ${DEPLOYMENT_ENV}
+    update_config:
+      parallelism: 1
+      delay: 10s
+      failure_action: rollback
+    labels:
+      - org.freecodecamp.autoupdate=true
+
+x-port-config: &port-config
+  target: 3000
+  protocol: tcp
+  mode: host
+
+services:
+
+  # This is a test service to dial in the deploment
+  # of the news services. Do not deploy this service in production.
+  
+  # svc-tst:
+  #   image: ${DOCKER_REGISTRY}/ops/test:latest
+  #   ports:
+  #     - published: 3000
+  #       target: 3000
+  #       protocol: tcp
+  #       mode: host
+  #   deploy:
+  #     replicas: 3
+  #     placement:
+  #       constraints:
+  #         - node.labels.jms.enabled == true
+  #         - node.labels.jms.variant == ${DEPLOYMENT_ENV}
+  #       preferences:
+  #         - spread: node.labels.jms.variant == ${DEPLOYMENT_ENV}
+  #     update_config:
+  #       parallelism: 1
+  #       delay: 10s
+  #       failure_action: rollback
+  #     labels:
+  #       - org.freecodecamp.autoupdate=true
+
+  # The following services are the news services for various languages.
+  # The PORTS are important, as they are defined in the downstream NGINX configuration.
+  # Uncomment the English service on production deployment.
+
+  # svc-eng:
+  #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
+  #   ports:
+  #     - published: 4001
+  #       <<: *port-config
+  #   <<: *deploy-config
+  svc-chn:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
+    ports:
+      - published: 4002
+        <<: *port-config
+    <<: *deploy-config
+  svc-esp:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-espanol:latest
+    ports:
+      - published: 4003
+        <<: *port-config
+    <<: *deploy-config
+  svc-ita:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-italian:latest
+    ports:
+      - published: 4004
+        <<: *port-config
+    <<: *deploy-config
+  svc-jpn:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-japanese:latest
+    ports:
+      - published: 4005
+        <<: *port-config
+    <<: *deploy-config
+  svc-kor:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-korean:latest
+    ports:
+      - published: 4006
+        <<: *port-config
+    <<: *deploy-config
+  svc-por:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-portuguese:latest
+    ports:
+      - published: 4007
+        <<: *port-config
+    <<: *deploy-config
+  svc-ukr:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-ukrainian:latest
+    ports:
+      - published: 4008
+        <<: *port-config
+    <<: *deploy-config

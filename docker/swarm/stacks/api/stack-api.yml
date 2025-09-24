@@ -1,0 +1,134 @@
+x-port-config: &port-config
+  target: 3000
+  protocol: tcp
+  mode: host
+x-deploy-config: &deploy-config
+  deploy:
+    replicas: 3
+    update_config:
+      parallelism: 1
+      delay: 10s
+      failure_action: rollback
+      monitor: 30s
+      max_failure_ratio: 0.3
+    restart_policy:
+      condition: on-failure
+    resources:
+      limits:
+        cpus: ${CPU_LIMIT:-1}
+        memory: ${MEMORY_LIMIT:-1G}
+      reservations:
+        memory: 512M
+    placement:
+      max_replicas_per_node: 1
+      constraints:
+        - node.labels.api.enabled == true
+        - node.labels.api.variant == ${DEPLOYMENT_TLD}
+      preferences:
+        - spread: node.labels.api.variant == ${DEPLOYMENT_TLD}
+  # logging:
+  #   driver: "json-file"
+  #   options:
+  #     max-size: "100m"
+  #     max-file: "5"
+  #     compress: "true"
+  #     labels: "service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}"
+
+  logging:
+    driver: loki
+    options:
+      loki-url: ${LOKI_URL}
+      loki-external-labels: service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}
+      loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-Scope-v20250508-0001}
+      loki-pipeline-stages: |
+        - json:
+            expressions:
+              # top-level
+              level:        level
+              timestamp:    time
+              msg:          msg
+              # under "req"
+              method:       req.REQ_METHOD
+              url:          req.REQ_URL
+              ip:           req.REQ_IP
+              user_agent:   req.REQ_USER_AGENT
+              country:      req.REQ_COUNTRY
+              query:        req.REQ_QUERY
+              id:           req.REQ_ID
+              # under "res"
+              status:       res.RES_STATUS_CODE
+              response_time: res.RES_ELAPSED_TIME
+        - labels:
+              level:
+              method:
+              status:
+              url:
+              msg:
+  healthcheck:
+    test:
+      [
+        "CMD-SHELL",
+        "curl -f http://localhost:${PORT:-3000}/status/ping?checker=${HEALTHCHECK_CHECKER:-swarm-manager} || exit 1",
+      ]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    start_interval: 5s
+  environment:
+    # -- Runtime
+    - NODE_ENV=${NODE_ENV:-production}
+    - FREECODECAMP_NODE_ENV=${FREECODECAMP_NODE_ENV:-production}
+    - PORT=${PORT:-3000}
+    - HOST=${HOST:-0.0.0.0}
+    - DEPLOYMENT_VERSION=${DEPLOYMENT_VERSION:-unset}
+    - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+    # -- Database
+    - MONGOHQ_URL=${MONGOHQ_URL}
+    # -- Logging
+    - FCC_API_LOG_LEVEL=${FCC_API_LOG_LEVEL:-info}
+    - FCC_API_LOG_TRANSPORT=${FCC_API_LOG_TRANSPORT:-default}
+    - SENTRY_DSN=${SENTRY_DSN}
+    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+    # -- Debugging
+    # - FCC_ENABLE_SENTRY_ROUTES=${FCC_ENABLE_SENTRY_ROUTES:-false}
+    # - FCC_ENABLE_SWAGGER_UI=${FCC_ENABLE_SWAGGER_UI:-false}
+    # -- Auth0 - OAuth 2.0 Credentials
+    - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+    - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
+    - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+    # Session, Cookie and JWT encryption strings
+    - JWT_SECRET=${JWT_SECRET}
+    - COOKIE_SECRET=${COOKIE_SECRET}
+    - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.freecodecamp.org}
+    # -- Email
+    - EMAIL_PROVIDER=${EMAIL_PROVIDER:-ses}
+    - SES_REGION=${SES_REGION:-us-east-1}
+    - SES_ID=${SES_ID}
+    - SES_SECRET=${SES_SECRET}
+    # -- Feature Flags
+    # - FCC_ENABLE_EXAM_ENVIRONMENT=${FCC_ENABLE_EXAM_ENVIRONMENT:-false}
+    # - FCC_ENABLE_SHADOW_CAPTURE=${FCC_ENABLE_SHADOW_CAPTURE:-false}
+    # -- Analytics
+    - GROWTHBOOK_FASTIFY_API_HOST=${GROWTHBOOK_FASTIFY_API_HOST}
+    - GROWTHBOOK_FASTIFY_CLIENT_KEY=${GROWTHBOOK_FASTIFY_CLIENT_KEY}
+    # -- Application Paths
+    - HOME_LOCATION=${HOME_LOCATION:-'https://www.freecodecamp.org'}
+    - API_LOCATION=${API_LOCATION:-'https://api.freecodecamp.org'}
+    # -- Donations
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+
+services:
+  svc-api-alpha:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_TLD}/learn-api:${DEPLOYMENT_VERSION}
+    ports:
+      - published: 2345
+        <<: *port-config
+    <<: *deploy-config
+
+  svc-api-bravo:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_TLD}/learn-api:${DEPLOYMENT_VERSION}
+    ports:
+      - published: 2346
+        <<: *port-config
+    <<: *deploy-config
