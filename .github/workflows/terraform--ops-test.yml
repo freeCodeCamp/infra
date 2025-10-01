@@ -115,7 +115,7 @@ jobs:
 
       - name: Create or update comment
         if: github.event_name == 'pull_request'
-        uses: peter-evans/create-or-update-comment@076d57233ac816370d98e4a8471745e4bab20c6e
+        uses: peter-evans/create-or-update-comment@fffe59ea229327e73edca9d31f0b578bf04152a9
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
