@@ -1,0 +1,31 @@
+---
+- name: Test Node Environment - Print Node/NPM/PM2 Versions
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: false
+  become: true
+  become_user: freecodecamp
+  tasks:
+    - name: Print Node, NPM, and PM2 versions
+      ansible.builtin.shell: |
+        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        echo "Node version:"
+        node -v
+        echo ""
+        echo "NPM version:"
+        npm -v
+        echo ""
+        echo "PM2 version:"
+        pm2 -v
+        echo ""
+        echo "PM2 location:"
+        which pm2
+      args:
+        executable: /bin/bash
+        chdir: /home/freecodecamp
+      register: version_output
+
+    - name: Display version information
+      ansible.builtin.debug:
+        msg: "{{ version_output.stdout_lines }}"

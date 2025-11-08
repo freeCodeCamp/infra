@@ -1,0 +1,52 @@
+---
+- name: Rollback
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: false
+  vars:
+    dry_run: '{{ variable_dry_run | default(false) }}'
+    client_binaries_id: '{{ variable_client_binaries_id }}'
+  tasks:
+    - name: Check if target release directory exists
+      ansible.builtin.stat:
+        path: "/home/freecodecamp/client/releases/{{ client_binaries_id }}"
+      register: release_directory
+
+    - name: Fail if release directory does not exist
+      ansible.builtin.fail:
+        msg: "Release directory {{ client_binaries_id }} does not exist in /home/freecodecamp/client/releases/"
+      when: not release_directory.stat.exists
+
+    - name: Update release ID and restart client services (rolling)
+      ansible.builtin.include_tasks:
+        file: tasks/rollback-client-service.yml
+      loop:
+        - primary
+        - secondary
+      loop_control:
+        loop_var: service_type
+
+    - name: Save PM2 process list
+      ansible.builtin.shell: |
+        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        pm2 save
+      args:
+        executable: /bin/bash
+        chdir: /home/freecodecamp/client
+      when: not dry_run | bool
+
+    - name: Display PM2 process status
+      ansible.builtin.shell: |
+        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        pm2 ls
+      args:
+        executable: /bin/bash
+        chdir: /home/freecodecamp/client
+      register: pm2_status
+
+    - name: Show PM2 status
+      ansible.builtin.debug:
+        msg: "{{ pm2_status.stdout_lines }}"
+

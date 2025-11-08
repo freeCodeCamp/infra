@@ -1,0 +1,20 @@
+---
+- name: Get all release directories
+  ansible.builtin.find:
+    paths: /home/freecodecamp/client/releases
+    recurse: false
+    file_type: directory
+  register: all_releases
+
+- name: Sort releases by modification time
+  ansible.builtin.set_fact:
+    sorted_releases:
+      "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
+
+- name: Display available releases (newest first)
+  ansible.builtin.debug:
+    msg: "{{ my_idx + 1 }}. {{ item.path | basename }}"
+  loop: "{{ sorted_releases }}"
+  loop_control:
+    index_var: my_idx
+    label: "{{ item.path | basename }}"

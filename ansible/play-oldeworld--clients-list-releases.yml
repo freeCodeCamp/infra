@@ -1,0 +1,9 @@
+---
+- name: List available releases
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: false
+  tasks:
+    - name: List client releases
+      ansible.builtin.include_tasks:
+        file: tasks/list-client-releases.yml

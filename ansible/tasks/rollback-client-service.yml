@@ -1,0 +1,23 @@
+---
+- name: "Update release ID in client-start-{{ service_type }}.sh"
+  ansible.builtin.replace:
+    path: "/home/freecodecamp/client/client-start-{{ service_type }}.sh"
+    regexp: 'prd-release-\d{8}-\d+'
+    replace: "{{ client_binaries_id }}"
+    backup: yes
+  when: not dry_run | bool
+
+- name: "Restart PM2 client-{{ service_type }} service"
+  ansible.builtin.shell: |
+    export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    pm2 restart client-{{ service_type }}
+  args:
+    executable: /bin/bash
+    chdir: /home/freecodecamp/client
+  when: not dry_run | bool
+
+- name: "Wait for client-{{ service_type }} to stabilize"
+  ansible.builtin.pause:
+    seconds: 10
+  when: not dry_run | bool
