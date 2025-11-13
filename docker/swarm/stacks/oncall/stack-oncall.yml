@@ -20,15 +20,17 @@ services:
       - "GANTRY_SLEEP_SECONDS=0"
       - "GANTRY_LOG_LEVEL=INFO"
       - "GANTRY_SERVICES_FILTERS=label=org.freecodecamp.autoupdate"
+      - "GANTRY_SERVICES_EXCLUDED_FILTERS=name=stg-news"
       - "GANTRY_UPDATE_NUM_WORKERS=3"
       - "GANTRY_MANIFEST_NUM_WORKERS=5"
       - "GANTRY_MANIFEST_CMD=buildx"
       - "GANTRY_CLEANUP_IMAGES=true"
       - "GANTRY_ROLLBACK_ON_FAILURE=true"
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
+      - "GANTRY_UPDATE_OPTIONS=--with-registry-auth"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "/home/freecodecamp/.docker/config.json:/root/.docker/config.json:ro"
+      - "/home/freecodecamp/.docker:/root/.docker"
     deploy:
       mode: replicated
       replicas: 0
