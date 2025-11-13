@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'ansible/**'
+      - '.github/workflows/ansible--test.yml'
   pull_request:
     branches:
       - main
+    paths:
+      - 'ansible/**'
+      - '.github/workflows/ansible--test.yml'
   workflow_dispatch:
     inputs:
       inventory:

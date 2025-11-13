@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform--ops-test.yml'
   workflow_dispatch:
 
 defaults:
