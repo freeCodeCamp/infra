@@ -28,6 +28,9 @@ services:
       - "GANTRY_ROLLBACK_ON_FAILURE=true"
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
       - "GANTRY_UPDATE_OPTIONS=--with-registry-auth"
+      - "GANTRY_NOTIFICATION_APPRISE_URL=${GANTRY_GCHAT_WEBHOOK_URL}"
+      - "GANTRY_NOTIFICATION_CONDITION=on-change"
+      - "GANTRY_NOTIFICATION_TITLE=Gantry Auto-Update"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
