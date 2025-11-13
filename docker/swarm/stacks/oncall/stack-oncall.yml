@@ -6,8 +6,6 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
       - "TZ=UTC"
-      # Set log level to "debug" because we want to see
-      # detailed updates about the jobs
       - "LOG_LEVEL=debug"
       - "LOG_JSON=false"
     deploy:
@@ -15,15 +13,20 @@ services:
         constraints:
           - "node.role == manager"
 
-  # Update service
   svc-update:
-    image: containrrr/shepherd:v1.8.1
+    image: shizunge/gantry:2025.0813.0
     environment:
       - "TZ=UTC"
-      - "FILTER_SERVICES=label=org.freecodecamp.autoupdate"
-      - "RUN_ONCE_AND_EXIT=true"
-      - "WITH_REGISTRY_AUTH=true"
-      - "VERBOSE=true"
+      - "GANTRY_NODE_NAME={{.Node.Hostname}}"
+      - "GANTRY_SLEEP_SECONDS=0"
+      - "GANTRY_LOG_LEVEL=INFO"
+      - "GANTRY_SERVICES_FILTERS=label=org.freecodecamp.autoupdate"
+      - "GANTRY_UPDATE_NUM_WORKERS=3"
+      - "GANTRY_MANIFEST_NUM_WORKERS=5"
+      - "GANTRY_MANIFEST_CMD=buildx"
+      - "GANTRY_CLEANUP_IMAGES=true"      # Reliability - Auto-rollback on Failure
+      - "GANTRY_ROLLBACK_ON_FAILURE=true"
+      - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker/config.json:/root/.docker/config.json:ro"
@@ -44,18 +47,26 @@ services:
         constraints:
           - "node.role == manager"
 
-  # Cleanup Service
+  # Cleanup Service - Weekly Failsafe
+  # Runs as a backup to Gantry's automatic cleanup
+  # Removes only resources older than 7 days (safer than aggressive prune)
   svc-cleanup:
     image: docker:29.0.0
-    command: ["docker", "system", "prune", "--volumes", "--all", "-f"]
+    command:
+      - "docker"
+      - "system"
+      - "prune"
+      - "-f"
+      - "--filter"
+      - "until=168h"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
     deploy:
       mode: global
       labels:
         - "swarm.cronjob.enable=true"
-        # Fire every 6 hours, on the 15th minute mark
-        - "swarm.cronjob.schedule=0 15 0/6 * * *"
+        # Fire every Monday at 03:30 UTC
+        - "swarm.cronjob.schedule=0 30 3 * * 1"
         - "swarm.cronjob.skip-running=false"
       restart_policy:
         condition: none
