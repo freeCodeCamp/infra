@@ -1,57 +1,81 @@
-## Oncall Stack
+# Oncall Stack
 
-This stack defines all the services for housekeeping and automated maintenance:
+Docker Swarm stack configuration for housekeeping and automated maintenance services.
 
-- **svc-cronjob**: Swarm cronjob scheduler (manages scheduled tasks)
-- **svc-update**: Gantry service updater (auto-updates tagged services)
-- **svc-cleanup**: Docker system cleanup (prunes old images/containers weekly)
+## Overview
+
+The Oncall stack provides automated maintenance and monitoring services including task scheduling, service updates, and system cleanup.
+
+## Components
+
+| Service | Purpose |
+| --- | --- |
+| **svc-cronjob** | Swarm cronjob scheduler (manages scheduled tasks) |
+| **svc-update** | Gantry service updater (auto-updates tagged services) |
+| **svc-cleanup** | Docker system cleanup (prunes old images/containers weekly) |
+
+## Architecture
+
+```
+Cronjob Scheduler → Scheduled Tasks
+Service Updater → Auto-update tagged services
+Cleanup Job → Weekly prune on all nodes
+    ↓
+All services → Loki logging
+```
 
 ## Prerequisites
 
-1. Docker credentials at `~/.docker/config.json` on manager node
-2. Loki instance with push API access (for centralized logging)
+- Docker Swarm cluster initialized
+- Docker credentials at `~/.docker/config.json` on manager node
+- Loki instance with push API access (for centralized logging)
+- kubectl access to Kubernetes cluster (for retrieving Loki credentials)
 
 ## Configuration
 
 ### Environment Variables
 
-Copy `.env.sample` to `.env` and configure:
+Set credentials before deployment:
 
 ```bash
-# Loki Push API URL
-LOKI_URL=https://o11y.freecodecamp.net/loki/api/v1/push
+# Get Loki gateway password from Kubernetes
+export LOKI_PASSWORD=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_GATEWAY_PASSWORD}' | base64 --decode)
 
-# Oncall-specific tenant ID (keeps logs separated from other stacks)
-LOKI_TENANT_ID=fCC-o11y-oncall-v20250113-0001
+# Construct Loki URL with embedded credentials
+export LOKI_URL="https://loki:${LOKI_PASSWORD}@o11y.freecodecamp.net/loki/api/v1/push"
+
+# Get tenant ID
+export LOKI_TENANT_ID=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_TENANT_ID}' | base64 --decode)
 ```
 
-### Log Separation
+### Logging Configuration
 
-Logs are forwarded to Loki with:
-- **Tenant ID**: `fCC-o11y-oncall-v20250113-0001` (separate from API/other services)
+Logs are forwarded to Loki with the following labels for clean separation:
+
+- **Tenant ID**: `fCC-o11y-oncall-v20250113-0001` (separate from other services)
 - **Labels**:
   - `stack=oncall` (all services)
   - `service=cronjob|update|cleanup` (per service)
   - `app=swarm-cronjob|gantry|docker` (application name)
 
-This provides clean separation in Grafana while using shared storage.
-
 ## Deployment
 
 ```bash
-# Set context to your swarm manager
+# Set Docker context
 docker context use <context_name>
 
-# Deploy with environment variables
-export LOKI_URL="https://o11y.freecodecamp.net/loki/api/v1/push"
+# Set environment variables (see Configuration section)
+export LOKI_PASSWORD=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_GATEWAY_PASSWORD}' | base64 --decode)
+export LOKI_URL="https://loki:${LOKI_PASSWORD}@o11y.freecodecamp.net/loki/api/v1/push"
 export LOKI_TENANT_ID="fCC-o11y-oncall-v20250113-0001"
 
+# Deploy the stack
 docker stack deploy -c docker/swarm/stacks/oncall/stack-oncall.yml oncall
 ```
 
 ## Querying Logs in Grafana
 
-Create separate views using LogQL queries:
+Use these LogQL queries to view logs by service:
 
 ```logql
 # All oncall logs
@@ -72,3 +96,4 @@ Create separate views using LogQL queries:
 - Docker credentials must be kept current at `~/.docker/config.json`
 - Update service runs on manager node (placement constraint enforced)
 - Cleanup runs weekly on Monday at 03:30 UTC on all nodes
+- Monitor logs in Grafana to verify scheduled tasks are running correctly
