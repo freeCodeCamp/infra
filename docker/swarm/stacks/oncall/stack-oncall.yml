@@ -1,5 +1,4 @@
 services:
-  # CRON service
   svc-cronjob:
     image: crazymax/swarm-cronjob:1.14.0
     volumes:
@@ -24,7 +23,7 @@ services:
       - "GANTRY_UPDATE_NUM_WORKERS=3"
       - "GANTRY_MANIFEST_NUM_WORKERS=5"
       - "GANTRY_MANIFEST_CMD=buildx"
-      - "GANTRY_CLEANUP_IMAGES=true"      # Reliability - Auto-rollback on Failure
+      - "GANTRY_CLEANUP_IMAGES=true"
       - "GANTRY_ROLLBACK_ON_FAILURE=true"
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
     volumes:
@@ -47,9 +46,7 @@ services:
         constraints:
           - "node.role == manager"
 
-  # Cleanup Service - Weekly Failsafe
   # Runs as a backup to Gantry's automatic cleanup
-  # Removes only resources older than 7 days (safer than aggressive prune)
   svc-cleanup:
     image: docker:29.0.0
     command:
