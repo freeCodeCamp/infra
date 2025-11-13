@@ -1,7 +1,7 @@
 services:
   # CRON service
   svc-cronjob:
-    image: crazymax/swarm-cronjob:latest
+    image: crazymax/swarm-cronjob:1.14.0
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
