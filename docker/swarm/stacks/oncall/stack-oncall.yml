@@ -17,7 +17,7 @@ services:
 
   # Update service
   svc-update:
-    image: mazzolino/shepherd
+    image: containrrr/shepherd:v1.8.1
     environment:
       - "TZ=UTC"
       - "FILTER_SERVICES=label=org.freecodecamp.autoupdate"
@@ -46,7 +46,7 @@ services:
 
   # Cleanup Service
   svc-cleanup:
-    image: docker
+    image: docker:29.0.0
     command: ["docker", "system", "prune", "--volumes", "--all", "-f"]
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
