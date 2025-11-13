@@ -1,3 +1,11 @@
+x-logging-config: &logging-config
+  logging:
+    driver: loki
+    options:
+      loki-url: ${LOKI_URL}
+      loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
+      loki-external-labels: stack=oncall
+
 services:
   svc-cronjob:
     image: crazymax/swarm-cronjob:1.14.0
@@ -7,6 +15,12 @@ services:
       - "TZ=UTC"
       - "LOG_LEVEL=debug"
       - "LOG_JSON=false"
+    logging:
+      driver: loki
+      options:
+        loki-url: ${LOKI_URL}
+        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
+        loki-external-labels: stack=oncall,service=cronjob,app=swarm-cronjob
     deploy:
       placement:
         constraints:
@@ -29,6 +43,12 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker/config.json:/root/.docker/config.json:ro"
+    logging:
+      driver: loki
+      options:
+        loki-url: ${LOKI_URL}
+        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
+        loki-external-labels: stack=oncall,service=update,app=gantry
     deploy:
       mode: replicated
       replicas: 0
@@ -58,6 +78,12 @@ services:
       - "until=168h"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
+    logging:
+      driver: loki
+      options:
+        loki-url: ${LOKI_URL}
+        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
+        loki-external-labels: stack=oncall,service=cleanup,app=docker
     deploy:
       mode: global
       labels:
