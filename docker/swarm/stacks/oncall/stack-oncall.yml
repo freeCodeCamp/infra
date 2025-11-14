@@ -13,8 +13,8 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
       - "TZ=UTC"
-      - "LOG_LEVEL=debug"
-      - "LOG_JSON=false"
+      - "LOG_LEVEL=info"
+      - "LOG_JSON=true"
     logging:
       driver: loki
       options:
