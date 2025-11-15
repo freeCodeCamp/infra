@@ -76,7 +76,7 @@ services:
 
   # Runs as a backup to Gantry's automatic cleanup
   svc-cleanup:
-    image: docker:29.0.0
+    image: docker:29.0.1
     command:
       - "docker"
       - "system"
