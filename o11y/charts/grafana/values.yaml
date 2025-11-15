@@ -70,6 +70,9 @@ datasources:
           httpHeaderValue1: $__env{LOKI_TENANT_ID}
         jsonData:
           httpHeaderName1: X-Scope-OrgID
+          timeout: 300
+          maxLines: 5000
+          derivedFields: []
         isDefault: true
 
       - name: Prometheus
@@ -82,3 +85,14 @@ datasources:
           exemplarTraceIdDestinations:
             - datasourceUid: tempo
               name: trace_id
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: o11y
+    folderAnnotation: grafana_folder
+    provider:
+      allowUiUpdates: true
+      foldersFromFilesStructure: true

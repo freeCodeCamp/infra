@@ -41,8 +41,16 @@ loki:
   ingesterConfig:
     chunk_encoding: snappy
 
+  bloom_build:
+    enabled: false
+
+  bloom_gateway:
+    enabled: false
+
   querierConfig:
     max_concurrent: 32
+    query_timeout: 5m
+    query_ingesters_within: 3h
     cache_config:
       enable_fifocache: true
       default_validity: 24h
@@ -59,6 +67,14 @@ loki:
       - selector: '{namespace="o11y"}'
         priority: 1
         period: 180d
+    split_queries_by_interval: 1h
+    max_query_lookback: 720h
+    max_query_length: 721h
+    max_query_parallelism: 16
+    max_entries_limit_per_query: 10000
+    max_cache_freshness_per_query: 10m
+    query_timeout: 5m
+    volume_enabled: true
 
   gateway:
     enabled: true
@@ -118,18 +134,19 @@ queryFrontend:
   replicas: 2
   maxUnavailable: 1
   config:
+    query_stats_enabled: true
     cache_config:
       enable_fifocache: true
       default_validity: 24h
       fifocache:
-        max_size_mb: 1024
+        max_size_mb: 2048
   resources:
     requests:
       cpu: 100m
-      memory: 384Mi
+      memory: 768Mi
     limits:
       cpu: 200m
-      memory: 768Mi
+      memory: 1.5Gi
 
 queryScheduler:
   enabled: true
@@ -181,6 +198,16 @@ chunksCache:
     limits:
       cpu: 150m
       memory: 256Mi
+
+resultsCache:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 512Mi
+    limits:
+      cpu: 150m
+      memory: 1Gi
 
 indexGateway:
   enabled: true
