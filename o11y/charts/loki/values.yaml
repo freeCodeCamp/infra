@@ -51,6 +51,9 @@ loki:
     max_concurrent: 32
     query_timeout: 5m
     query_ingesters_within: 3h
+    grpc_client_config:
+      max_recv_msg_size: 33554432
+      max_send_msg_size: 33554432
     cache_config:
       enable_fifocache: true
       default_validity: 24h
@@ -62,11 +65,7 @@ loki:
 
   limits_config:
     allow_structured_metadata: true
-    retention_period: 90d
-    retention_stream:
-      - selector: '{namespace="o11y"}'
-        priority: 1
-        period: 180d
+    retention_period: 30d
     split_queries_by_interval: 1h
     max_query_lookback: 720h
     max_query_length: 721h
@@ -102,61 +101,64 @@ ingester:
     size: 50Gi
   resources:
     requests:
-      cpu: 750m
-      memory: 1.5Gi
+      cpu: 100m
+      memory: 768Mi
     limits:
-      cpu: 1
-      memory: 2.5Gi
+      cpu: 300m
+      memory: 1536Mi
 
 distributor:
   replicas: 2
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 75m
+      cpu: 50m
       memory: 256Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 150m
+      memory: 512Mi
 
 querier:
   replicas: 3
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 200m
+      memory: 768Mi
     limits:
-      cpu: 1500m
-      memory: 3Gi
+      cpu: 600m
+      memory: 1536Mi
 
 queryFrontend:
   replicas: 2
   maxUnavailable: 1
   config:
     query_stats_enabled: true
+    grpc_client_config:
+      max_recv_msg_size: 33554432
+      max_send_msg_size: 33554432
     cache_config:
       enable_fifocache: true
       default_validity: 24h
       fifocache:
-        max_size_mb: 2048
+        max_size_mb: 4096
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 768Mi
     limits:
-      cpu: 200m
-      memory: 1.5Gi
+      cpu: 150m
+      memory: 1536Mi
 
 queryScheduler:
   enabled: true
   replicas: 2
   resources:
     requests:
-      cpu: 75m
+      cpu: 25m
       memory: 128Mi
     limits:
-      cpu: 150m
+      cpu: 100m
       memory: 256Mi
 
 compactor:
@@ -164,18 +166,18 @@ compactor:
   replicas: 1
   config:
     working_directory: /data/loki/compactor
-    compaction_interval: 5m
+    compaction_interval: 15m
     max_compaction_parallelism: 1
   persistence:
     enabled: true
     size: 30Gi
   resources:
     requests:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 100m
+      memory: 768Mi
     limits:
-      cpu: 400m
-      memory: 512Mi
+      cpu: 300m
+      memory: 1536Mi
 
 ruler:
   enabled: false
@@ -193,21 +195,21 @@ chunksCache:
   enabled: true
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 150m
+      cpu: 25m
       memory: 256Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi
 
 resultsCache:
   enabled: true
   resources:
     requests:
-      cpu: 100m
-      memory: 1Gi
+      cpu: 25m
+      memory: 256Mi
     limits:
-      cpu: 300m
-      memory: 3Gi
+      cpu: 100m
+      memory: 512Mi
 
 indexGateway:
   enabled: true
@@ -221,10 +223,10 @@ indexGateway:
         validity: "24h"
   resources:
     requests:
-      cpu: 100m
+      cpu: 150m
       memory: 512Mi
     limits:
-      cpu: 300m
+      cpu: 400m
       memory: 1Gi
 
 patternIngester:
@@ -233,18 +235,18 @@ patternIngester:
   resources:
     requests:
       cpu: 25m
-      memory: 64Mi
-    limits:
-      cpu: 150m
       memory: 256Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi
 
 bloomGateway:
   enabled: true
   replicas: 2
   resources:
     requests:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 25m
+      memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 2Gi
+      cpu: 100m
+      memory: 256Mi

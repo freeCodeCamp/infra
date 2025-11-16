@@ -71,7 +71,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json [$__auto]))",
+          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" [$__range]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -199,7 +199,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 200 and res_RES_STATUS_CODE < 300 [$__auto]))",
+          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 200 and res_RES_STATUS_CODE < 300 [$__range]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -257,7 +257,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 400 and res_RES_STATUS_CODE < 500 [$__auto]))",
+          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 400 and res_RES_STATUS_CODE < 500 [$__range]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -315,7 +315,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 500 and res_RES_STATUS_CODE < 600 [$__auto]))",
+          "expr": "sum(count_over_time({service=\"api\", variant=\"$variant\"} | json | __error__=\"\" and res_RES_STATUS_CODE >= 500 and res_RES_STATUS_CODE < 600 [$__range]))",
           "queryType": "range",
           "refId": "A"
         }
