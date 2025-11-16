@@ -71,7 +71,7 @@ datasources:
         jsonData:
           httpHeaderName1: X-Scope-OrgID
           timeout: 300
-          maxLines: 5000
+          maxLines: 50000
           derivedFields: []
         isDefault: true
 

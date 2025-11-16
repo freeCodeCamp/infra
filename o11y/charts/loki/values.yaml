@@ -42,10 +42,10 @@ loki:
     chunk_encoding: snappy
 
   bloom_build:
-    enabled: false
+    enabled: true
 
   bloom_gateway:
-    enabled: false
+    enabled: true
 
   querierConfig:
     max_concurrent: 32
@@ -70,9 +70,9 @@ loki:
     split_queries_by_interval: 1h
     max_query_lookback: 720h
     max_query_length: 721h
-    max_query_parallelism: 16
-    max_entries_limit_per_query: 10000
-    max_cache_freshness_per_query: 10m
+    max_query_parallelism: 32
+    max_entries_limit_per_query: 50000
+    max_cache_freshness_per_query: 1h
     query_timeout: 5m
     volume_enabled: true
 
@@ -120,15 +120,15 @@ distributor:
       memory: 256Mi
 
 querier:
-  replicas: 2
+  replicas: 3
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 350m
-      memory: 640Mi
+      cpu: 500m
+      memory: 1Gi
     limits:
-      cpu: 800m
-      memory: 1.5Gi
+      cpu: 1500m
+      memory: 3Gi
 
 queryFrontend:
   replicas: 2
@@ -203,28 +203,29 @@ resultsCache:
   enabled: true
   resources:
     requests:
-      cpu: 50m
-      memory: 512Mi
-    limits:
-      cpu: 150m
+      cpu: 100m
       memory: 1Gi
+    limits:
+      cpu: 300m
+      memory: 3Gi
 
 indexGateway:
   enabled: true
-  replicas: 1
+  replicas: 2
+  maxUnavailable: 1
   config:
     index_cache_config:
       enable_fifocache: true
       fifocache:
-        max_size_bytes: "256MB"
+        max_size_bytes: "1GB"
         validity: "24h"
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 150m
+      cpu: 100m
       memory: 512Mi
+    limits:
+      cpu: 300m
+      memory: 1Gi
 
 patternIngester:
   enabled: true
@@ -236,3 +237,14 @@ patternIngester:
     limits:
       cpu: 150m
       memory: 256Mi
+
+bloomGateway:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
