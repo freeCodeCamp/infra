@@ -4,13 +4,18 @@ persistence:
     - ReadWriteOnce
   size: 10Gi
 
+# Fix upgrade hangs: Recreate strategy required for RWO PVCs
+# This terminates old pod before creating new one, releasing the PVC
+deploymentStrategy:
+  type: Recreate
+
 resources:
   requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
     cpu: 500m
     memory: 1Gi
-  limits:
-    cpu: 1
-    memory: 2Gi
 
 serviceAccount:
   name: o11y-grafana
