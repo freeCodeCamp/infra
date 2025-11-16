@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Run lint-staged for dashboards if there are changes in that directory
+if git diff --cached --name-only | grep -q "^o11y/dashboards/"; then
+  cd o11y/dashboards
+  npx lint-staged
+fi

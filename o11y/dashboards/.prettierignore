@@ -1,0 +1,16 @@
+# Deep Directories
+**/node_modules
+
+# Generated Directories
+**/dist
+**/output
+**/__coverage__
+
+# Generated Files
+*.d.ts
+pnpm-lock.yaml
+k8s/grafana/dashboards/*.yaml
+
+# Husky
+pre-commit
+.prettierignore

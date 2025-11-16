@@ -1,0 +1,49 @@
+{
+  "name": "dashboards",
+  "version": "0.0.0",
+  "description": "Grafana dashboards-as-code using TypeScript and grafana-foundation-sdk",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint src tests",
+    "typecheck": "tsc --noEmit",
+    "validate": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "prepare": "husky"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "keywords": [],
+  "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
+  "license": "ISC",
+  "dependencies": {
+    "@grafana/grafana-foundation-sdk": "^11.6.0-cogv0.0.x.1753977659",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.10.1",
+    "@vitest/ui": "^4.0.9",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "oxlint": "^1.28.0",
+    "prettier": "3.6.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vite-plugin-dts": "^4.3.0",
+    "vitest": "^4.0.9"
+  },
+  "lint-staged": {
+    "*.{ts,json,md,yml,yaml}": "prettier --write",
+    "*.ts": [
+      "oxlint",
+      "tsc --noEmit"
+    ]
+  }
+}

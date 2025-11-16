@@ -177,3 +177,47 @@ helm repo update
     ```
 4.  Verify metrics are flowing into Prometheus by exploring metrics in Grafana
     or using the imported dashboard.
+
+## 7. Grafana Dashboards
+
+Dashboards are managed as TypeScript code in `dashboards/`, providing type-safe, version-controlled dashboard definitions.
+
+### Quick Start
+
+```bash
+cd dashboards
+pnpm install
+pnpm run build
+```
+
+Generates:
+- `output/api-monitoring.json` - Dashboard JSON
+- `../k8s/grafana/dashboards/api-monitoring.yaml` - Kubernetes ConfigMap
+
+### Deploy
+
+```bash
+kubectl apply -f ../k8s/grafana/dashboards/api-monitoring.yaml
+```
+
+Dashboard auto-loads in Grafana within ~30 seconds.
+**Dashboard UID**: `fcc-api-observability-v1-0`
+
+### Development Commands
+
+- **Build**: `pnpm run build`
+- **Test**: `pnpm test`
+- **Lint**: `pnpm run lint`
+- **Validate**: `pnpm run validate`
+
+### Project Structure
+
+- `src/dashboards/` - Dashboard definitions
+- `src/builders/` - Reusable query/panel builders
+- `tests/` - Unit tests
+
+### Adding Panels
+
+1. Edit `src/dashboards/api-monitoring.ts`
+2. Run `pnpm run build`
+3. Deploy: `kubectl apply -f ../k8s/grafana/dashboards/api-monitoring.yaml`
