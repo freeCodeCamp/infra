@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeAll } from 'vitest';
 import { createAPIMonitoringDashboard } from '../src/dashboards/api-monitoring.js';
+import { createNewsMonitoringDashboard } from '../src/dashboards/news-monitoring.js';
 
 interface Dashboard {
   uid: string;
@@ -53,8 +54,8 @@ describe('API Monitoring Dashboard', () => {
   });
 
   test('should have required tags', () => {
-    expect(dashboard.tags).toContain('Node.js');
     expect(dashboard.tags).toContain('API');
+    expect(dashboard.tags).toContain('Docker');
     expect(dashboard.tags).toContain('Loki');
   });
 
@@ -353,6 +354,188 @@ describe('API Monitoring Dashboard', () => {
       const logsPanel = dashboard.panels.find(p => p.title === 'Logs');
       const target = logsPanel?.targets?.[0];
       expect(target?.expr).not.toContain('__error__=""');
+    });
+  });
+});
+
+describe('freeCodeCamp News Dashboard', () => {
+  let dashboard: Dashboard;
+
+  beforeAll(() => {
+    dashboard = createNewsMonitoringDashboard();
+  });
+
+  test('should have correct UID', () => {
+    expect(dashboard.uid).toBe('freecodecamp-news-v1');
+  });
+
+  test('should have correct title', () => {
+    expect(dashboard.title).toBe('freeCodeCamp News Dashboard (Gantry)');
+  });
+
+  test('should have required tags', () => {
+    expect(dashboard.tags).toContain('News');
+    expect(dashboard.tags).toContain('Docker');
+    expect(dashboard.tags).toContain('Loki');
+  });
+
+  test('should have 15m refresh interval', () => {
+    expect(dashboard.refresh).toBe('15m');
+  });
+
+  test('should have time range from now-2d to now', () => {
+    expect(dashboard.time.from).toBe('now-2d');
+    expect(dashboard.time.to).toBe('now');
+  });
+
+  test('should have LOKI_DATASOURCE variable', () => {
+    const lokiVar = dashboard.templating.list.find(v => v.name === 'LOKI_DATASOURCE');
+    expect(lokiVar).toBeDefined();
+    expect(lokiVar?.type).toBe('datasource');
+  });
+
+  test('all panels with queries should use stack=oncall label', () => {
+    dashboard.panels.forEach(panel => {
+      if (panel.targets && panel.targets.length > 0) {
+        panel.targets.forEach(target => {
+          // Skip vector queries (like total services panel)
+          if (!target.expr.startsWith('vector(')) {
+            expect(target.expr).toContain('stack="oncall"');
+          }
+        });
+      }
+    });
+  });
+
+  describe('Executive Summary Row', () => {
+    test('should have 4 key metric panels', () => {
+      const row1Panels = dashboard.panels.filter(p => p.gridPos.y === 0);
+      expect(row1Panels).toHaveLength(4);
+      row1Panels.forEach(panel => {
+        expect(panel.type).toBe('stat');
+      });
+    });
+
+    test('should have correct panel titles in order', () => {
+      const row1Panels = dashboard.panels
+        .filter(p => p.gridPos.y === 0)
+        .sort((a, b) => a.gridPos.x - b.gridPos.x);
+
+      const expectedTitles = [
+        'Total Log Lines',
+        'Service Updates',
+        'Successes',
+        'Failures & Rollbacks'
+      ];
+
+      expectedTitles.forEach((title, index) => {
+        expect(row1Panels[index].title).toBe(title);
+      });
+    });
+  });
+
+  describe('Service Status Grid', () => {
+    test('should have panels for all 7 news services', () => {
+      const serviceLabels = [
+        'Chinese',
+        'Español',
+        'Italian',
+        'Japanese',
+        'Korean',
+        'Portuguese',
+        'Ukrainian'
+      ];
+
+      serviceLabels.forEach(label => {
+        const panel = dashboard.panels.find(p => p.title?.includes(label));
+        expect(panel).toBeDefined();
+        expect(panel?.type).toBe('stat');
+      });
+    });
+
+    test('service panels should track individual service updates', () => {
+      const servicePanel = dashboard.panels.find(p => p.title?.includes('Chinese'));
+      expect(servicePanel?.targets?.[0].expr).toContain('svc-chn');
+    });
+  });
+
+  describe('Timeline Panels', () => {
+    test('should have timeseries for update operations', () => {
+      const opsPanel = dashboard.panels.find(p => p.title === 'Update Operations Over Time');
+      expect(opsPanel).toBeDefined();
+      expect(opsPanel?.type).toBe('timeseries');
+    });
+
+    test('update operations should track success and failure', () => {
+      const opsPanel = dashboard.panels.find(p => p.title === 'Update Operations Over Time');
+      expect(opsPanel?.targets?.length).toBeGreaterThanOrEqual(3);
+
+      const hasSuccessQuery = opsPanel?.targets?.some(t =>
+        t.expr.match(/succeed|updated service/i)
+      );
+      const hasFailQuery = opsPanel?.targets?.some(t => t.expr.match(/fail|error/i));
+
+      expect(hasSuccessQuery).toBe(true);
+      expect(hasFailQuery).toBe(true);
+    });
+  });
+
+  describe('Log Panels', () => {
+    test('should have failures & rollbacks log panel', () => {
+      const failurePanel = dashboard.panels.find(
+        p => p.title?.includes('Failures & Rollbacks') && p.type === 'logs'
+      );
+      expect(failurePanel).toBeDefined();
+      expect(failurePanel?.type).toBe('logs');
+      expect(failurePanel?.targets?.[0].expr).toMatch(/fail|error|rollback/i);
+    });
+
+    test('should have all update logs panel', () => {
+      const logsPanel = dashboard.panels.find(p => p.title === 'Logs' && p.type === 'logs');
+      expect(logsPanel).toBeDefined();
+      expect(logsPanel?.type).toBe('logs');
+      expect(logsPanel?.targets?.[0].expr).toBe('{stack="oncall", service="update"}');
+    });
+
+    test('log panels should have 5000 line limit', () => {
+      const logPanels = dashboard.panels.filter(p => p.type === 'logs');
+
+      logPanels.forEach(panel => {
+        const target = panel.targets?.[0];
+        expect(target?.maxLines).toBe(5000);
+      });
+    });
+  });
+
+  describe('Panel Grid Validation', () => {
+    test('all panels should have valid grid positions', () => {
+      dashboard.panels.forEach(panel => {
+        expect(panel.gridPos.x).toBeGreaterThanOrEqual(0);
+        expect(panel.gridPos.x).toBeLessThan(24);
+        expect(panel.gridPos.y).toBeGreaterThanOrEqual(0);
+        expect(panel.gridPos.w).toBeGreaterThan(0);
+        expect(panel.gridPos.w).toBeLessThanOrEqual(24);
+        expect(panel.gridPos.h).toBeGreaterThan(0);
+      });
+    });
+
+    test('no panel should exceed 24-column grid width', () => {
+      dashboard.panels.forEach(panel => {
+        expect(panel.gridPos.x + panel.gridPos.w).toBeLessThanOrEqual(24);
+      });
+    });
+  });
+
+  describe('Query Patterns', () => {
+    test('all queries should filter for update service', () => {
+      dashboard.panels.forEach(panel => {
+        panel.targets?.forEach(target => {
+          // Skip vector queries (like total services panel)
+          if (!target.expr.startsWith('vector(')) {
+            expect(target.expr).toContain('service="update"');
+          }
+        });
+      });
     });
   });
 });

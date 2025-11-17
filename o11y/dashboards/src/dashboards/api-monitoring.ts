@@ -62,7 +62,7 @@ export function createAPIMonitoringDashboard(): GrafanaDashboard {
   // Build dashboard using SDK
   const dashboard = new DashboardBuilder('freeCodeCamp API Dashboard')
     .uid('freecodecamp-api-v1')
-    .tags(['Node.js', 'API', 'Loki'])
+    .tags(['API', 'Docker', 'Loki'])
     .timezone('utc')
     .refresh('5m')
     .time({ from: 'now-1h', to: 'now' })
