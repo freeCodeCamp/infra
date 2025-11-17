@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: o11y-gateway
+  namespace: o11y
+spec:
+  gatewayClassName: traefik
+  listeners:
+  - name: websecure
+    protocol: HTTPS
+    port: 8443
+    hostname: o11y.freecodecamp.net
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: o11y-secret-cloudflare-origin-cert
+    allowedRoutes:
+      namespaces:
+        from: Same
