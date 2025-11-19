@@ -80,6 +80,22 @@ datasources:
           derivedFields: []
         isDefault: true
 
+      - name: Loki - OnCall
+        type: loki
+        access: proxy
+        url: http://loki-gateway.o11y.svc.cluster.local
+        basicAuth: true
+        basicAuthUser: loki
+        secureJsonData:
+          basicAuthPassword: $__env{LOKI_GATEWAY_PASSWORD}
+          httpHeaderValue1: fCC-o11y-oncall-v20250113-0001
+        jsonData:
+          httpHeaderName1: X-Scope-OrgID
+          timeout: 300
+          maxLines: 50000
+          derivedFields: []
+        isDefault: false
+
       - name: Prometheus
         type: prometheus
         access: proxy
@@ -87,9 +103,6 @@ datasources:
         isDefault: false
         jsonData:
           httpMethod: POST
-          exemplarTraceIdDestinations:
-            - datasourceUid: tempo
-              name: trace_id
 
 sidecar:
   dashboards:

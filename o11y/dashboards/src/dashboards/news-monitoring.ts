@@ -5,354 +5,342 @@ import {
   Dashboard as GrafanaDashboard
 } from '@grafana/grafana-foundation-sdk/dashboard';
 import { PanelBuilder as StatPanelBuilder } from '@grafana/grafana-foundation-sdk/stat';
-import { PanelBuilder as TimeSeriesPanelBuilder } from '@grafana/grafana-foundation-sdk/timeseries';
+import { PanelBuilder as BarGaugePanelBuilder } from '@grafana/grafana-foundation-sdk/bargauge';
 import { PanelBuilder as LogsPanelBuilder } from '@grafana/grafana-foundation-sdk/logs';
+import { PanelBuilder as TablePanelBuilder } from '@grafana/grafana-foundation-sdk/table';
+import { PanelBuilder as StateTimelinePanelBuilder } from '@grafana/grafana-foundation-sdk/statetimeline';
 import { DataqueryBuilder } from '@grafana/grafana-foundation-sdk/loki';
 import {
-  BigValueGraphMode,
   BigValueColorMode,
+  BigValueGraphMode,
   BigValueTextMode,
   LogsSortOrder,
   ReduceDataOptionsBuilder,
+  BarGaugeDisplayMode,
+  BarGaugeNamePlacement,
+  BarGaugeSizing,
+  BarGaugeValueMode,
   VizLegendOptionsBuilder,
-  VizTooltipOptionsBuilder,
-  VizTextDisplayOptionsBuilder,
-  LegendDisplayMode,
-  LegendPlacement,
-  TooltipDisplayMode,
-  SortOrder
+  VizOrientation,
+  LegendDisplayMode
 } from '@grafana/grafana-foundation-sdk/common';
-import { createLokiDatasourceVariable } from '../builders/variables.js';
 import { DatasourceRef } from '../types.js';
 
 export function createNewsMonitoringDashboard(): GrafanaDashboard {
-  // Use the oncall-specific Loki datasource directly
+  // Reference Loki - OnCall datasource by name
   const datasourceRef: DatasourceRef = {
     type: 'loki',
-    uid: 'ff42fx0hl5qtcd'
+    uid: 'Loki - OnCall'
   };
 
-  const newsServices = ['chn', 'esp', 'ita', 'jpn', 'kor', 'por', 'ukr'];
-  const serviceLabels: Record<string, string> = {
-    chn: 'Chinese',
-    esp: 'Español',
-    ita: 'Italian',
-    jpn: 'Japanese',
-    kor: 'Korean',
-    por: 'Portuguese',
-    ukr: 'Ukrainian'
-  };
-
-  // Helper functions
-  const createReduceOptions = () =>
-    new ReduceDataOptionsBuilder().values(false).calcs(['lastNotNull']).fields('');
-
-  const createThresholds = (steps: Array<{ color: string; value: number | null }>) =>
-    new ThresholdsConfigBuilder().mode(ThresholdsMode.Absolute).steps(steps);
-
-  const createStatTextOptions = () =>
-    new VizTextDisplayOptionsBuilder().valueSize(32).titleSize(12);
-
-  const createListLegend = () =>
-    new VizLegendOptionsBuilder()
-      .showLegend(true)
-      .displayMode(LegendDisplayMode.List)
-      .placement(LegendPlacement.Bottom);
-
-  const createTooltip = () =>
-    new VizTooltipOptionsBuilder().mode(TooltipDisplayMode.Multi).sort(SortOrder.None);
-
-  const createQuery = (
-    expr: string,
-    refId: string,
-    legendFormat?: string,
-    maxLines?: number
-  ): DataqueryBuilder => {
-    const builder = new DataqueryBuilder().datasource(datasourceRef).expr(expr).refId(refId);
-
-    if (legendFormat) {
-      builder.legendFormat(legendFormat);
-    }
-
-    if (maxLines !== undefined) {
-      builder.maxLines(maxLines);
-    }
-
-    return builder;
-  };
-
-  const dashboard = new DashboardBuilder('freeCodeCamp News Dashboard (Gantry)')
+  const dashboard = new DashboardBuilder('News Dashboard (Gantry)')
     .uid('freecodecamp-news-v1')
     .tags(['News', 'Docker', 'Loki'])
     .description('Monitor automated news service updates via Gantry (runs hourly at :45)')
     .timezone('utc')
     .refresh('15m')
-    .time({ from: 'now-2d', to: 'now' })
+    .time({ from: 'now-24h', to: 'now' })
     .editable()
 
-    // Variables
-    .withVariable(createLokiDatasourceVariable())
-
-    // Row 1: Executive Summary
+    // Services Panel - shows Skipped and Updated counts
     .withPanel(
       new StatPanelBuilder()
-        .title('Total Log Lines')
-        .description('Total Gantry log activity in selected range')
-        .gridPos({ x: 0, y: 0, w: 6, h: 5 })
+        .title('Services')
+        .gridPos({ x: 0, y: 0, w: 24, h: 9 })
         .datasource(datasourceRef)
         .withTarget(
-          createQuery('sum(count_over_time({stack="oncall", service="update"} [$__range]))', 'A')
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum(count_over_time({stack="oncall", service="update"} |= `Skip updating` [$__range]))'
+            )
+            .refId('A')
+            .legendFormat('Skipped')
         )
-        .unit('short')
-        .graphMode(BigValueGraphMode.Area)
-        .colorMode(BigValueColorMode.Value)
-        .textMode(BigValueTextMode.ValueAndName)
-        .text(createStatTextOptions())
-        .reduceOptions(createReduceOptions())
-        .thresholds(createThresholds([{ color: 'blue', value: 0 }]))
-    )
-
-    .withPanel(
-      new StatPanelBuilder()
-        .title('Service Updates')
-        .description('Number of service update operations in selected range')
-        .gridPos({ x: 6, y: 0, w: 6, h: 5 })
-        .datasource(datasourceRef)
         .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)updating" [$__range]))',
-            'A'
-          )
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum(count_over_time({stack="oncall", service="update"} |= `Perform updating` [$__range]))'
+            )
+            .refId('B')
+            .legendFormat('Updated')
         )
         .unit('short')
-        .graphMode(BigValueGraphMode.Area)
-        .colorMode(BigValueColorMode.Value)
-        .textMode(BigValueTextMode.ValueAndName)
-        .text(createStatTextOptions())
-        .reduceOptions(createReduceOptions())
-        .thresholds(createThresholds([{ color: 'green', value: 0 }]))
-    )
-
-    .withPanel(
-      new StatPanelBuilder()
-        .title('Successes')
-        .description('Successful update operations')
-        .gridPos({ x: 12, y: 0, w: 6, h: 5 })
-        .datasource(datasourceRef)
-        .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)updated" [$__range]))',
-            'A'
-          )
-        )
-        .unit('short')
+        .colorMode(BigValueColorMode.BackgroundSolid)
         .graphMode(BigValueGraphMode.None)
-        .colorMode(BigValueColorMode.Value)
         .textMode(BigValueTextMode.ValueAndName)
-        .text(createStatTextOptions())
-        .reduceOptions(createReduceOptions())
-        .thresholds(createThresholds([{ color: 'green', value: 0 }]))
-    )
-
-    .withPanel(
-      new StatPanelBuilder()
-        .title('Failures & Rollbacks')
-        .description('Failed updates and rollback events')
-        .gridPos({ x: 18, y: 0, w: 6, h: 5 })
-        .datasource(datasourceRef)
-        .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)(fail|error|rollback)" [$__range])) or vector(0)',
-            'A'
-          )
+        .orientation(VizOrientation.Vertical)
+        .wideLayout(false)
+        .reduceOptions(
+          new ReduceDataOptionsBuilder().values(false).calcs(['lastNotNull']).fields('')
         )
-        .unit('short')
-        .graphMode(BigValueGraphMode.None)
-        .colorMode(BigValueColorMode.Value)
-        .textMode(BigValueTextMode.ValueAndName)
-        .text(createStatTextOptions())
-        .reduceOptions(createReduceOptions())
         .thresholds(
-          createThresholds([
+          new ThresholdsConfigBuilder()
+            .mode(ThresholdsMode.Absolute)
+            .steps([{ color: 'green', value: null }])
+        )
+    )
+
+    // Last Action Table - shows precise timestamps and counts per service
+    .withPanel(
+      new TablePanelBuilder()
+        .title('Last Action by Service')
+        .description('Timestamps of last update/skip per service with activity counts')
+        .gridPos({ x: 0, y: 9, w: 24, h: 10 })
+        .datasource(datasourceRef)
+        // Last update timestamp per service
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'last_over_time({stack="oncall", service="update"} |= "Perform updating" | regexp `prd-news_svc-(?P<svc>\\w+)` | line_format "{{.svc}}" [$__range]) by (svc)'
+            )
+            .refId('A')
+            .legendFormat('{{svc}}')
+        )
+        // Last skip timestamp per service
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'last_over_time({stack="oncall", service="update"} |= "Skip updating" | regexp `prd-news_svc-(?P<svc>\\w+)` | line_format "{{.svc}}" [$__range]) by (svc)'
+            )
+            .refId('B')
+            .legendFormat('{{svc}}')
+        )
+        // Update count in time window
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum by (svc) (count_over_time({stack="oncall", service="update"} |= "Perform updating" | regexp `prd-news_svc-(?P<svc>\\w+)` [$__range]))'
+            )
+            .refId('C')
+            .legendFormat('{{svc}}')
+        )
+        // Skip count in time window
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum by (svc) (count_over_time({stack="oncall", service="update"} |= "Skip updating" | regexp `prd-news_svc-(?P<svc>\\w+)` [$__range]))'
+            )
+            .refId('D')
+            .legendFormat('{{svc}}')
+        )
+        .withTransformation({
+          id: 'merge',
+          options: {}
+        })
+        .withTransformation({
+          id: 'organize',
+          options: {
+            renameByName: {
+              'Value #A': 'Last Updated',
+              'Value #B': 'Last Skipped',
+              'Value #C': 'Updates',
+              'Value #D': 'Skips'
+            },
+            indexByName: {
+              svc: 0,
+              'Value #A': 1,
+              'Value #B': 2,
+              'Value #C': 3,
+              'Value #D': 4
+            }
+          }
+        })
+        .showHeader(true)
+    )
+
+    // State Timeline - visual activity over time
+    .withPanel(
+      new StateTimelinePanelBuilder()
+        .title('Service Activity Timeline')
+        .description(
+          'Visual timeline showing when services were updated (green) or skipped (yellow)'
+        )
+        .gridPos({ x: 0, y: 19, w: 24, h: 8 })
+        .datasource(datasourceRef)
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum by (svc, action) (count_over_time({stack="oncall", service="update"} | regexp `prd-news_svc-(?P<svc>\\w+)` | line_format "{{.svc}}" | __line__ |~ "(?P<action>Perform updating|Skip updating)" [1m]))'
+            )
+            .refId('A')
+            .legendFormat('{{svc}}')
+        )
+        .withTransformation({
+          id: 'renameByRegex',
+          options: {
+            regex: 'prd-news_svc-(\\w+)',
+            renamePattern: '$1'
+          }
+        })
+        .legend(new VizLegendOptionsBuilder().showLegend(true).displayMode(LegendDisplayMode.List))
+    )
+
+    // Stale Service Alert - shows time since last update
+    .withPanel(
+      new StatPanelBuilder()
+        .title('Minutes Since Last Update')
+        .description('Time since any service was last updated (red if >120min)')
+        .gridPos({ x: 0, y: 27, w: 8, h: 6 })
+        .datasource(datasourceRef)
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              '(time() - last_over_time({stack="oncall", service="update"} |= "Perform updating" [24h] offset 0s)) / 60'
+            )
+            .refId('A')
+            .legendFormat('Minutes')
+        )
+        .unit('m')
+        .colorMode(BigValueColorMode.Background)
+        .graphMode(BigValueGraphMode.None)
+        .textMode(BigValueTextMode.ValueAndName)
+        .reduceOptions(
+          new ReduceDataOptionsBuilder().values(false).calcs(['lastNotNull']).fields('')
+        )
+        .thresholds(
+          new ThresholdsConfigBuilder().mode(ThresholdsMode.Absolute).steps([
             { color: 'green', value: 0 },
-            { color: 'yellow', value: 1 },
-            { color: 'red', value: 5 }
+            { color: 'yellow', value: 60 },
+            { color: 'red', value: 120 }
           ])
         )
-    );
+    )
 
-  // Row 2: Service Status Grid (7 services)
-  let xPos = 0;
-  newsServices.forEach(service => {
-    const width = 3; // Reduced width to fit more panels
-    const height = 4;
-
-    dashboard.withPanel(
-      new StatPanelBuilder()
-        .title(`${serviceLabels[service]}`)
-        .description(`Update activity for svc-${service}`)
-        .gridPos({ x: xPos, y: 5, w: width, h: height })
-        .datasource(datasourceRef)
-        .withTarget(
-          createQuery(
-            `sum(count_over_time({stack="oncall", service="update"} |~ "(?i)svc-${service}" [$__range]))`,
-            'A'
-          )
-        )
-        .unit('short')
-        .graphMode(BigValueGraphMode.Area)
-        .colorMode(BigValueColorMode.Value)
-        .textMode(BigValueTextMode.ValueAndName)
-        .text(new VizTextDisplayOptionsBuilder().valueSize(20))
-        .reduceOptions(createReduceOptions())
-        .thresholds(
-          createThresholds([
-            { color: 'red', value: 0 },
-            { color: 'yellow', value: 1 },
-            { color: 'green', value: 3 }
-          ])
-        )
-    );
-
-    xPos += width;
-    if (xPos >= 21) {
-      xPos = 0;
-    }
-  });
-
-  // Add final panel to fill the row
-  dashboard
+    // Update/Skip Ratio - overall health metric
     .withPanel(
       new StatPanelBuilder()
-        .title('Total Services')
-        .description('Services tracked')
-        .gridPos({ x: 21, y: 5, w: 3, h: 4 })
+        .title('Update vs Skip Ratio')
+        .description('Overall distribution of updates vs skips across all services')
+        .gridPos({ x: 8, y: 27, w: 16, h: 6 })
         .datasource(datasourceRef)
-        .withTarget(createQuery('vector(7)', 'A'))
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum(count_over_time({stack="oncall", service="update"} |= "Perform updating" [$__range]))'
+            )
+            .refId('A')
+            .legendFormat('Updated')
+        )
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum(count_over_time({stack="oncall", service="update"} |= "Skip updating" [$__range]))'
+            )
+            .refId('B')
+            .legendFormat('Skipped')
+        )
         .unit('short')
+        .colorMode(BigValueColorMode.Value)
         .graphMode(BigValueGraphMode.None)
-        .colorMode(BigValueColorMode.Value)
-        .textMode(BigValueTextMode.Value)
-        .text(new VizTextDisplayOptionsBuilder().valueSize(24))
-        .reduceOptions(createReduceOptions())
-        .thresholds(createThresholds([{ color: 'blue', value: 0 }]))
+        .textMode(BigValueTextMode.ValueAndName)
+        .orientation(VizOrientation.Horizontal)
+        .reduceOptions(
+          new ReduceDataOptionsBuilder().values(false).calcs(['lastNotNull']).fields('')
+        )
+        .thresholds(
+          new ThresholdsConfigBuilder().mode(ThresholdsMode.Absolute).steps([
+            { color: 'blue', value: 0 },
+            { color: 'green', value: 1 }
+          ])
+        )
     )
 
-    // Row 3: Update Activity by Service Name
+    // Image Deletion Success Panel - counts successful image deletions by service
     .withPanel(
-      new TimeSeriesPanelBuilder()
-        .title('Updates by Service Name (Extracted from Logs)')
-        .description('Which news services are being updated')
-        .gridPos({ x: 0, y: 9, w: 24, h: 8 })
+      new BarGaugePanelBuilder()
+        .title('Image Deletions (Successful)')
+        .description('Successful image removals by service (by 3-letter code)')
+        .gridPos({ x: 0, y: 33, w: 12, h: 8 })
         .datasource(datasourceRef)
         .withTarget(
-          createQuery(
-            'sum by (svc) (count_over_time({stack="oncall", service="update"} | regexp `svc-(?P<svc>\\w+)` [$__interval]))',
-            'A',
-            '{{svc}}'
-          )
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum by (svc) (count_over_time({stack="oncall", service="update"} |= "Removed image" | regexp `news-(?P<svc>\\w+):` [$__range]))'
+            )
+            .refId('A')
+            .legendFormat('{{svc}}')
         )
         .unit('short')
-        .legend(createListLegend())
-        .tooltip(createTooltip())
+        .reduceOptions(
+          new ReduceDataOptionsBuilder().values(false).calcs(['lastNotNull']).fields('')
+        )
+        .withTransformation({
+          id: 'sortBy',
+          options: {
+            sort: [{ field: 'Value #A', desc: true }]
+          }
+        })
+        .thresholds(
+          new ThresholdsConfigBuilder()
+            .mode(ThresholdsMode.Absolute)
+            .steps([{ color: 'green', value: null }])
+        )
+        .orientation(VizOrientation.Horizontal)
+        .displayMode(BarGaugeDisplayMode.Lcd)
+        .valueMode(BarGaugeValueMode.Text)
+        .namePlacement(BarGaugeNamePlacement.Left)
+        .showUnfilled(true)
+        .sizing(BarGaugeSizing.Manual)
+        .minVizWidth(8)
+        .minVizHeight(50)
+        .maxVizHeight(250)
+        .legend(new VizLegendOptionsBuilder().showLegend(false))
     )
 
-    // Row 4: Update Operations Timeline
+    // Image Deletion Skipped Panel - counts when no images were removed
     .withPanel(
-      new TimeSeriesPanelBuilder()
-        .title('Update Operations Over Time')
-        .description('Count of update operations (updating, updated, failed, rollback)')
-        .gridPos({ x: 0, y: 17, w: 12, h: 8 })
+      new StatPanelBuilder()
+        .title('Image Deletions (Skipped)')
+        .description('Times when no images needed removal')
+        .gridPos({ x: 12, y: 33, w: 12, h: 8 })
         .datasource(datasourceRef)
         .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)(updating service)" [$__interval]))',
-            'A',
-            'Starting Update'
-          )
-        )
-        .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)(updated service|update succeed)" [$__interval]))',
-            'B',
-            'Success'
-          )
-        )
-        .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)(fail|error)" [$__interval]))',
-            'C',
-            'Failed'
-          )
-        )
-        .withTarget(
-          createQuery(
-            'sum(count_over_time({stack="oncall", service="update"} |~ "(?i)(rollback)" [$__interval]))',
-            'D',
-            'Rollback'
-          )
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum(count_over_time({stack="oncall", service="update"} |= "No images to remove" [$__range]))'
+            )
+            .refId('A')
+            .legendFormat('Skipped')
         )
         .unit('short')
-        .legend(createListLegend())
-        .tooltip(createTooltip())
-        .overrideByName('Starting Update', [
-          { id: 'color', value: { mode: 'fixed', fixedColor: 'blue' } }
-        ])
-        .overrideByName('Success', [{ id: 'color', value: { mode: 'fixed', fixedColor: 'green' } }])
-        .overrideByName('Failed', [{ id: 'color', value: { mode: 'fixed', fixedColor: 'red' } }])
-        .overrideByName('Rollback', [
-          { id: 'color', value: { mode: 'fixed', fixedColor: 'orange' } }
-        ])
-    )
-
-    .withPanel(
-      new TimeSeriesPanelBuilder()
-        .title('Updates by News Service')
-        .description('Which news services are being updated most frequently')
-        .gridPos({ x: 12, y: 17, w: 12, h: 8 })
-        .datasource(datasourceRef)
-        .withTarget(
-          createQuery(
-            'sum by (svc) (count_over_time({stack="oncall", service="update"} | regexp `prd-news_svc-(?P<svc>\\w+)` [$__interval]))',
-            'A',
-            '{{svc}}'
-          )
+        .colorMode(BigValueColorMode.Background)
+        .graphMode(BigValueGraphMode.None)
+        .reduceOptions(
+          new ReduceDataOptionsBuilder().values(false).calcs(['lastNotNull']).fields('')
         )
-        .unit('short')
-        .legend(createListLegend())
-        .tooltip(createTooltip())
-    )
-
-    // Row 5: Failures & Rollbacks
-    .withPanel(
-      new LogsPanelBuilder()
-        .title('Failures & Rollbacks (Problems Only)')
-        .description('Showing only failed updates and rollback events')
-        .gridPos({ x: 0, y: 25, w: 24, h: 10 })
-        .datasource(datasourceRef)
-        .withTarget(
-          createQuery(
-            '{stack="oncall", service="update"} |~ "(?i)(fail|rollback|roll back|exception)" != "0 error" !~ "PARSE RATE ERROR"',
-            'A',
-            undefined,
-            5000
-          )
+        .thresholds(
+          new ThresholdsConfigBuilder()
+            .mode(ThresholdsMode.Absolute)
+            .steps([{ color: 'text', value: 0 }])
         )
-        .showTime(true)
-        .showLabels(true)
-        .wrapLogMessage(true)
-        .enableLogDetails(true)
-        .sortOrder(LogsSortOrder.Descending)
     )
 
-    // Row 6: All Update Logs
+    // Logs Panel - shows all update logs
     .withPanel(
       new LogsPanelBuilder()
         .title('Logs')
         .description('Filtered logs showing service update operations')
-        .gridPos({ x: 0, y: 35, w: 24, h: 12 })
+        .gridPos({ x: 0, y: 41, w: 24, h: 22 })
         .datasource(datasourceRef)
-        .withTarget(createQuery('{stack="oncall", service="update"}', 'A', undefined, 5000))
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr('{stack="oncall", service="update"}')
+            .refId('A')
+            .maxLines(5000)
+        )
         .showTime(true)
         .showLabels(false)
         .wrapLogMessage(false)

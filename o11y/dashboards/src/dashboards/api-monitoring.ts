@@ -22,13 +22,14 @@ import {
   SortOrder
 } from '@grafana/grafana-foundation-sdk/common';
 import { LokiQueryBuilder } from '../builders/queries.js';
-import { createLokiDatasourceVariable, createStackVariable } from '../builders/variables.js';
+import { createStackVariable } from '../builders/variables.js';
 import { DatasourceRef } from '../types.js';
 
 export function createAPIMonitoringDashboard(): GrafanaDashboard {
+  // Reference Loki datasource by name
   const datasourceRef: DatasourceRef = {
     type: 'loki',
-    uid: '${LOKI_DATASOURCE}'
+    uid: 'Loki'
   };
 
   const queryBuilder = new LokiQueryBuilder(
@@ -69,7 +70,6 @@ export function createAPIMonitoringDashboard(): GrafanaDashboard {
     .editable()
 
     // Add variables
-    .withVariable(createLokiDatasourceVariable())
     .withVariable(createStackVariable())
 
     // Row 1: Stat panels - Total Requests, Request Rate, P95, P99, 2xx, 4xx, 5xx

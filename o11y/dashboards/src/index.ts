@@ -5,6 +5,7 @@ import { dirname } from 'path';
 import yaml from 'js-yaml';
 import { createAPIMonitoringDashboard } from './dashboards/api-monitoring.js';
 import { createNewsMonitoringDashboard } from './dashboards/news-monitoring.js';
+import type { GrafanaDashboardJSON, GrafanaPanel } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,7 +17,28 @@ async function generateDashboards() {
   const apiDashboard = createAPIMonitoringDashboard();
 
   // Generate News monitoring dashboard
-  const newsDashboard = createNewsMonitoringDashboard();
+  const newsDashboard = createNewsMonitoringDashboard() as unknown as GrafanaDashboardJSON;
+
+  // Post-process: Add color mode to panels
+  const servicesPanel: GrafanaPanel | undefined = newsDashboard.panels?.find(
+    (p: GrafanaPanel) => p.title === 'Services'
+  );
+  if (servicesPanel?.fieldConfig) {
+    servicesPanel.fieldConfig.defaults = {
+      ...servicesPanel.fieldConfig.defaults,
+      color: { mode: 'continuous-BlPu' }
+    };
+  }
+
+  const bargaugePanel: GrafanaPanel | undefined = newsDashboard.panels?.find(
+    (p: GrafanaPanel) => p.title === 'Image Deletions (Successful)'
+  );
+  if (bargaugePanel?.fieldConfig) {
+    bargaugePanel.fieldConfig.defaults = {
+      ...bargaugePanel.fieldConfig.defaults,
+      color: { mode: 'continuous-BlPu' }
+    };
+  }
 
   // Create output directory
   const outputDir = path.join(__dirname, '..', 'output');
