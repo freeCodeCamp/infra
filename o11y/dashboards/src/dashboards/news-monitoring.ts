@@ -14,6 +14,7 @@ import {
   BigValueColorMode,
   BigValueGraphMode,
   BigValueTextMode,
+  BigValueJustifyMode,
   LogsSortOrder,
   ReduceDataOptionsBuilder,
   BarGaugeDisplayMode,
@@ -52,24 +53,25 @@ export function createNewsMonitoringDashboard(): GrafanaDashboard {
           new DataqueryBuilder()
             .datasource(datasourceRef)
             .expr(
-              'sum(count_over_time({stack="oncall", service="update"} |= `Skip updating` [$__range]))'
-            )
-            .refId('A')
-            .legendFormat('Skipped')
-        )
-        .withTarget(
-          new DataqueryBuilder()
-            .datasource(datasourceRef)
-            .expr(
               'sum(count_over_time({stack="oncall", service="update"} |= `Perform updating` [$__range]))'
             )
             .refId('B')
             .legendFormat('Updated')
         )
+        .withTarget(
+          new DataqueryBuilder()
+            .datasource(datasourceRef)
+            .expr(
+              'sum(count_over_time({stack="oncall", service="update"} |= `Skip updating` [$__range]))'
+            )
+            .refId('A')
+            .legendFormat('Skipped')
+        )
         .unit('short')
         .colorMode(BigValueColorMode.BackgroundSolid)
         .graphMode(BigValueGraphMode.None)
         .textMode(BigValueTextMode.ValueAndName)
+        .justifyMode(BigValueJustifyMode.Center)
         .orientation(VizOrientation.Vertical)
         .wideLayout(false)
         .reduceOptions(
@@ -80,6 +82,15 @@ export function createNewsMonitoringDashboard(): GrafanaDashboard {
             .mode(ThresholdsMode.Absolute)
             .steps([{ color: 'green', value: null }])
         )
+        .withOverride({
+          matcher: { id: 'byName' },
+          properties: [
+            {
+              id: 'color',
+              value: { mode: 'continuous-BlPu' }
+            }
+          ]
+        })
     )
 
     // Last Action Table - shows precise timestamps and counts per service
