@@ -1,0 +1,91 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-route
+  namespace: o11y
+  annotations:
+    # Traefik-specific annotations for proxy settings
+    traefik.ingress.kubernetes.io/router.middlewares: o11y-proxy-settings@kubernetescrd
+spec:
+  parentRefs:
+  - name: o11y-gateway
+    namespace: o11y
+  hostnames:
+  - o11y.freecodecamp.net
+  rules:
+  # Root path to Grafana
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: grafana
+      port: 80
+  # Explicit /grafana path
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /grafana
+    backendRefs:
+    - name: grafana
+      port: 80
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: loki-route
+  namespace: o11y
+  annotations:
+    # Traefik-specific annotations for proxy settings
+    traefik.ingress.kubernetes.io/router.middlewares: o11y-proxy-settings@kubernetescrd
+spec:
+  parentRefs:
+  - name: o11y-gateway
+    namespace: o11y
+  hostnames:
+  - o11y.freecodecamp.net
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /loki
+    backendRefs:
+    - name: loki-gateway
+      port: 80
+
+---
+# Middleware for proxy settings (replaces ingress-nginx annotations)
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: proxy-settings
+  namespace: o11y
+spec:
+  buffering:
+    maxRequestBodyBytes: 52428800  # 50MB in bytes
+    memRequestBodyBytes: 52428800
+    retryExpression: "IsNetworkError() && Attempts() < 2"
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+---
+# IngressRoute for handling timeouts (Traefik-specific)
+# Note: Gateway API doesn't have native timeout support yet
+# We configure this at the Traefik service level via ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-dynamic-config
+  namespace: traefik-system
+data:
+  dynamic-config.yaml: |
+    http:
+      serversTransports:
+        default:
+          forwardingTimeouts:
+            dialTimeout: 30s
+            responseHeaderTimeout: 3600s
+            idleConnTimeout: 90s

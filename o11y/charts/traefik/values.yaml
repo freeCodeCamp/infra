@@ -1,0 +1,54 @@
+# Traefik Gateway API configuration for o11y stack
+# Resource limits match the previous ingress-nginx configuration
+
+deployment:
+  replicas: 2
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 100m
+    memory: 256Mi
+
+# Enable Gateway API provider
+providers:
+  kubernetesGateway:
+    enabled: true
+    # Enable experimental features for full Gateway API support
+    experimentalChannel: true
+
+# Create a LoadBalancer service (DigitalOcean will provision one)
+service:
+  enabled: true
+  type: LoadBalancer
+  annotations: {}
+
+# Access logs for debugging
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+
+# Prometheus metrics for o11y integration
+metrics:
+  prometheus:
+    enabled: true
+
+# Security headers
+securityContext:
+  capabilities:
+    drop: [ALL]
+    add: [NET_BIND_SERVICE]
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 65532
