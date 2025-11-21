@@ -20,8 +20,7 @@
     - name: Check if Git Repository was Updated
       debug:
         msg:
-          'Git Repository was updated, you should run the pipeline for a new
-          deployment.'
+          'Git Repository was updated, will run NGINX config check and reload.'
       when: git_update.changed
 
     - name: Check NGINX Config
