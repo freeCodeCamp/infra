@@ -1,0 +1,60 @@
+---
+- name: Update Git Repository (Parallel)
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  serial: "{{ ansible_play_batch | length }}"
+
+  tasks:
+    - name: Update Git Repository
+      git:
+        repo: https://github.com/freeCodeCamp/nginx-config.git
+        dest: /etc/nginx
+        clone: false
+        update: true
+        force: true
+        single_branch: true
+        version: main
+        accept_hostkey: true
+      register: git_update
+
+    - name: Check if Git Repository was Updated
+      debug:
+        msg:
+          'Git Repository was updated, you should run the pipeline for a new
+          deployment.'
+      when: git_update.changed
+
+    - name: Check NGINX Config
+      shell:
+        chdir: /etc/nginx
+        cmd: nginx -t
+      register: nginx_config_check
+      ignore_errors: true
+
+    - name: Notify if NGINX Config Check Failed
+      debug:
+        msg: "NGINX configuration check failed! Please review the configuration before proceeding."
+      when: nginx_config_check.rc != 0
+
+- name: Reload NGINX (Staggered)
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  serial: 1
+
+  tasks:
+    - name: Add a delay to stagger the reloads
+      pause:
+        seconds: "{{ range(5, 30) | random(seed=inventory_hostname) }}"
+
+    - name: Start NGINX
+      service:
+        name: nginx
+        state: started
+        enabled: true
+      when: hostvars[inventory_hostname]['nginx_config_check'] is defined and hostvars[inventory_hostname]['nginx_config_check'].rc == 0
+
+    - name: Reload NGINX
+      shell:
+        chdir: /etc/nginx
+        cmd: nginx -s 'reload'
+      when: hostvars[inventory_hostname]['nginx_config_check'] is defined and hostvars[inventory_hostname]['nginx_config_check'].rc == 0
