@@ -1,0 +1,39 @@
+kind: Deployment
+
+schedule: "*/30 * * * *"
+
+evictionsPolicy:
+  podsPerNamespaceEvictionLimit: 2
+  totalEvictionsPerNamespace: 5
+
+deschedulerPolicy:
+  strategies:
+    LowNodeUtilization:
+      enabled: true
+      params:
+        nodeResourceUtilizationThresholds:
+          thresholds:
+            cpu: 20
+            memory: 20
+            pods: 20
+          targetThresholds:
+            cpu: 60
+            memory: 60
+            pods: 60
+        numberOfNodes: 1
+        evictableNamespaces:
+          include:
+            - o11y
+            - clickstack
+
+  namespaces:
+    include:
+      - o11y
+      - clickstack
+
+deschedulingInterval: 30m
+
+ignorePvcPods: true
+
+nodeSelector:
+  kubernetes.io/os: linux

@@ -21,6 +21,10 @@ loki:
       insecure: false
       access_key_id: ""
       secret_access_key: ""
+      http_config:
+        idle_conn_timeout: 90s
+        response_header_timeout: 30s
+        insecure_skip_verify: false
 
   schemaConfig:
     configs:
@@ -48,8 +52,8 @@ loki:
     enabled: true
 
   querierConfig:
-    max_concurrent: 32
-    query_timeout: 5m
+    max_concurrent: 16
+    query_timeout: 10m
     query_ingesters_within: 3h
     grpc_client_config:
       max_recv_msg_size: 33554432
@@ -58,7 +62,9 @@ loki:
       enable_fifocache: true
       default_validity: 24h
       fifocache:
-        max_size_mb: 1024
+        max_size_mb: 2048
+    parallelise_shardable_queries: true
+    shard_parallelisation: 8
 
   pattern_ingester:
     enabled: true
@@ -69,11 +75,13 @@ loki:
     split_queries_by_interval: 1h
     max_query_lookback: 720h
     max_query_length: 721h
-    max_query_parallelism: 32
+    max_query_parallelism: 16
     max_entries_limit_per_query: 50000
     max_cache_freshness_per_query: 1h
-    query_timeout: 5m
+    query_timeout: 10m
     volume_enabled: true
+    max_chunks_per_query: 10000000
+    max_query_series: 5000
 
   gateway:
     enabled: true
@@ -119,15 +127,15 @@ distributor:
       memory: 512Mi
 
 querier:
-  replicas: 3
+  replicas: 5
   maxUnavailable: 1
   resources:
     requests:
-      cpu: 200m
-      memory: 768Mi
+      cpu: 300m
+      memory: 1Gi
     limits:
-      cpu: 600m
-      memory: 1536Mi
+      cpu: 1000m
+      memory: 2Gi
 
 queryFrontend:
   replicas: 2
@@ -193,23 +201,25 @@ backend:
 
 chunksCache:
   enabled: true
+  replicas: 2
   resources:
     requests:
-      cpu: 25m
-      memory: 256Mi
+      cpu: 50m
+      memory: 1Gi
     limits:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 200m
+      memory: 2Gi
 
 resultsCache:
   enabled: true
+  replicas: 2
   resources:
     requests:
-      cpu: 25m
-      memory: 256Mi
+      cpu: 50m
+      memory: 1Gi
     limits:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 200m
+      memory: 2Gi
 
 indexGateway:
   enabled: true

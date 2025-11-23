@@ -1,6 +1,4 @@
 ---
-# Buffering Middleware - Request body size limit and retry logic
-# Replaces nginx.ingress.kubernetes.io/proxy-body-size annotation
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -13,8 +11,6 @@ spec:
     retryExpression: "IsNetworkError() && Attempts() < 2"
 
 ---
-# Headers Middleware - Security and proxy headers
-# Replaces custom header annotations from ingress-nginx
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -26,8 +22,6 @@ spec:
       X-Forwarded-Proto: "https"
 
 ---
-# Grafana HTTPRoute - Handles both / and /grafana paths
-# Replaces previous Ingress resource
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -40,13 +34,11 @@ spec:
   hostnames:
   - o11y.freecodecamp.net
   rules:
-  # Root path to Grafana
   - matches:
     - path:
         type: PathPrefix
         value: /
     filters:
-    # Apply middlewares via ExtensionRef (Gateway API standard pattern)
     - type: ExtensionRef
       extensionRef:
         group: traefik.io
@@ -60,7 +52,6 @@ spec:
     backendRefs:
     - name: grafana
       port: 80
-  # Explicit /grafana path
   - matches:
     - path:
         type: PathPrefix
@@ -81,8 +72,6 @@ spec:
       port: 80
 
 ---
-# Loki HTTPRoute - Handles /loki path for log ingestion
-# Replaces previous Ingress resource
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

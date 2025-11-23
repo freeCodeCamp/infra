@@ -129,6 +129,24 @@ helm repo update
 
     Expected: Gateway PROGRAMMED = True, 2 HTTPRoutes (grafana-route, loki-route)
 
+5.  **Descheduler (Optional - Pod Rebalancing)**
+
+    Automatically rebalances pods across nodes based on resource utilization.
+
+    _Install:_
+    ```bash
+    helm repo add descheduler https://kubernetes-sigs.github.io/descheduler/
+    helm upgrade descheduler descheduler/descheduler \
+      --namespace o11y \
+      --install \
+      -f charts/descheduler/values.yaml
+    ```
+
+    _Verify:_
+    ```bash
+    kubectl get cronjob -n o11y descheduler
+    ```
+
 ## 4. Observability Stack Deployment
 
 1.  **Loki Deployment (Log Aggregation)** _Install:_

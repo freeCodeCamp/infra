@@ -16,6 +16,3 @@ secretGenerator:
   - tls.key=secrets/tls.key
   options:
     disableNameSuffixHash: true
-
-# No static resources needed for these secrets, they are generated.
-# resources:

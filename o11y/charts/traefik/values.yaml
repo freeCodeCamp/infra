@@ -1,6 +1,3 @@
-# Traefik Gateway API configuration for o11y stack
-# Resource limits match the previous ingress-nginx configuration
-
 deployment:
   replicas: 2
 
@@ -15,25 +12,19 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-# Enable Gateway API provider
 providers:
   kubernetesGateway:
     enabled: true
-    # Enable experimental features for full Gateway API support
     experimentalChannel: false
 
-# Disable Helm chart's built-in Gateway creation - we create our own
 gateway:
   enabled: false
 
-# Create a LoadBalancer service (DigitalOcean will provision one)
 service:
   enabled: true
   type: LoadBalancer
   annotations: {}
 
-# EntryPoint timeout configuration (replaces nginx proxy timeouts)
-# Using high ports internally, LoadBalancer maps to 80/443 externally
 ports:
   web:
     port: 8000
@@ -48,22 +39,19 @@ ports:
     transport:
       respondingTimeouts:
         readTimeout: "0s"    # Unlimited - for large log uploads to Loki
-        writeTimeout: "0s"   # Unlimited - for long-running Grafana queries
-        idleTimeout: "180s"  # 3 minutes - keep connections alive
+        writeTimeout: "0s"
+        idleTimeout: "180s"
 
-# Access logs for debugging
 logs:
   general:
     level: INFO
   access:
     enabled: true
 
-# Prometheus metrics for o11y integration
 metrics:
   prometheus:
     enabled: true
 
-# Security headers
 securityContext:
   capabilities:
     drop: [ALL]
@@ -72,6 +60,5 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 65532
 
-# Pod security context
 podSecurityContext:
   fsGroup: 65532

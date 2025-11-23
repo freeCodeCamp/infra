@@ -1,8 +1,8 @@
 grafana:
-  enabled: false # We are using our own Grafana instance
+  enabled: false
 
 alertmanager:
-  enabled: true # You may want to disable this if not using alerting initially
+  enabled: true
   alertmanagerSpec:
     storage:
       volumeClaimTemplate:
@@ -10,7 +10,7 @@ alertmanager:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 10Gi # Adjust as needed
+              storage: 10Gi
     resources:
       requests:
         cpu: 300m
@@ -28,7 +28,7 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 50Gi # Adjust based on retention and scrape volume
+              storage: 50Gi
     resources:
       requests:
         cpu: 500m
@@ -36,9 +36,6 @@ prometheus:
       limits:
         cpu: 1
         memory: 2Gi
-
-# Exporters - adjust resources as needed
-# These are often lightweight but monitor them
 
 nodeExporter:
   resources:
@@ -57,9 +54,6 @@ kubeStateMetrics:
     limits:
       cpu: 330m
       memory: 512Mi
-
-# Other components like kube-proxy-metrics, etc., can also have resources defined if needed.
-# For now, focusing on the main ones.
 
 prometheusOperator:
   resources:
