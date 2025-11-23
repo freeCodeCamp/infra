@@ -1,7 +1,23 @@
 # Observability Stack Setup
 
 This document outlines the steps to set up an observability stack using Loki,
-Prometheus, and Grafana.
+Prometheus, and Grafana with Traefik Gateway API.
+
+## Architecture Notes
+
+**Ingress Controller:** Traefik with Kubernetes Gateway API (migrated from ingress-nginx in Nov 2025)
+
+**Why Gateway API?**
+- ingress-nginx retired (EOL: March 2026)
+- Gateway API is Kubernetes standard for traffic routing
+- Better separation of concerns (infrastructure vs application routing)
+
+**Key Components:**
+- **Gateway API v1.4.0**: Standard CRDs for traffic routing
+- **Traefik v3.6+**: Gateway API controller
+- **Gateway**: Defines HTTPS listener on port 8443 (internal), exposed as 443 externally
+- **HTTPRoutes**: Route `/grafana` and `/loki` to respective services
+- **Middlewares**: Request buffering (50MB limit), security headers
 
 ## 1. Prerequisites & Initial Setup
 
@@ -36,7 +52,7 @@ Prometheus, and Grafana.
 Install and update necessary Helm chart repositories:
 
 ```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add traefik https://traefik.github.io/charts
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
@@ -78,19 +94,40 @@ helm repo update
     kubectl get deployment metrics-server -n kube-system
     ```
 
-4.  **NGINX Ingress Controller** _Create Namespace (if not present, though
-    usually handled by Helm):_
+4.  **Gateway API & Traefik**
+
+    _Install Gateway API CRDs:_
     ```bash
-    kubectl create namespace ingress-nginx # Optional, Helm might create it
+    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
     ```
-    _Install:_
+
+    _Verify CRDs:_
     ```bash
-    helm upgrade ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --install -f charts/ingress-nginx/values.yaml
+    kubectl get crd gateways.gateway.networking.k8s.io
     ```
-    _Verify:_
+
+    _Install Traefik with Gateway API support:_
     ```bash
-    kubectl get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+    helm upgrade traefik traefik/traefik \
+      --namespace o11y \
+      --install \
+      --values charts/traefik/values.yaml \
+      --reuse-values=false
     ```
+
+    _Deploy Gateway and HTTPRoutes:_
+    ```bash
+    kubectl apply -f k8s/gateway/gateway.yaml
+    kubectl apply -f k8s/gateway/httproutes.yaml
+    ```
+
+    _Verify Gateway status:_
+    ```bash
+    kubectl get gateway -n o11y o11y-gateway
+    kubectl get httproute -n o11y
+    ```
+
+    Expected: Gateway PROGRAMMED = True, 2 HTTPRoutes (grafana-route, loki-route)
 
 ## 4. Observability Stack Deployment
 
@@ -139,27 +176,44 @@ helm repo update
       [Kubernetes cluster monitoring (via Prometheus) - ID 315](https://grafana.com/grafana/dashboards/315-kubernetes-cluster-monitoring-via-prometheus/)
       or create your own.
 
-## 5. Ingress & DNS Configuration
+## 5. Gateway & DNS Configuration
 
-1.  **Ingress Configuration (Grafana/Loki)** _Apply:_
+> **Note:** Gateway and HTTPRoutes are deployed in Step 3.4 above. This section covers DNS configuration only.
 
+1.  **Verify Gateway Configuration**
+
+    _Check Gateway status:_
     ```bash
-    kubectl apply -f k8s/ingress/o11y-ingress.yaml -n o11y
+    kubectl get gateway -n o11y o11y-gateway
     ```
+    Expected: `PROGRAMMED = True`
 
-    _Verify:_
-
+    _Check HTTPRoutes:_
     ```bash
-    kubectl get ingress -n o11y
+    kubectl get httproute -n o11y
     ```
+    Expected: 2 routes (grafana-route, loki-route)
 
 2.  **DNS Configuration (Manual)**
-    1.  Get Load Balancer IP for the NGINX Ingress controller:
+
+    1.  Get Load Balancer IP for Traefik:
         ```bash
-        kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}' | cat
+        kubectl get svc -n o11y traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+        echo
         ```
-    2.  Create an A record in Cloudflare for `o11y.freecodecamp.net` pointing to
-        the retrieved IP.
+
+    2.  Update A record in Cloudflare for `o11y.freecodecamp.net` to point to the Traefik LoadBalancer IP.
+
+    3.  Test endpoints before DNS update (optional):
+        ```bash
+        TRAEFIK_IP=$(kubectl get svc -n o11y traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+        # Test Grafana
+        curl -k -H "Host: o11y.freecodecamp.net" https://$TRAEFIK_IP/grafana/api/health
+
+        # Test Loki
+        curl -k -H "Host: o11y.freecodecamp.net" https://$TRAEFIK_IP/loki/api/v1/status/buildinfo
+        ```
 
 ## 6. Final Verification
 
