@@ -107,7 +107,6 @@ x-deploy-config: &deploy-config
     - SES_ID=${SES_ID}
     - SES_SECRET=${SES_SECRET}
     # -- Feature Flags
-    # - FCC_ENABLE_EXAM_ENVIRONMENT=${FCC_ENABLE_EXAM_ENVIRONMENT:-false}
     # - FCC_ENABLE_SHADOW_CAPTURE=${FCC_ENABLE_SHADOW_CAPTURE:-false}
     # -- Analytics
     - GROWTHBOOK_FASTIFY_API_HOST=${GROWTHBOOK_FASTIFY_API_HOST}
