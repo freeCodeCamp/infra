@@ -260,3 +260,21 @@ bloomGateway:
     limits:
       cpu: 100m
       memory: 256Mi
+
+# Monitoring configuration for Prometheus Operator integration
+monitoring:
+  dashboards:
+    enabled: false
+    namespace: o11y
+    labels:
+      grafana_dashboard: "1"
+  rules:
+    enabled: true
+    alerting: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    namespaceSelector: {}
+    labels:
+      release: prometheus
+    annotations: {}
