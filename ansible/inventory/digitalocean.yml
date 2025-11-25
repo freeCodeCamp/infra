@@ -7,6 +7,6 @@ attributes:
   - networks
 keyed_groups:
   - key: do_tags
-leading_separator: no
+    leading_separator: false
 compose:
   ansible_host: do_networks.v4 | selectattr('type','eq','public') | map(attribute='ip_address') | first
