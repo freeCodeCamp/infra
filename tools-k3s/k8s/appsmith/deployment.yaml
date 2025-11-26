@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appsmith
+  namespace: appsmith
+  labels:
+    app: appsmith
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Required for RWO PVC
+  selector:
+    matchLabels:
+      app: appsmith
+  template:
+    metadata:
+      labels:
+        app: appsmith
+    spec:
+      containers:
+      - name: appsmith
+        image: index.docker.io/appsmith/appsmith-ce:v1.92
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: APPSMITH_ENCRYPTION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: appsmith-secrets
+              key: APPSMITH_ENCRYPTION_PASSWORD
+        - name: APPSMITH_ENCRYPTION_SALT
+          valueFrom:
+            secretKeyRef:
+              name: appsmith-secrets
+              key: APPSMITH_ENCRYPTION_SALT
+        - name: APPSMITH_SUPERVISOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: appsmith-secrets
+              key: APPSMITH_SUPERVISOR_PASSWORD
+        - name: APPSMITH_DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: appsmith-secrets
+              key: APPSMITH_DB_URL
+        - name: APPSMITH_REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: appsmith-secrets
+              key: APPSMITH_REDIS_URL
+              optional: true
+        volumeMounts:
+        - name: appsmith-data
+          mountPath: /appsmith-stacks
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: appsmith-data
+        persistentVolumeClaim:
+          claimName: appsmith-data
