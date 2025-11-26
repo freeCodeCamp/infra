@@ -24,33 +24,9 @@ spec:
         ports:
         - containerPort: 80
           name: http
-        env:
-        - name: APPSMITH_ENCRYPTION_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: appsmith-secrets
-              key: APPSMITH_ENCRYPTION_PASSWORD
-        - name: APPSMITH_ENCRYPTION_SALT
-          valueFrom:
-            secretKeyRef:
-              name: appsmith-secrets
-              key: APPSMITH_ENCRYPTION_SALT
-        - name: APPSMITH_SUPERVISOR_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: appsmith-secrets
-              key: APPSMITH_SUPERVISOR_PASSWORD
-        - name: APPSMITH_DB_URL
-          valueFrom:
-            secretKeyRef:
-              name: appsmith-secrets
-              key: APPSMITH_DB_URL
-        - name: APPSMITH_REDIS_URL
-          valueFrom:
-            secretKeyRef:
-              name: appsmith-secrets
-              key: APPSMITH_REDIS_URL
-              optional: true
+        envFrom:
+        - secretRef:
+            name: appsmith-secrets
         volumeMounts:
         - name: appsmith-data
           mountPath: /appsmith-stacks
