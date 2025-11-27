@@ -18,7 +18,7 @@
     "validate": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "prepare": "husky"
   },
-  "packageManager": "pnpm@10.23.0",
+  "packageManager": "pnpm@10.24.0",
   "keywords": [],
   "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "license": "ISC",
