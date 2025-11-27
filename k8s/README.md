@@ -41,10 +41,9 @@ Prometheus, and Grafana with Traefik Gateway API.
         keys), generate a new access key and secret key for this Space. These
         will be used in the secrets configuration later.
 
-3.  **Working Directory** Locate and change to the `o11y` directory for
-    subsequent commands:
+3.  **Working Directory** Navigate to the `k8s` directory (direnv will auto-load KUBECONFIG):
     ```bash
-    cd o11y
+    cd k8s
     ```
 
 ## 2. Helm Repositories
@@ -70,14 +69,14 @@ helm repo update
 2.  **Secrets Configuration & Creation (via Kustomize)**
 
     1.  Prepare Secret Files:
-        - Create and populate `.secrets.env` in `k8s/base/secrets/` based on
-          `.secrets.env.example`. (Do NOT use quotes around values).
+        - Create and populate `.secrets.env` in `apps/o11y/manifests/base/secrets/` based on
+          `.secrets.env.sample`. (Do NOT use quotes around values).
         - Place your Cloudflare origin certificate into
-          `k8s/base/secrets/tls.crt`.
-        - Place your Cloudflare private key into `k8s/base/secrets/tls.key`.
+          `apps/o11y/manifests/base/secrets/tls.crt`.
+        - Place your Cloudflare private key into `apps/o11y/manifests/base/secrets/tls.key`.
     2.  Apply Kustomized Secrets:
         ```bash
-        kubectl apply -k k8s/base/
+        kubectl apply -k apps/o11y/manifests/base/
         ```
         > Note: The `o11y-secrets` Kubernetes secret will be used by Loki and
         > Grafana.
@@ -111,14 +110,14 @@ helm repo update
     helm upgrade traefik traefik/traefik \
       --namespace o11y \
       --install \
-      --values charts/traefik/values.yaml \
+      --values apps/o11y/charts/traefik/values.yaml \
       --reuse-values=false
     ```
 
     _Deploy Gateway and HTTPRoutes:_
     ```bash
-    kubectl apply -f k8s/gateway/gateway.yaml
-    kubectl apply -f k8s/gateway/httproutes.yaml
+    kubectl apply -f apps/o11y/manifests/gateway/gateway.yaml
+    kubectl apply -f apps/o11y/manifests/gateway/httproutes.yaml
     ```
 
     _Verify Gateway status:_
@@ -139,7 +138,7 @@ helm repo update
     helm upgrade descheduler descheduler/descheduler \
       --namespace o11y \
       --install \
-      -f charts/descheduler/values.yaml
+      -f apps/o11y/charts/descheduler/values.yaml
     ```
 
     _Verify:_
@@ -152,7 +151,7 @@ helm repo update
 1.  **Loki Deployment (Log Aggregation)** _Install:_
 
     ```bash
-    helm upgrade loki grafana/loki --namespace o11y --install -f charts/loki/values.yaml
+    helm upgrade loki grafana/loki --namespace o11y --install -f apps/o11y/charts/loki/values.yaml
     ```
 
     _Verify:_
@@ -164,11 +163,11 @@ helm repo update
 2.  **Prometheus Stack Installation (Metrics Collection)**
 
     1.  Install `kube-prometheus-stack`: The stack is configured via
-        `charts/prometheus/values.yaml`. This configuration disables the Grafana
+        `apps/o11y/charts/prometheus/values.yaml`. This configuration disables the Grafana
         instance included with the stack (as we use a separate one) and sets
         conservative resource limits.
         ```bash
-        helm upgrade prometheus prometheus-community/kube-prometheus-stack --namespace o11y --install --create-namespace -f charts/prometheus/values.yaml
+        helm upgrade prometheus prometheus-community/kube-prometheus-stack --namespace o11y --install --create-namespace -f apps/o11y/charts/prometheus/values.yaml
         ```
     2.  Verify Installation:
         ```bash
@@ -178,14 +177,14 @@ helm repo update
 
 3.  **Grafana Deployment (Visualization)** _Install:_
     ```bash
-    helm upgrade grafana grafana/grafana --namespace o11y --install -f charts/grafana/values.yaml
+    helm upgrade grafana grafana/grafana --namespace o11y --install -f apps/o11y/charts/grafana/values.yaml
     ```
     _Verify:_
     ```bash
     kubectl get pods -n o11y -l app.kubernetes.io/name=grafana
     ```
     _Data Sources Note:_ The Grafana configuration in
-    `charts/grafana/values.yaml` automatically provisions:
+    `apps/o11y/charts/grafana/values.yaml` automatically provisions:
     - **Loki** datasource, pointing to
       `http://loki-gateway.o11y.svc.cluster.local`.
     - **Prometheus** datasource, pointing to
@@ -252,24 +251,24 @@ helm repo update
 
 ## 7. Grafana Dashboards
 
-Dashboards are managed as TypeScript code in `dashboards/`, providing type-safe, version-controlled dashboard definitions.
+Dashboards are managed as TypeScript code in `apps/o11y/dashboards/`, providing type-safe, version-controlled dashboard definitions.
 
 ### Quick Start
 
 ```bash
-cd dashboards
+cd apps/o11y/dashboards
 pnpm install
 pnpm run build
 ```
 
 Generates:
 - `output/api-monitoring.json` - Dashboard JSON
-- `../k8s/grafana/dashboards/api-monitoring.yaml` - Kubernetes ConfigMap
+- `../manifests/grafana/dashboards/api-monitoring.yaml` - Kubernetes ConfigMap
 
 ### Deploy
 
 ```bash
-kubectl apply -f ../k8s/grafana/dashboards/api-monitoring.yaml
+kubectl apply -f apps/o11y/manifests/grafana/dashboards/api-monitoring.yaml
 ```
 
 Dashboard auto-loads in Grafana within ~30 seconds.
@@ -292,4 +291,4 @@ Dashboard auto-loads in Grafana within ~30 seconds.
 
 1. Edit `src/dashboards/api-monitoring.ts`
 2. Run `pnpm run build`
-3. Deploy: `kubectl apply -f ../k8s/grafana/dashboards/api-monitoring.yaml`
+3. Deploy: `kubectl apply -f ../manifests/grafana/dashboards/api-monitoring.yaml`
