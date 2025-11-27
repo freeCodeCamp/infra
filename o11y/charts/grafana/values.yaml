@@ -33,8 +33,10 @@ admin:
   passwordKey: "GRAFANA_ADMIN_PASSWORD"
 
 grafana.ini:
+  auth:
+    disable_login_form: true
   users:
-    auto_assign_org_role: Admin
+    auto_assign_org_role: Viewer
   paths:
     data: /var/lib/grafana/
     logs: /var/log/grafana
@@ -44,21 +46,21 @@ grafana.ini:
     domain: o11y.freecodecamp.net
     root_url: https://o11y.freecodecamp.net/grafana
     serve_from_sub_path: true
-  auth.github:
+  auth.google:
     enabled: true
     allow_sign_up: true
-    auto_login: false
-    scopes: user:email,read:org
+    auto_login: true
+    scopes: openid email profile
+    auth_url: https://accounts.google.com/o/oauth2/v2/auth
+    token_url: https://oauth2.googleapis.com/token
+    api_url: https://openidconnect.googleapis.com/v1/userinfo
+    allowed_domains: $__env{GRAFANA_GOOGLE_ALLOWED_DOMAIN}
+    validate_hd: true
+    use_pkce: true
     skip_org_role_sync: true
     allow_assign_grafana_admin: true
-    role_attribute_path: GrafanaAdmin
-    auth_url: https://github.com/login/oauth/authorize
-    token_url: https://github.com/login/oauth/access_token
-    api_url: https://api.github.com/user
-    allowed_organizations: $__env{GRAFANA_GITHUB_ORG_NAME}
-    team_ids: $__env{GRAFANA_GITHUB_TEAM_ADMIN_ID}
-    client_id: $__env{GRAFANA_GITHUB_CLIENT_ID}
-    client_secret: $__env{GRAFANA_GITHUB_CLIENT_SECRET}
+    client_id: $__env{GRAFANA_GOOGLE_CLIENT_ID}
+    client_secret: $__env{GRAFANA_GOOGLE_CLIENT_SECRET}
 
 datasources:
   datasources.yaml:
