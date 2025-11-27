@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: outline
+
+resources:
+- namespace.yaml
+
+secretGenerator:
+- name: outline-secrets
+  type: Opaque
+  envs:
+  - secrets/.secrets.env
+  options:
+    disableNameSuffixHash: true
+- name: outline-tls-cloudflare
+  type: kubernetes.io/tls
+  files:
+  - tls.crt=secrets/tls.crt
+  - tls.key=secrets/tls.key
+  options:
+    disableNameSuffixHash: true

@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: outline-gateway
+  namespace: outline
+spec:
+  gatewayClassName: traefik
+  listeners:
+  - name: websecure
+    protocol: HTTPS
+    port: 8443
+    hostname: outline.freecodecamp.net
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: outline-tls-cloudflare
+    allowedRoutes:
+      namespaces:
+        from: Same
+  - name: web
+    protocol: HTTP
+    port: 8000
+    hostname: outline.freecodecamp.net
+    allowedRoutes:
+      namespaces:
+        from: Same
