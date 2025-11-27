@@ -16,11 +16,6 @@ runcmd:
     sed -i -e '/^PasswordAuthentication/s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config
     sed -i -e '/^PubkeyAuthentication/s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config
     sed -i -e '$aAllowUsers freecodecamp' /etc/ssh/sshd_config
-  # Configure hostname
-  - |
-    sed -i '/preserve_hostname: false/c\preserve_hostname: true' /etc/cloud/cloud.cfg
-    hostnamectl set-hostname ubuntu-server
-    echo "ubuntu-server" > /etc/hostname
   # :-----------------------: WARNING :-----------------------:
   #
   #   This next line should be the last command in the list,
