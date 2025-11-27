@@ -1,0 +1,83 @@
+# Longhorn Distributed Storage for K3s
+# Reference: https://longhorn.io/docs/latest/deploy/install/install-with-helm/
+
+# Default settings for new volumes
+defaultSettings:
+  # 2 replicas = data on 2 of 3 nodes (survives 1 node failure)
+  defaultReplicaCount: 2
+
+  # Storage path on nodes
+  defaultDataPath: /var/lib/longhorn
+
+  # Automatic salvage for faulted replicas
+  autoSalvage: true
+
+  # Allow scheduling on control-plane nodes (all our nodes are control-plane)
+  allowNodeDrainWithLastHealthyReplica: false
+
+  # Replica auto-balance when nodes are added/removed
+  replicaAutoBalance: best-effort
+
+  # Backup target (configure for DO Spaces later if needed)
+  # backupTarget: s3://bucket-name@region/
+  # backupTargetCredentialSecret: longhorn-backup-secret
+
+# Persistence settings
+persistence:
+  # Don't set as default yet - keep local-path as default
+  # Change to true after migrating existing workloads
+  defaultClass: false
+
+  defaultClassReplicaCount: 2
+
+  # RWO is typical for databases
+  defaultFsType: ext4
+
+  # Reclaim policy
+  reclaimPolicy: Delete
+
+# Resource limits for Longhorn components
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Longhorn Manager
+longhornManager:
+  priorityClass: ~
+  tolerations: []
+  nodeSelector: {}
+
+# Longhorn Driver
+longhornDriver:
+  priorityClass: ~
+  tolerations: []
+  nodeSelector: {}
+
+# Longhorn UI
+longhornUI:
+  replicas: 1
+  priorityClass: ~
+  tolerations: []
+  nodeSelector: {}
+
+# Ingress for UI (disabled - access via kubectl port-forward)
+ingress:
+  enabled: false
+
+# Service for UI
+service:
+  ui:
+    type: ClusterIP
+  manager:
+    type: ClusterIP
+
+# Enable CSI snapshots
+csi:
+  attacherReplicaCount: 2
+  provisionerReplicaCount: 2
+  resizerReplicaCount: 2
+  snapshotterReplicaCount: 2
