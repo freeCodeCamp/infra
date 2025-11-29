@@ -12,7 +12,7 @@ x-deploy-config: &deploy-config
       monitor: 30s
       max_failure_ratio: 0.3
     restart_policy:
-      condition: on-failure
+      condition: any
     resources:
       limits:
         cpus: ${CPU_LIMIT:-1}
