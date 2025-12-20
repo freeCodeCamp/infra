@@ -1,0 +1,161 @@
+---
+# Prepare k3s cluster for ClickHouse deployment
+#
+# Applies:
+#   - sysctl tuning for ClickHouse performance
+#   - Storage symlink from DO Block Storage to /data/clickhouse
+#   - local-path provisioner config for /data/clickhouse
+#
+# Usage:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--clickhouse.yml \
+#     -e variable_host=<group>
+#
+# Example:
+#   uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--clickhouse.yml -e variable_host=logs_k3s
+
+
+# Play 1: Apply ClickHouse tuning to all nodes
+- name: ClickHouse - System tuning
+  hosts: '{{ variable_host }}'
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Apply sysctl settings
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: true
+        reload: true
+      loop:
+        # Memory settings
+        - { key: vm.max_map_count, value: "262144" }
+        - { key: vm.swappiness, value: "1" }
+        - { key: vm.dirty_background_ratio, value: "5" }
+        - { key: vm.dirty_ratio, value: "10" }
+        # Network settings
+        - { key: net.core.somaxconn, value: "65535" }
+        - { key: net.core.netdev_max_backlog, value: "65535" }
+        - { key: net.ipv4.tcp_max_syn_backlog, value: "65535" }
+        - { key: net.ipv4.tcp_fin_timeout, value: "15" }
+        - { key: net.ipv4.tcp_keepalive_time, value: "300" }
+        - { key: net.ipv4.tcp_keepalive_intvl, value: "30" }
+        - { key: net.ipv4.tcp_keepalive_probes, value: "5" }
+
+    - name: Disable transparent huge pages
+      shell: |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+      changed_when: false
+
+    - name: Detect mounted block storage
+      shell: findmnt -rno TARGET -t ext4 | grep '/mnt' | head -1
+      register: storage_mount
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if no block storage detected
+      fail:
+        msg: "No DO Block Storage found mounted at /mnt/*. Ensure volume is attached and mounted."
+      when: storage_mount.stdout | length == 0
+
+    - name: Verify mount is in fstab (persistent)
+      shell: grep -q "{{ storage_mount.stdout }}" /etc/fstab
+      register: fstab_check
+      changed_when: false
+      failed_when: false
+
+    - name: Warn if mount not in fstab
+      debug:
+        msg: "WARNING: {{ storage_mount.stdout }} not in fstab - mount may not survive reboot"
+      when: fstab_check.rc != 0
+
+    - name: Get block device for mount
+      shell: findmnt -rno SOURCE "{{ storage_mount.stdout }}"
+      register: block_device
+      changed_when: false
+
+    - name: Set I/O scheduler to none
+      shell: |
+        DEV=$(basename {{ block_device.stdout }} | sed 's/[0-9]*$//')
+        echo none > /sys/block/${DEV}/queue/scheduler 2>/dev/null || true
+      changed_when: false
+
+    - name: Make I/O scheduler persistent via udev rule
+      copy:
+        dest: /etc/udev/rules.d/60-clickhouse-scheduler.rules
+        content: |
+          # Set I/O scheduler to none for DO block storage (SSD)
+          ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+          ACTION=="add|change", KERNEL=="vd[a-z]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+        mode: '0644'
+
+    - name: Make THP disable persistent
+      copy:
+        dest: /etc/systemd/system/disable-thp.service
+        content: |
+          [Unit]
+          Description=Disable Transparent Huge Pages
+          DefaultDependencies=no
+          After=sysinit.target local-fs.target
+          Before=basic.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+          ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+
+          [Install]
+          WantedBy=basic.target
+        mode: '0644'
+      register: thp_service
+
+    - name: Enable THP disable service
+      systemd:
+        name: disable-thp
+        enabled: true
+        daemon_reload: "{{ thp_service.changed }}"
+
+    - name: Create /data directory
+      file:
+        path: /data
+        state: directory
+        mode: '0755'
+
+    - name: Create storage symlink
+      file:
+        src: "{{ storage_mount.stdout }}"
+        dest: /data/clickhouse
+        state: link
+        force: true
+
+
+# Play 2: Configure local-path provisioner for ClickHouse storage (runs on first server only)
+- name: ClickHouse - Storage provisioner
+  hosts: '{{ variable_host }}[0]'
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Update local-path provisioner config
+      shell: |
+        k3s kubectl patch configmap local-path-config -n kube-system --type merge \
+          -p '{"data":{"config.json":"{\"nodePathMap\":[{\"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\"paths\":[\"/data/clickhouse\"]}]}"}}'
+      register: patch_result
+      changed_when: "'patched' in patch_result.stdout"
+
+    - name: Restart local-path provisioner
+      command: k3s kubectl rollout restart deployment local-path-provisioner -n kube-system
+
+    - name: Wait for rollout
+      command: k3s kubectl rollout status deployment local-path-provisioner -n kube-system --timeout=60s
+      changed_when: false
+
+    - name: Verify config
+      command: k3s kubectl get configmap local-path-config -n kube-system -o jsonpath='{.data.config\.json}'
+      register: config
+      changed_when: false
+
+    - name: Display
+      debug:
+        msg: "local-path provisioner configured: {{ config.stdout }}"

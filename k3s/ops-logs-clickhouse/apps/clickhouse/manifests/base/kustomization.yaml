@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: clickhouse
+
+resources:
+  - namespace.yaml
+  - clickhouse-keeper.yaml
+  - clickhouse-installation.yaml
+  - service-tailscale.yaml

@@ -1,0 +1,9 @@
+apiVersion: longhorn.io/v1beta2
+kind: BackupTarget
+metadata:
+  name: default
+  namespace: longhorn-system
+spec:
+  backupTargetURL: s3://net.freecodecamp.ops-k3s-backups@nyc3/
+  credentialSecret: do-spaces-backup
+  pollInterval: 5m0s

@@ -1,0 +1,99 @@
+---
+# Install Longhorn distributed storage on k3s cluster
+#
+# For clusters running apps without built-in replication (Appsmith, Outline, etc.)
+# Provides: replicated volumes, snapshots, backups
+#
+# Usage:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
+#     -e variable_host=<group>
+#
+# Example:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
+#     -e variable_host=k3s_tools
+
+
+# Play 1: Install Longhorn prerequisites on all nodes
+- name: Longhorn - Prerequisites
+  hosts: '{{ variable_host }}'
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - open-iscsi
+          - nfs-common
+        state: present
+        update_cache: true
+
+    - name: Enable and start iscsid
+      systemd:
+        name: iscsid
+        enabled: true
+        state: started
+
+
+# Play 2: Deploy Longhorn via k3s HelmChart (runs on first server only)
+- name: Longhorn - Deploy
+  hosts: '{{ variable_host }}[0]'
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Deploy Longhorn HelmChart
+      copy:
+        dest: /var/lib/rancher/k3s/server/manifests/longhorn.yaml
+        content: |
+          apiVersion: helm.cattle.io/v1
+          kind: HelmChart
+          metadata:
+            name: longhorn
+            namespace: default
+          spec:
+            chart: longhorn
+            repo: https://charts.longhorn.io
+            version: 1.10.1
+            targetNamespace: longhorn-system
+            createNamespace: true
+            failurePolicy: abort
+            valuesContent: |-
+              persistence:
+                defaultClassReplicaCount: 2
+              defaultSettings:
+                defaultReplicaCount: 2
+                storageMinimalAvailablePercentage: 15
+                storageOverProvisioningPercentage: 100
+        mode: '0600'
+
+    - name: Wait for Longhorn namespace
+      command: k3s kubectl get namespace longhorn-system
+      register: ns_check
+      until: ns_check.rc == 0
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Wait for Longhorn manager
+      command: >
+        k3s kubectl -n longhorn-system wait --for=condition=Available
+        deployment/longhorn-driver-deployer --timeout=300s
+      changed_when: false
+
+    - name: Verify StorageClass
+      command: k3s kubectl get storageclass longhorn
+      register: sc_check
+      until: sc_check.rc == 0
+      retries: 12
+      delay: 10
+      changed_when: false
+
+    - name: Get Longhorn status
+      command: k3s kubectl -n longhorn-system get pods
+      register: status
+      changed_when: false
+
+    - name: Display
+      debug:
+        msg: "{{ status.stdout_lines }}"

@@ -1,0 +1,144 @@
+---
+# Deploy Vector log shipper to NGINX/proxy nodes
+#
+# Usage:
+#   uv run ansible-playbook -i inventory/linode.yml play-o11y--vector.yml \
+#     -e variable_host=stg_oldeworld_pxy \
+#     -e vector_env=stg \
+#     -e vector_clickhouse_password=<password>
+#
+# Environments: stg (staging), prd (production)
+# Databases: logs_nginx_stg, logs_nginx_prd
+
+- name: Deploy Vector for log shipping
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+
+  vars:
+    vector_config_dir: /etc/vector
+    vector_data_dir: /var/lib/vector
+    clickhouse_host: "{{ clickhouse_endpoint | default('clickhouse-logs') }}"  # Tailscale hostname
+    clickhouse_user: "{{ clickhouse_vector_user | default('vector') }}"
+    clickhouse_database: "logs_nginx_{{ vector_env | default('prd') }}"
+    nginx_log_path: "{{ nginx_access_log | default('/var/log/nginx/json_access.log') }}"
+    vector_password: "{{ vector_clickhouse_password }}"
+
+  tasks:
+    - name: Check if Vector is installed
+      command: vector --version
+      register: vector_installed
+      changed_when: false
+      failed_when: false
+
+    - name: Install Vector
+      when: vector_installed.rc != 0
+      block:
+        - name: Download Datadog GPG keys
+          ansible.builtin.get_url:
+            url: "https://keys.datadoghq.com/{{ item }}"
+            dest: "/tmp/{{ item }}"
+            mode: '0644'
+          loop:
+            - DATADOG_APT_KEY_CURRENT.public
+            - DATADOG_APT_KEY_F14F620E.public
+            - DATADOG_APT_KEY_C0962C7D.public
+
+        - name: Import GPG keys to keyring
+          ansible.builtin.shell: |
+            cat /tmp/DATADOG_APT_KEY_CURRENT.public /tmp/DATADOG_APT_KEY_F14F620E.public /tmp/DATADOG_APT_KEY_C0962C7D.public | \
+            gpg --dearmor -o /usr/share/keyrings/datadog-archive-keyring.gpg
+          args:
+            creates: /usr/share/keyrings/datadog-archive-keyring.gpg
+
+        - name: Set keyring permissions
+          ansible.builtin.file:
+            path: /usr/share/keyrings/datadog-archive-keyring.gpg
+            mode: '0644'
+
+        - name: Copy keyring to trusted.gpg.d for compatibility
+          ansible.builtin.copy:
+            src: /usr/share/keyrings/datadog-archive-keyring.gpg
+            dest: /etc/apt/trusted.gpg.d/datadog-archive-keyring.gpg
+            remote_src: true
+            mode: '0644'
+
+        - name: Add Vector repository
+          ansible.builtin.apt_repository:
+            repo: "deb [signed-by=/usr/share/keyrings/datadog-archive-keyring.gpg] https://apt.vector.dev/ stable vector-0"
+            state: present
+            filename: vector
+
+        - name: Install Vector package
+          ansible.builtin.apt:
+            name: vector
+            state: present
+            update_cache: true
+
+    - name: Create Vector directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: vector
+        group: vector
+        mode: '0755'
+      loop:
+        - "{{ vector_config_dir }}"
+        - "{{ vector_data_dir }}"
+
+    - name: Deploy Vector configuration
+      ansible.builtin.template:
+        src: templates/vector/vector.yaml.j2
+        dest: "{{ vector_config_dir }}/vector.yaml"
+        owner: vector
+        group: vector
+        mode: '0640'
+      notify: Restart Vector
+
+    - name: Create Vector environment file with credentials
+      ansible.builtin.copy:
+        content: |
+          VECTOR_CLICKHOUSE_PASSWORD={{ vector_password }}
+        dest: "{{ vector_config_dir }}/vector.env"
+        owner: vector
+        group: vector
+        mode: '0600'
+      notify: Restart Vector
+
+    - name: Create systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/vector.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Configure Vector systemd override
+      ansible.builtin.copy:
+        content: |
+          [Service]
+          EnvironmentFile={{ vector_config_dir }}/vector.env
+          ExecStartPre=
+          ExecStartPre=/usr/bin/vector validate --no-environment --config-yaml {{ vector_config_dir }}/vector.yaml
+          ExecStart=
+          ExecStart=/usr/bin/vector --config-yaml {{ vector_config_dir }}/vector.yaml
+        dest: /etc/systemd/system/vector.service.d/override.conf
+        mode: '0644'
+      notify: Restart Vector
+
+    - name: Add vector user to adm group for log access
+      ansible.builtin.user:
+        name: vector
+        groups: adm
+        append: true
+      notify: Restart Vector
+
+    - name: Ensure Vector is enabled and running
+      ansible.builtin.systemd:
+        name: vector
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart Vector
+      ansible.builtin.systemd:
+        name: vector
+        state: restarted

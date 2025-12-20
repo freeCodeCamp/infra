@@ -1,0 +1,63 @@
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  size: 5Gi
+
+# Fix upgrade hangs: Recreate strategy required for RWO PVCs
+deploymentStrategy:
+  type: Recreate
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+serviceAccount:
+  name: grafana
+  annotations: {}
+
+envFromSecret: "grafana-secrets"
+
+admin:
+  existingSecret: "grafana-secrets"
+  userKey: "GRAFANA_ADMIN_USER"
+  passwordKey: "GRAFANA_ADMIN_PASSWORD"
+
+plugins:
+  - grafana-clickhouse-datasource
+
+grafana.ini:
+  auth:
+    disable_login_form: false
+  users:
+    auto_assign_org_role: Viewer
+  paths:
+    data: /var/lib/grafana/
+    logs: /var/log/grafana
+    plugins: /var/lib/grafana/plugins
+    provisioning: /etc/grafana/provisioning
+  server:
+    domain: grafana.freecodecamp.net
+    root_url: https://grafana.freecodecamp.net
+  auth.google:
+    enabled: true
+    allow_sign_up: true
+    auto_login: false
+    scopes: openid email profile
+    auth_url: https://accounts.google.com/o/oauth2/v2/auth
+    token_url: https://oauth2.googleapis.com/token
+    api_url: https://openidconnect.googleapis.com/v1/userinfo
+    allowed_domains: $__env{GRAFANA_GOOGLE_ALLOWED_DOMAIN}
+    validate_hd: true
+    use_pkce: true
+    skip_org_role_sync: true
+    allow_assign_grafana_admin: true
+    client_id: $__env{GRAFANA_GOOGLE_CLIENT_ID}
+    client_secret: $__env{GRAFANA_GOOGLE_CLIENT_SECRET}
+
+# Datasources configured via UI, not provisioning
