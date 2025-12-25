@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: grafana-gateway
+  namespace: grafana
+spec:
+  gatewayClassName: traefik
+  listeners:
+  - name: websecure
+    protocol: HTTPS
+    port: 8443
+    hostname: grafana.freecodecamp.net
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: grafana-tls-cloudflare
+    allowedRoutes:
+      namespaces:
+        from: Same
+  - name: web
+    protocol: HTTP
+    port: 8000
+    hostname: grafana.freecodecamp.net
+    allowedRoutes:
+      namespaces:
+        from: Same

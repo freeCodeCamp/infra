@@ -1,0 +1,114 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: logs
+  namespace: clickhouse
+spec:
+  defaults:
+    templates:
+      podTemplate: pod-template
+      dataVolumeClaimTemplate: data-volume
+      serviceTemplate: svc-template
+
+  configuration:
+    zookeeper:
+      nodes:
+        - host: keeper-keeper
+          port: 2181
+
+    clusters:
+      - name: logs
+        layout:
+          shardsCount: 1
+          replicasCount: 3
+
+    settings:
+      # Compression for logs (high compression ratio)
+      compression/case/method: zstd
+      compression/case/level: "3"
+
+      # Logging retention
+      logger/level: warning
+      logger/size: 100M
+      logger/count: "3"
+
+    profiles:
+      default/max_memory_usage: "2000000000"
+      default/max_memory_usage_for_user: "1500000000"
+      readonly/readonly: "1"
+
+    users:
+      # Admin user - full access
+      admin/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-users
+            key: admin_password_sha256
+      admin/networks/ip:
+        - "100.64.0.0/10"
+        - "10.42.0.0/16"
+      admin/profile: default
+      admin/quota: default
+
+      # Vector ingestion user - write to stg/prd logs databases
+      vector/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-users
+            key: vector_password_sha256
+      vector/networks/ip:
+        - "100.64.0.0/10"
+        - "10.42.0.0/16"
+      vector/profile: default
+      vector/quota: default
+      vector/allow_databases/database:
+        - logs_nginx_stg
+        - logs_nginx_prd
+
+      # Read-only user for Grafana
+      grafana/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-users
+            key: grafana_password_sha256
+      grafana/networks/ip:
+        - "100.64.0.0/10"
+        - "10.42.0.0/16"
+      grafana/profile: readonly
+      grafana/quota: default
+
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:25.8
+              resources:
+                requests:
+                  memory: "1Gi"
+                  cpu: "500m"
+                limits:
+                  memory: "3Gi"
+                  cpu: "2"
+
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 80Gi
+
+    serviceTemplates:
+      - name: svc-template
+        generateName: clickhouse-{chi}
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP

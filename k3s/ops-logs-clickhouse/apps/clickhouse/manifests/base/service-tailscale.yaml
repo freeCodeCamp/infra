@@ -1,0 +1,24 @@
+# ClickHouse service exposed via Tailscale
+# Creates a stable hostname: clickhouse-logs.<tailnet>.ts.net
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-logs-ts
+  namespace: clickhouse
+  annotations:
+    tailscale.com/hostname: "clickhouse-logs"
+    tailscale.com/tags: "tag:k8s"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    clickhouse.altinity.com/chi: logs
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      protocol: TCP
+    - name: native
+      port: 9000
+      targetPort: 9000
+      protocol: TCP

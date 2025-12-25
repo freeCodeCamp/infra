@@ -1,0 +1,125 @@
+---
+# Deploy k3s HA cluster with Traefik + Gateway API
+#
+# Prerequisites (manual):
+#   - 3x Ubuntu VMs on DigitalOcean with VPC attached (eth1)
+#   - Tailscale installed and connected on all nodes
+#   - DO Load Balancer: HTTP:80->30080, HTTPS:443->30443 (TLS passthrough)
+#   - DO Firewall configured
+#
+# Usage:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
+#     -e variable_host=<group>
+#
+# Examples:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
+#     -e variable_host=tools_k3s
+
+
+# Play 1: Validate and Prepare
+- name: K3s - Validate Prerequisites
+  hosts: '{{ variable_host }}'
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Validate VPC interface exists (eth1)
+      assert:
+        that:
+          - ansible_eth1 is defined
+          - ansible_eth1.ipv4 is defined
+          - ansible_eth1.ipv4.address is defined
+        fail_msg: "VPC interface eth1 not found. Ensure VM is attached to DO VPC."
+
+    - name: Validate Tailscale is connected
+      assert:
+        that:
+          - ansible_tailscale0 is defined
+          - ansible_tailscale0.ipv4 is defined
+          - ansible_tailscale0.ipv4.address is defined
+        fail_msg: "Tailscale interface not found. Ensure Tailscale is installed and connected."
+
+    - name: Validate VPC IP is in expected range
+      assert:
+        that:
+          - ansible_eth1.ipv4.address | regex_search('^10\\.')
+        fail_msg: "VPC IP {{ ansible_eth1.ipv4.address }} not in 10.x.x.x range."
+
+    - name: Set network facts
+      set_fact:
+        vpc_ip: "{{ ansible_eth1.ipv4.address }}"
+        tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
+
+    - name: Display network configuration
+      debug:
+        msg: "{{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }}"
+
+    - name: Build k3s_cluster group
+      group_by:
+        key: k3s_cluster
+
+    - name: Build server group
+      group_by:
+        key: server
+
+
+# Play 2: System Prerequisites
+- name: K3s - System Prerequisites
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  roles:
+    - role: k3s.orchestration.prereq
+
+
+# Play 3: Deploy k3s Servers
+- name: K3s - Deploy Cluster
+  hosts: server
+  gather_facts: true
+  become: true
+  vars:
+    k3s_version: v1.32.11+k3s1
+    api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
+    extra_server_args: >-
+      --node-ip={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --flannel-iface=eth1
+      --tls-san={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --tls-san={{ hostvars[inventory_hostname]['tailscale_ip'] }}
+    server_group: server
+  roles:
+    - role: k3s.orchestration.k3s_server
+
+
+# Play 4: Configure Ingress
+- name: K3s - Configure Traefik and Gateway API
+  hosts: server[0]
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Apply Traefik HelmChartConfig
+      copy:
+        src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: '0600'
+
+    - name: Install Gateway API CRDs
+      command: >
+        k3s kubectl apply -f
+        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+      register: gateway_result
+      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
+
+    - name: Wait for all nodes ready
+      command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      changed_when: false
+
+    - name: Display cluster status
+      command: k3s kubectl get nodes -o wide
+      register: cluster_status
+      changed_when: false
+
+    - name: Cluster ready
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"

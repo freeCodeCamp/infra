@@ -1,0 +1,75 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: secure-headers
+  namespace: grafana
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: grafana
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+
+---
+# HTTP to HTTPS redirect
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-redirect
+  namespace: grafana
+spec:
+  parentRefs:
+  - name: grafana-gateway
+    namespace: grafana
+    sectionName: web
+  hostnames:
+  - grafana.freecodecamp.net
+  rules:
+  - filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: traefik.io
+        kind: Middleware
+        name: redirect-https
+    backendRefs:
+    - name: grafana
+      port: 80
+
+---
+# Main Grafana route
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-route
+  namespace: grafana
+spec:
+  parentRefs:
+  - name: grafana-gateway
+    namespace: grafana
+    sectionName: websecure
+  hostnames:
+  - grafana.freecodecamp.net
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    filters:
+    - type: ExtensionRef
+      extensionRef:
+        group: traefik.io
+        kind: Middleware
+        name: secure-headers
+    backendRefs:
+    - name: grafana
+      port: 80

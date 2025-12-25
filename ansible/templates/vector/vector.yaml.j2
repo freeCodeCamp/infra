@@ -1,0 +1,93 @@
+# Vector configuration for NGINX log shipping to ClickHouse
+# Managed by Ansible - do not edit manually
+
+data_dir: {{ vector_data_dir }}
+
+sources:
+  nginx_access_logs:
+    type: file
+    include:
+      - {{ nginx_log_path }}
+    read_from: {{ vector_read_from | default('end') }}
+    fingerprint:
+      strategy: device_and_inode
+
+transforms:
+  parse_nginx:
+    type: remap
+    inputs:
+      - nginx_access_logs
+    source: |
+      parsed = parse_json!(.message)
+      .timestamp = from_unix_timestamp!(to_int!(to_float!(parsed.msec) * 1000), unit: "milliseconds")
+      .method = string(parsed.request_method) ?? ""
+      .path = string(parsed.request_uri) ?? ""
+      .query_string = string(parsed.args) ?? ""
+      .protocol = string(parsed.server_protocol) ?? ""
+      .status = to_int(parsed.status) ?? 0
+      .scheme = string(parsed.scheme) ?? ""
+      .bytes_sent = to_int(parsed.bytes_sent) ?? 0
+      .body_bytes_sent = to_int(parsed.body_bytes_sent) ?? 0
+      .request_length = to_int(parsed.request_length) ?? 0
+      .request_time = to_float(parsed.request_time) ?? 0.0
+      .upstream_response_time = to_float(parsed.upstream_response_time) ?? 0.0
+      .upstream_connect_time = to_float(parsed.upstream_connect_time) ?? 0.0
+      .upstream_header_time = to_float(parsed.upstream_header_time) ?? 0.0
+      .remote_addr = string(parsed.remote_addr) ?? ""
+      .remote_user = string(parsed.remote_user) ?? ""
+      .host = string(parsed.http_host) ?? ""
+      .server_name = string(parsed.server_name) ?? ""
+      .user_agent = string(parsed.http_user_agent) ?? ""
+      .referer = string(parsed.http_referer) ?? ""
+      .x_forwarded_for = string(parsed.http_x_forwarded_for) ?? ""
+      .upstream_addr = string(parsed.upstream) ?? ""
+      .upstream_cache_status = string(parsed.upstream_cache_status) ?? ""
+      .ssl_protocol = string(parsed.ssl_protocol) ?? ""
+      .ssl_cipher = string(parsed.ssl_cipher) ?? ""
+      .cf_ray = string(parsed.http_cf_ray) ?? ""
+      .country_code = string(parsed.geoip_country_code) ?? ""
+      .request_id = string(parsed.request_id) ?? ""
+      .source_host = "{{ ansible_hostname }}"
+      .source_file = .file
+      del(.message)
+      del(.file)
+      del(.source_type)
+
+  filter_health_checks:
+    type: filter
+    inputs:
+      - parse_nginx
+    condition: |
+      !starts_with(string!(.path), "/health") &&
+      !starts_with(string!(.path), "/.well-known") &&
+      !contains(string!(.user_agent), "kube-probe") &&
+      !contains(string!(.user_agent), "ELB-HealthChecker") &&
+      !contains(string!(.user_agent), "DigitalOcean")
+
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs:
+      - filter_health_checks
+    endpoint: http://{{ clickhouse_host }}:8123
+    database: {{ clickhouse_database }}
+    table: access
+    auth:
+      strategy: basic
+      user: {{ clickhouse_user }}
+      password: "${VECTOR_CLICKHOUSE_PASSWORD}"
+    encoding:
+      timestamp_format: unix_ms
+    skip_unknown_fields: true
+    batch:
+      max_events: 1000
+      timeout_secs: 5
+    buffer:
+      type: disk
+      max_size: 268435488
+      when_full: block
+    request:
+      retry_initial_backoff_secs: 1
+      retry_max_duration_secs: 3600
+    healthcheck:
+      enabled: true

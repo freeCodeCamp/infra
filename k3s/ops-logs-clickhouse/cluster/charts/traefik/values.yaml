@@ -1,0 +1,52 @@
+# Traefik HelmChartConfig for K3s
+# Apply via: kubectl apply -f values.yaml
+# Reference: https://docs.k3s.io/networking/networking-services#customizing-the-traefik-helm-chart
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    # Enable Gateway API provider
+    providers:
+      kubernetesGateway:
+        enabled: true
+
+    # Use NodePort for DO Load Balancer compatibility
+    service:
+      type: NodePort
+
+    # Fixed NodePorts for Load Balancer targeting
+    ports:
+      web:
+        nodePort: 30080
+      websecure:
+        nodePort: 30443
+        tls:
+          enabled: true
+        transport:
+          respondingTimeouts:
+            readTimeout: "0s"
+            writeTimeout: "0s"
+            idleTimeout: "180s"
+
+    # Logging
+    logs:
+      general:
+        level: INFO
+      access:
+        enabled: true
+
+    # Security context
+    securityContext:
+      capabilities:
+        drop: [ALL]
+        add: [NET_BIND_SERVICE]
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532
+
+    podSecurityContext:
+      fsGroup: 65532
