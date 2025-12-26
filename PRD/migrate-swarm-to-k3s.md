@@ -36,18 +36,13 @@ The codebase already has well-established K3s patterns in `ops-backoffice-tools`
 
 #### Cluster Topology
 
-| Node Type | Count | Spec | Purpose |
-|-----------|-------|------|---------|
-| **Control Plane** | 3 | 2 vCPU, TBD RAM | HA control plane (cost-optimized) |
-| **API Workers** | 4 | TBD (right-size) | Dedicated to API stack (stg + prd) |
-| **News Workers** | 4-5 | TBD (right-size) | Dedicated to News stack (stg + prd) |
+| Node Type | Count | Spec | Monthly Cost | Purpose |
+|-----------|-------|------|--------------|---------|
+| **Control Plane** | 3 | 1 vCPU / 2 GB | $10 each | HA control plane |
+| **Workers (shared)** | 4 | 2 vCPU / 4 GB | $20 each | API + News workloads |
+| **Total** | **7** | | **$110/mo** | |
 
-#### Worker Pool Strategy
-
-- **Dedicated pools**: Workers assigned to specific stacks via node labels/taints
-- **Sticky workloads**: Pods remain on their designated pool
-- **Movement trigger**: Only when node is removed from pool
-- **Environment separation**: Staging and Production in same cluster, namespace-isolated
+**Cost comparison:** Swarm (13 nodes, ~$260/mo) → K3s (7 nodes, $110/mo) = **$150/mo savings**
 
 #### Pod Distribution
 
@@ -56,24 +51,56 @@ The codebase already has well-established K3s patterns in `ops-backoffice-tools`
 | API Alpha | 2 (stg, prd) | 1 | 2 | 4 |
 | API Bravo | 2 (stg, prd) | 1 | 2 | 4 |
 | **API Total** | | | | **8 pods** |
-| News | 2 (stg, prd) | 7-8 langs | 2 | 28-32 |
-| **News Total** | | | | **28-32 pods** |
+| News | 2 (stg, prd) | 8 langs | 2 | 32 |
+| **News Total** | | | | **32 pods** |
+| **Cluster Total** | | | | **40 pods** |
+
+#### Resource Allocation
+
+**Per-pod resource requests/limits:**
+
+| App | CPU Request | CPU Limit | RAM Request | RAM Limit |
+|-----|-------------|-----------|-------------|-----------|
+| API | 250m | 1000m | 512Mi | 1Gi |
+| News | 50m | 200m | 64Mi | 128Mi |
+
+**Per-node usage (10 pods: 2 API + 8 News):**
+
+| Resource | Requests | Limits | % of Node |
+|----------|----------|--------|-----------|
+| CPU | 900m | 3600m | 45% |
+| RAM | 1.5 GB | 3 GB | 37.5% |
+
+**Headroom analysis:**
+
+| Scenario | CPU Used | RAM Used | Status |
+|----------|----------|----------|--------|
+| Steady state | 45% | 37.5% | ✅ 55% CPU, 62% RAM free |
+| Traffic spike (+40%) | 63% | 52% | ✅ Within budget |
+| During updates (+1 API pod/node) | 57% | 50% | ✅ Within budget |
+
+#### Scheduling Strategy
+
+- **Shared worker pool**: All 4 workers run both API and News pods
+- **Pod anti-affinity**: Each deployment's 2 replicas spread across different nodes
+- **Environment separation**: Namespace isolation (`api-stg`, `api-prd`, `news-stg`, `news-prd`)
 
 #### Other Infrastructure
 
-| Aspect | Recommendation | Notes |
-|--------|----------------|-------|
-| **Region** | Same as Swarm (likely DigitalOcean NYC3) | Minimize latency during cutover |
-| **Storage** | local-path (stateless apps) | API/News don't need persistent storage |
-| **Load Balancer** | DigitalOcean LB → NodePort 30080/30443 | Follow existing pattern |
+| Aspect | Choice | Notes |
+|--------|--------|-------|
+| **Provider** | DigitalOcean | Consistency with existing clusters |
+| **Region** | NYC3 | Same as existing infrastructure |
+| **Storage** | local-path | Stateless apps, no persistent storage needed |
+| **Load Balancer** | DO LB → NodePort 30080/30443 | Follow existing pattern |
 | **Networking** | VPC + Tailscale | Secure internal communication |
 
-**Provisioning approach**: Follow the existing 4-phase pattern in `k3s/README.md`:
+**Provisioning approach**: Follow existing 4-phase pattern in `k3s/README.md`:
 
 1. Create VPC and droplets manually
 2. Harden with Ansible
 3. Deploy K3s HA cluster with Ansible
-4. Configure node labels/taints for worker pools
+4. Apply Kustomize manifests
 
 ---
 
@@ -295,12 +322,15 @@ Timeline:
 | **Cluster naming** | `prd-api-news` (single cluster) |
 | **Environment strategy** | Single cluster, namespace separation (`api-stg`, `api-prd`, `news-stg`, `news-prd`) |
 | **Replicas** | 2 per deployment (down from 3) |
-| **Worker pools** | Dedicated pools per stack with node labels/taints |
+| **Worker strategy** | Shared pool (4 nodes), pod anti-affinity for HA |
+| **Node sizing** | Control plane: 1 vCPU/2GB, Workers: 2 vCPU/4GB |
+| **Provider** | DigitalOcean (consistency with existing clusters) |
+| **Total cost** | $110/mo (down from ~$260/mo) |
 
 ### Pending
 
 1. **News deployment architecture**:
-   - 7-8 separate Deployments (mirrors Swarm)?
+   - 8 separate Deployments (mirrors Swarm)?
    - Or templated approach (Helm/Kustomize generators)?
 
 2. **Auto-update mechanism**:
@@ -355,4 +385,5 @@ Timeline:
 | Date | Change |
 |------|--------|
 | 2025-12-26 | Initial plan created |
-| 2025-12-26 | Updated: 2 replicas (down from 3), dedicated worker pools, dual environments (stg+prd), cluster topology refined |
+| 2025-12-26 | Updated: 2 replicas (down from 3), dual environments (stg+prd), cluster topology refined |
+| 2025-12-26 | Finalized: Shared worker pool (4 nodes), resource allocation, $110/mo cost target |
