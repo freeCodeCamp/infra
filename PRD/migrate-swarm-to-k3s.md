@@ -32,13 +32,39 @@ The codebase already has well-established K3s patterns in `ops-backoffice-tools`
 
 ### Phase 1: Infrastructure Provisioning
 
-**New Cluster: `prd-api-news` (suggested name)**
+**New Cluster: `prd-api-news`**
+
+#### Cluster Topology
+
+| Node Type | Count | Spec | Purpose |
+|-----------|-------|------|---------|
+| **Control Plane** | 3 | 2 vCPU, TBD RAM | HA control plane (cost-optimized) |
+| **API Workers** | 4 | TBD (right-size) | Dedicated to API stack (stg + prd) |
+| **News Workers** | 4-5 | TBD (right-size) | Dedicated to News stack (stg + prd) |
+
+#### Worker Pool Strategy
+
+- **Dedicated pools**: Workers assigned to specific stacks via node labels/taints
+- **Sticky workloads**: Pods remain on their designated pool
+- **Movement trigger**: Only when node is removed from pool
+- **Environment separation**: Staging and Production in same cluster, namespace-isolated
+
+#### Pod Distribution
+
+| Stack | Environments | Variants | Replicas | Total Pods |
+|-------|--------------|----------|----------|------------|
+| API Alpha | 2 (stg, prd) | 1 | 2 | 4 |
+| API Bravo | 2 (stg, prd) | 1 | 2 | 4 |
+| **API Total** | | | | **8 pods** |
+| News | 2 (stg, prd) | 7-8 langs | 2 | 28-32 |
+| **News Total** | | | | **28-32 pods** |
+
+#### Other Infrastructure
 
 | Aspect | Recommendation | Notes |
 |--------|----------------|-------|
-| **Nodes** | 3-6 nodes (4 vCPU, 8GB RAM) | Match current Swarm capacity |
 | **Region** | Same as Swarm (likely DigitalOcean NYC3) | Minimize latency during cutover |
-| **Storage** | Longhorn (if stateful) or local-path | API/News are stateless |
+| **Storage** | local-path (stateless apps) | API/News don't need persistent storage |
 | **Load Balancer** | DigitalOcean LB → NodePort 30080/30443 | Follow existing pattern |
 | **Networking** | VPC + Tailscale | Secure internal communication |
 
@@ -47,7 +73,7 @@ The codebase already has well-established K3s patterns in `ops-backoffice-tools`
 1. Create VPC and droplets manually
 2. Harden with Ansible
 3. Deploy K3s HA cluster with Ansible
-4. Install Longhorn (if needed)
+4. Configure node labels/taints for worker pools
 
 ---
 
@@ -87,7 +113,7 @@ k3s/prd-api-news/
 
 | Docker Swarm | K3s Equivalent |
 |--------------|----------------|
-| `deploy.replicas: 3` | `spec.replicas: 3` + PodAntiAffinity |
+| `deploy.replicas: 3` | `spec.replicas: 2` + PodAntiAffinity |
 | `node.labels.api.enabled` | `nodeSelector` or `nodeAffinity` |
 | `max_replicas_per_node: 1` | `podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution` |
 | `update_config.parallelism: 1` | `strategy.rollingUpdate.maxUnavailable: 1` |
@@ -262,36 +288,37 @@ Timeline:
 
 ## Key Decisions
 
-> **Status:** Pending user input
+### Decided
 
-Before implementation, the following decisions need to be made:
+| Decision | Choice |
+|----------|--------|
+| **Cluster naming** | `prd-api-news` (single cluster) |
+| **Environment strategy** | Single cluster, namespace separation (`api-stg`, `api-prd`, `news-stg`, `news-prd`) |
+| **Replicas** | 2 per deployment (down from 3) |
+| **Worker pools** | Dedicated pools per stack with node labels/taints |
 
-1. **Cluster naming**: `prd-api-news`? Or separate `prd-api` and `prd-news`?
+### Pending
 
-2. **Overlay strategy**:
-   - Single cluster with staging/production overlays?
-   - Or separate clusters for staging vs production?
-
-3. **News deployment architecture**:
+1. **News deployment architecture**:
    - 7-8 separate Deployments (mirrors Swarm)?
    - Or templated approach (Helm/Kustomize generators)?
 
-4. **Auto-update mechanism**:
+2. **Auto-update mechanism**:
    - Renovate PRs?
    - Flux/ArgoCD image automation?
    - Manual updates?
 
-5. **Logging approach**:
+3. **Logging approach**:
    - Promtail DaemonSet?
    - Vector sidecars?
    - Direct Loki integration?
 
-6. **Secrets management**:
+4. **Secrets management**:
    - Kustomize secretGenerator (current pattern)?
    - External Secrets Operator (for Vault/cloud secrets)?
    - Sealed Secrets?
 
-7. **Gateway API hostnames**:
+5. **Gateway API hostnames**:
    - Keep same hostnames (`api.freecodecamp.org`)?
    - New hostnames during migration (`api-k3s.freecodecamp.org`)?
 
@@ -328,3 +355,4 @@ Before implementation, the following decisions need to be made:
 | Date | Change |
 |------|--------|
 | 2025-12-26 | Initial plan created |
+| 2025-12-26 | Updated: 2 replicas (down from 3), dedicated worker pools, dual environments (stg+prd), cluster topology refined |
