@@ -42,6 +42,7 @@ grafana.ini:
     plugins: /var/lib/grafana/plugins
     provisioning: /etc/grafana/provisioning
   server:
+    enable_gzip: true
     domain: grafana.freecodecamp.net
     root_url: https://grafana.freecodecamp.net
   auth.google:
