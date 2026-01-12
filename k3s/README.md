@@ -16,6 +16,9 @@ k3s/
 ├── README.md
 ├── nginx-logs-schema.md
 ├── grafana-nginx-dashboard.md
+├── dashboards/                       # Grafana dashboards (manual import)
+│   ├── clickhouse-monitoring.json
+│   └── nginx-access-logs.json
 ├── shared/
 │   └── traefik-config.yaml
 ├── ops-backoffice-tools/
@@ -270,6 +273,41 @@ kubectl exec -i -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client < apps/cl
 - Port 9000: Native TCP (clickhouse-client)
 
 See [nginx-logs-schema.md](nginx-logs-schema.md) for log format mapping and sample queries.
+
+### ClickHouse Monitoring Dashboard
+
+Import the dashboard to Grafana for ClickHouse cluster monitoring:
+
+**File:** `k3s/dashboards/clickhouse-monitoring.json`
+
+**Panels:**
+- Cluster Status (healthy replicas)
+- Active Queries
+- Memory & Disk Usage (gauges)
+- Queries per Minute
+- Insert Rate
+- Replication Lag
+- Active Merges
+- Top Slow Queries (table)
+- Storage by Table
+- Replica Status
+- Query Latency Percentiles
+
+**Import via Grafana UI:**
+1. Go to Dashboards > Import
+2. Upload `clickhouse-monitoring.json`
+3. Select ClickHouse datasource
+4. Save
+
+**Create Alerts (via Grafana UI):**
+
+| Alert | Query | Condition | Severity |
+|-------|-------|-----------|----------|
+| ReplicaDown | `SELECT count() FROM system.replicas WHERE is_readonly = 0` | < 3 | critical |
+| ReplicationLag | `SELECT max(absolute_delay) FROM system.replicas` | > 100MB | warning |
+| HighMemory | `SELECT value FROM system.metrics WHERE metric = 'MemoryTracking'` | > 2.5GB | warning |
+| DiskFull | `SELECT sum(bytes_on_disk) FROM system.parts WHERE active` | > 72GB (90%) | critical |
+| NoIngestion | `SELECT count() FROM system.query_log WHERE ... AND query_kind = 'Insert'` | = 0 (5min) | warning |
 
 ### DNS (Cloudflare)
 

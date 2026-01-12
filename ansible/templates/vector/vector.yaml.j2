@@ -80,8 +80,11 @@ sinks:
       timestamp_format: unix_ms
     skip_unknown_fields: true
     batch:
-      max_events: 1000
-      timeout_secs: 5
+      # Larger batches = fewer ClickHouse parts = healthier merges
+      # Production: 5.2M events/day ÷ 10000 = 520 inserts/day
+      # Staging: timeout-triggered but less frequent
+      max_events: 10000
+      timeout_secs: 30
     buffer:
       type: disk
       max_size: 268435488

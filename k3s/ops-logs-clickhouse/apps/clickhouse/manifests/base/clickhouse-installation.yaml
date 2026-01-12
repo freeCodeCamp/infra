@@ -32,9 +32,73 @@ spec:
       logger/size: 100M
       logger/count: "3"
 
+      # Memory management - reserve 20% for OS
+      max_server_memory_usage_to_ram_ratio: "0.8"
+
+      # Background pool settings (server-level)
+      # Limit concurrent background operations (default: 16)
+      background_pool_size: "4"
+      # Ratio of merges to mutations (default: 2)
+      background_merges_mutations_concurrency_ratio: "1"
+
+      # MergeTree table settings (require merge_tree/ prefix)
+      # Rows per block during merge (default: 8192)
+      merge_tree/merge_max_block_size: "4096"
+      # Max bytes per merge operation (default: 150GB, way too high)
+      merge_tree/max_bytes_to_merge_at_max_space_in_pool: "2147483648"
+      # All "number_of_free_entries" settings must be < background_pool_size * ratio (4)
+      merge_tree/number_of_free_entries_in_pool_to_lower_max_size_of_merge: "2"
+      merge_tree/number_of_free_entries_in_pool_to_execute_mutation: "2"
+      merge_tree/number_of_free_entries_in_pool_to_execute_optimize_entire_partition: "2"
+
+      # Cache tuning for 5Gi memory environment
+      mark_cache_size: "536870912"
+      uncompressed_cache_size: "134217728"
+
+    # System tables configuration
+    # Note: Altinity operator auto-generates configs for query_log, part_log, trace_log
+    # with 30-day TTL. We only configure tables without operator defaults.
+    # Ref: https://clickhouse.com/docs/operations/server-configuration-parameters/settings#system-tables
+    files:
+      config.d/system-tables.xml: |
+        <clickhouse>
+          <!-- Disable trace_log (profiler also disabled in profiles) -->
+          <trace_log remove="1"/>
+
+          <!-- metric_log: 60s flush (vs 1s default), 3-day TTL -->
+          <metric_log>
+            <database>system</database>
+            <table>metric_log</table>
+            <flush_interval_milliseconds>60000</flush_interval_milliseconds>
+            <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 3 DAY DELETE</engine>
+          </metric_log>
+
+          <!-- asynchronous_metric_log: 60s flush, 3-day TTL -->
+          <asynchronous_metric_log>
+            <database>system</database>
+            <table>asynchronous_metric_log</table>
+            <flush_interval_milliseconds>60000</flush_interval_milliseconds>
+            <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 3 DAY DELETE</engine>
+          </asynchronous_metric_log>
+
+          <!-- text_log: 60s flush, 3-day TTL -->
+          <text_log>
+            <database>system</database>
+            <table>text_log</table>
+            <flush_interval_milliseconds>60000</flush_interval_milliseconds>
+            <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 3 DAY DELETE</engine>
+          </text_log>
+        </clickhouse>
+
     profiles:
       default/max_memory_usage: "2000000000"
       default/max_memory_usage_for_user: "1500000000"
+      # Disable query profiler (prevents trace_log bloat)
+      # Ref: https://clickhouse.com/docs/operations/settings/settings#query_profiler_real_time_period_ns
+      default/query_profiler_real_time_period_ns: "0"
+      default/query_profiler_cpu_time_period_ns: "0"
+      default/memory_profiler_step: "0"
+      default/trace_profile_events: "0"
       readonly/readonly: "1"
 
     users:
@@ -86,11 +150,11 @@ spec:
               image: clickhouse/clickhouse-server:25.8
               resources:
                 requests:
-                  memory: "1Gi"
-                  cpu: "500m"
-                limits:
                   memory: "3Gi"
-                  cpu: "2"
+                  cpu: "1"
+                limits:
+                  memory: "5Gi"
+                  cpu: "3"
 
     volumeClaimTemplates:
       - name: data-volume
