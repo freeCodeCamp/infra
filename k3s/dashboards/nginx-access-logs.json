@@ -50,10 +50,11 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -69,6 +70,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -110,7 +112,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -130,6 +132,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -147,7 +150,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT round(count() / greatest(dateDiff('second', min(timestamp), max(timestamp)), 1), 2) AS rps FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country'",
+          "rawSql": "SELECT if(count() = 0, 0, round(count() / greatest(dateDiff('second', min(timestamp), max(timestamp)), 1), 2)) AS rps FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country'",
           "refId": "A"
         }
       ],
@@ -170,10 +173,11 @@
             "steps": [
               {
                 "color": "blue",
-                "value": null
+                "value": 0
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -189,6 +193,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -231,15 +236,15 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
-                "value": 5
+                "value": 1
               },
               {
                 "color": "red",
-                "value": 20
+                "value": 5
               }
             ]
           },
@@ -259,6 +264,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -299,7 +305,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -327,6 +333,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -348,7 +355,7 @@
           "refId": "A"
         }
       ],
-      "title": "P95 Latency",
+      "title": "Response Time (P95)",
       "type": "stat"
     },
     {
@@ -370,7 +377,7 @@
             "steps": [
               {
                 "color": "red",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -398,6 +405,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -415,7 +423,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT round(countIf(upstream_cache_status = 'HIT') * 100.0 / countIf(upstream_cache_status != ''), 2) AS cache_hit_pct FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country'",
+          "rawSql": "SELECT if(countIf(upstream_cache_status != '') = 0, 0, round(countIf(upstream_cache_status = 'HIT') * 100.0 / countIf(upstream_cache_status != ''), 2)) AS cache_hit_pct FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country'",
           "refId": "A"
         }
       ],
@@ -438,7 +446,7 @@
             "steps": [
               {
                 "color": "purple",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -458,6 +466,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -500,7 +509,7 @@
             "steps": [
               {
                 "color": "orange",
-                "value": null
+                "value": 0
               },
               {
                 "color": "green",
@@ -524,6 +533,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -545,7 +555,7 @@
           "refId": "A"
         }
       ],
-      "title": "Cloudflare Traffic %",
+      "title": "CDN Coverage",
       "type": "stat"
     },
     {
@@ -595,6 +605,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -610,7 +621,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -668,6 +679,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -676,7 +690,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -715,7 +729,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "yellow",
@@ -750,7 +764,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "red",
@@ -847,6 +861,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -862,7 +877,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -940,6 +955,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -955,7 +971,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -1058,6 +1074,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1066,7 +1085,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -1117,7 +1136,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "yellow",
@@ -1152,7 +1171,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "orange",
@@ -1177,7 +1196,7 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 11,
         "w": 12,
         "x": 0,
         "y": 24
@@ -1221,6 +1240,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1229,7 +1251,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -1252,7 +1274,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "yellow",
@@ -1281,7 +1303,7 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 11,
         "w": 12,
         "x": 12,
         "y": 24
@@ -1316,7 +1338,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 35
       },
       "id": 104,
       "panels": [],
@@ -1357,6 +1379,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1372,7 +1395,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -1381,7 +1404,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "2xx"
+              "options": "2xx OK"
             },
             "properties": [
               {
@@ -1396,7 +1419,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "3xx"
+              "options": "3xx Redirect"
             },
             "properties": [
               {
@@ -1411,7 +1434,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "4xx"
+              "options": "4xx Client Error"
             },
             "properties": [
               {
@@ -1426,7 +1449,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "5xx"
+              "options": "5xx Server Error"
             },
             "properties": [
               {
@@ -1441,7 +1464,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "444 blocked"
+              "options": "Blocked"
             },
             "properties": [
               {
@@ -1456,10 +1479,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 14,
         "x": 0,
-        "y": 33
+        "y": 36
       },
       "id": 16,
       "options": {
@@ -1483,7 +1506,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT $__timeInterval(timestamp) AS time, multiIf(status < 300, '2xx', status < 400, '3xx', status < 500, '4xx', status = 444, '444 blocked', '5xx') AS status_class, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY time, status_class ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(timestamp) AS time, multiIf(status < 300, '2xx OK', status < 400, '3xx Redirect', status < 500, '4xx Client Error', status = 444, 'Blocked', '5xx Server Error') AS status_class, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY time, status_class ORDER BY time",
           "refId": "A"
         }
       ],
@@ -1501,11 +1524,15 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "wrapText": false
           },
           "mappings": [],
           "thresholds": {
@@ -1513,10 +1540,15 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 400
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -1532,6 +1564,10 @@
                   "type": "gauge",
                   "valueDisplayMode": "text"
                 }
+              },
+              {
+                "id": "custom.width",
+                "value": 466
               }
             ]
           },
@@ -1548,7 +1584,7 @@
                   "steps": [
                     {
                       "color": "green",
-                      "value": null
+                      "value": 0
                     },
                     {
                       "color": "orange",
@@ -1567,20 +1603,40 @@
                   "mode": "basic",
                   "type": "color-text"
                 }
+              },
+              {
+                "id": "custom.width",
+                "value": 54
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pct"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 61
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 10,
         "x": 14,
-        "y": 33
+        "y": 36
       },
       "id": 17,
       "options": {
-        "cellHeight": "sm",
+        "cellHeight": "md",
+        "enablePagination": false,
+        "frozenColumns": {
+          "left": 1
+        },
         "showHeader": true,
         "sortBy": [
           {
@@ -1594,6 +1650,8 @@
         {
           "editorType": "sql",
           "format": 1,
+          "meta": {},
+          "pluginVersion": "4.11.4",
           "queryType": "table",
           "rawSql": "SELECT status, count() AS count, round(count() * 100.0 / sum(count()) OVER (), 2) AS pct, any(path) AS example_path FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND status >= 400 AND status != 444 AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY status ORDER BY count DESC LIMIT 15",
           "refId": "A"
@@ -1608,7 +1666,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 46
       },
       "id": 105,
       "panels": [],
@@ -1632,17 +1690,34 @@
               "viz": false
             }
           },
+          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
                 "color": "green",
                 "value": 0
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "super-light-green",
+                "value": 0
+              },
+              {
+                "color": "light-green",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 10
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 20
+              },
+              {
+                "color": "dark-green",
+                "value": 50
               }
             ]
           }
@@ -1650,25 +1725,26 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 12,
+        "h": 12,
+        "w": 15,
         "x": 0,
-        "y": 42
+        "y": 47
       },
       "id": 18,
       "options": {
         "basemap": {
           "config": {},
           "name": "Layer 0",
+          "noRepeat": true,
           "type": "default"
         },
         "controls": {
-          "mouseWheelZoom": true,
-          "showAttribution": true,
+          "mouseWheelZoom": false,
+          "showAttribution": false,
           "showDebug": false,
           "showMeasure": false,
           "showScale": false,
-          "showZoom": true
+          "showZoom": false
         },
         "layers": [
           {
@@ -1676,21 +1752,37 @@
               "showLegend": true,
               "style": {
                 "color": {
+                  "field": "requests",
                   "fixed": "dark-green"
                 },
-                "opacity": 0.5,
+                "opacity": 0.9,
+                "rotation": {
+                  "fixed": 0,
+                  "max": 360,
+                  "min": -360,
+                  "mode": "mod"
+                },
                 "size": {
                   "field": "requests",
                   "fixed": 5,
-                  "max": 20,
-                  "min": 3
+                  "max": 30,
+                  "min": 5
                 },
                 "symbol": {
                   "fixed": "img/icons/marker/circle.svg",
                   "mode": "fixed"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "text": {
+                  "fixed": "",
+                  "mode": "fixed"
                 }
               }
             },
+            "layer-tooltip": false,
             "location": {
               "gazetteer": "public/build/gazetteer/countries.json",
               "lookup": "country_code",
@@ -1709,6 +1801,7 @@
           "id": "zero",
           "lat": 20,
           "lon": 0,
+          "noRepeat": true,
           "zoom": 1.5
         }
       },
@@ -1733,7 +1826,41 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -1741,20 +1868,409 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           }
         },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Via CDN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Direct"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Blocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 9,
+        "x": 15,
+        "y": 47
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "right",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT $__timeInterval(timestamp) AS time, multiIf(cf_ray != '', 'Via CDN', status = 444, 'Blocked', 'Direct') AS traffic_type, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY time, traffic_type ORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Traffic Source",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "log": 2,
+              "type": "log"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 6,
-        "x": 12,
-        "y": 42
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 59
       },
       "id": 19,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.95,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "editorType": "sql",
+          "format": 1,
+          "meta": {},
+          "pluginVersion": "4.11.4",
+          "queryType": "table",
+          "rawSql": "SELECT country_code, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND country_code != '' AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY country_code ORDER BY requests DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Countries",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 106,
+      "panels": [],
+      "title": "Infrastructure",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "requests"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error_pct"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 500
+                    },
+                    {
+                      "color": "red",
+                      "value": 1000
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 72
+      },
+      "id": 21,
+      "options": {
+        "cellHeight": "lg",
+        "showHeader": true
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT source_host, count() AS requests, round(countIf(status >= 500) * 100.0 / count(), 2) AS error_pct, round(quantile(0.95)(request_time) * 1000, 0) AS p95_ms FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY source_host ORDER BY requests DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Server Health (Source Host)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "BYPASS": {
+                  "color": "orange",
+                  "index": 2
+                },
+                "EXPIRED": {
+                  "color": "blue",
+                  "index": 3
+                },
+                "HIT": {
+                  "color": "green",
+                  "index": 0
+                },
+                "MISS": {
+                  "color": "yellow",
+                  "index": 1
+                },
+                "No Cache": {
+                  "color": "gray",
+                  "index": 4
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 6,
+        "y": 72
+      },
+      "id": 23,
       "options": {
         "displayMode": "gradient",
         "legend": {
@@ -1785,11 +2301,11 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT country_code, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND country_code != '' AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY country_code ORDER BY requests DESC LIMIT 10",
+          "rawSql": "SELECT if(upstream_cache_status = '', 'No Cache', upstream_cache_status) AS cache_status, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY cache_status ORDER BY requests DESC",
           "refId": "A"
         }
       ],
-      "title": "Top Countries",
+      "title": "Cache Status",
       "type": "bargauge"
     },
     {
@@ -1803,117 +2319,77 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
             }
           },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
+          "mappings": [
+            {
+              "options": {
+                "No SSL": {
+                  "color": "dark-red",
+                  "index": 4
+                },
+                "TLSv1": {
+                  "color": "red",
+                  "index": 3
+                },
+                "TLSv1.1": {
+                  "color": "orange",
+                  "index": 2
+                },
+                "TLSv1.2": {
+                  "color": "blue",
+                  "index": 1
+                },
+                "TLSv1.3": {
+                  "color": "green",
+                  "index": 0
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "unit": "short"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Cloudflare"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Direct/Bypass"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Blocked (444)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 10,
+        "h": 7,
         "w": 6,
-        "x": 18,
-        "y": 42
+        "x": 12,
+        "y": 72
       },
-      "id": 20,
+      "id": 301,
       "options": {
+        "displayLabels": [
+          "percent"
+        ],
         "legend": {
-          "calcs": [
-            "sum"
-          ],
+          "calcs": [],
           "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "percent",
+            "value"
+          ]
         },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "sort": "desc",
         "tooltip": {
           "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "pluginVersion": "12.3.0",
@@ -1922,462 +2398,83 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "SELECT $__timeInterval(timestamp) AS time, multiIf(cf_ray != '', 'Cloudflare', status = 444, 'Blocked (444)', 'Direct/Bypass') AS traffic_type, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY time, traffic_type ORDER BY time",
+          "rawSql": "SELECT if(ssl_protocol = '', 'No SSL', ssl_protocol) AS protocol, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY protocol ORDER BY requests DESC",
           "refId": "A"
         }
       ],
-      "title": "Traffic Source",
-      "type": "timeseries"
+      "title": "SSL/TLS Versions",
+      "type": "piechart"
     },
     {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 52
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
       },
-      "id": 106,
-      "panels": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_CLICKHOUSE}"
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "custom": {
-                "align": "auto",
-                "cellOptions": {
-                  "type": "auto"
-                },
-                "inspect": false
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "requests"
-                },
-                "properties": [
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "mode": "gradient",
-                      "type": "gauge",
-                      "valueDisplayMode": "text"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "error_pct"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "percent"
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "green",
-                          "value": null
-                        },
-                        {
-                          "color": "yellow",
-                          "value": 5
-                        },
-                        {
-                          "color": "red",
-                          "value": 20
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "mode": "basic",
-                      "type": "color-background"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "p95_ms"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "ms"
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "green",
-                          "value": null
-                        },
-                        {
-                          "color": "yellow",
-                          "value": 500
-                        },
-                        {
-                          "color": "red",
-                          "value": 1000
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "mode": "basic",
-                      "type": "color-background"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 53
-          },
-          "id": 21,
-          "options": {
-            "cellHeight": "sm",
-            "showHeader": true,
-            "sortBy": [
-              {
-                "desc": true,
-                "displayName": "requests"
-              }
-            ]
-          },
-          "pluginVersion": "12.3.0",
-          "targets": [
-            {
-              "editorType": "sql",
-              "format": 1,
-              "queryType": "table",
-              "rawSql": "SELECT source_host, count() AS requests, round(countIf(status >= 500) * 100.0 / count(), 2) AS error_pct, round(quantile(0.95)(request_time) * 1000, 0) AS p95_ms FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY source_host ORDER BY requests DESC",
-              "refId": "A"
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             }
-          ],
-          "title": "Server Health (Source Host)",
-          "type": "table"
+          },
+          "mappings": [],
+          "unit": "short"
         },
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_CLICKHOUSE}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 12,
-            "y": 53
-          },
-          "id": 22,
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "right",
-              "showLegend": true
-            },
-            "pieType": "pie",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "12.3.0",
-          "targets": [
-            {
-              "editorType": "sql",
-              "format": 1,
-              "queryType": "table",
-              "rawSql": "SELECT method, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY method ORDER BY requests DESC",
-              "refId": "A"
-            }
-          ],
-          "title": "HTTP Methods",
-          "type": "piechart"
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 18,
+        "y": 72
+      },
+      "id": 22,
+      "options": {
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "percent",
+            "value"
+          ]
         },
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_CLICKHOUSE}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 18,
-            "y": 53
-          },
-          "id": 23,
-          "options": {
-            "legend": {
-              "displayMode": "list",
-              "placement": "right",
-              "showLegend": true
-            },
-            "pieType": "pie",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "12.3.0",
-          "targets": [
-            {
-              "editorType": "sql",
-              "format": 1,
-              "queryType": "table",
-              "rawSql": "SELECT if(upstream_cache_status = '', 'N/A', upstream_cache_status) AS cache_status, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY cache_status ORDER BY requests DESC",
-              "refId": "A"
-            }
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "title": "Cache Status",
-          "type": "piechart"
+          "fields": "",
+          "values": true
+        },
+        "sort": "desc",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT method, count() AS requests FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY method ORDER BY requests DESC LIMIT 10",
+          "refId": "A"
         }
       ],
-      "title": "Infrastructure",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 53
-      },
-      "id": 107,
-      "panels": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_CLICKHOUSE}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "custom": {
-                "align": "auto",
-                "cellOptions": {
-                  "type": "auto"
-                },
-                "inspect": false
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "total_ms"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "ms"
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "yellow",
-                          "value": null
-                        },
-                        {
-                          "color": "orange",
-                          "value": 2000
-                        },
-                        {
-                          "color": "red",
-                          "value": 5000
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "mode": "basic",
-                      "type": "color-background"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "upstream_ms"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "ms"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "status"
-                },
-                "properties": [
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "green",
-                          "value": null
-                        },
-                        {
-                          "color": "orange",
-                          "value": 400
-                        },
-                        {
-                          "color": "red",
-                          "value": 500
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "mode": "basic",
-                      "type": "color-text"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 10,
-            "w": 24,
-            "x": 0,
-            "y": 54
-          },
-          "id": 24,
-          "options": {
-            "cellHeight": "sm",
-            "showHeader": true,
-            "sortBy": [
-              {
-                "desc": true,
-                "displayName": "total_ms"
-              }
-            ]
-          },
-          "pluginVersion": "12.3.0",
-          "targets": [
-            {
-              "editorType": "sql",
-              "format": 1,
-              "queryType": "table",
-              "rawSql": "SELECT timestamp, host, path, round(request_time * 1000, 0) AS total_ms, round(upstream_response_time * 1000, 0) AS upstream_ms, status, remote_addr FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND request_time > 2 AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' ORDER BY request_time DESC LIMIT 50",
-              "refId": "A"
-            }
-          ],
-          "title": "Slow Requests (>2s)",
-          "type": "table"
-        }
-      ],
-      "title": "Debug",
-      "type": "row"
+      "title": "HTTP Methods",
+      "type": "piechart"
     },
     {
       "collapsed": false,
@@ -2385,7 +2482,170 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 79
+      },
+      "id": 107,
+      "panels": [],
+      "title": "Debug",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "total_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "yellow",
+                      "value": 0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 2000
+                    },
+                    {
+                      "color": "red",
+                      "value": 5000
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "upstream_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 400
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "id": 24,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "total_ms"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT timestamp, host, path, round(request_time * 1000, 0) AS total_ms, round(upstream_response_time * 1000, 0) AS upstream_ms, status, remote_addr FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND request_time > 2 AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' ORDER BY request_time DESC LIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "title": "Slow Requests (>2s)",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 90
       },
       "id": 200,
       "panels": [],
@@ -2407,6 +2667,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -2415,7 +2678,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -2443,7 +2706,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 56
+        "y": 91
       },
       "id": 201,
       "options": {
@@ -2484,6 +2747,9 @@
             "cellOptions": {
               "type": "auto"
             },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -2492,7 +2758,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -2503,7 +2769,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 56
+        "y": 91
       },
       "id": 202,
       "options": {
@@ -2528,150 +2794,10 @@
       ],
       "title": "Top Referrers",
       "type": "table"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 65
-      },
-      "id": 300,
-      "panels": [],
-      "title": "Additional Insights",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${DS_CLICKHOUSE}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 66
-      },
-      "id": 301,
-      "options": {
-        "displayLabels": [
-          "percent"
-        ],
-        "legend": {
-          "displayMode": "list",
-          "placement": "right",
-          "showLegend": true
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.3.0",
-      "targets": [
-        {
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT if(ssl_protocol = '', 'No SSL', ssl_protocol) AS protocol, count() AS count FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY protocol ORDER BY count DESC",
-          "refId": "A"
-        }
-      ],
-      "title": "SSL Protocol Distribution",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${DS_CLICKHOUSE}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 16,
-        "x": 8,
-        "y": 66
-      },
-      "id": 302,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "error_count"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.0",
-      "targets": [
-        {
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "SELECT path, status, count() AS error_count FROM logs_nginx_${deployment_env}.access WHERE $__timeFilter(timestamp) AND status >= 400 AND host LIKE '$host' AND toString(status) LIKE '$status' AND method LIKE '$method' AND country_code LIKE '$country' GROUP BY path, status ORDER BY error_count DESC LIMIT 20",
-          "refId": "A"
-        }
-      ],
-      "title": "Top Error Paths",
-      "type": "table"
     }
   ],
   "preload": false,
-  "refresh": "30s",
+  "refresh": "",
   "schemaVersion": 42,
   "tags": [
     "nginx",
@@ -2703,9 +2829,10 @@
         "type": "custom"
       },
       {
+        "allValue": "%",
         "current": {
           "text": "All",
-          "value": "%"
+          "value": "$__all"
         },
         "datasource": {
           "type": "grafana-clickhouse-datasource",
@@ -2713,7 +2840,6 @@
         },
         "definition": "SELECT DISTINCT host FROM logs_nginx_${deployment_env}.access WHERE timestamp > now() - INTERVAL 1 DAY ORDER BY host",
         "includeAll": true,
-        "allValue": "%",
         "label": "Host",
         "name": "host",
         "options": [],
@@ -2734,9 +2860,10 @@
         "type": "datasource"
       },
       {
+        "allValue": "%",
         "current": {
           "text": "All",
-          "value": "%"
+          "value": "$__all"
         },
         "datasource": {
           "type": "grafana-clickhouse-datasource",
@@ -2744,7 +2871,6 @@
         },
         "definition": "SELECT DISTINCT method FROM logs_nginx_${deployment_env}.access ORDER BY method",
         "includeAll": true,
-        "allValue": "%",
         "label": "Method",
         "name": "method",
         "options": [],
@@ -2753,9 +2879,10 @@
         "type": "query"
       },
       {
+        "allValue": "%",
         "current": {
           "text": "All",
-          "value": "%"
+          "value": "$__all"
         },
         "datasource": {
           "type": "grafana-clickhouse-datasource",
@@ -2763,7 +2890,6 @@
         },
         "definition": "SELECT DISTINCT toString(status) FROM logs_nginx_${deployment_env}.access ORDER BY status",
         "includeAll": true,
-        "allValue": "%",
         "label": "Status",
         "name": "status",
         "options": [],
@@ -2772,9 +2898,10 @@
         "type": "query"
       },
       {
+        "allValue": "%",
         "current": {
           "text": "All",
-          "value": "%"
+          "value": "$__all"
         },
         "datasource": {
           "type": "grafana-clickhouse-datasource",
@@ -2782,7 +2909,6 @@
         },
         "definition": "SELECT DISTINCT country_code FROM logs_nginx_${deployment_env}.access WHERE country_code != '' ORDER BY country_code",
         "includeAll": true,
-        "allValue": "%",
         "label": "Country",
         "name": "country",
         "options": [],
@@ -2793,12 +2919,12 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "NGINX Access Logs",
   "uid": "nginx-access-logs",
-  "version": 4
+  "version": 17
 }
