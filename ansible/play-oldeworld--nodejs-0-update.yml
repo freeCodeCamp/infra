@@ -15,8 +15,7 @@
     - name: Get the Node.js version
       shell:
         cmd: |
-          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
-          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           node -v
         chdir: /home/freecodecamp
@@ -30,8 +29,7 @@
     - name: Install Global Dependencies
       shell:
         cmd: |
-          export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ]
-          printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+          export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           npm i -g npm pnpm pm2
           sleep 2

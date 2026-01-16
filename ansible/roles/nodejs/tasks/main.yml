@@ -19,6 +19,7 @@
       fi
     else
       nvm install {{ nodejs_version }}
+      nvm alias default {{ nodejs_version }}
     fi
     echo "Node.js version $(node --version) installed."
   args:
