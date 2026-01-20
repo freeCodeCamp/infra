@@ -1,0 +1,6 @@
+# Kubeconfig
+.kubeconfig.yaml
+
+# Generated cluster manifests (samples are committed, actual configs may contain secrets)
+clusters/*.yaml
+!clusters/*.yaml.sample
