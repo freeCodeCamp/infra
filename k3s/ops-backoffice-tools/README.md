@@ -33,6 +33,7 @@ Distributed block storage with automatic backups to DO Spaces.
 | Appsmith | appsmith | https://appsmith.freecodecamp.net | Low-code app builder |
 | Outline | outline | https://outline.freecodecamp.net | Knowledge base wiki |
 | Grafana | grafana | https://grafana.freecodecamp.net | Log analytics dashboard |
+| n8n | n8n | https://n8n.freecodecamp.net | Workflow automation platform |
 
 ---
 
@@ -146,6 +147,115 @@ kubectl exec -n grafana deploy/grafana -- \
 1. Navigate to https://grafana.freecodecamp.net
 2. Login with admin credentials from `.secrets.env`
 3. Verify ClickHouse datasource in Configuration > Data Sources
+
+---
+
+## n8n Deployment
+
+Workflow automation platform with queue mode for ops automation, team tooling, and data pipelines.
+
+### 1. Prerequisites
+
+**Tailscale Operator** (for ClickHouse access) - see Tailscale Operator Setup section above.
+
+**DNS Records (Cloudflare):**
+- `n8n.freecodecamp.net` -> tools LB IP (proxied)
+- `n8n-wh.freecodecamp.net` -> tools LB IP (proxied)
+
+### 2. Create Secrets
+
+```bash
+cd apps/n8n/manifests/base/secrets
+
+# Copy sample and fill in values
+cp .secrets.env.sample .secrets.env
+
+# Generate secrets
+openssl rand -hex 32  # for N8N_ENCRYPTION_KEY
+openssl rand -hex 32  # for JWT_SECRET
+openssl rand -base64 24  # for POSTGRES_PASSWORD
+
+# Edit .secrets.env with generated values
+# SMTP can be configured later in n8n UI (Settings > Email)
+```
+
+### 3. Add TLS Certificate
+
+Obtain Cloudflare origin certificate covering both domains:
+
+```bash
+# Certificate for n8n.freecodecamp.net and n8n-wh.freecodecamp.net
+# Save as: secrets/tls.crt and secrets/tls.key
+```
+
+### 4. Deploy n8n
+
+```bash
+kubectl apply -k apps/n8n/manifests/base/
+```
+
+### 5. Verify Deployment
+
+```bash
+# Check all pods are running
+kubectl get pods -n n8n
+
+# Check PVCs are bound
+kubectl get pvc -n n8n
+
+# Check gateways and routes
+kubectl get gateway,httproute -n n8n
+
+# View logs
+kubectl logs -n n8n deploy/n8n-main
+kubectl logs -n n8n deploy/n8n-worker
+```
+
+### 6. Initial Setup
+
+1. Navigate to https://n8n.freecodecamp.net
+2. Create first user (becomes instance owner) - use @freecodecamp.org email
+3. Configure credentials for integrations
+
+### n8n Architecture
+
+- **n8n-main**: UI, API, webhook receiver (1 replica)
+- **n8n-worker**: Workflow execution (2 replicas, scalable)
+- **n8n-postgres**: Database (20Gi)
+- **n8n-redis**: Queue backend
+
+### Scaling Workers
+
+```bash
+# Edit worker deployment
+kubectl edit deploy/n8n-worker -n n8n
+# Change replicas: 2 to desired count
+```
+
+### TBD: System SMTP Configuration
+
+System emails (user invites, password resets) require SMTP environment variables.
+
+Add to `apps/n8n/manifests/base/secrets/.secrets.env`:
+
+```bash
+N8N_EMAIL_MODE=smtp
+N8N_SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+N8N_SMTP_PORT=587
+N8N_SMTP_USER=<ses-smtp-user>
+N8N_SMTP_PASS=<ses-smtp-password>
+N8N_SMTP_SENDER=n8n@freecodecamp.org
+N8N_SMTP_SSL=false
+```
+
+Then redeploy:
+
+```bash
+kubectl apply -k apps/n8n/manifests/base/
+kubectl rollout restart deployment/n8n-main -n n8n
+```
+
+**Note:** Workflow emails use Send Email node credentials configured in n8n UI.
 
 ---
 
