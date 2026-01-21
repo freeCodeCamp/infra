@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: n8n
+
+resources:
+- namespace.yaml
+- pvc.yaml
+- postgres-deployment.yaml
+- postgres-service.yaml
+- redis-deployment.yaml
+- redis-service.yaml
+- n8n-main-deployment.yaml
+- n8n-main-service.yaml
+- n8n-worker-deployment.yaml
+- gateway.yaml
+- httproutes.yaml
+
+secretGenerator:
+- name: n8n-secrets
+  type: Opaque
+  envs:
+  - secrets/.secrets.env
+  options:
+    disableNameSuffixHash: true
+- name: n8n-tls-cloudflare
+  type: kubernetes.io/tls
+  files:
+  - tls.crt=secrets/tls.crt
+  - tls.key=secrets/tls.key
+  options:
+    disableNameSuffixHash: true
