@@ -17,7 +17,7 @@
   vars:
     vector_config_dir: /etc/vector
     vector_data_dir: /var/lib/vector
-    clickhouse_host: "{{ clickhouse_endpoint | default('clickhouse-logs') }}"  # Tailscale hostname
+    clickhouse_host: "{{ clickhouse_endpoint | default('ops-k3s-clickhouse-logs') }}"  # Tailscale hostname
     clickhouse_user: "{{ clickhouse_vector_user | default('vector') }}"
     clickhouse_database: "logs_nginx_{{ vector_env | default('prd') }}"
     nginx_log_path: "{{ nginx_access_log | default('/var/log/nginx/json_access.log') }}"

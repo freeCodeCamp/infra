@@ -1102,8 +1102,8 @@
     "list": [
       {
         "current": {
-          "text": "clickhouse-logs",
-          "value": "clickhouse-logs"
+          "text": "ClickHouse",
+          "value": "ClickHouse"
         },
         "label": "Data Source",
         "name": "DS_CLICKHOUSE",

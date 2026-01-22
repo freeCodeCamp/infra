@@ -268,7 +268,7 @@ kubectl exec -i -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client < apps/cl
 | `grafana` | Read-only | Dashboards |
 
 **ClickHouse Access (Tailscale only):**
-- Hostname: `clickhouse-logs.<tailnet>.ts.net`
+- Hostname: `ops-k3s-clickhouse-logs.<tailnet>.ts.net`
 - Port 8123: HTTP interface (queries, Play UI)
 - Port 9000: Native TCP (clickhouse-client)
 
@@ -391,10 +391,10 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 **Via Tailscale (preferred):**
 ```bash
 # Web UI
-open http://clickhouse-logs.<tailnet>.ts.net:8123/play
+open http://ops-k3s-clickhouse-logs.<tailnet>.ts.net:8123/play
 
 # CLI (requires clickhouse-client installed)
-clickhouse-client --host clickhouse-logs.<tailnet>.ts.net --user admin --password
+clickhouse-client --host ops-k3s-clickhouse-logs.<tailnet>.ts.net --user admin --password
 ```
 
 **Via kubectl:**

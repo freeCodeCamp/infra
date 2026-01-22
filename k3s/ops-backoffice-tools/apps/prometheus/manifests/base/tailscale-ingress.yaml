@@ -1,0 +1,28 @@
+# Expose Prometheus to Tailscale network
+# Creates Tailscale device: ops-k3s-backoffice-prometheus
+#
+# Security: Access restricted to Tailnet members only
+# Use Tailscale ACLs to further restrict by user/device if needed
+#
+# Use cases:
+#   - Remote-write from external Prometheus agents
+#   - Direct scraping of external targets
+#   - Ad-hoc queries from Tailnet machines
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-ingress
+  namespace: prometheus
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: "ops-k3s-backoffice-prometheus"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+    prometheus: prometheus-kube-prometheus-prometheus
+  ports:
+    - name: http-web
+      port: 9090
+      targetPort: 9090
+      protocol: TCP

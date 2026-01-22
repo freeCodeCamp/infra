@@ -1,0 +1,23 @@
+# Tailscale Kubernetes Operator
+# https://tailscale.com/kb/1236/kubernetes-operator
+#
+# Prerequisites:
+# 1. Create OAuth client at https://login.tailscale.com/admin/settings/oauth
+#    - Scopes: devices (write), auth_keys (write)
+# 2. Create tags in ACL policy:
+#    - tag:k8s-operator (owner of tag:k8s)
+#    - tag:k8s
+#
+# Install/Upgrade:
+#   helm repo add tailscale https://pkgs.tailscale.com/helmcharts
+#   helm repo update
+#   helm upgrade tailscale-operator tailscale/tailscale-operator \
+#     --namespace tailscale --create-namespace --install \
+#     -f cluster/tailscale/operator-values.yaml \
+#     --set oauth.clientId=<CLIENT_ID> \
+#     --set oauth.clientSecret=<CLIENT_SECRET>
+
+operatorConfig:
+  hostname: "ops-k3s-backoffice-operator"
+  defaultTags:
+    - "tag:k8s"

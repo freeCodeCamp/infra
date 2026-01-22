@@ -6,8 +6,8 @@ Dashboard panels for analyzing NGINX access logs stored in ClickHouse.
 
 - Grafana deployed on ops-backoffice-tools cluster
 - ClickHouse datasource configured:
-  - **Server:** `clickhouse-egress.tailscale.svc.cluster.local`
-  - **Port:** `8123` (HTTP)
+  - **Server:** `ops-k3s-clickhouse-logs.batfish-ray.ts.net`
+  - **Port:** `8123` (HTTP) or `9000` (Native)
   - **Username:** `grafana`
   - **Database:** `logs_nginx_stg` (staging) or `logs_nginx_prd` (production)
 

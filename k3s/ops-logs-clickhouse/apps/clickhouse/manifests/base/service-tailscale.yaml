@@ -1,12 +1,12 @@
 # ClickHouse service exposed via Tailscale
-# Creates a stable hostname: clickhouse-logs.<tailnet>.ts.net
+# Creates a stable hostname: ops-k3s-clickhouse-logs.<tailnet>.ts.net
 apiVersion: v1
 kind: Service
 metadata:
-  name: clickhouse-logs-ts
+  name: clickhouse-ingress
   namespace: clickhouse
   annotations:
-    tailscale.com/hostname: "clickhouse-logs"
+    tailscale.com/hostname: "ops-k3s-clickhouse-logs"
     tailscale.com/tags: "tag:k8s"
 spec:
   type: LoadBalancer

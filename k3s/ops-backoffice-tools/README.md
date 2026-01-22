@@ -34,6 +34,7 @@ Distributed block storage with automatic backups to DO Spaces.
 | Outline | outline | https://outline.freecodecamp.net | Knowledge base wiki |
 | Grafana | grafana | https://grafana.freecodecamp.net | Log analytics dashboard |
 | n8n | n8n | https://n8n.freecodecamp.net | Workflow automation platform |
+| Prometheus | prometheus | (internal + Tailscale) | Metrics collection and alerting |
 
 ---
 
@@ -70,20 +71,11 @@ kubectl get pods -n tailscale
 # Should show operator pod running
 ```
 
-### 4. Apply ClickHouse Egress Proxy
-
-```bash
-kubectl apply -f cluster/tailscale/clickhouse-egress.yaml
-```
-
-This creates a service that allows pods to reach ClickHouse via:
-- `http://clickhouse-egress.tailscale.svc.cluster.local:8123`
-
 ---
 
 ## Grafana Deployment
 
-Log analytics dashboard connected to ClickHouse via Tailscale egress.
+Log analytics dashboard connected to ClickHouse via Tailscale FQDN.
 
 ### 1. Create Secrets
 
@@ -137,9 +129,8 @@ Add A record in Cloudflare:
 # Check pods
 kubectl get pods -n grafana
 
-# Check ClickHouse connection
-kubectl exec -n grafana deploy/grafana -- \
-  curl -s http://clickhouse-egress.tailscale.svc.cluster.local:8123/ping
+# Check ClickHouse connection (via Tailscale FQDN)
+curl -s http://ops-k3s-clickhouse-logs.batfish-ray.ts.net:8123/ping
 ```
 
 ### 6. Access Grafana
@@ -259,6 +250,82 @@ kubectl rollout restart deployment/n8n-main -n n8n
 
 ---
 
+## Prometheus Deployment
+
+Metrics collection and alerting for k3s workloads.
+
+### 1. Deploy Prometheus
+
+```bash
+# Apply Kustomize manifests (namespace + tailscale ingress)
+kubectl apply -k apps/prometheus/manifests/base/
+
+# Install kube-prometheus-stack
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus \
+  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
+```
+
+### 2. Verify
+
+```bash
+kubectl get pods -n prometheus
+```
+
+### Upgrading
+
+```bash
+helm upgrade prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus \
+  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
+```
+
+### Architecture
+
+- **Prometheus**: Metrics storage (50GB Longhorn, 7-day retention)
+- **Alertmanager**: Routes alerts to n8n webhooks
+- **Node Exporter**: k3s host metrics
+- **Kube State Metrics**: k3s workload metrics
+
+### Access
+
+| Method | URL |
+|--------|-----|
+| Grafana | Internal datasource (no direct access needed) |
+| Tailscale | `ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090` |
+
+### Adding External Targets
+
+Edit `apps/prometheus/charts/kube-prometheus-stack/values.yaml`:
+
+```yaml
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      - job_name: 'external-node'
+        static_configs:
+          - targets: ['10.0.0.1:9100']
+            labels:
+              cluster: my-cluster
+```
+
+Then upgrade helm release.
+
+### Remote Write (for external agents)
+
+External Prometheus agents can push metrics:
+
+```yaml
+remote_write:
+  - url: http://ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090/api/v1/write
+```
+
+Requires Tailscale connectivity.
+
+---
+
 ## Application Deployment Pattern
 
 All apps follow Kustomize pattern:
@@ -301,34 +368,28 @@ kubectl apply -f cluster/longhorn/recurring-backup.yaml
 
 ## Troubleshooting
 
-### Tailscale Egress Not Working
+### Tailscale Connectivity Issues
 
 ```bash
 # Check operator logs
 kubectl logs -n tailscale deploy/operator
 
-# Verify egress service
-kubectl get svc -n tailscale clickhouse-egress -o yaml
+# Test ClickHouse FQDN (from any Tailscale node)
+curl -s http://ops-k3s-clickhouse-logs.batfish-ray.ts.net:8123/ping
 
-# Test connectivity from a pod
-kubectl run test --rm -it --image=busybox -- \
-  wget -qO- http://clickhouse-egress.tailscale.svc.cluster.local:8123/ping
+# Test Prometheus FQDN
+curl -s http://ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090/-/healthy
 ```
 
 ### Grafana ClickHouse Connection Failed
 
 ```bash
-# Verify Tailscale egress is working
-kubectl exec -n grafana deploy/grafana -- \
-  curl -v http://clickhouse-egress.tailscale.svc.cluster.local:8123/
-
 # Check Grafana logs
 kubectl logs -n grafana deploy/grafana | grep -i clickhouse
 
-# Test with credentials
-kubectl exec -n grafana deploy/grafana -- \
-  curl -u grafana:PASSWORD \
-  'http://clickhouse-egress.tailscale.svc.cluster.local:8123/?query=SELECT%201'
+# Test ClickHouse connectivity (from Tailscale network)
+curl -u grafana:PASSWORD \
+  'http://ops-k3s-clickhouse-logs.batfish-ray.ts.net:8123/?query=SELECT%201'
 ```
 
 ### PVC Stuck in Pending

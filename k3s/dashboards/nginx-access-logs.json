@@ -2849,7 +2849,7 @@
       },
       {
         "current": {
-          "text": "clickhouse-logs",
+          "text": "ClickHouse",
           "value": "af84wpojvuxhcb"
         },
         "label": "Data Source",
