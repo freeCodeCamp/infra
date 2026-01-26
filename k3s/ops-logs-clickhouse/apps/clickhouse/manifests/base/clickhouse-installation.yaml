@@ -100,7 +100,7 @@ spec:
       default/query_profiler_cpu_time_period_ns: "0"
       default/memory_profiler_step: "0"
       default/trace_profile_events: "0"
-      readonly/readonly: "1"
+      readonly/readonly: "2"
 
     users:
       # Admin user - full access

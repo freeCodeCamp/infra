@@ -61,10 +61,12 @@ grafana.ini:
     client_id: $__env{GRAFANA_GOOGLE_CLIENT_ID}
     client_secret: $__env{GRAFANA_GOOGLE_CLIENT_SECRET}
 
-# Datasource provisioning
 datasources:
   datasources.yaml:
     apiVersion: 1
+    deleteDatasources:
+      - name: ClickHouse
+        orgId: 1
     datasources:
       - name: Prometheus
         type: prometheus
@@ -73,15 +75,3 @@ datasources:
         isDefault: false
         jsonData:
           timeInterval: 15s
-      - name: ClickHouse
-        type: grafana-clickhouse-datasource
-        access: proxy
-        isDefault: false
-        jsonData:
-          host: ops-k3s-clickhouse-logs.batfish-ray.ts.net
-          port: 9000
-          protocol: native
-          username: grafana
-          defaultDatabase: logs
-        secureJsonData:
-          password: $__env{CLICKHOUSE_GRAFANA_PASSWORD}
