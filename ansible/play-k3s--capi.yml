@@ -1,0 +1,154 @@
+---
+# Install Cluster API (CAPI) controllers on a k3s management cluster
+#
+# Prerequisites:
+#   - k3s cluster deployed (play-k3s--cluster.yml)
+#   - Tailscale connected on all nodes
+#   - DIGITALOCEAN_ACCESS_TOKEN environment variable set
+#
+# Usage:
+#   DIGITALOCEAN_ACCESS_TOKEN=<token> ansible-playbook -i inventory/digitalocean.yml play-k3s--capi.yml \
+#     -e variable_host=ops_mgmt_k3s
+#
+# Note: Run on first server node only (CAPI controllers deployed via kubectl)
+
+
+# Play 1: Install clusterctl CLI
+- name: CAPI - Install clusterctl
+  hosts: '{{ variable_host }}[0]'
+  gather_facts: true
+  become: true
+
+  vars:
+    # Pinned versions - see RFC-001 for rationale
+    clusterctl_version: "1.8.4"  # Match CAPI version for compatibility
+    capi_k3s_version: "0.2.1"    # Conservative, tested with CAPI 1.8.x
+
+  tasks:
+    - name: Check if clusterctl is installed
+      command: clusterctl version
+      register: clusterctl_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Download clusterctl binary
+      get_url:
+        url: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v{{ clusterctl_version }}/clusterctl-linux-amd64"
+        dest: /usr/local/bin/clusterctl
+        mode: '0755'
+      when: clusterctl_check.rc != 0
+
+    - name: Verify clusterctl installation
+      command: clusterctl version
+      changed_when: false
+
+    - name: Create clusterctl config directory
+      file:
+        path: /root/.config/cluster-api
+        state: directory
+        mode: '0755'
+
+    - name: Configure k3s providers for clusterctl
+      copy:
+        dest: /root/.config/cluster-api/clusterctl.yaml
+        mode: '0644'
+        content: |
+          providers:
+            - name: "k3s"
+              url: "https://github.com/k3s-io/cluster-api-k3s/releases/v{{ capi_k3s_version }}/bootstrap-components.yaml"
+              type: "BootstrapProvider"
+            - name: "k3s"
+              url: "https://github.com/k3s-io/cluster-api-k3s/releases/v{{ capi_k3s_version }}/control-plane-components.yaml"
+              type: "ControlPlaneProvider"
+
+
+# Play 2: Initialize CAPI controllers
+- name: CAPI - Initialize Controllers
+  hosts: '{{ variable_host }}[0]'
+  gather_facts: false
+  become: true
+
+  vars:
+    do_token: "{{ lookup('env', 'DIGITALOCEAN_ACCESS_TOKEN') }}"
+
+  tasks:
+    - name: Validate DO token is set
+      assert:
+        that:
+          - do_token | length > 0
+        fail_msg: "DIGITALOCEAN_ACCESS_TOKEN environment variable must be set"
+
+    - name: Check if CAPI is already initialized
+      command: k3s kubectl get namespace capi-system
+      register: capi_ns_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Initialize CAPI with k3s and DigitalOcean providers
+      environment:
+        DIGITALOCEAN_ACCESS_TOKEN: "{{ do_token }}"
+        DO_B64ENCODED_CREDENTIALS: "{{ do_token | b64encode }}"
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      command: >
+        clusterctl init
+        --bootstrap k3s
+        --control-plane k3s
+        --infrastructure digitalocean
+        --wait-providers
+      when: capi_ns_check.rc != 0
+      register: capi_init
+      changed_when: "'installed' in capi_init.stdout"
+
+    - name: Wait for CAPI controllers to be ready
+      command: >
+        k3s kubectl wait --for=condition=Available
+        --timeout=300s deployment --all
+        -n {{ item }}
+      loop:
+        - capi-system
+        - capi-k3s-bootstrap-system
+        - capi-k3s-control-plane-system
+        - capdo-system
+      changed_when: false
+
+    - name: Create clusters namespace
+      command: k3s kubectl create namespace clusters
+      register: ns_create
+      changed_when: "'created' in ns_create.stdout"
+      failed_when: ns_create.rc != 0 and 'already exists' not in ns_create.stderr
+
+
+# Play 3: Display status
+- name: CAPI - Display Status
+  hosts: '{{ variable_host }}[0]'
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Get CAPI pods
+      command: k3s kubectl get pods -A -l cluster.x-k8s.io/provider
+      register: capi_pods
+      changed_when: false
+
+    - name: Get CAPI CRDs
+      command: k3s kubectl get crds -o name
+      register: capi_crds
+      changed_when: false
+
+    - name: Display CAPI pods
+      debug:
+        msg: "{{ capi_pods.stdout_lines }}"
+
+    - name: Display cluster-api CRDs count
+      debug:
+        msg: "Installed {{ capi_crds.stdout_lines | select('search', 'cluster.x-k8s.io') | list | length }} Cluster API CRDs"
+
+    - name: CAPI ready
+      debug:
+        msg: |
+          CAPI controllers initialized successfully!
+
+          Next steps:
+          1. Fetch kubeconfig: ansible -i inventory/digitalocean.yml {{ variable_host }}[0] -m fetch -a "src=/etc/rancher/k3s/k3s.yaml dest=../k3s/ops-mgmt/.kubeconfig.yaml flat=yes" -b
+          2. Create cluster manifest in clusters/ namespace
+          3. Apply: kubectl apply -f clusters/<cluster-name>.yaml

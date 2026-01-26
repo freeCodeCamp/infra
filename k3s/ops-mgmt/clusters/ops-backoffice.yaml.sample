@@ -1,0 +1,104 @@
+# CAPI Cluster Manifest: ops-backoffice
+#
+# Before applying:
+#   1. Replace <YOUR-DO-SSH-KEY-ID> with actual DigitalOcean SSH key ID
+#   2. Replace <YOUR-TAILSCALE-AUTH-KEY> with reusable Tailscale auth key
+#   3. Verify stock ubuntu-24-04-x64 works (or build CAPI image if not)
+#
+# Apply:
+#   kubectl apply -f clusters/ops-backoffice.yaml
+#
+# Monitor:
+#   clusterctl describe cluster ops-backoffice -n clusters
+#
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: ops-backoffice
+  namespace: clusters
+  labels:
+    environment: ops
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 10.42.0.0/16
+    services:
+      cidrBlocks:
+        - 10.43.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KThreesControlPlane
+    name: ops-backoffice-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DOCluster
+    name: ops-backoffice
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DOCluster
+metadata:
+  name: ops-backoffice
+  namespace: clusters
+spec:
+  region: nyc3
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KThreesControlPlane
+metadata:
+  name: ops-backoffice-control-plane
+  namespace: clusters
+spec:
+  replicas: 3
+  version: v1.32.0+k3s1
+  infrastructureTemplate:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DOMachineTemplate
+    name: ops-backoffice-control-plane
+  kthreesConfigSpec:
+    # Install Tailscale before k3s for SSH debugging access
+    preK3sCommands:
+      - |
+        # Install Tailscale
+        curl -fsSL https://tailscale.com/install.sh | sh
+        # Authenticate and connect (ephemeral, tagged)
+        tailscale up --auth-key=<YOUR-TAILSCALE-AUTH-KEY> --ssh --accept-routes
+    serverConfig:
+      disableComponents:
+        - servicelb  # Using external DO Load Balancer
+      # Use VPC interface for cluster traffic
+      nodeIP: '{{ ds.meta_data.interfaces.private.0.ipv4.ip_address }}'
+      advertiseAddress: '{{ ds.meta_data.interfaces.private.0.ipv4.ip_address }}'
+      flannelInterface: eth1
+      tlsSan:
+        - '{{ ds.meta_data.interfaces.private.0.ipv4.ip_address }}'
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DOMachineTemplate
+metadata:
+  name: ops-backoffice-control-plane
+  namespace: clusters
+spec:
+  template:
+    spec:
+      size: s-4vcpu-8gb
+      image: ubuntu-24-04-x64
+      sshKeys:
+        - "<YOUR-DO-SSH-KEY-ID>"
+---
+# Post-provisioning: Apply these to the workload cluster after it's ready
+#
+# 1. Fetch kubeconfig:
+#    clusterctl get kubeconfig ops-backoffice -n clusters > ~/.kube/ops-backoffice.yaml
+#
+# 2. Deploy workloads:
+#    KUBECONFIG=~/.kube/ops-backoffice.yaml kubectl apply -k apps/appsmith/manifests/base/
+#    KUBECONFIG=~/.kube/ops-backoffice.yaml kubectl apply -k apps/outline/manifests/base/
+#    KUBECONFIG=~/.kube/ops-backoffice.yaml kubectl apply -k apps/grafana/manifests/base/
+#
+# 3. Create DO Load Balancer (manual):
+#    - Target tag: ops-backoffice nodes
+#    - Forward: 80->30080, 443->30443 (TLS passthrough)
+#
+# 4. Update Cloudflare DNS to new LB IP

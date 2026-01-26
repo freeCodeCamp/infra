@@ -4,10 +4,14 @@ Self-hosted k3s clusters on DigitalOcean for internal tools and logging.
 
 ## Clusters
 
-| Cluster              | Purpose             | Apps                       |
-| -------------------- | ------------------- | -------------------------- |
-| ops-backoffice-tools | Internal tools      | Appsmith, Outline, Grafana |
-| ops-logs-clickhouse  | Centralized logging | ClickHouse                 |
+| Cluster              | Purpose             | Apps                       | Management |
+| -------------------- | ------------------- | -------------------------- | ---------- |
+| ops-mgmt             | CAPI management     | CAPI controllers           | Manual     |
+| ops-backoffice-tools | Internal tools      | Appsmith, Outline, Grafana | Legacy     |
+| ops-logs-clickhouse  | Centralized logging | ClickHouse                 | Legacy     |
+
+> **Migration in progress:** See [RFC-001](../.claude/RFC/RFC-001-k3s-multi-cluster-capi.md) for CAPI migration plan.
+> ops-backoffice-tools and ops-logs-clickhouse will be migrated to CAPI-managed clusters.
 
 ## Structure
 
@@ -21,6 +25,12 @@ k3s/
 │   └── nginx-access-logs.json
 ├── shared/
 │   └── traefik-config.yaml
+├── ops-mgmt/                         # CAPI management cluster (NEW)
+│   ├── README.md
+│   ├── clusters/                     # CAPI cluster manifests
+│   │   └── ops-backoffice.yaml.sample
+│   ├── .kubeconfig.yaml
+│   └── .env
 ├── ops-backoffice-tools/
 │   ├── README.md
 │   ├── cluster/longhorn/
