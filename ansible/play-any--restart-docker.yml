@@ -1,0 +1,72 @@
+---
+- name: Restart Docker daemon and wait for it to come back
+  hosts: "{{ variable_host | default('null') }}"
+  serial: '{{ variable_serial | default(1) }}'
+  gather_facts: true
+  become: true
+  become_user: root
+  vars:
+    force_restart: '{{ variable_force_restart | default(False) }}'
+  tasks:
+    - name: Check Docker service status
+      ansible.builtin.systemd:
+        name: docker
+      register: docker_status
+
+    - name: Display Docker status
+      debug:
+        msg:
+          - 'Debug info:'
+          - '  Force Restart Flag: {{ force_restart }}'
+          - '  Docker Active State: {{ docker_status.status.ActiveState }}'
+          - '  Docker Sub State: {{ docker_status.status.SubState }}'
+
+    - name: Set should_restart
+      set_fact:
+        should_restart: >-
+          {{ (force_restart | bool) or
+             (docker_status.status.ActiveState != 'active') }}
+        restart_reason: >-
+          {%- set reasons = [] -%}
+          {%- if force_restart | bool -%}
+            {%- set reasons = reasons + ['manual force restart requested'] -%}
+          {%- endif -%}
+          {%- if docker_status.status.ActiveState != 'active' -%}
+            {%- set reasons = reasons + ['docker not in active state'] -%}
+          {%- endif -%}
+          {%- if reasons|length == 0 -%}
+            No restart needed
+          {%- else -%}
+            {{ reasons|join(', ') }}
+          {%- endif -%}
+
+    - name: Print restart reason
+      debug:
+        msg:
+          'Restarting Docker on: {{ inventory_hostname }} - Reason: {{
+          restart_reason }}'
+      when: should_restart
+
+    - name: Conditionally restart Docker
+      block:
+        - name: Restart Docker daemon
+          ansible.builtin.systemd:
+            name: docker
+            state: restarted
+            daemon_reload: true
+          register: restart_result
+
+        - name: Wait for Docker to be ready
+          ansible.builtin.command: docker info
+          register: docker_info
+          retries: 12
+          delay: 5
+          until: docker_info.rc == 0
+          changed_when: false
+
+        - name: Display Docker info after restart
+          debug:
+            msg: 'Docker restarted successfully on {{ inventory_hostname }}'
+
+      when: should_restart
+      ignore_errors: '{{ ansible_check_mode }}'
