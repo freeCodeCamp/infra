@@ -1,384 +1,226 @@
-# k3s Stack (Self-hosted)
+# k3s Clusters
 
-Self-hosted k3s clusters on DigitalOcean for internal tools and logging.
+Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose             | Apps                       |
-| -------------------- | ------------------- | -------------------------- |
-| ops-backoffice-tools | Internal tools      | Appsmith, Outline, Grafana |
-| ops-logs-clickhouse  | Centralized logging | ClickHouse                 |
+| Cluster | Purpose | Apps |
+|---------|---------|------|
+| ops-backoffice-tools | Internal tools | Appsmith, Outline, Grafana, n8n, Prometheus |
+| ops-logs-clickhouse | Centralized logging | ClickHouse |
+
+## Quick Access
+
+```bash
+# Tools cluster
+cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+# Logs cluster
+cd k3s/ops-logs-clickhouse && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+```
 
 ## Structure
 
 ```
 k3s/
-├── README.md
-├── nginx-logs-schema.md
-├── grafana-nginx-dashboard.md
-├── dashboards/                       # Grafana dashboards (manual import)
+├── dashboards/                    # Grafana dashboards (manual import)
 │   ├── clickhouse-monitoring.json
 │   └── nginx-access-logs.json
-├── shared/
-│   └── traefik-config.yaml
 ├── ops-backoffice-tools/
-│   ├── README.md
-│   ├── cluster/longhorn/
-│   ├── cluster/tailscale/
-│   ├── apps/appsmith/manifests/base/
-│   ├── apps/outline/manifests/base/
-│   ├── apps/grafana/manifests/base/
-│   ├── .kubeconfig.yaml
-│   └── .env
+│   ├── apps/
+│   │   ├── appsmith/
+│   │   ├── grafana/
+│   │   ├── n8n/
+│   │   ├── outline/
+│   │   └── prometheus/
+│   └── cluster/
+│       ├── longhorn/
+│       └── tailscale/
 └── ops-logs-clickhouse/
-    ├── cluster/charts/tailscale-operator/
     ├── apps/clickhouse/
-    │   ├── manifests/base/
-    │   │   ├── secrets/users-secret.yaml.sample
-    │   │   └── *.yaml
-    │   └── schemas/*.sql
-    ├── .kubeconfig.yaml
-    └── .env
+    │   ├── manifests/
+    │   └── schemas/
+    └── cluster/tailscale/
 ```
 
 ---
 
-## Phase 1: DigitalOcean Resources
-
-Create all resources in DO console before running Ansible.
+## DigitalOcean Resources
 
 ### VPC
 
-| Property | Value              |
-| -------- | ------------------ |
-| Name     | ops-vpc-k3s-nyc3   |
-| Region   | nyc3               |
-| IP Range | 10.108.0.0/20      |
+| Property | Value |
+|----------|-------|
+| Name | ops-vpc-k3s-nyc3 |
+| Region | nyc3 |
+| IP Range | 10.108.0.0/20 |
 
 ### Droplets
 
-| Cluster | Name Pattern              | Count | Specs                | Tags                   |
-| ------- | ------------------------- | ----- | -------------------- | ---------------------- |
-| tools   | ops-vm-tools-k3s-nyc3-0X  | 3     | 4 vCPU, 8GB, 160GB   | k3s, tools_k3s         |
-| logs    | ops-vm-logs-k3s-nyc3-0X   | 3     | 4 vCPU, 8GB, 160GB   | k3s, logs_k3s          |
+| Cluster | Name Pattern | Count | Specs | Tags |
+|---------|--------------|-------|-------|------|
+| tools | ops-vm-tools-k3s-nyc3-0X | 3 | 4 vCPU, 8GB, 160GB | k3s, tools_k3s |
+| logs | ops-vm-logs-k3s-nyc3-0X | 3 | 4 vCPU, 8GB, 160GB | k3s, logs_k3s |
 
-All droplets attach to VPC (eth1 gets 10.108.0.x IP).
+### Volumes (logs cluster)
 
-### Volumes (logs cluster only)
+| Name Pattern | Size | Mount Point |
+|--------------|------|-------------|
+| ops-vol-logs-k3s-nyc3-0X | 100GB | /mnt/ops-vol-logs-k3s-nyc3-0X |
 
-| Name Pattern                    | Size  | Attached To               |
-| ------------------------------- | ----- | ------------------------- |
-| ops-vol-logs-k3s-nyc3-0X        | 100GB | ops-vm-logs-k3s-nyc3-0X   |
+### Load Balancer (tools cluster only)
 
-Mount to `/mnt/ops-vol-logs-k3s-nyc3-0X` on each node.
+| Name | Target Tag | Ports |
+|------|------------|-------|
+| ops-lb-tools-k3s-nyc3 | tools_k3s | 80→30080, 443→30443 (passthrough) |
 
-### Load Balancers
-
-| Name                  | Cluster | Target Tag | VPC              |
-| --------------------- | ------- | ---------- | ---------------- |
-| ops-lb-tools-k3s-nyc3 | tools   | tools_k3s  | ops-vpc-k3s-nyc3 |
-
-Logs cluster uses Tailscale for private access (no public LB).
-
-**Forwarding Rules:**
-
-| Entry      | Entry Port | Target     | Target Port | TLS         |
-| ---------- | ---------- | ---------- | ----------- | ----------- |
-| HTTP       | 80         | HTTP       | 30080       | -           |
-| HTTPS      | 443        | HTTPS      | 30443       | Passthrough |
-
-**Health Check:** TCP on port 30443
-
-### Firewalls
-
-| Name              | Applied To |
-| ----------------- | ---------- |
-| ops-fw-k3s-nyc3   | tag: k3s   |
-
-**Inbound Rules:**
-
-| Protocol | Ports      | Source                |
-| -------- | ---------- | --------------------- |
-| TCP/UDP  | All        | VPC (10.108.0.0/20)   |
-| ICMP     | -          | VPC (10.108.0.0/20)   |
-| TCP      | 22         | Restricted IPs        |
-| TCP      | 30080,30443| Load Balancer         |
-
-**Outbound:** All traffic allowed
+Logs cluster uses Tailscale only (no public LB).
 
 ---
 
-## Phase 2: Ansible Setup
-
-Prerequisites: Droplets hardened and Tailscale installed.
-
-### Deploy Clusters
+## Ansible Deployment
 
 ```bash
 cd ansible
 
-# Tools cluster
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml -e variable_host=tools_k3s
+# Deploy cluster
+uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
+  -e variable_host=tools_k3s  # or logs_k3s
 
-# Logs cluster
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml -e variable_host=logs_k3s
-```
+# Longhorn storage (tools only)
+uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
+  -e variable_host=tools_k3s
 
-### Install Longhorn (tools cluster)
-
-```bash
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
-```
-
-### ClickHouse Tuning (logs cluster)
-
-Requires volumes attached and mounted.
-
-```bash
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--clickhouse.yml -e variable_host=logs_k3s
-```
-
-Applies: sysctl tuning, THP disable, I/O scheduler, `/data/clickhouse` symlink, local-path provisioner patch.
-
-### Fetch Kubeconfig
-
-```bash
-# Tools cluster
-uv run ansible -i inventory/digitalocean.yml tools_k3s -m fetch -a "src=/etc/rancher/k3s/k3s.yaml dest=/tmp/k3s-tools-{{ inventory_hostname }}.yaml flat=yes" -b
-
-# Update server URLs to Tailscale IPs
-for f in /tmp/k3s-tools-*.yaml; do
-  HOST=$(basename "$f" .yaml | sed 's/k3s-tools-//')
-  TS_IP=$(tailscale status | grep "$HOST" | awk '{print $1}')
-  sed -i '' "s|127.0.0.1|$TS_IP|g; s|default|$HOST|g" "$f"
-done
-
-# Merge
-kubectl konfig merge /tmp/k3s-tools-*.yaml > ../k3s/ops-backoffice-tools/.kubeconfig.yaml
-```
-
-Repeat for logs cluster with `logs_k3s` and appropriate paths.
-
----
-
-## Phase 3: Backup Configuration
-
-Backups to DO Spaces: `net.freecodecamp.ops-k3s-backups`
-
-### Longhorn Backup Setup
-
-```bash
-cd ../k3s/ops-backoffice-tools
-
-# Create credentials secret
-kubectl -n longhorn-system create secret generic do-spaces-backup --from-literal=AWS_ACCESS_KEY_ID=<key> --from-literal=AWS_SECRET_ACCESS_KEY=<secret> --from-literal=AWS_ENDPOINTS=nyc3.digitaloceanspaces.com
-
-# Apply backup target and recurring job
-kubectl apply -k cluster/longhorn/
-```
-
-**Manifests applied:**
-- `cluster/longhorn/backup-target.yaml` - Configures `default` BackupTarget with S3 URL
-- `cluster/longhorn/recurring-backup.yaml` - Daily backup at 2 AM UTC, retain 7
-
-### Manual Backup Test
-
-```bash
-# Trigger backup for a volume
-kubectl -n longhorn-system create -f - <<EOF
-apiVersion: longhorn.io/v1beta2
-kind: Backup
-metadata:
-  generateName: manual-test-
-  labels:
-    longhornvolume: <volume-name>
-spec:
-  snapshotName: ""
-EOF
-
-# Check backup status
-kubectl get backups.longhorn.io -n longhorn-system
+# ClickHouse tuning (logs only)
+uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--clickhouse.yml \
+  -e variable_host=logs_k3s
 ```
 
 ---
 
-## Phase 4: App Deployment
+## Tailscale Network
 
-### Tools Cluster
+All inter-cluster communication via Tailscale.
+
+| Device | Cluster | FQDN | Ports |
+|--------|---------|------|-------|
+| ops-k3s-backoffice-prometheus | tools | ops-k3s-backoffice-prometheus.batfish-ray.ts.net | 9090 |
+| ops-k3s-clickhouse-logs | logs | ops-k3s-clickhouse-logs.batfish-ray.ts.net | 8123, 9000 |
+
+See `tailscale/README.md` (repo root) for full device inventory.
+
+---
+
+## ClickHouse
+
+### Users
+
+| User | Profile | Access |
+|------|---------|--------|
+| admin | default | Full access |
+| vector | default | Write to logs_nginx_* |
+| grafana | readonly | Read-only (readonly=2 allows query settings) |
+
+### Databases
+
+| Database | Purpose |
+|----------|---------|
+| logs_nginx_stg | Staging nginx logs |
+| logs_nginx_prd | Production nginx logs |
+
+### Access
 
 ```bash
-cd ../k3s/ops-backoffice-tools
+# Via Tailscale
+clickhouse-client --host ops-k3s-clickhouse-logs.batfish-ray.ts.net \
+  --user grafana --password
 
-kubectl apply -k apps/appsmith/manifests/base/
-kubectl apply -k apps/outline/manifests/base/
-
-# Grafana (requires Tailscale operator first - see ops-backoffice-tools/README.md)
-kubectl apply -k apps/grafana/manifests/base/
-helm install grafana grafana/grafana -n grafana -f apps/grafana/charts/grafana/values.yaml
+# Via kubectl
+cd k3s/ops-logs-clickhouse
+kubectl exec -it -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client
 ```
 
-### Logs Cluster
-
-**Tailscale OAuth Prerequisites:**
-1. Create OAuth client at https://login.tailscale.com/admin/settings/oauth
-   - Scopes: `Devices Core` (write), `Auth Keys` (write), `Services` (write)
-   - Tag: `tag:k8s-operator`
-2. Add tags in ACL policy: `tag:k8s-operator` (owner of `tag:k8s`), `tag:k8s`
-
-**Create User Secret:**
-```bash
-cd ../k3s/ops-logs-clickhouse
-
-# Generate passwords and hashes
-openssl rand -base64 32                              # Generate password
-echo -n "your_password" | sha256sum | cut -d' ' -f1  # Generate hash
-
-# Create secret from template (3 users: admin, vector, grafana)
-cp apps/clickhouse/manifests/base/secrets/users-secret.yaml.sample \
-   apps/clickhouse/manifests/base/secrets/users-secret.yaml
-# Edit with your hashes, then apply
-kubectl apply -f apps/clickhouse/manifests/base/secrets/users-secret.yaml
-```
-
-**Deploy:**
-```bash
-# Install ClickHouse operator
-helm repo add altinity https://docs.altinity.com/clickhouse-operator-helm
-helm repo update
-helm upgrade clickhouse-operator altinity/altinity-clickhouse-operator --namespace clickhouse --create-namespace --install
-
-# Deploy Tailscale operator
-helm repo add tailscale https://pkgs.tailscale.com/helmcharts
-helm upgrade tailscale-operator tailscale/tailscale-operator --namespace tailscale --create-namespace --install -f cluster/charts/tailscale-operator/values.yaml --set oauth.clientId=<id> --set oauth.clientSecret=<secret>
-
-# Deploy ClickHouse
-kubectl apply -k apps/clickhouse/manifests/base/
-
-# Create schemas (staging and production databases)
-kubectl exec -i -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client < apps/clickhouse/schemas/002-logs-nginx-stg.sql
-kubectl exec -i -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client < apps/clickhouse/schemas/003-logs-nginx-prd.sql
-```
-
-**ClickHouse Users:**
-
-| User | Access | Use Case |
-|------|--------|----------|
-| `admin` | Full | Administration |
-| `vector` | Write `logs_*` | Log ingestion |
-| `grafana` | Read-only | Dashboards |
-
-**ClickHouse Access (Tailscale only):**
-- Hostname: `ops-k3s-clickhouse-logs.<tailnet>.ts.net`
-- Port 8123: HTTP interface (queries, Play UI)
-- Port 9000: Native TCP (clickhouse-client)
-
-See [nginx-logs-schema.md](nginx-logs-schema.md) for log format mapping and sample queries.
-
-### ClickHouse Monitoring Dashboard
-
-Import the dashboard to Grafana for ClickHouse cluster monitoring:
-
-**File:** `k3s/dashboards/clickhouse-monitoring.json`
-
-**Panels:**
-- Cluster Status (healthy replicas)
-- Active Queries
-- Memory & Disk Usage (gauges)
-- Queries per Minute
-- Insert Rate
-- Replication Lag
-- Active Merges
-- Top Slow Queries (table)
-- Storage by Table
-- Replica Status
-- Query Latency Percentiles
-
-**Import via Grafana UI:**
-1. Go to Dashboards > Import
-2. Upload `clickhouse-monitoring.json`
-3. Select ClickHouse datasource
-4. Save
-
-**Create Alerts (via Grafana UI):**
-
-| Alert | Query | Condition | Severity |
-|-------|-------|-----------|----------|
-| ReplicaDown | `SELECT count() FROM system.replicas WHERE is_readonly = 0` | < 3 | critical |
-| ReplicationLag | `SELECT max(absolute_delay) FROM system.replicas` | > 100MB | warning |
-| HighMemory | `SELECT value FROM system.metrics WHERE metric = 'MemoryTracking'` | > 2.5GB | warning |
-| DiskFull | `SELECT sum(bytes_on_disk) FROM system.parts WHERE active` | > 72GB (90%) | critical |
-| NoIngestion | `SELECT count() FROM system.query_log WHERE ... AND query_kind = 'Insert'` | = 0 (5min) | warning |
-
-### DNS (Cloudflare)
-
-| Record                      | Type | Value     |
-| --------------------------- | ---- | --------- |
-| appsmith.freecodecamp.net   | A    | tools LB  |
-| outline.freecodecamp.net    | A    | tools LB  |
-| grafana.freecodecamp.net    | A    | tools LB  |
-
-ClickHouse uses Tailscale for private access (no public DNS).
-
-### Verify
+### Deploy Schema Changes
 
 ```bash
-kubectl get pods -A
-kubectl get pvc -A
-kubectl get gateway,httproute -A
-kubectl -n longhorn-system get backuptargets
-kubectl -n longhorn-system get recurringjobs
-
-curl -I https://appsmith.freecodecamp.net
-curl -I https://outline.freecodecamp.net
+kubectl exec -i -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client \
+  < apps/clickhouse/schemas/<file>.sql
 ```
 
 ---
 
-## Architecture
+## Grafana Dashboards
 
-### Traffic Flow
+Import manually via Grafana UI (Dashboards > Import).
 
-```
-Internet → Cloudflare → DO Load Balancer → Firewall → Traefik (NodePort 30443) → Gateway API → App Service
-```
+| Dashboard | File | Datasource |
+|-----------|------|------------|
+| ClickHouse Monitoring | `dashboards/clickhouse-monitoring.json` | ClickHouse (UI-configured) |
+| NGINX Access Logs | `dashboards/nginx-access-logs.json` | ClickHouse (UI-configured) |
 
-### Networking
+### ClickHouse Datasource (UI Configuration)
 
-| Component      | Value                    |
-| -------------- | ------------------------ |
-| VPC CIDR       | 10.108.0.0/20            |
-| Pod CIDR       | 10.42.0.0/16             |
-| Service CIDR   | 10.43.0.0/16             |
-| CoreDNS        | 10.43.0.10               |
-| Flannel iface  | eth1 (VPC)               |
+| Field | Value |
+|-------|-------|
+| Host | ops-k3s-clickhouse-logs.batfish-ray.ts.net |
+| Port | 9000 |
+| Protocol | Native |
+| Username | grafana |
+| Default Database | (leave empty) |
 
-### Cluster Components
+---
 
-| Component       | Version      |
-| --------------- | ------------ |
-| K3s             | v1.32.11+k3s1|
-| OS              | Ubuntu 24.04 |
-| Traefik         | 3.5.x        |
-| Longhorn        | 1.10.1       |
-| Gateway API     | v1.4.0       |
+## Prometheus & Alerting
 
-### Storage
+### Components
 
-| Class        | Provisioner            | Replicas | Use For                    |
-| ------------ | ---------------------- | -------- | -------------------------- |
-| longhorn     | driver.longhorn.io     | 2        | Databases, stateful apps   |
-| local-path   | rancher.io/local-path  | 1        | Ephemeral, non-critical    |
+| Component | Purpose |
+|-----------|---------|
+| Prometheus | Metrics storage (50GB, 7-day retention) |
+| Alertmanager | Routes to n8n webhooks |
+| Node Exporter | Host metrics |
+| Kube State Metrics | Workload metrics |
+
+### Alert Webhooks
+
+| Receiver | URL |
+|----------|-----|
+| n8n-default | https://n8n-wh.freecodecamp.net/webhook/alerts/default |
+| n8n-critical | https://n8n-wh.freecodecamp.net/webhook/alerts/critical |
+| n8n-custom | https://n8n-wh.freecodecamp.net/webhook/alerts/custom |
+
+---
+
+## Storage
+
+| Class | Provisioner | Replicas | Use For |
+|-------|-------------|----------|---------|
+| longhorn | driver.longhorn.io | 2 | Stateful apps (tools cluster) |
+| local-path | rancher.io/local-path | 1 | ClickHouse (logs cluster) |
+
+### Longhorn Backups
+
+- Target: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
+- Schedule: Daily 2 AM UTC
+- Retention: 7 days
+
+---
+
+## DNS (Cloudflare)
+
+| Record | Type | Value |
+|--------|------|-------|
+| appsmith.freecodecamp.net | A | tools LB |
+| outline.freecodecamp.net | A | tools LB |
+| grafana.freecodecamp.net | A | tools LB |
+| n8n.freecodecamp.net | A | tools LB |
+| n8n-wh.freecodecamp.net | A | tools LB |
+
+ClickHouse/Prometheus: Tailscale only (no public DNS).
 
 ---
 
 ## Maintenance
-
-### Update Apps
-
-```bash
-# Edit deployment.yaml with new image version
-kubectl apply -k apps/<app>/manifests/base/
-```
 
 ### Longhorn UI
 
@@ -386,102 +228,101 @@ kubectl apply -k apps/<app>/manifests/base/
 kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ```
 
-### ClickHouse Access
+### Update Apps
 
-**Via Tailscale (preferred):**
 ```bash
-# Web UI
-open http://ops-k3s-clickhouse-logs.<tailnet>.ts.net:8123/play
-
-# CLI (requires clickhouse-client installed)
-clickhouse-client --host ops-k3s-clickhouse-logs.<tailnet>.ts.net --user admin --password
+kubectl apply -k apps/<app>/manifests/base/
 ```
 
-**Via kubectl:**
-```bash
-cd k3s/ops-logs-clickhouse
-
-# Interactive shell
-KUBECONFIG=.kubeconfig.yaml kubectl exec -it -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client
-
-# Run query
-KUBECONFIG=.kubeconfig.yaml kubectl exec -it -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client -q "SHOW DATABASES"
-
-# Run SQL file (example: staging schema)
-KUBECONFIG=.kubeconfig.yaml kubectl exec -i -n clickhouse chi-logs-logs-0-0-0 -- clickhouse-client < apps/clickhouse/schemas/002-logs-nginx-stg.sql
-```
-
-### Useful Commands
+### Helm Releases
 
 ```bash
-# Cluster health
-kubectl get nodes -o wide
-kubectl top nodes
+# Grafana
+helm upgrade grafana grafana/grafana -n grafana \
+  -f apps/grafana/charts/grafana/values.yaml
 
-# Storage
-kubectl get pv,pvc -A
-kubectl get volumes.longhorn.io -n longhorn-system
-
-# DO resources
-doctl compute droplet list | grep k3s
-doctl compute load-balancer list | grep k3s
-```
-
-### Expand Block Storage (logs cluster)
-
-1. Resize volume in DO dashboard
-2. SSH to node: `sudo resize2fs /dev/disk/by-id/scsi-0DO_Volume_<name>`
-
----
-
-## Disaster Recovery (tools cluster)
-
-### Failure Scenarios
-
-| Scenario              | Recovery                                 |
-| --------------------- | ---------------------------------------- |
-| Single node failure   | Automatic - k3s HA (3 nodes)             |
-| Single volume failure | Automatic - Longhorn replicas (2 copies) |
-| Complete cluster loss | Manual restore (see below)               |
-
-### Complete Cluster Restore
-
-**Prerequisites:** New droplets tagged `k3s` + `tools_k3s`, VPC/LB/FW configured, Tailscale installed.
-
-```bash
-cd ansible
-
-# Deploy cluster
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml -e variable_host=tools_k3s
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
-
-# Fetch kubeconfig (see Phase 2)
-```
-
-```bash
-cd ../k3s/ops-backoffice-tools
-
-# Configure backup target
-kubectl -n longhorn-system create secret generic do-spaces-backup --from-literal=AWS_ACCESS_KEY_ID=<key> --from-literal=AWS_SECRET_ACCESS_KEY=<secret> --from-literal=AWS_ENDPOINTS=nyc3.digitaloceanspaces.com
-kubectl apply -f cluster/longhorn/recurring-backup.yaml
-```
-
-Restore via Longhorn UI: **Backup** > select backup > **Restore** (use same volume names).
-
-```bash
-kubectl apply -k apps/appsmith/manifests/base/
-kubectl apply -k apps/outline/manifests/base/
+# Prometheus
+helm upgrade prometheus prometheus-community/kube-prometheus-stack -n prometheus \
+  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
 ```
 
 ---
 
-## Ansible Playbooks
+## Architecture
 
-| Playbook                   | Purpose                                          |
-| -------------------------- | ------------------------------------------------ |
-| play-k3s--cluster.yml      | Deploy k3s HA cluster with Traefik + Gateway API |
-| play-k3s--longhorn.yml     | Install Longhorn distributed storage             |
-| play-k3s--clickhouse.yml   | ClickHouse node tuning + storage setup           |
-| play-o11y--vector.yml      | Deploy Vector log shipper to NGINX nodes         |
+### ops-backoffice-tools
 
-All playbooks use `-e variable_host=<group>` to target inventory groups.
+```
+Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → Apps
+                                                            │
+                                              ┌─────────────┼─────────────┐
+                                              ↓             ↓             ↓
+                                          Appsmith      Grafana        n8n
+                                          Outline     Prometheus    (queue mode)
+                                              │             │             │
+                                              └─────────────┴─────────────┘
+                                                           │
+                                                      Longhorn
+                                                   (2 replicas)
+                                                         │
+                                              Tailscale ←─┘
+                                                  │
+                                                  ↓
+                                          ops-logs-clickhouse
+```
+
+| App | Replicas | Storage | Database |
+|-----|----------|---------|----------|
+| Appsmith | 1 | 10Gi | Embedded |
+| Outline | 1 | 10Gi + 10Gi | PostgreSQL sidecar |
+| Grafana | 1 | 5Gi | Embedded SQLite |
+| n8n | 1 main + 2 workers | 10Gi + 20Gi | PostgreSQL sidecar |
+| Prometheus | 1 | 50Gi | TSDB |
+| Alertmanager | 1 | 10Gi | - |
+
+### ops-logs-clickhouse
+
+```
+                    Tailscale Only (no public LB)
+                              │
+                              ↓
+                     ClickHouse Cluster
+              ┌───────────────┼───────────────┐
+              ↓               ↓               ↓
+         chi-logs-0-0    chi-logs-0-1    chi-logs-0-2
+           (80Gi)          (80Gi)          (80Gi)
+              │               │               │
+              └───────────────┼───────────────┘
+                              │
+                              ↓
+                    ClickHouse Keeper
+              ┌───────────────┼───────────────┐
+              ↓               ↓               ↓
+         keeper-0-0      keeper-0-1      keeper-0-2
+           (5Gi)           (5Gi)           (5Gi)
+```
+
+| Component | Replicas | Storage | Class |
+|-----------|----------|---------|-------|
+| ClickHouse | 3 | 80Gi each | local-path |
+| Keeper | 3 | 5Gi each | local-path |
+
+### Design Strengths
+
+- **Cluster separation**: Tools vs Logs isolates workloads
+- **HA ClickHouse**: 3 replicas with Keeper consensus
+- **Tailscale private mesh**: No public exposure of ClickHouse/Prometheus
+- **Gateway API**: Modern ingress with Traefik
+- **Longhorn backups**: Daily to DO Spaces, 7-day retention
+- **n8n queue mode**: Scalable workers for workflow execution
+
+---
+
+## Playbooks Reference
+
+| Playbook | Purpose |
+|----------|---------|
+| play-k3s--cluster.yml | Deploy k3s HA cluster |
+| play-k3s--longhorn.yml | Install Longhorn storage |
+| play-k3s--clickhouse.yml | ClickHouse node tuning |
+| play-o11y--vector.yml | Deploy Vector log shipper |
