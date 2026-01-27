@@ -2,6 +2,9 @@
   "extends": [
     "github>freecodecamp/renovate-config"
   ],
+  "ignorePaths": [
+    "k8s/apps/o11y/dashboards/**"
+  ],
   "docker-compose": {
     "managerFilePatterns": [
       "/stacks/.+/stack-.+\\.ya?ml$/"
