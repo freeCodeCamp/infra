@@ -64,14 +64,885 @@ grafana.ini:
 datasources:
   datasources.yaml:
     apiVersion: 1
-    deleteDatasources:
-      - name: ClickHouse
-        orgId: 1
     datasources:
       - name: Prometheus
+        uid: PBFA97CFB590B2093
         type: prometheus
         url: http://prometheus-kube-prometheus-prometheus.prometheus.svc:9090
         access: proxy
         isDefault: false
         jsonData:
           timeInterval: 15s
+      - name: Alertmanager
+        uid: P7647F508D5F54FCB
+        type: alertmanager
+        url: http://prometheus-kube-prometheus-alertmanager.prometheus.svc:9093
+        access: proxy
+        jsonData:
+          implementation: prometheus
+          handleGrafanaManagedAlerts: false
+
+# =============================================================================
+# Alerting: Contact Points, Notification Policy, and Alert Rules
+# Provisioned as code -- edits in Grafana UI will be overwritten on redeploy.
+# =============================================================================
+alerting:
+  contactpoints.yaml:
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: n8n-webhook
+        receivers:
+          - uid: n8n-webhook
+            type: webhook
+            settings:
+              url: http://n8n-main.n8n.svc.cluster.local/webhook/grafana-alerts
+              httpMethod: POST
+
+  policies.yaml:
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: n8n-webhook
+        group_by:
+          - alertname
+          - namespace
+          - severity
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+
+  rules.yaml:
+    apiVersion: 1
+    groups:
+      # ================================================================
+      # Group 1: Node Resources (7 rules)
+      # ================================================================
+      - orgId: 1
+        name: k3s-node-resources
+        folder: k3s-alerts
+        interval: 1m
+        rules:
+          - uid: k3s-node-high-cpu
+            title: K3sNodeHighCPU
+            condition: C
+            for: 10m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'High CPU usage on {{ "{{" }} $labels.instance {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [85]}
+                  refId: C
+
+          - uid: k3s-node-critical-cpu
+            title: K3sNodeCriticalCPU
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Critical CPU usage on {{ "{{" }} $labels.instance {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [95]}
+                  refId: C
+
+          - uid: k3s-node-high-memory
+            title: K3sNodeHighMemory
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'High memory usage on {{ "{{" }} $labels.instance {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [80]}
+                  refId: C
+
+          - uid: k3s-node-critical-memory
+            title: K3sNodeCriticalMemory
+            condition: C
+            for: 2m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Critical memory usage on {{ "{{" }} $labels.instance {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [90]}
+                  refId: C
+
+          - uid: k3s-node-disk-pressure
+            title: K3sNodeDiskPressure
+            condition: C
+            for: 10m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Disk pressure on {{ "{{" }} $labels.instance {{ "}}" }} ({{ "{{" }} $labels.mountpoint {{ "}}" }})'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs|zfs", mountpoint!=""} / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs|zfs", mountpoint!=""}) * 100 and node_filesystem_readonly{fstype=~"ext4|xfs|btrfs|zfs", mountpoint!=""} == 0'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [85]}
+                  refId: C
+
+          - uid: k3s-node-disk-critical
+            title: K3sNodeDiskCritical
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Critical disk usage on {{ "{{" }} $labels.instance {{ "}}" }} ({{ "{{" }} $labels.mountpoint {{ "}}" }})'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs|zfs", mountpoint!=""} / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs|zfs", mountpoint!=""}) * 100 and node_filesystem_readonly{fstype=~"ext4|xfs|btrfs|zfs", mountpoint!=""} == 0'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [95]}
+                  refId: C
+
+          - uid: k3s-node-clock-skew
+            title: K3sNodeClockSkew
+            condition: C
+            for: 10m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Clock skew detected on {{ "{{" }} $labels.instance {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'abs(node_timex_offset_seconds)'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0.05]}
+                  refId: C
+
+      # ================================================================
+      # Group 2: Cluster Overcommit (6 rules)
+      # ================================================================
+      - orgId: 1
+        name: k3s-cluster-overcommit
+        folder: k3s-alerts
+        interval: 1m
+        rules:
+          - uid: k3s-memory-overcommit
+            title: K3sMemoryOvercommit
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Memory overcommit on {{ "{{" }} $labels.node {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'sum by(node) (kube_pod_container_resource_limits{resource="memory"}) / sum by(node) (kube_node_status_allocatable{resource="memory"}) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [90]}
+                  refId: C
+
+          - uid: k3s-memory-overcommit-crit
+            title: K3sMemoryOvercommitCritical
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Memory overcommit critical on {{ "{{" }} $labels.node {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'sum by(node) (kube_pod_container_resource_limits{resource="memory"}) / sum by(node) (kube_node_status_allocatable{resource="memory"}) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [100]}
+                  refId: C
+
+          - uid: k3s-cpu-overcommit-warn
+            title: K3sCPUOvercommitWarning
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'CPU overcommit on {{ "{{" }} $labels.node {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'sum by(node) (kube_pod_container_resource_limits{resource="cpu"}) / sum by(node) (kube_node_status_allocatable{resource="cpu"}) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [90]}
+                  refId: C
+
+          - uid: k3s-cpu-overcommit-crit
+            title: K3sCPUOvercommitCritical
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'CPU overcommit critical on {{ "{{" }} $labels.node {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'sum by(node) (kube_pod_container_resource_limits{resource="cpu"}) / sum by(node) (kube_node_status_allocatable{resource="cpu"}) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [150]}
+                  refId: C
+
+          - uid: k3s-mem-request-overcommit
+            title: K3sMemoryRequestOvercommit
+            condition: C
+            for: 10m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Memory requests exceed safe capacity (>66% = cannot survive single node failure)'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'sum(kube_pod_container_resource_requests{resource="memory"}) / sum(kube_node_status_allocatable{resource="memory"}) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [66]}
+                  refId: C
+
+          - uid: k3s-cpu-request-overcommit
+            title: K3sCPURequestOvercommit
+            condition: C
+            for: 10m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'CPU requests exceed safe capacity (>66% = cannot survive single node failure)'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'sum(kube_pod_container_resource_requests{resource="cpu"}) / sum(kube_node_status_allocatable{resource="cpu"}) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [66]}
+                  refId: C
+
+      # ================================================================
+      # Group 3: Pod Health (6 rules)
+      # ================================================================
+      - orgId: 1
+        name: k3s-pod-health
+        folder: k3s-alerts
+        interval: 1m
+        rules:
+          - uid: k3s-pod-oomkilled
+            title: K3sPodOOMKilled
+            condition: C
+            for: 0s
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'OOMKilled: {{ "{{" }} $labels.namespace {{ "}}" }}/{{ "{{" }} $labels.pod {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1) and ignoring(reason) min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m]) == 1'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: k3s-pod-crashlooping
+            title: K3sPodCrashLooping
+            condition: C
+            for: 15m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'CrashLooping: {{ "{{" }} $labels.namespace {{ "}}" }}/{{ "{{" }} $labels.pod {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m]) >= 1'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: k3s-pod-not-ready
+            title: K3sPodNotReady
+            condition: C
+            for: 15m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Pod not ready: {{ "{{" }} $labels.namespace {{ "}}" }}/{{ "{{" }} $labels.pod {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(1 - kube_pod_status_ready{condition="true"}) > 0 and on(pod, namespace) kube_pod_status_phase{phase="Running"} == 1 unless on(pod, namespace) (kube_pod_owner{owner_kind="Job"})'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: k3s-pod-pending
+            title: K3sPodPending
+            condition: C
+            for: 15m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Pod pending: {{ "{{" }} $labels.namespace {{ "}}" }}/{{ "{{" }} $labels.pod {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'kube_pod_status_phase{phase="Pending"} == 1 unless on(pod, namespace) (kube_pod_owner{owner_kind="Job"})'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: k3s-container-waiting
+            title: K3sContainerWaiting
+            condition: C
+            for: 1h
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Container waiting: {{ "{{" }} $labels.namespace {{ "}}" }}/{{ "{{" }} $labels.pod {{ "}}" }} ({{ "{{" }} $labels.reason {{ "}}" }})'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'kube_pod_container_status_waiting_reason{reason!="CrashLoopBackOff"} > 0'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: k3s-deployment-mismatch
+            title: K3sDeploymentReplicasMismatch
+            condition: C
+            for: 15m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Stuck rollout: {{ "{{" }} $labels.namespace {{ "}}" }}/{{ "{{" }} $labels.deployment {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(kube_deployment_spec_replicas > kube_deployment_status_replicas_available) and (changes(kube_deployment_status_replicas_updated[10m]) == 0)'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+      # ================================================================
+      # Group 4: Longhorn Storage (6 rules)
+      # ================================================================
+      - orgId: 1
+        name: k3s-longhorn
+        folder: k3s-alerts
+        interval: 1m
+        rules:
+          - uid: longhorn-vol-degraded
+            title: LonghornVolumeDegraded
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Longhorn volume degraded: {{ "{{" }} $labels.volume {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'longhorn_volume_robustness == 2'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: longhorn-vol-faulted
+            title: LonghornVolumeFaulted
+            condition: C
+            for: 2m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Longhorn volume faulted: {{ "{{" }} $labels.volume {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: 'longhorn_volume_robustness == 3'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C
+
+          - uid: longhorn-disk-pressure
+            title: LonghornNodeDiskPressure
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Longhorn disk pressure on {{ "{{" }} $labels.node {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(longhorn_node_storage_usage_bytes / longhorn_node_storage_capacity_bytes) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [70]}
+                  refId: C
+
+          - uid: longhorn-disk-critical
+            title: LonghornNodeDiskCritical
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Longhorn disk critical on {{ "{{" }} $labels.node {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(longhorn_node_storage_usage_bytes / longhorn_node_storage_capacity_bytes) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [90]}
+                  refId: C
+
+          - uid: longhorn-vol-space-used
+            title: LonghornVolumeActualSpaceUsed
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Longhorn volume near capacity: {{ "{{" }} $labels.volume {{ "}}" }}'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(longhorn_volume_actual_size_bytes / longhorn_volume_capacity_bytes) * 100'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [90]}
+                  refId: C
+
+          - uid: longhorn-node-down
+            title: LonghornNodeDown
+            condition: C
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Longhorn node down (expected vs ready mismatch)'
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: PBFA97CFB590B2093
+                model:
+                  expr: '(avg(longhorn_node_count_total) or on() vector(0)) - (count(longhorn_node_status{condition="ready"} == 1) or on() vector(0))'
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model: {type: reduce, expression: A, reducer: last, refId: B}
+              - refId: C
+                relativeTimeRange: {from: 0, to: 0}
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator: {type: gt, params: [0]}
+                  refId: C

@@ -177,17 +177,23 @@ Import manually via Grafana UI (Dashboards > Import).
 | Component | Purpose |
 |-----------|---------|
 | Prometheus | Metrics storage (50GB, 7-day retention) |
-| Alertmanager | Routes to n8n webhooks |
+| Alertmanager | Handles kube-prometheus-stack built-in rules (null receiver, no notifications) |
 | Node Exporter | Host metrics |
 | Kube State Metrics | Workload metrics |
+| Longhorn ServiceMonitor | Longhorn storage metrics scraping |
 
-### Alert Webhooks
+### Alerting Architecture
 
-| Receiver | URL |
-|----------|-----|
-| n8n-default | https://n8n-wh.freecodecamp.net/webhook/alerts/default |
-| n8n-critical | https://n8n-wh.freecodecamp.net/webhook/alerts/critical |
-| n8n-custom | https://n8n-wh.freecodecamp.net/webhook/alerts/custom |
+Alert rules are **Grafana-managed** (not Prometheus Alertmanager), provisioned via Helm values.yaml:
+
+| Layer | Details |
+|-------|---------|
+| Rules | 25 rules across 4 groups (node resources, cluster overcommit, pod health, Longhorn) |
+| Contact Point | n8n webhook (`http://n8n-main.n8n.svc.cluster.local/webhook/grafana-alerts`) |
+| Notification Policy | Group by alertname, namespace, severity. Repeat every 4h. |
+| Delivery | n8n workflow formats and sends to Google Chat |
+
+All alerting config is code-managed in `apps/grafana/charts/grafana/values.yaml`.
 
 ---
 

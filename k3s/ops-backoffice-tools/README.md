@@ -159,12 +159,20 @@ helm upgrade prometheus prometheus-community/kube-prometheus-stack \
 | Prometheus | 50Gi Longhorn | 7 days |
 | Alertmanager | 10Gi Longhorn | - |
 
-### Alertmanager Webhooks
+### Alerting
 
-Alerts route to n8n:
-- Default: `https://n8n-wh.freecodecamp.net/webhook/alerts/default`
-- Critical: `https://n8n-wh.freecodecamp.net/webhook/alerts/critical`
-- Custom: `https://n8n-wh.freecodecamp.net/webhook/alerts/custom`
+Alert rules are **Grafana-managed**, provisioned as code in `apps/grafana/charts/grafana/values.yaml`:
+
+| Group | Rules | Examples |
+|-------|-------|---------|
+| k3s-node-resources | 7 | CPU, memory, disk, clock skew |
+| k3s-cluster-overcommit | 6 | CPU/memory limits and requests vs allocatable |
+| k3s-pod-health | 6 | OOMKilled, CrashLoop, pending, stuck rollouts |
+| k3s-longhorn | 6 | Volume degraded/faulted, disk pressure, node down |
+
+**Pipeline:** Grafana alert rules -> n8n webhook (cluster-internal) -> Google Chat
+
+Prometheus Alertmanager uses a null receiver (handles only kube-prometheus-stack built-in recording/alerting rules, no notifications).
 
 ### Access
 

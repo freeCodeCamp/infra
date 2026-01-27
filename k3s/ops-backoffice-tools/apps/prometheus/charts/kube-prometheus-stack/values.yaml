@@ -84,36 +84,17 @@ alertmanager:
         cpu: 500m
         memory: 512Mi
 
-  # Alert routing to n8n webhooks
   config:
     global:
       resolve_timeout: 5m
     route:
-      receiver: 'n8n-default'
+      receiver: 'null'
       group_by: ['alertname', 'cluster', 'service']
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
-      routes:
-        - match:
-            severity: critical
-          receiver: 'n8n-critical'
-        - match:
-            custom_workflow: 'true'
-          receiver: 'n8n-custom'
     receivers:
-      - name: 'n8n-default'
-        webhook_configs:
-          - url: 'https://n8n-wh.freecodecamp.net/webhook/alerts/default'
-            send_resolved: true
-      - name: 'n8n-critical'
-        webhook_configs:
-          - url: 'https://n8n-wh.freecodecamp.net/webhook/alerts/critical'
-            send_resolved: true
-      - name: 'n8n-custom'
-        webhook_configs:
-          - url: 'https://n8n-wh.freecodecamp.net/webhook/alerts/custom'
-            send_resolved: true
+      - name: 'null'
 
 # Node exporter for k3s nodes
 nodeExporter:

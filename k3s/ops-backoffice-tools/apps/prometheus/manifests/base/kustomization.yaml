@@ -6,11 +6,4 @@ namespace: prometheus
 resources:
 - namespace.yaml
 - tailscale-ingress.yaml
-
-secretGenerator:
-- name: alertmanager-webhook-urls
-  envs:
-  - secrets/.secrets.env
-
-generatorOptions:
-  disableNameSuffixHash: true
+- longhorn-servicemonitor.yaml
