@@ -8,23 +8,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      inventory:
-        description: 'Inventory file to validate'
-        type: choice
-        required: true
-        default: 'linode.yml'
-        options:
-          - 'linode.yml'
-      verbosity:
-        description: 'Verbosity level for logs'
-        type: choice
-        required: true
-        default: '-v'
-        options:
-          - '-v'
-          - '-vv'
-          - '-vvv'
 
 defaults:
   run:
@@ -34,8 +17,6 @@ jobs:
   test:
     name: Ansible CI Test
     runs-on: ubuntu-latest
-    env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
 
     steps:
       - name: Checkout
@@ -43,14 +24,12 @@ jobs:
 
       - name: Setup UV
         run: |
-          # Install uv if not available
           if ! command -v uv >/dev/null 2>&1; then
             echo "Installing uv..."
             curl -LsSf https://astral.sh/uv/install.sh | sh
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
 
-          # Verify uv is available
           if ! command -v uv >/dev/null 2>&1; then
             echo "ERROR: uv installation failed"
             exit 1
@@ -60,31 +39,41 @@ jobs:
 
       - name: Setup Ansible and Dependencies
         run: |
-          # Use uv to install ansible and dependencies (matches local setup)
           uv sync
 
-          # Activate venv and install ansible collections/roles
           source .venv/bin/activate
           ansible-galaxy install -r requirements.yml
 
-          # Verify ansible is working
           ansible --version
 
-      - name: Test Basic Ansible Commands
+      - name: Validate Ansible Setup
         run: |
-          # Test ansible commands work with installed dependencies
           source .venv/bin/activate
           ansible --version
           ansible-lint --version
           ansible-inventory --help >/dev/null
-          echo "SUCCESS: All ansible commands working with CI setup"
+          echo "SUCCESS: All ansible commands working"
 
-      - name: Validate Ansible Inventory
+      - name: Syntax Check Playbooks
         run: |
           source .venv/bin/activate
-          HOST_COUNT=$(ansible-inventory -i inventory/${{ inputs.inventory }} --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
-          if [ "$HOST_COUNT" -eq 0 ]; then
-            echo "ERROR: No hosts found in inventory - would run against localhost"
+
+          echo "Checking playbook syntax..."
+          FAILED=0
+          for playbook in play-*.yml; do
+            # Pass dummy variable_host to satisfy playbooks that use dynamic hosts
+            if ! ansible-playbook --syntax-check -e variable_host=localhost "$playbook" >/dev/null 2>&1; then
+              echo "FAIL: $playbook"
+              ansible-playbook --syntax-check -e variable_host=localhost "$playbook" 2>&1 | tail -10
+              FAILED=1
+            else
+              echo "OK: $playbook"
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "ERROR: Some playbooks have syntax errors"
             exit 1
           fi
-          echo "Inventory validation passed: $HOST_COUNT hosts found"
+
+          echo "SUCCESS: All playbooks passed syntax check"
