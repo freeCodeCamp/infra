@@ -384,7 +384,7 @@ alerting:
                   type: threshold
                   expression: B
                   conditions:
-                    - evaluator: {type: gt, params: [90]}
+                    - evaluator: {type: gt, params: [120]}
                   refId: C
 
           - uid: k3s-memory-overcommit-crit
@@ -416,7 +416,7 @@ alerting:
                   type: threshold
                   expression: B
                   conditions:
-                    - evaluator: {type: gt, params: [100]}
+                    - evaluator: {type: gt, params: [150]}
                   refId: C
 
           - uid: k3s-cpu-overcommit-warn
@@ -448,7 +448,7 @@ alerting:
                   type: threshold
                   expression: B
                   conditions:
-                    - evaluator: {type: gt, params: [90]}
+                    - evaluator: {type: gt, params: [150]}
                   refId: C
 
           - uid: k3s-cpu-overcommit-crit
@@ -480,7 +480,7 @@ alerting:
                   type: threshold
                   expression: B
                   conditions:
-                    - evaluator: {type: gt, params: [150]}
+                    - evaluator: {type: gt, params: [200]}
                   refId: C
 
           - uid: k3s-mem-request-overcommit
