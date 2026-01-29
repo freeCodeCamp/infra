@@ -4,7 +4,7 @@ resource "digitalocean_droplet" "stg_ahoyworld_api" {
   name = "stg-vm-ahoyworld-api-${count.index + 1}"
   tags = ["stg", "ahoyworld", digitalocean_tag.stg_tag_fw_internal.id, "api", "stg_ahoyworld_api"]
 
-  image    = data.hcp_packer_artifact.do_ubuntu.external_identifier
+  image    = local.do_ubuntu_image
   size     = "s-2vcpu-4gb"
   region   = "nyc3"
   vpc_uuid = digitalocean_vpc.stg_vpc.id

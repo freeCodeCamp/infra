@@ -2,11 +2,27 @@ locals {
   zone = "freecodecamp.net"
 }
 
-data "hcp_packer_artifact" "do_ubuntu" {
-  bucket_name  = "digitalocean-ubuntu"
-  channel_name = "latest"
-  platform     = "digitalocean"
-  region       = "nyc3"
+# Looks up the latest custom Ubuntu image built by Packer
+# Images are named: ami-ubuntu-24.04-YYYYMMDD.hhmm
+data "digitalocean_images" "ubuntu" {
+  filter {
+    key      = "name"
+    values   = ["ami-ubuntu-24.04-*"]
+    match_by = "re"
+  }
+  filter {
+    key    = "private"
+    values = ["true"]
+  }
+  sort {
+    key       = "created"
+    direction = "desc"
+  }
+}
+
+locals {
+  # Get the most recently created image
+  do_ubuntu_image = data.digitalocean_images.ubuntu.images[0].id
 }
 
 data "cloudflare_zone" "cf_zone" {

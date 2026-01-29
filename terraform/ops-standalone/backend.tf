@@ -1,10 +1,9 @@
 terraform {
-  backend "remote" {
-    hostname     = "app.terraform.io"
-    organization = "freecodecamp"
-
-    workspaces {
-      name = "tfws-ops-standalone"
-    }
+  backend "s3" {
+    bucket       = "fcc-infra-state"
+    key          = "ops-standalone/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }

@@ -15,11 +15,22 @@ data "linode_stackscripts" "cloudinit_scripts" {
   }
 }
 
-data "hcp_packer_artifact" "linode_ubuntu" {
-  bucket_name  = "linode-ubuntu"
-  channel_name = "golden"
-  platform     = "linode"
-  region       = "us-east"
+# Looks up the latest custom Ubuntu image built by Packer
+# Images are named: ami-ubuntu-22.04-YYYYMMDD.hhmm
+data "linode_images" "ubuntu" {
+  filter {
+    name   = "label"
+    values = ["ami-ubuntu-22.04-*"]
+  }
+  filter {
+    name   = "is_public"
+    values = ["false"]
+  }
+}
+
+locals {
+  # Get the most recently created image (sorted by created date descending)
+  linode_ubuntu_image = sort([for img in data.linode_images.ubuntu.images : img.id])[length(data.linode_images.ubuntu.images) - 1]
 }
 
 data "cloudflare_zone" "cf_zone" {

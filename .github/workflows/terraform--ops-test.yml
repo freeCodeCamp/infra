@@ -1,4 +1,4 @@
-name: Terraform -- Linode-OPS-Test
+name: OpenTofu -- Linode-OPS-Test
 
 on:
   pull_request:
@@ -14,12 +14,12 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  terraform-format:
+  opentofu-format:
     if:
       github.event_name == 'pull_request' || github.event_name ==
       'workflow_dispatch'
     runs-on: ubuntu-latest
-    name: Terraform Format
+    name: OpenTofu Format
     permissions:
       contents: read
       pull-requests: write
@@ -28,121 +28,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-        # This is only for the GitHub Actions runner, not Terraform Cloud
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@12f4debbf681675350b6cd1f0ff8ecfbda62027b # v1
 
-      - name: Terraform Format
-        run: terraform fmt -check
+      - name: OpenTofu Format
+        run: tofu fmt -check
         working-directory: terraform/ops-test
 
-  terraform-upgrade-test:
+  opentofu-validate:
     if:
       github.event_name == 'pull_request' || github.event_name ==
       'workflow_dispatch'
     runs-on: ubuntu-latest
-    name: Terraform Upgrade Test
-    permissions:
-      contents: read
-      pull-requests: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-        # This is only for the GitHub Actions runner, not Terraform Cloud
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-        with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-
-      - name: Terraform Upgrade Test
-        run: terraform init -upgrade && terraform plan
-        working-directory: terraform/ops-test
-
-  terraform-cloud-speculative-run:
-    if:
-      github.event_name == 'pull_request' || github.event_name ==
-      'workflow_dispatch'
-    runs-on: ubuntu-latest
-    name: Terraform Cloud Speculative Run
+    name: OpenTofu Validate
     permissions:
       contents: read
       pull-requests: write
     env:
-      TF_CLOUD_ORGANIZATION: freecodecamp
-      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-      TF_WORKSPACE: tfws-ops-test
-      TF_LOG: ERROR
-      CONFIG_DIRECTORY: terraform/ops-test
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Terraform Cloud Upload Configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
-        id: upload
-        with:
-          workspace: ${{ env.TF_WORKSPACE }}
-          directory: ${{ env.CONFIG_DIRECTORY }}
-          speculative: true
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@12f4debbf681675350b6cd1f0ff8ecfbda62027b # v1
 
-      - name: Terraform Cloud Create Speculative Run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
-        id: run
-        with:
-          workspace: ${{ env.TF_WORKSPACE }}
-          configuration_version:
-            ${{ steps.upload.outputs.configuration_version_id }}
-          plan_only: true
-          message: 'Triggered From GitHub Actions CI ${{ github.sha }}'
+      - name: OpenTofu Init
+        run: tofu init -backend=false
+        working-directory: terraform/ops-test
 
-      - name: Terraform Cloud Plan Output
-        uses: hashicorp/tfc-workflows-github/actions/plan-output@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
-        id: plan-output
-        with:
-          plan: ${{ steps.run.outputs.plan_id }}
-
-      - name: Find Comment
-        if: github.event_name == 'pull_request'
-        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
-        id: fc
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
-          body-includes: Run Details - ${{ env.TF_WORKSPACE }}
-
-      - name: Create or update comment
-        if: github.event_name == 'pull_request'
-        uses: peter-evans/create-or-update-comment@cf1a4a2020fa08820c81f4127c6aad2fa212beb8
-        with:
-          comment-id: ${{ steps.fc.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          edit-mode: replace
-          body: |
-            Run Details - ${{ env.TF_WORKSPACE }}
-
-            **Terraform Cloud Plan Output**
-
-            ```
-            Plan: ${{ steps.plan-output.outputs.add }} to add, ${{ steps.plan-output.outputs.change }} to change, ${{ steps.plan-output.outputs.destroy }} to destroy.
-            ```
-
-            **Details : <${{ steps.run.outputs.run_link }}>**
-
-            <table>
-              <tr>
-                <td>
-                  Warning
-                </td>
-                <td>
-                  <p>
-                    Please note that the plan output provided may not accurately reflect the impact on the Terraform project you are currently working on in this Pull Request. The CI checks are merely a sanity test to verify that the versions in the lock file are valid and functional.
-                  </p>
-                  <p>
-                    Confirm the actual Terraform plan by running the corresponding project on your machine or on TFC.
-                  </p>
-                </td>
-              </tr>
-            </table>
+      - name: OpenTofu Validate
+        run: tofu validate
+        working-directory: terraform/ops-test

@@ -91,26 +91,4 @@ build {
     output     = "manifest.json"
     strip_path = true
   }
-
-  hcp_packer_registry {
-    bucket_name = "digitalocean-ubuntu"
-
-    description = <<EOT
-An Ubuntu LTS - Server image with Docker installed.
-    EOT
-
-    bucket_labels = {
-      "do_size"    = var.do_size
-      "do_region"  = var.do_region
-      "os_flavor"  = var.do_os_flavor
-      "os_version" = var.do_os_version
-    }
-
-    build_labels = {
-      "os_ami_id"     = "ami-${var.do_os_flavor}-${var.do_os_version}-${local.image_version}"
-      "os_base_image" = var.do_image
-      "os_flavor"     = var.do_os_flavor
-      "os_version"    = var.do_os_version
-    }
-  }
 }

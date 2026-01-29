@@ -1,10 +1,9 @@
 terraform {
-  backend "remote" {
-    hostname     = "app.terraform.io"
-    organization = "freecodecamp"
-
-    workspaces {
-      name = "tfws-prd-oldeworld"
-    }
+  backend "s3" {
+    bucket       = "fcc-infra-state"
+    key          = "prd-cluster-oldeworld/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }

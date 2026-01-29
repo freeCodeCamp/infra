@@ -27,7 +27,7 @@ resource "linode_instance_disk" "stg_oldeworld_api_disk__boot" {
   linode_id = linode_instance.stg_oldeworld_api[count.index].id
   size      = linode_instance.stg_oldeworld_api[count.index].specs.0.disk
 
-  image     = data.hcp_packer_artifact.linode_ubuntu.external_identifier
+  image     = local.linode_ubuntu_image
   root_pass = var.password
 
   stackscript_id = data.linode_stackscripts.cloudinit_scripts.stackscripts.0.id

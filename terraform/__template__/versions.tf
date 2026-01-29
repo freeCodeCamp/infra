@@ -1,9 +1,6 @@
 terraform {
   required_providers {
-    hcp = {
-      source  = "hashicorp/hcp"
-      version = "0.110.0"
-    }
+    # Add providers as needed for your workspace
   }
-  required_version = ">= 1"
+  required_version = ">= 1.8"
 }

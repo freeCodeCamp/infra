@@ -1,9 +1,9 @@
 terraform {
-  cloud {
-    organization = "freecodecamp"
-    workspaces {
-      name    = "tfws-prd-ahoyworld"
-      project = "DigitalOcean"
-    }
+  backend "s3" {
+    bucket       = "fcc-infra-state"
+    key          = "prd-cluster-ahoyworld/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
