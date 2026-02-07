@@ -1,0 +1,68 @@
+# Find all directories containing .terraform.lock.hcl files
+workspaces := `find . -name ".terraform.lock.hcl" -exec dirname {} \; | tr '\n' ' '`
+
+# Show available recipes
+default:
+    @just --list
+
+# Format Terraform files in all workspaces
+format:
+    @echo "Formatting Terraform files in all workspaces..."
+    @for workspace in {{workspaces}}; do \
+        echo "Formatting $workspace"; \
+        terraform -chdir=$workspace fmt; \
+    done
+    @echo "Formatting complete."
+
+# List all detected Terraform workspaces
+list-workspaces:
+    @echo "Detected Terraform workspaces:"
+    @for workspace in {{workspaces}}; do \
+        echo "  $workspace"; \
+    done
+
+# Validate Terraform configurations in all workspaces
+validate:
+    @echo "Validating Terraform configurations in all workspaces..."
+    @for workspace in {{workspaces}}; do \
+        echo "Validating $workspace"; \
+        terraform -chdir=$workspace validate; \
+    done
+    @echo "Validation complete."
+
+# Initialize Terraform in all workspaces
+init:
+    @echo "Initializing Terraform in all workspaces..."
+    @for workspace in {{workspaces}}; do \
+        echo "Initializing $workspace"; \
+        terraform -chdir=$workspace init; \
+    done
+    @echo "Initialization complete."
+
+# Initialize and upgrade Terraform in all workspaces
+init-upgrade:
+    @echo "Initializing and upgrading Terraform in all workspaces..."
+    @for workspace in {{workspaces}}; do \
+        echo "Initializing and upgrading $workspace"; \
+        terraform -chdir=$workspace init -upgrade; \
+    done
+    @echo "Initialization and upgrade complete."
+
+# Run Terraform plan in all workspaces
+plan:
+    @echo "Running Terraform plan in all workspaces..."
+    @for workspace in {{workspaces}}; do \
+        echo "Planning $workspace"; \
+        terraform -chdir=$workspace plan; \
+    done
+    @echo "Planning complete."
+
+# Remove Terraform cache files from all workspaces
+[confirm("This will delete .terraform, tfstate, and lock files. Continue?")]
+clean:
+    @echo "Cleaning Terraform cache files from all workspaces..."
+    @for workspace in {{workspaces}}; do \
+        echo "Cleaning $workspace"; \
+        rm -rf $workspace/.terraform $workspace/*.tfstate* $workspace/.terraform.lock.hcl; \
+    done
+    @echo "Cleaning complete."

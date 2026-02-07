@@ -1,0 +1,63 @@
+set shell := ["bash", "-cu"]
+
+venv := ".venv"
+INVENTORY := env("INVENTORY", "linode.yml")
+
+# Show available recipes
+default:
+    @just --list
+    @echo ""
+    @echo "UV-BASED WORKFLOW:"
+    @echo "  1. just install          # Install ansible + deps with uv"
+    @echo "  2. direnv allow          # Auto-activate venv (one-time)"
+    @echo "  3. just test             # Test connection"
+    @echo "  4. ansible-playbook ...  # Run playbooks"
+
+# Install ansible and dependencies using uv
+install:
+    #!/usr/bin/env bash
+    set -eu
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "ERROR: uv not found. Please install uv first:"
+        echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+        exit 1
+    fi
+    uv sync
+    source {{venv}}/bin/activate && ansible-galaxy install -r requirements.yml
+
+# Remove virtual environment and ansible directories
+[confirm("This will delete the virtual environment and .ansible directory. Continue?")]
+clean:
+    rm -rf {{venv}} .ansible
+
+# Test connection to random VM (set INVENTORY env var, default: linode.yml)
+test:
+    #!/usr/bin/env bash
+    set -eu
+    echo "Counting VMs in inventory..."
+    if ! command -v ansible >/dev/null 2>&1; then
+        echo "ERROR: ansible not found - did you source the venv?"
+        echo "Run: source {{venv}}/bin/activate"
+        exit 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "ERROR: jq not found - please install jq"
+        exit 1
+    fi
+    VM_COUNT=$(ansible-inventory -i inventory/{{INVENTORY}} --list 2>/dev/null | jq -r '._meta.hostvars | keys | length')
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to parse inventory"
+        exit 1
+    fi
+    echo "Found $VM_COUNT VMs in inventory"
+    if [ "$VM_COUNT" -eq 0 ]; then
+        echo "ERROR: No VMs found in inventory"
+        exit 1
+    fi
+    RANDOM_INDEX=$(( RANDOM % VM_COUNT ))
+    echo "Testing connection to VM at index $RANDOM_INDEX..."
+    if ! ansible -i inventory/{{INVENTORY}} "all[$RANDOM_INDEX]" -m ping --one-line -v; then
+        echo "ERROR: Connection test failed"
+        exit 1
+    fi
+    echo "SUCCESS: Connection test passed"
