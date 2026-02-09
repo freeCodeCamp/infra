@@ -231,6 +231,7 @@ kubectl logs -n grafana deploy/grafana | grep -i clickhouse
 ```
 
 Common issues:
+
 - `readonly mode`: ClickHouse user profile needs `readonly=2`
 - `Database X does not exist`: Leave default database empty in datasource config
 
