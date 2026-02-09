@@ -1,0 +1,84 @@
+# CAPI Cluster Manifest: ops-backoffice
+#
+# Before applying:
+#   1. Replace <YOUR-DO-SSH-KEY-ID> with actual DigitalOcean SSH key ID
+#   2. Replace <YOUR-TAILSCALE-AUTH-KEY> with reusable Tailscale auth key
+#   3. Verify ubuntu-24-04-x64 image is available in nyc3
+#
+# Apply:
+#   kubectl apply -f clusters/ops-backoffice.yaml
+#
+# Monitor:
+#   clusterctl describe cluster ops-backoffice -n clusters
+#
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: ops-backoffice
+  namespace: clusters
+  labels:
+    environment: ops
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 10.42.0.0/16
+    services:
+      cidrBlocks:
+        - 10.43.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KThreesControlPlane
+    name: ops-backoffice-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DOCluster
+    name: ops-backoffice
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DOCluster
+metadata:
+  name: ops-backoffice
+  namespace: clusters
+spec:
+  region: nyc3
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KThreesControlPlane
+metadata:
+  name: ops-backoffice-control-plane
+  namespace: clusters
+spec:
+  replicas: 3
+  version: v1.32.11+k3s1
+  infrastructureTemplate:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DOMachineTemplate
+    name: ops-backoffice-control-plane
+  kthreesConfigSpec:
+    preK3sCommands:
+      - |
+        curl -fsSL https://tailscale.com/install.sh | sh
+        tailscale up --auth-key=<YOUR-TAILSCALE-AUTH-KEY> --ssh --accept-routes
+    serverConfig:
+      disableComponents:
+        - servicelb
+      nodeIP: '{{ ds.meta_data.interfaces.private.0.ipv4.ip_address }}'
+      advertiseAddress: '{{ ds.meta_data.interfaces.private.0.ipv4.ip_address }}'
+      flannelInterface: eth1
+      tlsSan:
+        - '{{ ds.meta_data.interfaces.private.0.ipv4.ip_address }}'
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DOMachineTemplate
+metadata:
+  name: ops-backoffice-control-plane
+  namespace: clusters
+spec:
+  template:
+    spec:
+      size: s-4vcpu-8gb
+      image: ubuntu-24-04-x64
+      sshKeys:
+        - "<YOUR-DO-SSH-KEY-ID>"

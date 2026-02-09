@@ -12,34 +12,16 @@ kubectl get nodes
 
 ## Applications
 
-| App | Namespace | URL |
-|-----|-----------|-----|
-| Appsmith | appsmith | https://appsmith.freecodecamp.net |
-| Outline | outline | https://outline.freecodecamp.net |
-| Grafana | grafana | https://grafana.freecodecamp.net |
-| n8n | n8n | https://n8n.freecodecamp.net |
-| Prometheus | prometheus | Tailscale: `ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090` |
+| App      | Namespace | URL                               |
+| -------- | --------- | --------------------------------- |
+| Appsmith | appsmith  | https://appsmith.freecodecamp.net |
+| Outline  | outline   | https://outline.freecodecamp.net  |
+| Grafana  | grafana   | https://grafana.freecodecamp.net  |
 
 ## Storage
 
 - **Longhorn**: Replicas=2, daily backups to DO Spaces
 - **Backup Target**: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
-
----
-
-## Tailscale Operator
-
-Required for cross-cluster communication.
-
-```bash
-helm repo add tailscale https://pkgs.tailscale.com/helmcharts
-helm repo update
-helm upgrade tailscale-operator tailscale/tailscale-operator \
-  -n tailscale --create-namespace --install \
-  -f cluster/tailscale/operator-values.yaml \
-  --set oauth.clientId=<CLIENT_ID> \
-  --set oauth.clientSecret=<CLIENT_SECRET>
-```
 
 ---
 
@@ -68,118 +50,31 @@ helm upgrade grafana grafana/grafana -n grafana \
 
 File: `apps/grafana/manifests/base/secrets/.secrets.env`
 
-| Variable | Description |
-|----------|-------------|
-| GRAFANA_ADMIN_USER | Admin username |
-| GRAFANA_ADMIN_PASSWORD | Admin password |
-| GRAFANA_GOOGLE_CLIENT_ID | Google OAuth client ID |
-| GRAFANA_GOOGLE_CLIENT_SECRET | Google OAuth client secret |
-| GRAFANA_GOOGLE_ALLOWED_DOMAIN | freecodecamp.org |
+| Variable                      | Description                |
+| ----------------------------- | -------------------------- |
+| GRAFANA_ADMIN_USER            | Admin username             |
+| GRAFANA_ADMIN_PASSWORD        | Admin password             |
+| GRAFANA_GOOGLE_CLIENT_ID      | Google OAuth client ID     |
+| GRAFANA_GOOGLE_CLIENT_SECRET  | Google OAuth client secret |
+| GRAFANA_GOOGLE_ALLOWED_DOMAIN | freecodecamp.org           |
 
 ### Datasources
 
-| Datasource | Configuration |
-|------------|---------------|
-| Prometheus | Provisioned via Helm values |
+| Datasource | Configuration                              |
+| ---------- | ------------------------------------------ |
+| Prometheus | Provisioned via Helm values                |
 | ClickHouse | UI-configured (Connections > Data sources) |
 
 #### ClickHouse Datasource Setup (Grafana UI)
 
-| Field | Value |
-|-------|-------|
-| Host | ops-k3s-clickhouse-logs.batfish-ray.ts.net |
-| Port | 9000 |
-| Protocol | Native |
-| Username | grafana |
-| Password | (from ClickHouse cluster) |
-| Default Database | (leave empty) |
-
----
-
-## n8n
-
-### Deploy
-
-```bash
-kubectl apply -k apps/n8n/manifests/base/
-```
-
-### Secrets
-
-File: `apps/n8n/manifests/base/secrets/.secrets.env`
-
-| Variable | Description |
-|----------|-------------|
-| N8N_ENCRYPTION_KEY | `openssl rand -hex 32` |
-| JWT_SECRET | `openssl rand -hex 32` |
-| POSTGRES_PASSWORD | `openssl rand -base64 24` |
-
-### Architecture
-
-- **n8n-main**: UI, API, webhooks (1 replica)
-- **n8n-worker**: Execution (2 replicas)
-- **n8n-postgres**: Database (20Gi)
-- **n8n-redis**: Queue
-
-### Scale Workers
-
-```bash
-kubectl scale deploy/n8n-worker -n n8n --replicas=3
-```
-
----
-
-## Prometheus
-
-### Deploy
-
-```bash
-# Namespace + Tailscale ingress
-kubectl apply -k apps/prometheus/manifests/base/
-
-# Helm chart
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
-```
-
-### Upgrade
-
-```bash
-helm upgrade prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
-```
-
-### Components
-
-| Component | Storage | Retention |
-|-----------|---------|-----------|
-| Prometheus | 50Gi Longhorn | 7 days |
-| Alertmanager | 10Gi Longhorn | - |
-
-### Alerting
-
-Alert rules are **Grafana-managed**, provisioned as code in `apps/grafana/charts/grafana/values.yaml`:
-
-| Group | Rules | Examples |
-|-------|-------|---------|
-| k3s-node-resources | 7 | CPU, memory, disk, clock skew |
-| k3s-cluster-overcommit | 6 | CPU/memory limits and requests vs allocatable |
-| k3s-pod-health | 6 | OOMKilled, CrashLoop, pending, stuck rollouts |
-| k3s-longhorn | 6 | Volume degraded/faulted, disk pressure, node down |
-
-**Pipeline:** Grafana alert rules -> n8n webhook (cluster-internal) -> Google Chat
-
-Prometheus Alertmanager uses a null receiver (handles only kube-prometheus-stack built-in recording/alerting rules, no notifications).
-
-### Access
-
-| Method | URL |
-|--------|-----|
-| Grafana | Datasource configured internally |
-| Tailscale | `ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090` |
+| Field            | Value                                      |
+| ---------------- | ------------------------------------------ |
+| Host             | ops-k3s-clickhouse-logs.batfish-ray.ts.net |
+| Port             | 9000                                       |
+| Protocol         | Native                                     |
+| Username         | grafana                                    |
+| Password         | (from ClickHouse cluster)                  |
+| Default Database | (leave empty)                              |
 
 ---
 
@@ -219,9 +114,6 @@ kubectl logs -n tailscale deploy/operator
 
 # Test ClickHouse
 curl -s http://ops-k3s-clickhouse-logs.batfish-ray.ts.net:8123/ping
-
-# Test Prometheus
-curl -s http://ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090/-/healthy
 ```
 
 ### Grafana ClickHouse Errors

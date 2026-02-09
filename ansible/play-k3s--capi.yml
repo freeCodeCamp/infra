@@ -1,0 +1,186 @@
+---
+# Install Cluster API (CAPI) controllers on a k3s management cluster
+#
+# Prerequisites:
+#   - k3s cluster deployed via play-k3s--cluster.yml
+#   - kubectl access configured (kubeconfig on first server node)
+#   - DIGITALOCEAN_ACCESS_TOKEN environment variable set
+#
+# Usage:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--capi.yml \
+#     -e variable_host=<group>
+#
+# Examples:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--capi.yml \
+#     -e variable_host=mgmt_k3s
+
+# Play 1: Install clusterctl
+- name: CAPI - Install clusterctl
+  hosts: "{{ variable_host }}[0]"
+  gather_facts: true
+  become: true
+  vars:
+    clusterctl_version: "1.10.10"
+    capi_k3s_version: "0.3.0"
+
+  tasks:
+    - name: Check if clusterctl is installed
+      command: clusterctl version -o short
+      register: clusterctl_check
+      changed_when: false
+      failed_when: false
+
+    - name: Download clusterctl binary
+      get_url:
+        url: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v{{ clusterctl_version }}/clusterctl-linux-amd64"
+        dest: /usr/local/bin/clusterctl
+        mode: "0755"
+      when: clusterctl_check.rc != 0 or clusterctl_version not in (clusterctl_check.stdout | default(''))
+
+    - name: Verify clusterctl installation
+      command: clusterctl version
+      register: clusterctl_version_output
+      changed_when: false
+
+    - name: Display clusterctl version
+      debug:
+        msg: "{{ clusterctl_version_output.stdout }}"
+
+    - name: Create clusterctl config directory
+      file:
+        path: /root/.cluster-api
+        state: directory
+        mode: "0755"
+
+    - name: Write clusterctl configuration
+      copy:
+        dest: /root/.cluster-api/clusterctl.yaml
+        mode: "0644"
+        content: |
+          providers:
+            - name: k3s
+              type: BootstrapProvider
+              url: https://github.com/k3s-io/cluster-api-k3s/releases/v{{ capi_k3s_version }}/bootstrap-components.yaml
+            - name: k3s
+              type: ControlPlaneProvider
+              url: https://github.com/k3s-io/cluster-api-k3s/releases/v{{ capi_k3s_version }}/control-plane-components.yaml
+
+# Play 2: Initialize CAPI
+- name: CAPI - Initialize Controllers
+  hosts: "{{ variable_host }}[0]"
+  gather_facts: false
+  become: true
+  vars:
+    do_token: "{{ lookup('env', 'DIGITALOCEAN_ACCESS_TOKEN') }}"
+
+  tasks:
+    - name: Validate DIGITALOCEAN_ACCESS_TOKEN is set
+      assert:
+        that:
+          - do_token | length > 0
+        fail_msg: "DIGITALOCEAN_ACCESS_TOKEN environment variable is not set."
+
+    - name: Check if CAPI is already initialized
+      command: kubectl get deploy capi-controller-manager -n capi-system
+      register: capi_check
+      changed_when: false
+      failed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Initialize CAPI with providers
+      command: >
+        clusterctl init
+        --bootstrap k3s
+        --control-plane k3s
+        --infrastructure digitalocean
+        --wait-providers
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        DIGITALOCEAN_ACCESS_TOKEN: "{{ do_token }}"
+      when: capi_check.rc != 0
+
+    - name: Wait for capi-system deployment
+      command: >
+        kubectl rollout status deploy/capi-controller-manager
+        -n capi-system --timeout=120s
+      changed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for capi-k3s-bootstrap-system deployment
+      command: >
+        kubectl rollout status deploy/capi-k3s-bootstrap-controller-manager
+        -n capi-k3s-bootstrap-system --timeout=120s
+      changed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for capi-k3s-control-plane-system deployment
+      command: >
+        kubectl rollout status deploy/capi-k3s-control-plane-controller-manager
+        -n capi-k3s-control-plane-system --timeout=120s
+      changed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for capdo-system deployment
+      command: >
+        kubectl rollout status deploy/capdo-controller-manager
+        -n capdo-system --timeout=120s
+      changed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Create clusters namespace
+      command: kubectl create namespace clusters
+      register: ns_result
+      changed_when: ns_result.rc == 0
+      failed_when: ns_result.rc != 0 and 'already exists' not in ns_result.stderr
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+# Play 3: Display Status
+- name: CAPI - Display Status
+  hosts: "{{ variable_host }}[0]"
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Get CAPI pods
+      command: kubectl get pods -A -l cluster.x-k8s.io/provider
+      register: capi_pods
+      changed_when: false
+      failed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Display CAPI pods
+      debug:
+        msg: "{{ capi_pods.stdout_lines }}"
+
+    - name: Get CAPI CRDs
+      command: kubectl get crds -l cluster.x-k8s.io
+      register: capi_crds
+      changed_when: false
+      failed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Display CRD count
+      debug:
+        msg: "CAPI CRDs installed: {{ capi_crds.stdout_lines | length - 1 }}"
+
+    - name: Display next steps
+      debug:
+        msg:
+          - "CAPI initialization complete."
+          - ""
+          - "Next steps:"
+          - "  1. Copy a cluster sample manifest:"
+          - "     cp k3s/ops-mgmt/clusters/ops-backoffice.yaml.sample k3s/ops-mgmt/clusters/ops-backoffice.yaml"
+          - "  2. Edit the manifest to replace placeholders"
+          - "  3. Apply the manifest:"
+          - "     kubectl apply -f k3s/ops-mgmt/clusters/ops-backoffice.yaml"
+          - "  4. Monitor provisioning:"
+          - "     clusterctl describe cluster ops-backoffice -n clusters"

@@ -15,10 +15,9 @@
 #   ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
 #     -e variable_host=tools_k3s
 
-
 # Play 1: Validate and Prepare
 - name: K3s - Validate Prerequisites
-  hosts: '{{ variable_host }}'
+  hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
 
@@ -62,7 +61,6 @@
       group_by:
         key: server
 
-
 # Play 2: System Prerequisites
 - name: K3s - System Prerequisites
   hosts: k3s_cluster
@@ -70,7 +68,6 @@
   become: true
   roles:
     - role: k3s.orchestration.prereq
-
 
 # Play 3: Deploy k3s Servers
 - name: K3s - Deploy Cluster
@@ -80,16 +77,31 @@
   vars:
     k3s_version: v1.32.11+k3s1
     api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
+    # etcd backup to DO Spaces (S3-compatible)
+    etcd_snapshot_schedule: "0 */6 * * *"
+    etcd_snapshot_retention: 5
+    etcd_s3_endpoint: "nyc3.digitaloceanspaces.com"
+    etcd_s3_bucket: "net.freecodecamp.ops-k3s-backups"
+    etcd_s3_region: "nyc3"
     extra_server_args: >-
       --node-ip={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --flannel-iface=eth1
       --tls-san={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --tls-san={{ hostvars[inventory_hostname]['tailscale_ip'] }}
+      --etcd-snapshot-schedule-cron="{{ etcd_snapshot_schedule }}"
+      --etcd-snapshot-retention={{ etcd_snapshot_retention }}
+      --etcd-s3
+      --etcd-s3-endpoint={{ etcd_s3_endpoint }}
+      --etcd-s3-bucket={{ etcd_s3_bucket }}
+      --etcd-s3-folder=etcd/{{ variable_host }}
+      --etcd-s3-region={{ etcd_s3_region }}
+    extra_install_envs:
+      AWS_ACCESS_KEY_ID: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
+      AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
     server_group: server
   roles:
     - role: k3s.orchestration.k3s_server
-
 
 # Play 4: Configure Ingress
 - name: K3s - Configure Traefik and Gateway API
@@ -102,7 +114,7 @@
       copy:
         src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
         dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
-        mode: '0600'
+        mode: "0600"
 
     - name: Install Gateway API CRDs
       command: >
