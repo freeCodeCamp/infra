@@ -1,0 +1,27 @@
+set shell := ["bash", "-cu"]
+
+# Show available recipes
+default:
+    @just --list
+
+# Encrypt app secrets for a given app path (e.g., just encrypt ops-backoffice/apps/appsmith)
+encrypt path:
+    sops --encrypt {{path}}/manifests/base/secrets/.secrets.env \
+      > {{path}}/manifests/base/secrets/.secrets.enc.env
+    @echo "Encrypted: {{path}}/manifests/base/secrets/.secrets.enc.env"
+
+# Decrypt app secrets for a given app path
+decrypt path:
+    sops --decrypt {{path}}/manifests/base/secrets/.secrets.enc.env \
+      > {{path}}/manifests/base/secrets/.secrets.env
+    @echo "Decrypted: {{path}}/manifests/base/secrets/.secrets.env"
+
+# Deploy an app (decrypt + apply)
+deploy cluster app:
+    #!/usr/bin/env bash
+    set -eu
+    cd {{cluster}}
+    export $(cat .env | xargs)
+    just decrypt apps/{{app}}
+    kubectl apply -k apps/{{app}}/manifests/base/
+    echo "Deployed {{app}} to {{cluster}}"
