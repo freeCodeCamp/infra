@@ -1,0 +1,18 @@
+# Recurring Rancher backup to DO Spaces
+# Apply: kubectl apply -f backup-schedule.yaml
+apiVersion: resources.cattle.io/v1
+kind: Backup
+metadata:
+  name: rancher-scheduled-backup
+spec:
+  resourceSetName: rancher-resource-set
+  retentionCount: 20
+  schedule: "0 */6 * * *"
+  storageLocation:
+    s3:
+      bucketName: net.freecodecamp.ops-k3s-backups
+      folder: rancher-backup
+      region: nyc3
+      endpoint: nyc3.digitaloceanspaces.com
+      credentialSecretName: rancher-backup-s3-creds
+      credentialSecretNamespace: cattle-resources-system

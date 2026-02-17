@@ -1,0 +1,38 @@
+# Kubernetes API audit policy
+# Copied to /var/lib/rancher/k3s/server/audit-policy.yaml by Ansible
+#
+# Phase 1: minimal — log secret access and anonymous requests only
+# Phase 2: expand to full request/response logging for sensitive resources
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # Log secret read/write at Metadata level
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets"]
+
+  # Log anonymous/unauthenticated requests
+  - level: Metadata
+    users: ["system:anonymous"]
+
+  # Log RBAC changes
+  - level: Metadata
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources:
+          ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+
+  # Skip noisy read-only system requests
+  - level: None
+    users: ["system:kube-proxy"]
+  - level: None
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "services/status"]
+    verbs: ["get", "watch", "list"]
+
+  # Default: log everything else at Metadata
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"

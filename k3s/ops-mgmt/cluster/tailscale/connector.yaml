@@ -1,0 +1,13 @@
+apiVersion: tailscale.com/v1alpha1
+kind: Connector
+metadata:
+  name: cluster-subnet-router
+spec:
+  replicas: 1
+  hostnamePrefix: ops-k3s-mgmt-subnet
+  subnetRouter:
+    advertiseRoutes:
+      - "10.40.0.0/16"
+      - "10.41.0.0/16"
+  tags:
+    - "tag:k8s"

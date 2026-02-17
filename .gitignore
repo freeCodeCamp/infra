@@ -58,3 +58,9 @@ secrets.overrides.yaml
 
 .ansible/
 o11y/defaults/
+
+# SOPS - encrypted secrets (always commit, override *.env rule)
+!**/.secrets.enc.env
+
+# Ansible Vault password (never commit)
+.vault-password*

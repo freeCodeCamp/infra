@@ -1,0 +1,31 @@
+# Pod Security Standards admission configuration
+# Copied to /var/lib/rancher/k3s/server/pss.yaml by Ansible
+#
+# - baseline: enforced (blocks privileged containers, host networking, hostPath)
+# - restricted: audit + warn only (logs violations, does not block)
+# - System namespaces exempted (Rancher, cert-manager, Longhorn, Tailscale need elevated privileges)
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: pod-security.admission.config.k8s.io/v1
+      kind: PodSecurityConfiguration
+      defaults:
+        enforce: "baseline"
+        enforce-version: "latest"
+        audit: "restricted"
+        audit-version: "latest"
+        warn: "restricted"
+        warn-version: "latest"
+      exemptions:
+        namespaces:
+          - kube-system
+          - cattle-system
+          - cattle-fleet-system
+          - cattle-fleet-local-system
+          - cattle-resources-system
+          - cattle-provisioning-capi-system
+          - cert-manager
+          - longhorn-system
+          - tailscale

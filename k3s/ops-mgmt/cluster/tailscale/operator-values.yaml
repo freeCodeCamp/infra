@@ -1,0 +1,10 @@
+# Tailscale Kubernetes Operator Helm values
+# Install: helm install tailscale-operator tailscale/tailscale-operator \
+#   --namespace tailscale --create-namespace -f operator-values.yaml
+oauth:
+  clientId: "" # Set via --set at install time
+  clientSecret: "" # Set via --set at install time
+operatorConfig:
+  hostname: "ops-k3s-mgmt-operator"
+  defaultTags:
+    - "tag:k8s"

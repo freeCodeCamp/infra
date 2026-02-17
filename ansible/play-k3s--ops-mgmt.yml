@@ -1,0 +1,475 @@
+---
+# Deploy k3s single-node ops-mgmt cluster with Rancher management
+#
+# One command: bare VM (with Tailscale) → fully secured Rancher cluster
+#
+# Prerequisites (manual, one-time):
+#   - 1x Ubuntu VM on DigitalOcean (s-4vcpu-8gb) with VPC attached (eth1)
+#   - Tailscale installed and connected
+#   - DO API token in ../.env (loaded by direnv)
+#   - Ansible Vault password in 1Password
+#   - Vault secrets populated in vars/vault-k3s.yml (encrypted)
+#
+# Usage:
+#   cd ansible/   # direnv loads .env + activates venv
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--ops-mgmt.yml \
+#     -e variable_host=mgmt_k3s \
+#     --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+#
+# What this playbook does (7 plays):
+#   1. Validate prerequisites (VPC, Tailscale, vault secrets, DO firewall)
+#   2. Prepare system (k3s prerequisites)
+#   3. Deploy k3s server (with security hardening)
+#   4. Configure ingress (Traefik + Gateway API CRDs)
+#   5. Install Rancher (cert-manager + Rancher + backup operator + backup schedule)
+#   6. Install Tailscale operator (operator + ProxyClass + Connector)
+#   7. Fetch kubeconfig (copy to local machine, replace server IP with Tailscale IP)
+
+# Play 1: Validate prerequisites
+- name: K3s ops-mgmt - Validate prerequisites
+  hosts: "{{ variable_host }}"
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/vault-k3s.yml
+
+  tasks:
+    - name: Validate vault secrets loaded
+      assert:
+        that:
+          - vault_do_spaces_access_key is defined
+          - vault_do_spaces_access_key | length > 0
+          - vault_do_spaces_secret_key is defined
+          - vault_do_spaces_secret_key | length > 0
+          - vault_tailscale_oauth_client_id is defined
+          - vault_tailscale_oauth_client_id | length > 0
+          - vault_tailscale_oauth_client_secret is defined
+          - vault_tailscale_oauth_client_secret | length > 0
+          - vault_rancher_bootstrap_password is defined
+          - vault_rancher_bootstrap_password | length > 0
+        fail_msg: "Vault secrets missing. Run: ansible-vault edit vars/vault-k3s.yml"
+
+    - name: Validate VPC interface exists (eth1)
+      assert:
+        that:
+          - ansible_eth1 is defined
+          - ansible_eth1.ipv4 is defined
+          - ansible_eth1.ipv4.address is defined
+        fail_msg: "VPC interface eth1 not found. Ensure VM is attached to DO VPC."
+
+    - name: Validate Tailscale is connected
+      assert:
+        that:
+          - ansible_tailscale0 is defined
+          - ansible_tailscale0.ipv4 is defined
+          - ansible_tailscale0.ipv4.address is defined
+        fail_msg: "Tailscale interface not found. Install Tailscale first."
+
+    - name: Validate VPC IP is in expected range
+      assert:
+        that:
+          - ansible_eth1.ipv4.address | regex_search('^10\.')
+        fail_msg: "VPC IP {{ ansible_eth1.ipv4.address }} not in 10.x.x.x range."
+
+    - name: Set network facts
+      set_fact:
+        vpc_ip: "{{ ansible_eth1.ipv4.address }}"
+        tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
+
+    - name: Display network configuration
+      debug:
+        msg: "{{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }}"
+
+    - name: Create DO firewall (ops-fw-k3s-mgmt)
+      community.digitalocean.digital_ocean_firewall:
+        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+        name: ops-fw-k3s-mgmt
+        state: present
+        droplet_ids:
+          - "{{ do_id }}"
+        inbound_rules:
+          - protocol: tcp
+            ports: "22"
+            sources:
+              addresses: ["100.64.0.0/10"]
+          - protocol: tcp
+            ports: "6443"
+            sources:
+              addresses: ["100.64.0.0/10"]
+          - protocol: udp
+            ports: "41641"
+            sources:
+              addresses: ["0.0.0.0/0", "::/0"]
+        outbound_rules:
+          - protocol: tcp
+            ports: "all"
+            destinations:
+              addresses: ["0.0.0.0/0", "::/0"]
+          - protocol: udp
+            ports: "all"
+            destinations:
+              addresses: ["0.0.0.0/0", "::/0"]
+      delegate_to: localhost
+      become: false
+
+    - name: Build k3s_cluster group
+      group_by:
+        key: k3s_cluster
+
+    - name: Build server group
+      group_by:
+        key: server
+
+# Play 2: Prepare system
+- name: K3s ops-mgmt - Prepare system
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  roles:
+    - role: k3s.orchestration.prereq
+
+# Play 3: Deploy k3s server
+- name: K3s ops-mgmt - Deploy k3s server
+  hosts: server
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/vault-k3s.yml
+  vars:
+    k3s_version: v1.34.4+k3s1
+    cluster_cidr: "10.40.0.0/16"
+    service_cidr: "10.41.0.0/16"
+    etcd_s3_endpoint: "nyc3.digitaloceanspaces.com"
+    etcd_s3_bucket: "net.freecodecamp.ops-k3s-backups"
+    etcd_s3_folder: "etcd/ops-mgmt"
+    etcd_s3_region: "nyc3"
+    etcd_snapshot_schedule: "0 */6 * * *"
+    etcd_snapshot_retention: 20
+    api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
+    extra_service_envs:
+      - "AWS_ACCESS_KEY_ID={{ vault_do_spaces_access_key }}"
+      - "AWS_SECRET_ACCESS_KEY={{ vault_do_spaces_secret_key }}"
+    extra_server_args: >-
+      --node-ip={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --flannel-iface=eth1
+      --tls-san={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --tls-san={{ hostvars[inventory_hostname]['tailscale_ip'] }}
+      --cluster-cidr={{ cluster_cidr }}
+      --service-cidr={{ service_cidr }}
+      --etcd-s3
+      --etcd-s3-endpoint={{ etcd_s3_endpoint }}
+      --etcd-s3-bucket={{ etcd_s3_bucket }}
+      --etcd-s3-folder={{ etcd_s3_folder }}
+      --etcd-s3-region={{ etcd_s3_region }}
+      --etcd-snapshot-schedule-cron={{ etcd_snapshot_schedule }}
+      --etcd-snapshot-retention={{ etcd_snapshot_retention }}
+      --secrets-encryption
+      --protect-kernel-defaults
+      --kube-apiserver-arg=admission-control-config-file=/var/lib/rancher/k3s/server/pss.yaml
+      --kube-apiserver-arg=audit-log-path=/var/log/k3s/audit.log
+      --kube-apiserver-arg=audit-log-maxage=30
+      --kube-apiserver-arg=audit-log-maxbackup=10
+      --kube-apiserver-arg=audit-policy-file=/var/lib/rancher/k3s/server/audit-policy.yaml
+    server_group: server
+  pre_tasks:
+    - name: Create k3s audit log directory
+      file:
+        path: /var/log/k3s
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+
+    - name: Ensure k3s server config directory exists
+      file:
+        path: /var/lib/rancher/k3s/server
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+
+    - name: Copy PSS admission config
+      copy:
+        src: "{{ playbook_dir }}/../k3s/ops-mgmt/cluster/security/pss-admission.yaml"
+        dest: /var/lib/rancher/k3s/server/pss.yaml
+        mode: "0600"
+
+    - name: Copy audit policy
+      copy:
+        src: "{{ playbook_dir }}/../k3s/ops-mgmt/cluster/security/audit-policy.yaml"
+        dest: /var/lib/rancher/k3s/server/audit-policy.yaml
+        mode: "0600"
+  roles:
+    - role: k3s.orchestration.k3s_server
+
+# Play 4: Configure ingress
+- name: K3s ops-mgmt - Configure ingress
+  hosts: server[0]
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Apply Traefik HelmChartConfig
+      copy:
+        src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: "0600"
+
+    - name: Install Gateway API CRDs
+      command: >
+        k3s kubectl apply -f
+        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/standard-install.yaml
+      register: gateway_result
+      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
+
+    - name: Wait for all nodes ready
+      command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      changed_when: false
+
+    - name: Display cluster status
+      command: k3s kubectl get nodes -o wide
+      register: cluster_status
+      changed_when: false
+
+    - name: Cluster ready
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"
+
+# Play 5: Install Rancher
+- name: K3s ops-mgmt - Install Rancher
+  hosts: server[0]
+  gather_facts: false
+  become: true
+  vars_files:
+    - vars/vault-k3s.yml
+  vars:
+    rancher_version: "2.13.2"
+    rancher_hostname: "rancher.ops-mgmt.ts.net"
+
+  pre_tasks:
+    - name: Install Helm on server
+      shell: |
+        if ! command -v helm &>/dev/null; then
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        fi
+      args:
+        creates: /usr/local/bin/helm
+
+  tasks:
+    - name: Add jetstack Helm repo
+      command: helm repo add jetstack https://charts.jetstack.io
+      register: result
+      changed_when: "'has been added' in result.stdout"
+      failed_when: false
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+    - name: Add rancher-stable Helm repo
+      command: helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+      register: result
+      changed_when: "'has been added' in result.stdout"
+      failed_when: false
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+    - name: Add rancher-charts Helm repo
+      command: helm repo add rancher-charts https://charts.rancher.io
+      register: result
+      changed_when: "'has been added' in result.stdout"
+      failed_when: false
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+    - name: Update Helm repos
+      command: helm repo update
+      changed_when: false
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+    - name: Install cert-manager
+      command: >
+        helm upgrade --install cert-manager jetstack/cert-manager
+        --namespace cert-manager --create-namespace
+        --set crds.enabled=true
+        --wait --timeout 5m
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      register: result
+      changed_when: "'has been upgraded' in result.stdout or 'has been installed' in result.stdout"
+
+    - name: Install Rancher
+      command: >
+        helm upgrade --install rancher rancher-stable/rancher
+        --namespace cattle-system --create-namespace
+        --version {{ rancher_version }}
+        --set hostname={{ rancher_hostname }}
+        --set bootstrapPassword={{ vault_rancher_bootstrap_password }}
+        --set replicas=1
+        --wait --timeout 10m
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      register: result
+      changed_when: "'has been upgraded' in result.stdout or 'has been installed' in result.stdout"
+      no_log: true
+
+    - name: Install rancher-backup operator
+      command: >
+        helm upgrade --install rancher-backup rancher-charts/rancher-backup
+        --namespace cattle-resources-system --create-namespace
+        --wait --timeout 5m
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      register: result
+      changed_when: "'has been upgraded' in result.stdout or 'has been installed' in result.stdout"
+
+    - name: Create rancher-backup S3 credentials secret
+      command: >
+        k3s kubectl create secret generic rancher-backup-s3-creds
+        -n cattle-resources-system
+        --from-literal=accessKey={{ vault_do_spaces_access_key }}
+        --from-literal=secretKey={{ vault_do_spaces_secret_key }}
+        --dry-run=client -o yaml
+      register: secret_yaml
+      changed_when: false
+      no_log: true
+
+    - name: Apply rancher-backup S3 credentials secret
+      command: k3s kubectl apply -f -
+      args:
+        stdin: "{{ secret_yaml.stdout }}"
+      register: secret_result
+      changed_when: "'created' in secret_result.stdout or 'configured' in secret_result.stdout"
+      no_log: true
+
+    - name: Apply rancher-backup schedule
+      command: k3s kubectl apply -f -
+      args:
+        stdin: "{{ lookup('file', playbook_dir + '/../k3s/ops-mgmt/apps/rancher/backup-schedule.yaml') }}"
+      register: result
+      changed_when: "'created' in result.stdout or 'configured' in result.stdout"
+
+    - name: Wait for Rancher deployment ready
+      command: k3s kubectl rollout status deployment/rancher -n cattle-system --timeout=300s
+      changed_when: false
+
+    - name: Display Rancher status
+      debug:
+        msg: "Rancher UI: https://{{ rancher_hostname }}"
+
+# Play 6: Install Tailscale operator
+- name: K3s ops-mgmt - Install Tailscale operator
+  hosts: server[0]
+  gather_facts: false
+  become: true
+  vars_files:
+    - vars/vault-k3s.yml
+
+  tasks:
+    - name: Add Tailscale Helm repo
+      command: helm repo add tailscale https://pkgs.tailscale.com/helmcharts
+      register: result
+      changed_when: "'has been added' in result.stdout"
+      failed_when: false
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+    - name: Update Helm repos
+      command: helm repo update
+      changed_when: false
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+
+    - name: Copy Tailscale operator values to server
+      copy:
+        src: "{{ playbook_dir }}/../k3s/ops-mgmt/cluster/tailscale/operator-values.yaml"
+        dest: /tmp/tailscale-operator-values.yaml
+        mode: "0600"
+
+    - name: Install Tailscale operator
+      command: >
+        helm upgrade --install tailscale-operator tailscale/tailscale-operator
+        --namespace tailscale --create-namespace
+        --values /tmp/tailscale-operator-values.yaml
+        --set oauth.clientId={{ vault_tailscale_oauth_client_id }}
+        --set oauth.clientSecret={{ vault_tailscale_oauth_client_secret }}
+        --wait --timeout 5m
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      register: result
+      changed_when: "'has been upgraded' in result.stdout or 'has been installed' in result.stdout"
+      no_log: true
+
+    - name: Clean up Tailscale values file
+      file:
+        path: /tmp/tailscale-operator-values.yaml
+        state: absent
+
+    - name: Wait for Tailscale operator ready
+      command: >
+        k3s kubectl wait --for=condition=Ready pod
+        -l app.kubernetes.io/name=tailscale-operator
+        -n tailscale --timeout=120s
+      changed_when: false
+
+    - name: Apply ProxyClass (MTU 1200 fix)
+      command: k3s kubectl apply -f -
+      args:
+        stdin: "{{ lookup('file', playbook_dir + '/../k3s/ops-mgmt/cluster/tailscale/proxyclass.yaml') }}"
+      register: result
+      changed_when: "'created' in result.stdout or 'configured' in result.stdout"
+
+    - name: Apply Connector (subnet router)
+      command: k3s kubectl apply -f -
+      args:
+        stdin: "{{ lookup('file', playbook_dir + '/../k3s/ops-mgmt/cluster/tailscale/connector.yaml') }}"
+      register: result
+      changed_when: "'created' in result.stdout or 'configured' in result.stdout"
+
+    - name: Display Tailscale status
+      debug:
+        msg: "Tailscale Connector deployed. Check tailnet admin for ops-k3s-mgmt-subnet device."
+
+# Play 7: Fetch kubeconfig
+- name: K3s ops-mgmt - Fetch kubeconfig
+  hosts: server[0]
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Read kubeconfig from server
+      slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: kubeconfig_raw
+
+    - name: Write kubeconfig locally (replace server IP with Tailscale IP)
+      copy:
+        content: "{{ kubeconfig_raw.content | b64decode | regex_replace('127\\.0\\.0\\.1', hostvars[inventory_hostname]['tailscale_ip']) }}"
+        dest: "{{ playbook_dir }}/../k3s/ops-mgmt/.kubeconfig.yaml"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Verify kubectl connectivity
+      command: kubectl get nodes
+      environment:
+        KUBECONFIG: "{{ playbook_dir }}/../k3s/ops-mgmt/.kubeconfig.yaml"
+      register: kubectl_result
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Display final status
+      debug:
+        msg:
+          - "=== ops-mgmt cluster ready ==="
+          - "Kubeconfig: k3s/ops-mgmt/.kubeconfig.yaml"
+          - "Rancher UI: https://rancher.ops-mgmt.ts.net"
+          - "Bootstrap password: (in Ansible Vault)"
+          - "Nodes: {{ kubectl_result.stdout }}"
+          - ""
+          - "Next steps:"
+          - "  1. Access Rancher UI and set permanent admin password"
+          - "  2. Add DO cloud credentials (Cluster Management > Cloud Credentials)"
+          - "  3. Verify etcd snapshots: ssh root@<node> k3s etcd-snapshot list"
+          - "  4. Verify Tailscale Connector in tailnet admin console"
