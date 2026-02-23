@@ -102,32 +102,67 @@ docker stack deploy -c docker/swarm/stacks/oncall/stack-oncall.yml oncall
 
 ## GHA Integration
 
-Trigger an on-demand Gantry update from a GitHub Actions workflow:
+Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephemeral Tailscale connection:
 
 ```yaml
+- name: Setup and connect to Tailscale network
+  uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    hostname: gha-${{ env.STACK_NAME }}-deploy-${{ github.run_id }}
+    tags: tag:ci
+    version: latest
+
+- name: Wait for Tailscale Network Readiness
+  run: |
+    echo "Waiting for Tailscale network to be ready..."
+    max_wait=60
+    elapsed=0
+    while [ $elapsed -lt $max_wait ]; do
+      if tailscale status --json | jq -e '.BackendState == "Running"' > /dev/null 2>&1; then
+        echo "Tailscale network is ready"
+        break
+      fi
+      sleep 2
+      elapsed=$((elapsed + 2))
+    done
+    if [ $elapsed -ge $max_wait ]; then
+      echo "Tailscale network not ready after ${max_wait}s"
+      exit 1
+    fi
+
 - name: Trigger deployment
   run: |
-    curl -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
+    curl -fsS -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
       -H "Content-Type: application/json" \
       -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
       -d '{"GANTRY_SERVICES_FILTERS":"name=${{ env.STACK_NAME }}_${{ env.SERVICE_NAME }}"}'
 ```
 
+**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname), `WEBHOOK_SECRET`
+
 ## Testing Webhook
 
-Manual curl examples for verifying the webhook service:
+Run from the manager node (`ssh freecodecamp@ops-vm-backoffice`):
 
 ```bash
-# Valid request (with secret header)
+# Trigger update for a specific service
 curl -X POST http://localhost:9889/hooks/run-gantry \
   -H "Content-Type: application/json" \
-  -H "X-Webhook-Secret: YOUR_SECRET_HERE" \
-  -d '{"GANTRY_SERVICES_FILTERS":"name=mystack_myservice"}'
+  -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
+  -d '{"GANTRY_SERVICES_FILTERS":"name=<stack>_<service>"}'
 
-# Invalid request (without secret — should be rejected)
+# Trigger update for all autoupdate-labeled services (no filter)
 curl -X POST http://localhost:9889/hooks/run-gantry \
   -H "Content-Type: application/json" \
-  -d '{"GANTRY_SERVICES_FILTERS":"name=mystack_myservice"}'
+  -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
+  -d '{}'
+
+# Invalid request (no secret — should return "Hook rules were not satisfied")
+curl -X POST http://localhost:9889/hooks/run-gantry \
+  -H "Content-Type: application/json" \
+  -d '{}'
 
 # Check webhook logs
 docker service logs oncall_svc-webhook
