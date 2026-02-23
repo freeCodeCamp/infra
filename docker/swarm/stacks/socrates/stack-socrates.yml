@@ -1,0 +1,109 @@
+x-deploy-config: &deploy-config
+  deploy:
+    replicas: 2
+    placement:
+      max_replicas_per_node: 1
+      constraints:
+        - node.labels.socrates.enabled == true
+        - node.labels.socrates.variant == ${DEPLOYMENT_ENV}
+      preferences:
+        - spread: node.labels.socrates.variant == ${DEPLOYMENT_ENV}
+    update_config:
+      parallelism: 1
+      delay: 10s
+      failure_action: rollback
+    resources:
+      limits:
+        cpus: ${CPU_LIMIT:-1}
+        memory: ${MEMORY_LIMIT:-1G}
+      reservations:
+        memory: 512M
+    restart_policy:
+      condition: any
+    labels:
+      - org.freecodecamp.autoupdate=true
+
+x-port-config: &port-config
+  target: 3000
+  protocol: tcp
+  mode: host
+
+services:
+  svc-socrates:
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:${DEPLOYMENT_VERSION}
+    ports:
+      - published: 4010
+        <<: *port-config
+    <<: *deploy-config
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --spider http://localhost:3000/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    environment:
+      # Runtime
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - SERVER_URL=${SERVER_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Redis (overlay network service discovery)
+      - REDIS_URL=redis://svc-redis:6379
+      # Authentication
+      - API_KEY=${API_KEY}
+      - DOCS_BASIC_AUTH_USER=${DOCS_BASIC_AUTH_USER}
+      - DOCS_BASIC_AUTH_PASS=${DOCS_BASIC_AUTH_PASS}
+      # Groq AI
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
+      - GROQ_MODEL_HTML=${GROQ_MODEL_HTML:-openai/gpt-oss-20b}
+      - GROQ_MODEL_CSS=${GROQ_MODEL_CSS:-openai/gpt-oss-20b}
+      - GROQ_MODEL_JAVASCRIPT=${GROQ_MODEL_JAVASCRIPT:-openai/gpt-oss-120b}
+      - GROQ_MODEL_PYTHON=${GROQ_MODEL_PYTHON:-openai/gpt-oss-120b}
+      - GROQ_TIMEOUT_MS=${GROQ_TIMEOUT_MS:-30000}
+      - GROQ_MAX_RETRIES=${GROQ_MAX_RETRIES:-2}
+      - GROQ_BACKOFF_BASE_MS=${GROQ_BACKOFF_BASE_MS:-500}
+      - GROQ_MAX_TOKENS=${GROQ_MAX_TOKENS:-1024}
+      - GROQ_MAX_TOKENS_RETRY=${GROQ_MAX_TOKENS_RETRY:-2048}
+      # Circuit Breaker
+      - MODEL_CB_FAILURES=${MODEL_CB_FAILURES:-3}
+      - MODEL_CB_COOLDOWN_MS=${MODEL_CB_COOLDOWN_MS:-30000}
+      # Rate Limiting
+      - PER_USER_LIMIT=${PER_USER_LIMIT:-10}
+      - GLOBAL_LIMIT=${GLOBAL_LIMIT:-1000}
+
+  svc-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.socrates.enabled == true
+          - node.labels.socrates.variant == ${DEPLOYMENT_ENV}
+      update_config:
+        parallelism: 1
+        failure_action: rollback
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+      restart_policy:
+        condition: any
+
+volumes:
+  redis_data:
