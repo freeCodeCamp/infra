@@ -5,6 +5,7 @@ metadata:
 spec:
   replicas: 1
   hostnamePrefix: ops-k3s-mgmt-subnet
+  proxyClass: default
   subnetRouter:
     advertiseRoutes:
       - "10.40.0.0/16"
