@@ -104,3 +104,49 @@ services:
         - "swarm.cronjob.skip-running=false"
       restart_policy:
         condition: none
+
+  svc-webhook:
+    image: lwlook/webhook@sha256:93f708c6c0d6469b4a0f7f654d5f25054e54dccba1cf316a1d7e48e2be736c9a
+    command:
+      - "-verbose"
+      - "-hooks=/hooks.json"
+      - "-hotreload"
+      - "-template"
+    ports:
+      - published: 9889
+        target: 9000
+        protocol: tcp
+        mode: host
+    configs:
+      - source: hooks_json
+        target: /hooks.json
+      - source: run_gantry
+        target: /run_gantry.sh
+        mode: 0550
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/home/freecodecamp/.docker:/root/.docker"
+    environment:
+      - "WEBHOOK_SECRET=${WEBHOOK_SECRET}"
+    logging:
+      driver: loki
+      options:
+        loki-url: ${LOKI_URL}
+        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
+        loki-external-labels: container_name={{.Name}},stack=oncall,service=webhook,app=webhook
+        loki-retries: "2"
+        loki-max-backoff: 800ms
+        loki-timeout: 1s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - "node.role == manager"
+
+configs:
+  hooks_json:
+    file: ./hooks.json
+  run_gantry:
+    file: ./run_gantry.sh
