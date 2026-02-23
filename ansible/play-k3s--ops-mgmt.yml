@@ -16,14 +16,19 @@
 #     -e variable_host=mgmt_k3s \
 #     --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
 #
-# What this playbook does (7 plays):
-#   1. Validate prerequisites (VPC, Tailscale, vault secrets, DO firewall)
+# What this playbook does (8 plays):
+#   1. Validate prerequisites (VPC, Tailscale, vault secrets)
 #   2. Prepare system (k3s prerequisites)
 #   3. Deploy k3s server (with security hardening)
 #   4. Configure ingress (Traefik + Gateway API CRDs)
 #   5. Install Rancher (cert-manager + Rancher + backup operator + backup schedule)
 #   6. Install Tailscale operator (operator + ProxyClass + Connector)
 #   7. Fetch kubeconfig (copy to local machine, replace server IP with Tailscale IP)
+#   8. Apply DO firewall (lock down SSH + API to Tailscale only)
+#
+# NOTE: Firewall is applied LAST so Ansible can connect via public IP
+#       throughout the run. After first run, re-runs require Tailscale SSH:
+#         ansible-playbook ... -e ansible_host=<tailscale_ip>
 
 # Play 1: Validate prerequisites
 - name: K3s ops-mgmt - Validate prerequisites
@@ -80,38 +85,6 @@
       debug:
         msg: "{{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }}"
 
-    - name: Create DO firewall (ops-fw-k3s-mgmt)
-      community.digitalocean.digital_ocean_firewall:
-        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
-        name: ops-fw-k3s-mgmt
-        state: present
-        droplet_ids:
-          - "{{ do_id }}"
-        inbound_rules:
-          - protocol: tcp
-            ports: "22"
-            sources:
-              addresses: ["100.64.0.0/10"]
-          - protocol: tcp
-            ports: "6443"
-            sources:
-              addresses: ["100.64.0.0/10"]
-          - protocol: udp
-            ports: "41641"
-            sources:
-              addresses: ["0.0.0.0/0", "::/0"]
-        outbound_rules:
-          - protocol: tcp
-            ports: "all"
-            destinations:
-              addresses: ["0.0.0.0/0", "::/0"]
-          - protocol: udp
-            ports: "all"
-            destinations:
-              addresses: ["0.0.0.0/0", "::/0"]
-      delegate_to: localhost
-      become: false
-
     - name: Build k3s_cluster group
       group_by:
         key: k3s_cluster
@@ -146,9 +119,6 @@
     etcd_snapshot_schedule: "0 */6 * * *"
     etcd_snapshot_retention: 20
     api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
-    extra_service_envs:
-      - "AWS_ACCESS_KEY_ID={{ vault_do_spaces_access_key }}"
-      - "AWS_SECRET_ACCESS_KEY={{ vault_do_spaces_secret_key }}"
     extra_server_args: >-
       --node-ip={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
@@ -188,6 +158,17 @@
         mode: "0750"
         owner: root
         group: root
+
+    - name: Write k3s service environment (S3 credentials)
+      copy:
+        content: |
+          AWS_ACCESS_KEY_ID={{ vault_do_spaces_access_key }}
+          AWS_SECRET_ACCESS_KEY={{ vault_do_spaces_secret_key }}
+        dest: /etc/systemd/system/k3s.service.env
+        mode: "0600"
+        owner: root
+        group: root
+      no_log: true
 
     - name: Copy PSS admission config
       copy:
@@ -304,7 +285,7 @@
         --namespace cattle-system --create-namespace
         --version {{ rancher_version }}
         --set hostname={{ rancher_hostname }}
-        --set bootstrapPassword={{ vault_rancher_bootstrap_password }}
+        --set-string bootstrapPassword={{ vault_rancher_bootstrap_password }}
         --set replicas=1
         --wait --timeout 10m
       environment:
@@ -313,10 +294,20 @@
       changed_when: "'has been upgraded' in result.stdout or 'has been installed' in result.stdout"
       no_log: true
 
+    - name: Install rancher-backup CRDs
+      command: >
+        helm upgrade --install rancher-backup-crd rancher-charts/rancher-backup-crd
+        --namespace cattle-resources-system --create-namespace
+        --wait --timeout 5m
+      environment:
+        KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
+      register: result
+      changed_when: "'has been upgraded' in result.stdout or 'has been installed' in result.stdout"
+
     - name: Install rancher-backup operator
       command: >
         helm upgrade --install rancher-backup rancher-charts/rancher-backup
-        --namespace cattle-resources-system --create-namespace
+        --namespace cattle-resources-system
         --wait --timeout 5m
       environment:
         KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
@@ -341,6 +332,12 @@
       register: secret_result
       changed_when: "'created' in secret_result.stdout or 'configured' in secret_result.stdout"
       no_log: true
+
+    - name: Wait for rancher-backup operator ready
+      command: >
+        k3s kubectl rollout status deployment/rancher-backup
+        -n cattle-resources-system --timeout=120s
+      changed_when: false
 
     - name: Apply rancher-backup schedule
       command: k3s kubectl apply -f -
@@ -391,8 +388,8 @@
         helm upgrade --install tailscale-operator tailscale/tailscale-operator
         --namespace tailscale --create-namespace
         --values /tmp/tailscale-operator-values.yaml
-        --set oauth.clientId={{ vault_tailscale_oauth_client_id }}
-        --set oauth.clientSecret={{ vault_tailscale_oauth_client_secret }}
+        --set-string oauth.clientId={{ vault_tailscale_oauth_client_id }}
+        --set-string oauth.clientSecret={{ vault_tailscale_oauth_client_secret }}
         --wait --timeout 5m
       environment:
         KUBECONFIG: "/etc/rancher/k3s/k3s.yaml"
@@ -473,3 +470,45 @@
           - "  2. Add DO cloud credentials (Cluster Management > Cloud Credentials)"
           - "  3. Verify etcd snapshots: ssh root@<node> k3s etcd-snapshot list"
           - "  4. Verify Tailscale Connector in tailnet admin console"
+
+# Play 8: Apply DO firewall (LAST — locks down SSH to Tailscale only)
+- name: K3s ops-mgmt - Apply DO firewall
+  hosts: "{{ variable_host }}"
+  gather_facts: false
+  become: false
+
+  tasks:
+    - name: Create DO firewall (ops-fw-k3s-mgmt)
+      community.digitalocean.digital_ocean_firewall:
+        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+        name: ops-fw-k3s-mgmt
+        state: present
+        droplet_ids:
+          - "{{ do_id }}"
+        inbound_rules:
+          - protocol: tcp
+            ports: "22"
+            sources:
+              addresses: ["100.64.0.0/10"]
+          - protocol: tcp
+            ports: "6443"
+            sources:
+              addresses: ["100.64.0.0/10"]
+          - protocol: udp
+            ports: "41641"
+            sources:
+              addresses: ["0.0.0.0/0", "::/0"]
+        outbound_rules:
+          - protocol: tcp
+            ports: "all"
+            destinations:
+              addresses: ["0.0.0.0/0", "::/0"]
+          - protocol: udp
+            ports: "all"
+            destinations:
+              addresses: ["0.0.0.0/0", "::/0"]
+      delegate_to: localhost
+
+    - name: Firewall applied
+      debug:
+        msg: "DO firewall ops-fw-k3s-mgmt active. SSH + API now restricted to Tailscale only."

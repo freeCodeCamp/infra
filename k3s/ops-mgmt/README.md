@@ -16,45 +16,37 @@ cd k3s/ops-mgmt && export $(cat .env | xargs)
 kubectl get nodes
 ```
 
-## Setup
+## Deployment
 
-1. **Provision node and install k3s** via Ansible playbook:
+Everything is managed by a single Ansible playbook (8 plays):
 
-   ```bash
-   ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
-     -e '{"variable_host": "mgmt_k3s"}'
-   ```
+```bash
+cd ansible/
+ansible-playbook -i inventory/digitalocean.yml play-k3s--ops-mgmt.yml \
+  -e variable_host=mgmt_k3s \
+  --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+```
 
-2. **Install Tailscale operator**:
+The playbook handles: k3s install, security hardening (secrets-encryption, PSS, audit logging),
+cert-manager, Rancher, rancher-backup + schedule, Tailscale operator + Connector,
+kubeconfig fetch, and DO firewall lockdown.
 
-   ```bash
-   helm repo add tailscale https://pkgs.tailscale.com/helmcharts
-   helm install tailscale-operator tailscale/tailscale-operator \
-     --namespace tailscale --create-namespace \
-     -f cluster/tailscale/operator-values.yaml \
-     --set oauth.clientId=<ID> --set oauth.clientSecret=<SECRET>
-   kubectl apply -f cluster/tailscale/connector.yaml
-   kubectl apply -f cluster/tailscale/proxyclass.yaml
-   ```
+Prerequisites: VM provisioned with Tailscale installed, Ansible Vault populated.
 
-3. **Install Rancher + cert-manager + backup operator**:
+## Re-runs
 
-   ```bash
-   ./apps/rancher/install.sh
-   ```
+After first run, the DO firewall restricts SSH to Tailscale only. Re-run via Tailscale IP:
 
-4. **Configure backup storage** (requires S3 credentials secret):
-   ```bash
-   kubectl create secret generic rancher-backup-s3-creds \
-     -n cattle-resources-system \
-     --from-literal=accessKey=<KEY> \
-     --from-literal=secretKey=<SECRET>
-   kubectl apply -f apps/rancher/backup-schedule.yaml
-   ```
+```bash
+ansible-playbook -i inventory/digitalocean.yml play-k3s--ops-mgmt.yml \
+  -e variable_host=mgmt_k3s \
+  -e ansible_host=<tailscale_ip> \
+  --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+```
 
 ## Disaster Recovery
 
 - **rancher-backup operator** takes snapshots every 6 hours to DO Spaces (`net.freecodecamp.ops-k3s-backups/rancher-backup`)
-- Retains last 20 backups
+- **etcd snapshots** every 6 hours to DO Spaces (`net.freecodecamp.ops-k3s-backups/etcd/ops-mgmt`)
 - Downstream clusters continue operating independently if ops-mgmt is lost
 - Restore: deploy fresh k3s + Rancher, then `kubectl apply -f` a Restore CR pointing to the backup
