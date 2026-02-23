@@ -131,12 +131,8 @@ resource "linode_firewall" "ops_backoffice_firewall" {
     ipv4 = flatten([
       [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"],
       [for i in data.linode_instances.prd_oldeworld_jms.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.stg_oldeworld_api.instances :
-        contains(i.tags, "new_api") ? ["${i.private_ip_address}/32"] : []
-      ],
-      [for i in data.linode_instances.prd_oldeworld_api.instances :
-        contains(i.tags, "new_api") ? ["${i.private_ip_address}/32"] : []
-      ]
+      [for i in data.linode_instances.stg_oldeworld_api.instances : "${i.private_ip_address}/32"],
+      [for i in data.linode_instances.prd_oldeworld_api.instances : "${i.private_ip_address}/32"],
     ])
   }
 
@@ -148,12 +144,8 @@ resource "linode_firewall" "ops_backoffice_firewall" {
     ipv4 = flatten([
       [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"],
       [for i in data.linode_instances.prd_oldeworld_jms.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.stg_oldeworld_api.instances :
-        contains(i.tags, "new_api") ? ["${i.private_ip_address}/32"] : []
-      ],
-      [for i in data.linode_instances.prd_oldeworld_api.instances :
-        contains(i.tags, "new_api") ? ["${i.private_ip_address}/32"] : []
-      ]
+      [for i in data.linode_instances.stg_oldeworld_api.instances : "${i.private_ip_address}/32"],
+      [for i in data.linode_instances.prd_oldeworld_api.instances : "${i.private_ip_address}/32"],
     ])
   }
 
