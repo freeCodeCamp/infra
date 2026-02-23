@@ -8,11 +8,12 @@ The Oncall stack provides automated maintenance and monitoring services includin
 
 ## Components
 
-| Service | Purpose |
-| --- | --- |
-| **svc-cronjob** | Swarm cronjob scheduler (manages scheduled tasks) |
-| **svc-update** | Gantry service updater (auto-updates tagged services) |
+| Service         | Purpose                                                     |
+| --------------- | ----------------------------------------------------------- |
+| **svc-cronjob** | Swarm cronjob scheduler (manages scheduled tasks)           |
+| **svc-update**  | Gantry service updater (auto-updates tagged services)       |
 | **svc-cleanup** | Docker system cleanup (prunes old images/containers weekly) |
+| **svc-webhook** | Webhook receiver (triggers instant Gantry updates via HTTP) |
 
 ## Architecture
 
@@ -20,6 +21,7 @@ The Oncall stack provides automated maintenance and monitoring services includin
 Cronjob Scheduler → Scheduled Tasks
 Service Updater → Auto-update tagged services
 Cleanup Job → Weekly prune on all nodes
+Webhook Receiver → On-demand Gantry updates (via GHA)
     ↓
 All services → Loki logging
 ```
@@ -36,11 +38,13 @@ All services → Loki logging
 ### Gantry Auto-Update Service
 
 **Authentication Requirements:**
+
 - Uses host Docker credentials from `/home/freecodecamp/.docker/config.json`
 - Requires `--with-registry-auth` (set via `GANTRY_UPDATE_OPTIONS`) to propagate credentials to worker nodes
 - Credentials must be valid and updated if expired
 
 **Directory Requirements:**
+
 - Mount `/home/freecodecamp/.docker:/root/.docker` as **writable** (buildx needs write access)
 - Ensure `/home/freecodecamp/.docker/buildx/` directory exists on manager node
 
@@ -58,6 +62,12 @@ export LOKI_URL="https://loki:${LOKI_PASSWORD}@o11y.freecodecamp.net/loki/api/v1
 # Get tenant ID
 export LOKI_TENANT_ID=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_TENANT_ID}' | base64 --decode)
 ```
+
+### Webhook Configuration
+
+- Set `WEBHOOK_SECRET` env var to a strong random string (shared with GHA secrets)
+- Port 9889 is exposed on the host; reverse proxy with Nginx (out of scope)
+- Hook endpoint: `/hooks/run-gantry`
 
 ### Logging Configuration
 
@@ -90,6 +100,39 @@ docker stack deploy -c docker/swarm/stacks/oncall/stack-oncall.yml oncall
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
 
+## GHA Integration
+
+Trigger an on-demand Gantry update from a GitHub Actions workflow:
+
+```yaml
+- name: Trigger deployment
+  run: |
+    curl -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
+      -H "Content-Type: application/json" \
+      -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
+      -d '{"GANTRY_SERVICES_FILTERS":"name=${{ env.STACK_NAME }}_${{ env.SERVICE_NAME }}"}'
+```
+
+## Testing Webhook
+
+Manual curl examples for verifying the webhook service:
+
+```bash
+# Valid request (with secret header)
+curl -X POST http://localhost:9889/hooks/run-gantry \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Secret: YOUR_SECRET_HERE" \
+  -d '{"GANTRY_SERVICES_FILTERS":"name=mystack_myservice"}'
+
+# Invalid request (without secret — should be rejected)
+curl -X POST http://localhost:9889/hooks/run-gantry \
+  -H "Content-Type: application/json" \
+  -d '{"GANTRY_SERVICES_FILTERS":"name=mystack_myservice"}'
+
+# Check webhook logs
+docker service logs oncall_svc-webhook
+```
+
 ## Querying Logs in Grafana
 
 Use these LogQL queries to view logs by service:
@@ -106,6 +149,9 @@ Use these LogQL queries to view logs by service:
 
 # Docker cleanup logs only
 {stack="oncall", service="cleanup"}
+
+# Webhook receiver logs
+{stack="oncall", service="webhook"}
 ```
 
 ## Maintenance
