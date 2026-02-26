@@ -30,7 +30,6 @@
    > Labels are used for placement constraints in the docker stack templates.
 
    Here are some example lables for the nodes. Adjust as needed
-
    - Get the node ids using `docker node ls` on the manager node.
 
    - On the manager node
@@ -63,10 +62,21 @@
      docker node update --label-add "api.variant=org" <node id>
      ```
 
+     Socrates
+
+     ```shell
+     docker node update --label-add "socrates.enabled=true" <node id>
+     ```
+
+     ```shell
+     docker node update --label-add "socrates.variant=dev" <node id>
+     docker node update --label-add "socrates.variant=org" <node id>
+     ```
+
 4. Deploy [Portainer](stacks/portainer/README.md).
 
 5. Complete the Portainer setup wizard & add the cluster to Portainer.
 
 6. Add the container registry details to Portainer.
 
-7. Deploy all the remaining stacks via Portainer. Note that you should not manage the portainer stack from within Portainer UI.
+7. Deploy all the remaining stacks via Portainer, including [Socrates](stacks/socrates/README.md). Note that you should not manage the portainer stack from within Portainer UI.
