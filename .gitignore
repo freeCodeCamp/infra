@@ -31,6 +31,9 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+terraform/backend.hcl
+terraform/*.backend.hcl
+terraform/*.s3.hcl
 
 # Ignore Visual Studio Code files
 .vscode/

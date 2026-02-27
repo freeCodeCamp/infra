@@ -7,6 +7,7 @@ variable "linode_token" {
 variable "password" {
   description = "The root password for the Linode instances."
   type        = string
+  sensitive   = true
 }
 
 variable "region" {
@@ -42,6 +43,7 @@ variable "hcp_client_secret" {
 variable "cloudflare_api_token" {
   type        = string
   description = "Cloudflare API Token"
+  sensitive   = true
 }
 
 variable "cloudflare_account_id" {

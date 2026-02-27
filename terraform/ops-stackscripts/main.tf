@@ -1,12 +1,5 @@
 terraform {
-  backend "remote" {
-    hostname     = "app.terraform.io"
-    organization = "freecodecamp"
-
-    workspaces {
-      name = "tfws-ops-stackscripts"
-    }
-  }
+  backend "s3" {}
 }
 
 provider "linode" {

@@ -1,12 +1,5 @@
 terraform {
-  backend "remote" {
-    hostname     = "app.terraform.io"
-    organization = "freecodecamp"
-
-    workspaces {
-      name = "tfws-prd-oldeworld--origins"
-    }
-  }
+  backend "s3" {}
 }
 
 provider "linode" {
