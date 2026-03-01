@@ -12,6 +12,8 @@ x-deploy-config: &deploy-config
       parallelism: 1
       delay: 10s
       failure_action: rollback
+      monitor: 30s
+      max_failure_ratio: 0.3
     resources:
       limits:
         cpus: ${CPU_LIMIT:-1}
@@ -24,7 +26,7 @@ x-deploy-config: &deploy-config
       - org.freecodecamp.autoupdate=true
 
 x-port-config: &port-config
-  target: 3000
+  target: 3001
   protocol: tcp
   mode: host
 
@@ -39,25 +41,23 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget --no-verbose --spider http://localhost:3000/health || exit 1",
+          "wget --no-verbose --spider http://localhost:3001/health || exit 1",
         ]
       interval: 30s
       timeout: 5s
       start_period: 15s
+      start_interval: 5s
       retries: 3
     environment:
       # Runtime
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3000
-      - SERVER_URL=${SERVER_URL}
+      - PORT=3001
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # Redis (overlay network service discovery)
       - REDIS_URL=redis://svc-redis:6379
       # Authentication
       - API_KEY=${API_KEY}
-      - DOCS_BASIC_AUTH_USER=${DOCS_BASIC_AUTH_USER}
-      - DOCS_BASIC_AUTH_PASS=${DOCS_BASIC_AUTH_PASS}
       # Groq AI
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
@@ -82,7 +82,16 @@ services:
 
   svc-redis:
     image: redis:7.4-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "200mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -90,6 +99,7 @@ services:
       interval: 10s
       timeout: 5s
       start_period: 5s
+      start_interval: 5s
       retries: 3
     deploy:
       replicas: 1
