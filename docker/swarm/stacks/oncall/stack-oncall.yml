@@ -30,7 +30,7 @@ services:
           - "node.role == manager"
 
   svc-update:
-    image: shizunge/gantry:2025.0813.0
+    image: shizunge/gantry:2026.0115.0
     environment:
       - "TZ=UTC"
       - "GANTRY_NODE_NAME={{.Node.Hostname}}"
