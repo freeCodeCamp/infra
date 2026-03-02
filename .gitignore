@@ -47,6 +47,7 @@ ansible/inventory/hosts
 
 # Secrets
 *.env
+*.env.*
 .envrc
 
 .kubeconfig.yaml
