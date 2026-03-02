@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:24-alpine
 
 LABEL org.opencontainers.image.source=https://github.com/freecodecamp/infra
 LABEL org.opencontainers.image.description="A quick landing page for the freeCodeCamp.org Docker containers."
