@@ -1,0 +1,30 @@
+---
+# ONE-TIME FIX (2026-03-11):
+#
+# Removes stale /dev/sdb swap entry from fstab.
+# Linode base images included a swap disk reference, but our Terraform configs
+# provision only a single boot disk (sda). The dangling fstab entry caused
+# systemd to stall boot waiting for /dev/sdb (up to 1m30s), which led to
+# SSH timeouts in CI (housekeeping workflow).
+#
+# This likely only needs to be run once on existing Linode instances, but can
+# be safely re-run if needed. Future Linode images should not include
+# the swap entry, so new instances should not require this fix.
+#
+- name: Remove stale swap entry from fstab
+  hosts: '{{ variable_host | default("null") }}'
+  serial: "{{ variable_serial | default(1) }}"
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Remove /dev/sdb swap line from fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regexp: '^/dev/sdb\s+none\s+swap'
+        state: absent
+      register: fstab_changed
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "fstab {{ 'updated' if fstab_changed.changed else 'unchanged (no swap entry found)' }}"
