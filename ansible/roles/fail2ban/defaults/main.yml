@@ -1,0 +1,4 @@
+---
+fail2ban_sshd_maxretry: 5
+fail2ban_sshd_findtime: 600
+fail2ban_sshd_bantime: 3600

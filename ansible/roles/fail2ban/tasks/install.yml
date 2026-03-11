@@ -1,0 +1,7 @@
+---
+- name: Install fail2ban via apt
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
