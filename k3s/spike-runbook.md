@@ -24,10 +24,10 @@ Single-node k3s cluster running Rancher, cert-manager, and rancher-backup.
 | Property     | Value                              |
 | ------------ | ---------------------------------- |
 | Node         | 1x s-4vcpu-8gb, Ubuntu 24.04, nyc3 |
-| k3s version  | v1.34.4+k3s1                       |
+| k3s version  | v1.34.5+k3s1                       |
 | Pod CIDR     | 10.40.0.0/16                       |
 | Service CIDR | 10.41.0.0/16                       |
-| Rancher      | v2.13.2                            |
+| Rancher      | v2.13.3                            |
 | Tailscale    | ops-k3s-mgmt-subnet                |
 
 ### 1.1 Provision DigitalOcean Droplet
@@ -85,9 +85,9 @@ This playbook (7 plays):
 
 1. Validates VPC + Tailscale + vault secrets, creates DO firewall
 2. Installs system prerequisites
-3. Deploys k3s v1.34.4 with security hardening (secrets-encryption, PSS, audit logging)
-4. Configures Traefik + Gateway API CRDs v1.4.1
-5. Installs cert-manager, Rancher v2.13.2, rancher-backup operator + schedule
+3. Deploys k3s v1.34.5 with security hardening (secrets-encryption, PSS, audit logging)
+4. Configures Traefik + Gateway API CRDs v1.5.1
+5. Installs cert-manager, Rancher v2.13.3, rancher-backup operator + schedule
 6. Installs Tailscale operator + ProxyClass (MTU fix) + Connector (subnet router)
 7. Fetches kubeconfig to `k3s/ops-mgmt/.kubeconfig.yaml` (Tailscale IP)
 
@@ -154,7 +154,7 @@ Rancher-provisioned 3-node k3s cluster for Appsmith workloads.
 | Property     | Value                              |
 | ------------ | ---------------------------------- |
 | Nodes        | 3x s-4vcpu-8gb, Ubuntu 24.04, nyc3 |
-| k3s version  | v1.34.4                            |
+| k3s version  | v1.34.5                            |
 | Pod CIDR     | 10.42.0.0/16                       |
 | Service CIDR | 10.43.0.0/16                       |
 | Tailscale    | ops-k3s-backoffice-subnet          |
@@ -166,7 +166,7 @@ Rancher-provisioned 3-node k3s cluster for Appsmith workloads.
 2. Provider: DigitalOcean
 3. Settings:
    - **Cluster name**: `ops-backoffice`
-   - **Kubernetes version**: k3s v1.34.4
+   - **Kubernetes version**: k3s v1.34.5
    - **Machine pools**: 3x `s-4vcpu-8gb`, nyc3, same VPC as ops-mgmt
 4. Advanced > Cluster Configuration:
    - `cluster-cidr`: `10.42.0.0/16`
@@ -214,7 +214,7 @@ kubectl get svc traefik -n kube-system
 ```bash
 cd /Users/mrugesh/DEV/fCC/infra/k3s/ops-backoffice && export $(cat .env | xargs)
 
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
 ```
 
 ### 2.5 Install Longhorn via Rancher

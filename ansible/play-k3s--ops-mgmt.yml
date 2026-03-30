@@ -109,7 +109,7 @@
   vars_files:
     - vars/vault-k3s.yml
   vars:
-    k3s_version: v1.34.4+k3s1
+    k3s_version: v1.34.5+k3s1
     cluster_cidr: "10.40.0.0/16"
     service_cidr: "10.41.0.0/16"
     etcd_s3_endpoint: "nyc3.digitaloceanspaces.com"
@@ -200,7 +200,7 @@
     - name: Install Gateway API CRDs
       command: >
         k3s kubectl apply -f
-        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/standard-install.yaml
+        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
       register: gateway_result
       changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
 
@@ -225,7 +225,7 @@
   vars_files:
     - vars/vault-k3s.yml
   vars:
-    rancher_version: "2.13.2"
+    rancher_version: "2.13.3"
     rancher_hostname: "rancher.ops-mgmt.ts.net"
 
   pre_tasks:
