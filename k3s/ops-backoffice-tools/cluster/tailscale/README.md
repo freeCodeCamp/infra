@@ -4,15 +4,14 @@ Tailscale operator for the ops-backoffice-tools k3s cluster.
 
 ## Devices
 
-| Device | Type | Purpose |
-|--------|------|---------|
+| Device                        | Type     | Purpose                     |
+| ----------------------------- | -------- | --------------------------- |
 | `ops-k3s-backoffice-operator` | Operator | Manages Tailscale resources |
-| `ops-k3s-backoffice-prometheus` | Ingress | Prometheus accessible via `ops-k3s-backoffice-prometheus.batfish-ray.ts.net` |
 
 ## Files
 
-| File | Purpose |
-|------|---------|
+| File                   | Purpose                            |
+| ---------------------- | ---------------------------------- |
 | `operator-values.yaml` | Helm values for Tailscale operator |
 
 ## Install/Upgrade Operator
@@ -27,12 +26,6 @@ helm upgrade tailscale-operator tailscale/tailscale-operator \
   --set oauth.clientSecret=<CLIENT_SECRET>
 ```
 
-## Accessing Services
-
-External consumers reach services via Tailscale FQDN:
-- Prometheus: `http://ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090`
-
 ## See Also
 
 - Master inventory: `tailscale/README.md` (repo root)
-- Prometheus ingress: `apps/prometheus/manifests/base/tailscale-ingress.yaml`

@@ -12,13 +12,11 @@ kubectl get nodes
 
 ## Applications
 
-| App | Namespace | URL |
-|-----|-----------|-----|
-| Appsmith | appsmith | https://appsmith.freecodecamp.net |
-| Outline | outline | https://outline.freecodecamp.net |
-| Grafana | grafana | https://grafana.freecodecamp.net |
-| n8n | n8n | https://n8n.freecodecamp.net |
-| Prometheus | prometheus | Tailscale: `ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090` |
+| App      | Namespace | URL                               |
+| -------- | --------- | --------------------------------- |
+| Appsmith | appsmith  | https://appsmith.freecodecamp.net |
+| Outline  | outline   | https://outline.freecodecamp.net  |
+| n8n      | n8n       | https://n8n.freecodecamp.net      |
 
 ## Storage
 
@@ -43,59 +41,6 @@ helm upgrade tailscale-operator tailscale/tailscale-operator \
 
 ---
 
-## Grafana
-
-### Deploy
-
-```bash
-# Namespace, gateway, secrets
-kubectl apply -k apps/grafana/manifests/base/
-
-# Helm chart
-helm repo add grafana https://grafana.github.io/helm-charts
-helm install grafana grafana/grafana -n grafana \
-  -f apps/grafana/charts/grafana/values.yaml
-```
-
-### Upgrade
-
-```bash
-helm upgrade grafana grafana/grafana -n grafana \
-  -f apps/grafana/charts/grafana/values.yaml
-```
-
-### Secrets
-
-File: `apps/grafana/manifests/base/secrets/.secrets.env`
-
-| Variable | Description |
-|----------|-------------|
-| GRAFANA_ADMIN_USER | Admin username |
-| GRAFANA_ADMIN_PASSWORD | Admin password |
-| GRAFANA_GOOGLE_CLIENT_ID | Google OAuth client ID |
-| GRAFANA_GOOGLE_CLIENT_SECRET | Google OAuth client secret |
-| GRAFANA_GOOGLE_ALLOWED_DOMAIN | freecodecamp.org |
-
-### Datasources
-
-| Datasource | Configuration |
-|------------|---------------|
-| Prometheus | Provisioned via Helm values |
-| ClickHouse | UI-configured (Connections > Data sources) |
-
-#### ClickHouse Datasource Setup (Grafana UI)
-
-| Field | Value |
-|-------|-------|
-| Host | ops-k3s-clickhouse-logs.batfish-ray.ts.net |
-| Port | 9000 |
-| Protocol | Native |
-| Username | grafana |
-| Password | (from ClickHouse cluster) |
-| Default Database | (leave empty) |
-
----
-
 ## n8n
 
 ### Deploy
@@ -108,11 +53,11 @@ kubectl apply -k apps/n8n/manifests/base/
 
 File: `apps/n8n/manifests/base/secrets/.secrets.env`
 
-| Variable | Description |
-|----------|-------------|
-| N8N_ENCRYPTION_KEY | `openssl rand -hex 32` |
-| JWT_SECRET | `openssl rand -hex 32` |
-| POSTGRES_PASSWORD | `openssl rand -base64 24` |
+| Variable           | Description               |
+| ------------------ | ------------------------- |
+| N8N_ENCRYPTION_KEY | `openssl rand -hex 32`    |
+| JWT_SECRET         | `openssl rand -hex 32`    |
+| POSTGRES_PASSWORD  | `openssl rand -base64 24` |
 
 ### Architecture
 
@@ -126,60 +71,6 @@ File: `apps/n8n/manifests/base/secrets/.secrets.env`
 ```bash
 kubectl scale deploy/n8n-worker -n n8n --replicas=3
 ```
-
----
-
-## Prometheus
-
-### Deploy
-
-```bash
-# Namespace + Tailscale ingress
-kubectl apply -k apps/prometheus/manifests/base/
-
-# Helm chart
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
-```
-
-### Upgrade
-
-```bash
-helm upgrade prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f apps/prometheus/charts/kube-prometheus-stack/values.yaml
-```
-
-### Components
-
-| Component | Storage | Retention |
-|-----------|---------|-----------|
-| Prometheus | 50Gi Longhorn | 7 days |
-| Alertmanager | 10Gi Longhorn | - |
-
-### Alerting
-
-Alert rules are **Grafana-managed**, provisioned as code in `apps/grafana/charts/grafana/values.yaml`:
-
-| Group | Rules | Examples |
-|-------|-------|---------|
-| k3s-node-resources | 7 | CPU, memory, disk, clock skew |
-| k3s-cluster-overcommit | 6 | CPU/memory limits and requests vs allocatable |
-| k3s-pod-health | 6 | OOMKilled, CrashLoop, pending, stuck rollouts |
-| k3s-longhorn | 6 | Volume degraded/faulted, disk pressure, node down |
-
-**Pipeline:** Grafana alert rules -> n8n webhook (cluster-internal) -> Google Chat
-
-Prometheus Alertmanager uses a null receiver (handles only kube-prometheus-stack built-in recording/alerting rules, no notifications).
-
-### Access
-
-| Method | URL |
-|--------|-----|
-| Grafana | Datasource configured internally |
-| Tailscale | `ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090` |
 
 ---
 
@@ -216,23 +107,7 @@ apps/<app>/manifests/base/secrets/
 
 ```bash
 kubectl logs -n tailscale deploy/operator
-
-# Test ClickHouse
-curl -s http://ops-k3s-clickhouse-logs.batfish-ray.ts.net:8123/ping
-
-# Test Prometheus
-curl -s http://ops-k3s-backoffice-prometheus.batfish-ray.ts.net:9090/-/healthy
 ```
-
-### Grafana ClickHouse Errors
-
-```bash
-kubectl logs -n grafana deploy/grafana | grep -i clickhouse
-```
-
-Common issues:
-- `readonly mode`: ClickHouse user profile needs `readonly=2`
-- `Database X does not exist`: Leave default database empty in datasource config
 
 ### PVC Stuck Pending
 
