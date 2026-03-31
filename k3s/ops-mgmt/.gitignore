@@ -1,0 +1,5 @@
+.kubeconfig.yaml
+**/secrets/.secrets.env
+**/secrets/tls.crt
+**/secrets/tls.key
+!**/secrets/.secrets.enc.env
