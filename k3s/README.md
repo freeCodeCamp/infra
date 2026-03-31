@@ -4,9 +4,9 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose        | Apps                   |
-| -------------------- | -------------- | ---------------------- |
-| ops-backoffice-tools | Internal tools | Appsmith, Outline, n8n |
+| Cluster              | Purpose        | Apps              |
+| -------------------- | -------------- | ----------------- |
+| ops-backoffice-tools | Internal tools | Appsmith, Outline |
 
 ## Quick Access
 
@@ -23,7 +23,6 @@ k3s/
 ├── ops-backoffice-tools/
 │   ├── apps/
 │   │   ├── appsmith/
-│   │   ├── n8n/
 │   │   └── outline/
 │   └── cluster/
 │       ├── longhorn/
@@ -102,8 +101,6 @@ See `tailscale/README.md` (repo root) for device inventory.
 | ------------------------- | ---- | -------- |
 | appsmith.freecodecamp.net | A    | tools LB |
 | outline.freecodecamp.net  | A    | tools LB |
-| n8n.freecodecamp.net      | A    | tools LB |
-| n8n-wh.freecodecamp.net   | A    | tools LB |
 
 ---
 
@@ -132,19 +129,18 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
                                                             │
                                               ┌─────────────┼─────────────┐
                                               ↓             ↓             ↓
-                                          Appsmith       Outline         n8n
-                                              │             │        (queue mode)
-                                              └─────────────┴─────────────┘
+                                          Appsmith       Outline
+                                              │             │
+                                              └─────────────┘
                                                            │
                                                       Longhorn
                                                    (2 replicas)
 ```
 
-| App      | Replicas           | Storage     | Database           |
-| -------- | ------------------ | ----------- | ------------------ |
-| Appsmith | 1                  | 10Gi        | Embedded           |
-| Outline  | 1                  | 10Gi + 10Gi | PostgreSQL sidecar |
-| n8n      | 1 main + 2 workers | 10Gi + 20Gi | PostgreSQL sidecar |
+| App      | Replicas | Storage     | Database           |
+| -------- | -------- | ----------- | ------------------ |
+| Appsmith | 1        | 10Gi        | Embedded           |
+| Outline  | 1        | 10Gi + 10Gi | PostgreSQL sidecar |
 
 ---
 

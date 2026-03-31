@@ -10,9 +10,9 @@ Teardown of the self-hosted observability stack (ClickHouse, Grafana, Prometheus
 ## Prerequisites
 
 - SSH access to oldeworld proxy nodes via Tailscale
-- kubectl access to both k3s clusters (kubeconfigs in repo)
-- DigitalOcean console/API access
+- DigitalOcean console/API access (`doctl`)
 - Tailscale admin console access
+- Cloudflare DNS access
 
 ---
 
@@ -20,146 +20,95 @@ Teardown of the self-hosted observability stack (ClickHouse, Grafana, Prometheus
 
 Vector runs on oldeworld proxy nodes shipping NGINX access logs to ClickHouse. Must be stopped before ClickHouse teardown.
 
-### 1.1 Stop and uninstall Vector on staging proxy
+> **Note:** Ad-hoc ansible commands use `ansible` (not `ansible-playbook`).
+> The host group is a positional argument, not passed via `-e variable_host`.
+
+### 1.1 Stop and disable Vector on staging proxy — DONE
 
 ```bash
 cd ansible
-
-# Stop, disable, and remove Vector
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
+uv run ansible stg_oldeworld_pxy -i inventory/linode.yml \
   -m ansible.builtin.systemd -a "name=vector state=stopped enabled=false" --become
+```
 
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
+### 1.2 Stop and disable Vector on production proxy — DONE
+
+```bash
+uv run ansible prd_oldeworld_pxy -i inventory/linode.yml \
+  -m ansible.builtin.systemd -a "name=vector state=stopped enabled=false" --become
+```
+
+### 1.3 Verify Vector is stopped — DONE
+
+```bash
+uv run ansible "stg_oldeworld_pxy:prd_oldeworld_pxy" -i inventory/linode.yml \
+  -m ansible.builtin.command -a "systemctl is-active vector" --become
+# Expected: all hosts return "inactive" (rc=3 is normal)
+```
+
+### 1.4 Purge Vector package and clean up (optional, can be done later)
+
+```bash
+# Remove package
+uv run ansible "stg_oldeworld_pxy:prd_oldeworld_pxy" -i inventory/linode.yml \
   -m ansible.builtin.apt -a "name=vector state=absent purge=true" --become
 
-# Clean up config and data
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
+# Remove config, data, and systemd override
+uv run ansible "stg_oldeworld_pxy:prd_oldeworld_pxy" -i inventory/linode.yml \
   -m ansible.builtin.file -a "path=/etc/vector state=absent" --become
 
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
+uv run ansible "stg_oldeworld_pxy:prd_oldeworld_pxy" -i inventory/linode.yml \
   -m ansible.builtin.file -a "path=/var/lib/vector state=absent" --become
 
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
+uv run ansible "stg_oldeworld_pxy:prd_oldeworld_pxy" -i inventory/linode.yml \
   -m ansible.builtin.file -a "path=/etc/systemd/system/vector.service.d state=absent" --become
-```
 
-### 1.2 Stop and uninstall Vector on production proxy
-
-```bash
-# Same commands with prd target
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.systemd -a "name=vector state=stopped enabled=false" --become
-
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.apt -a "name=vector state=absent purge=true" --become
-
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.file -a "path=/etc/vector state=absent" --become
-
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.file -a "path=/var/lib/vector state=absent" --become
-
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.file -a "path=/etc/systemd/system/vector.service.d state=absent" --become
-```
-
-### 1.3 Clean up APT repository
-
-```bash
-# Remove Vector apt repo from both stg and prd
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
-  -m ansible.builtin.apt_repository -a "repo='deb [signed-by=/usr/share/keyrings/datadog-archive-keyring.gpg] https://apt.vector.dev/ stable vector-0' state=absent filename=vector" --become
-
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.apt_repository -a "repo='deb [signed-by=/usr/share/keyrings/datadog-archive-keyring.gpg] https://apt.vector.dev/ stable vector-0' state=absent filename=vector" --become
-```
-
-### 1.4 Verify Vector is gone
-
-```bash
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=stg_oldeworld_pxy \
-  -m ansible.builtin.command -a "systemctl status vector" --become
-# Expected: "Unit vector.service could not be found"
-
-uv run ansible-playbook -i inventory/linode.yml -e variable_host=prd_oldeworld_pxy \
-  -m ansible.builtin.command -a "systemctl status vector" --become
-# Expected: "Unit vector.service could not be found"
+# Remove APT repository
+uv run ansible "stg_oldeworld_pxy:prd_oldeworld_pxy" -i inventory/linode.yml \
+  -m ansible.builtin.apt_repository \
+  -a "repo='deb [signed-by=/usr/share/keyrings/datadog-archive-keyring.gpg] https://apt.vector.dev/ stable vector-0' state=absent filename=vector" --become
 ```
 
 ---
 
-## Phase 2: Teardown ops-logs-clickhouse Cluster
+## Phase 2: Teardown ops-logs-clickhouse Cluster — DONE
 
-### 2.1 Delete ClickHouse resources
+The logs cluster kubeconfig was lost during repo cleanup, so kubectl teardown was skipped. Resources were destroyed directly via DigitalOcean.
 
-```bash
-cd k3s/ops-logs-clickhouse
-export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+### 2.1 Destroy DigitalOcean resources — DONE
 
-# Delete ClickHouse resources via kustomize
-kubectl delete -k apps/clickhouse/manifests/base/
+Destroyed via DO console/API:
 
-# Verify namespace is terminating/gone
-kubectl get namespaces
-# clickhouse namespace should be gone or Terminating
-```
+| Resource      | Name                                      | Size          |
+| ------------- | ----------------------------------------- | ------------- |
+| Load balancer | `ops-lb-logs-k3s-nyc3` (tag: `logs-k3s`)  | -             |
+| Volume        | `ops-vol-logs-k3s-nyc3-01`                | 250 GiB       |
+| Volume        | `ops-vol-logs-k3s-nyc3-02`                | 250 GiB       |
+| Volume        | `ops-vol-logs-k3s-nyc3-03`                | 250 GiB       |
+| Droplet       | `ops-vm-logs-k3s-nyc3-01` (ID: 539109026) | 4 vCPU / 8 GB |
+| Droplet       | `ops-vm-logs-k3s-nyc3-02` (ID: 539109028) | 4 vCPU / 8 GB |
+| Droplet       | `ops-vm-logs-k3s-nyc3-03` (ID: 539109024) | 4 vCPU / 8 GB |
 
-### 2.2 Uninstall Tailscale operator
+**VPC `ops-vpc-k3s-nyc3` kept** — shared with tools cluster.
 
-```bash
-# Remove Tailscale operator Helm release
-helm list -n tailscale
-helm uninstall tailscale-operator -n tailscale
-kubectl delete namespace tailscale
-```
-
-### 2.3 Uninstall Traefik
-
-```bash
-# Traefik is installed by k3s but configured via HelmChartConfig
-# It will be destroyed with the cluster nodes
-```
-
-### 2.4 Remove Tailscale devices from tailnet
+### 2.2 Remove Tailscale devices from tailnet
 
 Go to https://login.tailscale.com/admin/machines and remove:
 
 - `ops-k3s-clickhouse-operator`
 - `ops-k3s-clickhouse-logs`
 
-### 2.5 Destroy DigitalOcean resources
-
-Via DigitalOcean console (https://cloud.digitalocean.com) or `doctl`:
+### 2.3 Verify — DONE
 
 ```bash
-# Detach and destroy volumes
-doctl compute volume-action detach ops-vol-logs-k3s-nyc3-01
-doctl compute volume-action detach ops-vol-logs-k3s-nyc3-02
-doctl compute volume-action detach ops-vol-logs-k3s-nyc3-03
-doctl compute volume delete ops-vol-logs-k3s-nyc3-01 --force
-doctl compute volume delete ops-vol-logs-k3s-nyc3-02 --force
-doctl compute volume delete ops-vol-logs-k3s-nyc3-03 --force
-
-# Destroy droplets
-doctl compute droplet delete ops-vm-logs-k3s-nyc3-01 --force
-doctl compute droplet delete ops-vm-logs-k3s-nyc3-02 --force
-doctl compute droplet delete ops-vm-logs-k3s-nyc3-03 --force
-```
-
-**DO NOT delete the VPC** (`ops-vpc-k3s-nyc3`) — it is shared with the tools cluster.
-
-### 2.6 Verify logs cluster is fully destroyed
-
-```bash
-# Confirm droplets gone
-doctl compute droplet list --tag-name logs_k3s
+doctl compute droplet list --format ID,Name,Tags,Status | grep -i logs
 # Expected: empty
 
-# Confirm volumes gone
-doctl compute volume list | grep logs-k3s
+doctl compute volume list --format ID,Name,Size,Region | grep -i logs
 # Expected: empty
 
-# Confirm Tailscale devices removed (check admin console)
+doctl compute load-balancer list --format ID,Name,Tag,Status | grep -i logs
+# Expected: empty
 ```
 
 ---
@@ -176,10 +125,7 @@ export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 helm list -n grafana
 helm uninstall grafana -n grafana
 
-# Delete remaining resources (gateway, httproutes, secrets)
-kubectl delete -k apps/grafana/manifests/base/
-
-# Delete namespace (catches any remaining resources)
+# Delete namespace (catches all remaining resources)
 kubectl delete namespace grafana
 ```
 
@@ -190,24 +136,12 @@ kubectl delete namespace grafana
 helm list -n prometheus
 helm uninstall prometheus -n prometheus
 
-# Delete remaining resources (longhorn servicemonitor, tailscale ingress)
-kubectl delete -k apps/prometheus/manifests/base/
-
 # Delete namespace
 kubectl delete namespace prometheus
 
-# Note: CRDs from kube-prometheus-stack may linger. Clean up:
+# Clean up CRDs from kube-prometheus-stack
 kubectl get crd | grep monitoring.coreos.com
-kubectl delete crd alertmanagerconfigs.monitoring.coreos.com \
-  alertmanagers.monitoring.coreos.com \
-  podmonitors.monitoring.coreos.com \
-  probes.monitoring.coreos.com \
-  prometheusagents.monitoring.coreos.com \
-  prometheuses.monitoring.coreos.com \
-  prometheusrules.monitoring.coreos.com \
-  scrapeconfigs.monitoring.coreos.com \
-  servicemonitors.monitoring.coreos.com \
-  thanosrulers.monitoring.coreos.com
+kubectl get crd | grep monitoring.coreos.com | awk '{print $1}' | xargs kubectl delete crd
 ```
 
 ### 3.3 Remove Tailscale device
@@ -220,7 +154,7 @@ Go to https://login.tailscale.com/admin/machines and remove:
 
 Remove the A record for `grafana.freecodecamp.net` from Cloudflare DNS.
 
-The n8n and other records remain.
+Other records remain: appsmith, outline, n8n, n8n-wh.
 
 ### 3.5 Verify cleanup
 
@@ -237,23 +171,23 @@ kubectl get crd | grep monitoring.coreos.com
 kubectl get pvc -A | grep -E "grafana|prometheus"
 # Expected: empty
 
-# Confirm Longhorn volumes reclaimed (check Longhorn UI)
+# Confirm Longhorn volumes reclaimed
 kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
-# Visit localhost:8080, check no orphaned volumes
+# Visit localhost:8080, verify no orphaned volumes
 ```
 
 ---
 
 ## Phase 4: Verification Checklist
 
-- [ ] Vector stopped and uninstalled on stg proxy nodes
-- [ ] Vector stopped and uninstalled on prd proxy nodes
-- [ ] ClickHouse namespace deleted from logs cluster
-- [ ] Tailscale operator removed from logs cluster
+- [x] Vector stopped and disabled on stg proxy nodes (3 hosts)
+- [x] Vector stopped and disabled on prd proxy nodes (3 hosts)
+- [ ] Vector package purged and configs removed (optional cleanup)
+- [x] DO load balancer destroyed: `ops-lb-logs-k3s-nyc3`
+- [x] DO volumes destroyed: 3x 250 GiB (`ops-vol-logs-k3s-nyc3-01/02/03`)
+- [x] DO droplets destroyed: 3x (`ops-vm-logs-k3s-nyc3-01/02/03`)
+- [x] VPC `ops-vpc-k3s-nyc3` still exists (shared with tools cluster)
 - [ ] Tailscale devices removed: `ops-k3s-clickhouse-operator`, `ops-k3s-clickhouse-logs`
-- [ ] DO volumes detached and destroyed (3x 100GB)
-- [ ] DO droplets destroyed (3x ops-vm-logs-k3s-nyc3-0X)
-- [ ] VPC `ops-vpc-k3s-nyc3` still exists (shared with tools cluster)
 - [ ] Grafana Helm release uninstalled
 - [ ] Grafana namespace deleted
 - [ ] Prometheus Helm release uninstalled
@@ -271,11 +205,12 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 | Resource                         | Monthly Cost | Status    |
 | -------------------------------- | ------------ | --------- |
 | 3x DO droplets (logs cluster)    | ~$144/mo     | Destroyed |
-| 3x DO volumes (100GB each)       | ~$30/mo      | Destroyed |
-| Grafana PVC (5Gi Longhorn)       | included     | Released  |
-| Prometheus PVC (50Gi Longhorn)   | included     | Released  |
-| Alertmanager PVC (10Gi Longhorn) | included     | Released  |
-| **Total savings**                | **~$174/mo** |           |
+| 3x DO volumes (250 GiB each)     | ~$75/mo      | Destroyed |
+| 1x DO load balancer              | ~$12/mo      | Destroyed |
+| Grafana PVC (5Gi Longhorn)       | included     | Pending   |
+| Prometheus PVC (50Gi Longhorn)   | included     | Pending   |
+| Alertmanager PVC (10Gi Longhorn) | included     | Pending   |
+| **Total savings**                | **~$231/mo** |           |
 
 ---
 

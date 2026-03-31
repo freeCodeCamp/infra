@@ -16,7 +16,6 @@ kubectl get nodes
 | -------- | --------- | --------------------------------- |
 | Appsmith | appsmith  | https://appsmith.freecodecamp.net |
 | Outline  | outline   | https://outline.freecodecamp.net  |
-| n8n      | n8n       | https://n8n.freecodecamp.net      |
 
 ## Storage
 
@@ -37,39 +36,6 @@ helm upgrade tailscale-operator tailscale/tailscale-operator \
   -f cluster/tailscale/operator-values.yaml \
   --set oauth.clientId=<CLIENT_ID> \
   --set oauth.clientSecret=<CLIENT_SECRET>
-```
-
----
-
-## n8n
-
-### Deploy
-
-```bash
-kubectl apply -k apps/n8n/manifests/base/
-```
-
-### Secrets
-
-File: `apps/n8n/manifests/base/secrets/.secrets.env`
-
-| Variable           | Description               |
-| ------------------ | ------------------------- |
-| N8N_ENCRYPTION_KEY | `openssl rand -hex 32`    |
-| JWT_SECRET         | `openssl rand -hex 32`    |
-| POSTGRES_PASSWORD  | `openssl rand -base64 24` |
-
-### Architecture
-
-- **n8n-main**: UI, API, webhooks (1 replica)
-- **n8n-worker**: Execution (2 replicas)
-- **n8n-postgres**: Database (20Gi)
-- **n8n-redis**: Queue
-
-### Scale Workers
-
-```bash
-kubectl scale deploy/n8n-worker -n n8n --replicas=3
 ```
 
 ---
