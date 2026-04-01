@@ -1,0 +1,60 @@
+# Argo CD Helm values for gxy-management cluster
+# Chart: argo-cd (https://argoproj.github.io/argo-helm)
+# Non-HA, Tailscale-only access (no public ingress)
+
+# -- Single-replica (non-HA) deployment for 8GB nodes
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# -- Disable DEX (external SSO not needed)
+dex:
+  enabled: false
+
+# -- Disable notifications controller (not needed)
+notifications:
+  enabled: false
+
+# -- Disable ApplicationSet controller (not needed initially)
+applicationSet:
+  enabled: false
+
+configs:
+  params:
+    # TLS terminated at Tailscale level
+    "server.insecure": true

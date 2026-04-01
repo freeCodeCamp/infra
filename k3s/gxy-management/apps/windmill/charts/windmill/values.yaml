@@ -1,0 +1,74 @@
+# Windmill Helm chart values
+# Chart: windmill/windmill
+# Repo: https://windmill-labs.github.io/windmill-helm-charts/
+# Source: https://github.com/windmill-labs/windmill-helm-charts
+
+windmill:
+  baseDomain: windmill.freecodecamp.net
+  baseProtocol: https
+  appReplicas: 1
+  extraReplicas: 1
+  databaseUrl: postgres://postgres:windmill@windmill-postgresql/windmill?sslmode=disable
+
+  app:
+    resources:
+      requests:
+        memory: "512Mi"
+      limits:
+        memory: "2Gi"
+
+  workerGroups:
+    - name: "default"
+      controller: "Deployment"
+      replicas: 2
+      privileged: true
+      podSecurityContext:
+        runAsUser: 0
+        runAsNonRoot: false
+      resources:
+        requests:
+          memory: "512Mi"
+        limits:
+          memory: "2Gi"
+
+    - name: "native"
+      controller: "Deployment"
+      replicas: 1
+      privileged: false
+      podSecurityContext:
+        runAsUser: 0
+        runAsNonRoot: false
+      resources:
+        requests:
+          memory: "256Mi"
+        limits:
+          memory: "1Gi"
+      extraEnv:
+        - name: "NATIVE_MODE"
+          value: "true"
+        - name: "SLEEP_QUEUE"
+          value: "200"
+
+  indexer:
+    enabled: true
+    resources:
+      requests:
+        memory: "256Mi"
+      limits:
+        memory: "2Gi"
+
+postgresql:
+  enabled: true
+  auth:
+    postgresUser: postgres
+    postgresPassword: windmill
+    database: windmill
+  persistence:
+    enabled: true
+    size: 10Gi
+
+ingress:
+  enabled: false
+
+enterprise:
+  enabled: false

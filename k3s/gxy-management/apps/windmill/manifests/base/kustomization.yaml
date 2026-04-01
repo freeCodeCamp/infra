@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: windmill
+
+resources:
+  - namespace.yaml
+
+secretGenerator:
+  - name: windmill-secrets
+    type: Opaque
+    envs:
+      - secrets/.secrets.env
+    options:
+      disableNameSuffixHash: true

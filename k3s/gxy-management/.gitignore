@@ -1,0 +1,7 @@
+# Kubeconfig
+.kubeconfig.yaml
+
+# Secrets (managed locally, not in git)
+apps/*/manifests/base/secrets/.secrets.env
+apps/*/manifests/base/secrets/tls.crt
+apps/*/manifests/base/secrets/tls.key

@@ -1,0 +1,281 @@
+---
+# Deploy k3s HA galaxy cluster with Cilium CNI
+#
+# Provisions any Universe galaxy cluster. All nodes are control-plane (HA).
+# Uses Cilium as CNI (flannel/kube-proxy disabled). Tailscale on nodes for
+# SSH/kubectl access (NOT the K8s operator — ADR-009).
+#
+# Prerequisites (manual, one-time per galaxy):
+#   - 3x Ubuntu VMs on DigitalOcean with VPC attached (eth1)
+#   - Tailscale installed and connected on all nodes (play-tailscale--*.yml)
+#   - Ansible Vault password in 1Password
+#   - Vault secrets populated in vars/vault-k3s.yml (encrypted)
+#   - Cluster config directory: k3s/<galaxy_name>/cluster/
+#
+# Usage:
+#   cd ansible/   # direnv loads .env + activates venv
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--galaxy.yml \
+#     -e variable_host=gxy_mgmt_k3s \
+#     -e galaxy_name=gxy-management \
+#     --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+#
+# What this playbook does (6 plays):
+#   1. Validate prerequisites (VPC, Tailscale, vault secrets)
+#   2. Prepare system (k3s prerequisites + security configs)
+#   3. Deploy k3s server (Cilium flags, etcd S3 backups, security hardening)
+#   4. Configure ingress (Traefik + Gateway API CRDs)
+#   5. Install Cilium CNI
+#   6. Fetch kubeconfig (copy to local machine, replace server IP with Tailscale IP)
+
+# Play 1: Validate prerequisites
+- name: "K3s {{ galaxy_name | default('galaxy') }} - Validate prerequisites"
+  hosts: "{{ variable_host }}"
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/vault-k3s.yml
+  vars:
+    galaxy_name: "gxy-management"
+
+  tasks:
+    - name: Validate vault secrets loaded
+      assert:
+        that:
+          - vault_do_spaces_access_key is defined
+          - vault_do_spaces_access_key | length > 0
+          - vault_do_spaces_secret_key is defined
+          - vault_do_spaces_secret_key | length > 0
+        fail_msg: "Vault secrets missing. Run: ansible-vault edit vars/vault-k3s.yml"
+
+    - name: Validate VPC interface exists (eth1)
+      assert:
+        that:
+          - ansible_eth1 is defined
+          - ansible_eth1.ipv4 is defined
+          - ansible_eth1.ipv4.address is defined
+        fail_msg: "VPC interface eth1 not found. Ensure VM is attached to DO VPC."
+
+    - name: Validate Tailscale is connected
+      assert:
+        that:
+          - ansible_tailscale0 is defined
+          - ansible_tailscale0.ipv4 is defined
+          - ansible_tailscale0.ipv4.address is defined
+        fail_msg: "Tailscale interface not found. Ensure Tailscale is installed and connected."
+
+    - name: Validate VPC IP is in expected range
+      assert:
+        that:
+          - ansible_eth1.ipv4.address | regex_search('^10\.')
+        fail_msg: "VPC IP {{ ansible_eth1.ipv4.address }} not in 10.x.x.x range."
+
+    - name: Set network facts
+      set_fact:
+        vpc_ip: "{{ ansible_eth1.ipv4.address }}"
+        tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
+
+    - name: Display network configuration
+      debug:
+        msg: "{{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }}"
+
+    - name: Build k3s_cluster group
+      group_by:
+        key: k3s_cluster
+
+    - name: Build server group
+      group_by:
+        key: server
+
+# Play 2: System prerequisites
+- name: "K3s {{ galaxy_name | default('galaxy') }} - System prerequisites"
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  vars:
+    galaxy_name: "gxy-management"
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
+
+  pre_tasks:
+    - name: Ensure k3s config directory exists
+      file:
+        path: /etc/rancher/k3s
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
+
+    - name: Copy PSS admission config
+      copy:
+        src: "{{ cluster_config_dir }}/cluster/security/pss-admission.yaml"
+        dest: /etc/rancher/k3s/pss-admission.yaml
+        mode: "0600"
+
+    - name: Copy audit policy
+      copy:
+        src: "{{ cluster_config_dir }}/cluster/security/audit-policy.yaml"
+        dest: /etc/rancher/k3s/audit-policy.yaml
+        mode: "0600"
+
+  roles:
+    - role: k3s.orchestration.prereq
+
+# Play 3: Deploy k3s server
+- name: "K3s {{ galaxy_name | default('galaxy') }} - Deploy k3s server"
+  hosts: server
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/vault-k3s.yml
+  vars:
+    galaxy_name: "gxy-management"
+    k3s_version: "v1.34.5+k3s1"
+    cluster_cidr: "10.1.0.0/16"
+    service_cidr: "10.11.0.0/16"
+    etcd_s3_endpoint: "nyc3.digitaloceanspaces.com"
+    etcd_s3_bucket: "net.freecodecamp.ops-k3s-backups"
+    etcd_s3_folder: "etcd/{{ galaxy_name }}"
+    etcd_s3_region: "nyc3"
+    etcd_snapshot_schedule: "0 */6 * * *"
+    etcd_snapshot_retention: 20
+    api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
+    extra_server_args: >-
+      --node-ip={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --tls-san={{ hostvars[inventory_hostname]['vpc_ip'] }}
+      --tls-san={{ hostvars[inventory_hostname]['tailscale_ip'] }}
+      --flannel-backend=none
+      --disable-network-policy
+      --disable-kube-proxy
+      --disable=servicelb
+      --secrets-encryption
+      --protect-kernel-defaults
+      --cluster-cidr={{ cluster_cidr }}
+      --service-cidr={{ service_cidr }}
+      --kube-apiserver-arg=admission-control-config-file=/etc/rancher/k3s/pss-admission.yaml
+      --kube-apiserver-arg=audit-log-path=/var/log/k3s/audit.log
+      --kube-apiserver-arg=audit-policy-file=/etc/rancher/k3s/audit-policy.yaml
+      --etcd-s3
+      --etcd-s3-endpoint={{ etcd_s3_endpoint }}
+      --etcd-s3-bucket={{ etcd_s3_bucket }}
+      --etcd-s3-folder={{ etcd_s3_folder }}
+      --etcd-s3-region={{ etcd_s3_region }}
+      --etcd-snapshot-schedule-cron={{ etcd_snapshot_schedule }}
+      --etcd-snapshot-retention={{ etcd_snapshot_retention }}
+    server_group: server
+  pre_tasks:
+    - name: Create k3s audit log directory
+      file:
+        path: /var/log/k3s
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+
+    - name: Write k3s service environment (S3 credentials)
+      copy:
+        content: |
+          AWS_ACCESS_KEY_ID={{ vault_do_spaces_access_key }}
+          AWS_SECRET_ACCESS_KEY={{ vault_do_spaces_secret_key }}
+        dest: /etc/systemd/system/k3s.service.env
+        mode: "0600"
+        owner: root
+        group: root
+      no_log: true
+
+  roles:
+    - role: k3s.orchestration.k3s_server
+
+# Play 4: Configure ingress
+- name: "K3s {{ galaxy_name | default('galaxy') }} - Configure ingress"
+  hosts: server[0]
+  gather_facts: false
+  become: true
+  vars:
+    gateway_api_version: "v1.5.1"
+
+  tasks:
+    - name: Apply Traefik HelmChartConfig
+      copy:
+        src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: "0600"
+
+    - name: Install Gateway API CRDs
+      command: >
+        k3s kubectl apply -f
+        https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
+      register: gateway_result
+      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
+
+    - name: Wait for all nodes ready
+      command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      changed_when: false
+
+    - name: Display cluster status
+      command: k3s kubectl get nodes -o wide
+      register: cluster_status
+      changed_when: false
+
+    - name: Cluster ready
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"
+
+# Play 5: Install Cilium
+- name: "K3s {{ galaxy_name | default('galaxy') }} - Install Cilium"
+  hosts: server[0]
+  gather_facts: false
+  become: true
+  vars:
+    galaxy_name: "gxy-management"
+    cilium_cluster_id: 1
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
+  roles:
+    - role: cilium
+      vars:
+        cilium_cluster_name: "{{ galaxy_name }}"
+        cilium_values_file: "{{ cluster_config_dir }}/cluster/cilium/values.yaml"
+        cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
+
+# Play 6: Fetch kubeconfig
+- name: "K3s {{ galaxy_name | default('galaxy') }} - Fetch kubeconfig"
+  hosts: server[0]
+  gather_facts: false
+  become: true
+  vars:
+    galaxy_name: "gxy-management"
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
+
+  tasks:
+    - name: Read kubeconfig from server
+      slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: kubeconfig_raw
+
+    - name: Write kubeconfig locally (replace server IP with Tailscale IP)
+      copy:
+        content: "{{ kubeconfig_raw.content | b64decode | regex_replace('127\\.0\\.0\\.1', hostvars[inventory_hostname]['tailscale_ip']) }}"
+        dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Verify kubectl connectivity
+      command: kubectl get nodes
+      environment:
+        KUBECONFIG: "{{ cluster_config_dir }}/.kubeconfig.yaml"
+      register: kubectl_result
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Display final status
+      debug:
+        msg:
+          - "=== {{ galaxy_name }} cluster ready ==="
+          - "Kubeconfig: k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+          - "Nodes: {{ kubectl_result.stdout }}"
+          - ""
+          - "Next steps:"
+          - "  1. Verify Cilium: kubectl exec -n kube-system ds/cilium -c cilium-agent -- cilium status"
+          - "  2. Verify etcd snapshots: ssh root@<node> k3s etcd-snapshot list"
+          - "  3. Deploy apps: kubectl apply -k k3s/{{ galaxy_name }}/apps/<app>/manifests/base/"
