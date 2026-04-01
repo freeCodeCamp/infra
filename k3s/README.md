@@ -4,15 +4,19 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose        | Apps              |
-| -------------------- | -------------- | ----------------- |
-| ops-backoffice-tools | Internal tools | Appsmith, Outline |
+| Cluster              | Purpose           | Apps                  |
+| -------------------- | ----------------- | --------------------- |
+| ops-backoffice-tools | Internal tools    | Appsmith, Outline     |
+| gxy-management       | Universe platform | Windmill, ArgoCD, Zot |
 
 ## Quick Access
 
 ```bash
 # Tools cluster
 cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+# Galaxy management cluster
+cd k3s/gxy-management && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 ```
 
 ## Structure
@@ -20,6 +24,16 @@ cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 ```
 k3s/
 ├── archive/                       # Archived configs (historical reference)
+├── gxy-management/
+│   ├── apps/
+│   │   ├── argocd/
+│   │   ├── windmill/
+│   │   └── zot/
+│   └── cluster/
+│       ├── cilium/
+│       ├── longhorn/
+│       ├── security/
+│       └── tailscale/
 ├── ops-backoffice-tools/
 │   ├── apps/
 │   │   ├── appsmith/
@@ -45,9 +59,10 @@ k3s/
 
 ### Droplets
 
-| Cluster | Name Pattern             | Count | Specs              | Tags           |
-| ------- | ------------------------ | ----- | ------------------ | -------------- |
-| tools   | ops-vm-tools-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | k3s, tools_k3s |
+| Cluster        | Name Pattern                | Count | Specs              | Tags                |
+| -------------- | --------------------------- | ----- | ------------------ | ------------------- |
+| tools          | ops-vm-tools-k3s-nyc3-0X    | 3     | 4 vCPU, 8GB, 160GB | k3s, tools_k3s      |
+| gxy-management | ops-vm-gxy-mgmt-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | k3s, \_gxy-mgmt-k3s |
 
 ### Load Balancer
 
@@ -62,13 +77,17 @@ k3s/
 ```bash
 cd ansible
 
-# Deploy cluster
+# Deploy tools cluster
 uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
   -e variable_host=tools_k3s
 
-# Longhorn storage
+# Longhorn storage (tools)
 uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
   -e variable_host=tools_k3s
+
+# Deploy gxy-management galaxy
+uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--galaxy.yml \
+  -e variable_host=gxy_mgmt_k3s
 ```
 
 ---
@@ -97,10 +116,11 @@ See `tailscale/README.md` (repo root) for device inventory.
 
 ## DNS (Cloudflare)
 
-| Record                    | Type | Value    |
-| ------------------------- | ---- | -------- |
-| appsmith.freecodecamp.net | A    | tools LB |
-| outline.freecodecamp.net  | A    | tools LB |
+| Record                    | Type | Value             |
+| ------------------------- | ---- | ----------------- |
+| appsmith.freecodecamp.net | A    | tools LB          |
+| outline.freecodecamp.net  | A    | tools LB          |
+| windmill.freecodecamp.net | A    | gxy-management LB |
 
 ---
 
@@ -142,11 +162,29 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 | Appsmith | 1        | 10Gi        | Embedded           |
 | Outline  | 1        | 10Gi + 10Gi | PostgreSQL sidecar |
 
+### gxy-management
+
+```
+Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → Windmill
+                                                            │
+Tailscale ──────────────────────────────────────────────────→├── ArgoCD
+                                                            └── Zot
+
+CNI: Cilium    Storage: Longhorn (2 replicas)    SSH/kubectl: Tailscale
+```
+
+| App      | Replicas            | Access         | Notes      |
+| -------- | ------------------- | -------------- | ---------- |
+| Windmill | 1 server, 2 workers | Public (HTTPS) |            |
+| ArgoCD   | 1 (single replica)  | Tailscale-only |            |
+| Zot      | 1 (single replica)  | Tailscale-only | S3 backend |
+
 ---
 
 ## Playbooks Reference
 
-| Playbook               | Purpose                  |
-| ---------------------- | ------------------------ |
-| play-k3s--cluster.yml  | Deploy k3s HA cluster    |
-| play-k3s--longhorn.yml | Install Longhorn storage |
+| Playbook               | Purpose                                               |
+| ---------------------- | ----------------------------------------------------- |
+| play-k3s--cluster.yml  | Deploy k3s HA cluster                                 |
+| play-k3s--longhorn.yml | Install Longhorn storage                              |
+| play-k3s--galaxy.yml   | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |

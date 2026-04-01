@@ -1,0 +1,66 @@
+---
+- name: Validate required Cilium variables
+  ansible.builtin.assert:
+    that:
+      - cilium_cluster_name | length > 0
+      - cilium_cluster_id | length > 0
+      - cilium_values_file | length > 0
+      - cilium_k8s_service_host | length > 0
+    fail_msg: >-
+      Required variables missing. Set cilium_cluster_name, cilium_cluster_id,
+      cilium_values_file, and cilium_k8s_service_host.
+
+- name: Copy Cilium values file to server
+  ansible.builtin.copy:
+    src: "{{ cilium_values_file }}"
+    dest: /tmp/cilium-values.yaml
+    mode: "0600"
+
+- name: Add Cilium Helm repo
+  kubernetes.core.helm_repository:
+    name: cilium
+    repo_url: https://helm.cilium.io/
+
+- name: Install Cilium
+  kubernetes.core.helm:
+    name: cilium
+    chart_ref: cilium/cilium
+    chart_version: "{{ cilium_version }}"
+    release_namespace: kube-system
+    update_repo_cache: true
+    values_files:
+      - /tmp/cilium-values.yaml
+    set_values:
+      - value: "k8sServiceHost={{ cilium_k8s_service_host }}"
+      - value: "k8sServicePort={{ cilium_k8s_service_port }}"
+    wait: true
+    timeout: "5m0s"
+
+- name: Clean up Cilium values file
+  ansible.builtin.file:
+    path: /tmp/cilium-values.yaml
+    state: absent
+
+- name: Wait for Cilium agent DaemonSet rollout
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status daemonset/cilium --timeout=180s
+  changed_when: false
+
+- name: Wait for Cilium operator Deployment rollout
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n kube-system rollout status
+      deployment/cilium-operator --timeout=180s
+  changed_when: false
+
+- name: Verify Cilium status
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n kube-system exec ds/cilium
+      -c cilium-agent -- cilium status --brief
+  register: cilium_status
+  changed_when: false
+
+- name: Display Cilium status
+  ansible.builtin.debug:
+    msg: "{{ cilium_status.stdout_lines }}"
