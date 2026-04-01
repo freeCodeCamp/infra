@@ -50,11 +50,16 @@ ansible/inventory/hosts
 *.env.*
 .envrc
 
+# Allow .envrc files (direnv config, not secrets)
+!.envrc
+!k3s/**/.envrc
 
-# Allow secrets/ directory (ansible-vault encrypted, safe in public repo)
-!secrets/**/.env
+# Allow secrets/ samples and docs (NOT encrypted .env files)
 !secrets/**/.env.sample
-!secrets/**/README.md
+!secrets/.gitignore
+!secrets/README.md
+
+
 
 .kubeconfig.yaml
 *.crt

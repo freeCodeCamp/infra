@@ -55,7 +55,7 @@ just deploy <cluster> <app>
 | Directory      | Purpose                                         |
 | -------------- | ----------------------------------------------- |
 | `global/`      | Shared tokens (Cloudflare, Linode)              |
-| `do-legacy/`   | Legacy DO team API token                        |
+| `do-primary/`  | Primary DO team API token                       |
 | `do-universe/` | Universe DO team API token + Spaces credentials |
 | `ansible/`     | Playbook runtime secrets (S3, Tailscale OAuth)  |
 | `appsmith/`    | Appsmith app secrets                            |

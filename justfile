@@ -11,6 +11,30 @@ default:
 # Secrets
 # ---------------------------------------------------------------------------
 
+# Bootstrap root .env (global tokens only — Cloudflare, Linode)
+[group('secrets')]
+secret-bootstrap:
+    #!/usr/bin/env bash
+    set -eu
+    SRC="secrets/global/.env"
+    [ -f "$SRC" ] || { echo "Error: $SRC not found. Get it from 1Password."; exit 1; }
+    {{ansible_vault}} decrypt --output .env {{vault_password}} "$SRC"
+    echo "Bootstrapped .env (global tokens)"
+    echo "Run: direnv allow"
+
+# Bootstrap a cluster .env (DO_API_TOKEN + KUBECONFIG)
+[group('secrets')]
+secret-bootstrap-cluster cluster team:
+    #!/usr/bin/env bash
+    set -eu
+    SRC="secrets/do-{{team}}/.env"
+    DEST="k3s/{{cluster}}/.env"
+    [ -f "$SRC" ] || { echo "Error: $SRC not found. Get it from 1Password."; exit 1; }
+    {{ansible_vault}} decrypt --output - {{vault_password}} "$SRC" > "$DEST"
+    echo "KUBECONFIG=.kubeconfig.yaml" >> "$DEST"
+    echo "Bootstrapped $DEST (team: {{team}})"
+    echo "Run: cd k3s/{{cluster}} && direnv allow"
+
 # Encrypt a secret
 [group('secrets')]
 secret-encrypt name:
