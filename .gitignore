@@ -50,6 +50,12 @@ ansible/inventory/hosts
 *.env.*
 .envrc
 
+
+# Allow secrets/ directory (ansible-vault encrypted, safe in public repo)
+!secrets/**/.env
+!secrets/**/.env.sample
+!secrets/**/README.md
+
 .kubeconfig.yaml
 *.crt
 *.key
