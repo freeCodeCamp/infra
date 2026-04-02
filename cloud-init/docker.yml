@@ -3,13 +3,13 @@ package_update: true
 package_upgrade: true
 package_reboot_if_required: true
 packages:
-  - unattended-upgrades
   - apt-transport-https
   - ca-certificates
   - curl
   - gnupg-agent
   - software-properties-common
   - lsb-release
+  - fail2ban
 users:
   - name: freecodecamp
     groups:
@@ -20,8 +20,27 @@ users:
     ssh_import_id:
       - gh:camperbot
       - raisedadead
+write_files:
+  - path: /etc/fail2ban/jail.local
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+    owner: root:root
+    permissions: "0644"
+  - path: /etc/ssh/sshd_config.d/99-hardening.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      AllowUsers freecodecamp
+    owner: root:root
+    permissions: "0644"
 runcmd:
-  # This will install docker on the virtual machine and add the freeCodeCamp user to docker usergroup
   - sudo mkdir -p /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor
     -o /etc/apt/keyrings/docker.gpg
@@ -35,4 +54,13 @@ runcmd:
   - sudo systemctl start docker
   - sudo systemctl enable docker
   - sudo usermod -aG docker freecodecamp
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+  # :-----------------------: WARNING :-----------------------:
+  #
+  #   This next line should be the last command in the list,
+  #   because it involves restarting the ssh service.
+  #
+  # :-----------------------: WARNING :-----------------------:
+  - systemctl restart ssh || systemctl restart sshd || true
 final_message: "Setup complete"
