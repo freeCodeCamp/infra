@@ -2,6 +2,7 @@ set shell := ["bash", "-cu"]
 
 ansible_vault := "uv run --project ansible ansible-vault"
 vault_password := "--vault-password-file <(op read \"op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password\")"
+crds_schema := 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 
 # Show available recipes
 default:
@@ -111,6 +112,28 @@ deploy cluster app:
     export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
     kubectl apply -k apps/{{app}}/manifests/base/
     echo "Deployed {{app}} to {{cluster}}"
+
+# Validate K8s manifests with kubeconform
+[group('k3s')]
+k8s-validate:
+    kubeconform \
+      -summary \
+      -output text \
+      -strict \
+      -ignore-missing-schemas \
+      -kubernetes-version 1.30.0 \
+      -schema-location default \
+      -schema-location '{{crds_schema}}' \
+      -ignore-filename-pattern 'kustomization\.yaml' \
+      -ignore-filename-pattern '\.kubeconfig\.yaml' \
+      -ignore-filename-pattern 'values\.yaml' \
+      -ignore-filename-pattern 'operator-values\.yaml' \
+      -ignore-filename-pattern 'pnpm-lock\.yaml' \
+      -ignore-filename-pattern 'pss-admission\.yaml' \
+      -ignore-filename-pattern 'audit-policy\.yaml' \
+      -ignore-filename-pattern '\.sample' \
+      -ignore-filename-pattern 'node_modules' \
+      k3s/ k8s/
 
 # ---------------------------------------------------------------------------
 # Ansible
