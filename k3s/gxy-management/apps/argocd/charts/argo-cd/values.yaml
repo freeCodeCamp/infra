@@ -1,6 +1,6 @@
 # Argo CD Helm values for gxy-management cluster
 # Chart: argo-cd (https://argoproj.github.io/argo-helm)
-# Non-HA, Tailscale-only access (no public ingress)
+# Non-HA, Cloudflare Access-gated (platform team only)
 
 # -- Single-replica (non-HA) deployment for 8GB nodes
 controller:
@@ -56,5 +56,5 @@ applicationSet:
 
 configs:
   params:
-    # TLS terminated at Tailscale level
+    # TLS terminated at Traefik (Cloudflare origin cert)
     "server.insecure": true

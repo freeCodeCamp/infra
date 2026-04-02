@@ -4,6 +4,8 @@ namespace: argocd
 
 resources:
   - namespace.yaml
+  - gateway.yaml
+  - httproutes.yaml
 
 secretGenerator:
   - name: argocd-secrets

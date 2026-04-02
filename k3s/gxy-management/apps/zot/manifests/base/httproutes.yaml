@@ -1,0 +1,75 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: secure-headers
+  namespace: zot
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: zot
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+
+---
+# HTTP to HTTPS redirect
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-redirect
+  namespace: zot
+spec:
+  parentRefs:
+    - name: zot-gateway
+      namespace: zot
+      sectionName: web
+  hostnames:
+    - registry.freecodecamp.net
+  rules:
+    - filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: redirect-https
+      backendRefs:
+        - name: zot
+          port: 5000
+
+---
+# Main Zot route
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-route
+  namespace: zot
+spec:
+  parentRefs:
+    - name: zot-gateway
+      namespace: zot
+      sectionName: websecure
+  hostnames:
+    - registry.freecodecamp.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: secure-headers
+      backendRefs:
+        - name: zot
+          port: 5000

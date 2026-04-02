@@ -59,10 +59,10 @@ k3s/
 
 ### Droplets
 
-| Cluster        | Name Pattern                | Count | Specs              | Tags                |
-| -------------- | --------------------------- | ----- | ------------------ | ------------------- |
-| tools          | ops-vm-tools-k3s-nyc3-0X    | 3     | 4 vCPU, 8GB, 160GB | k3s, tools_k3s      |
-| gxy-management | ops-vm-gxy-mgmt-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | k3s, \_gxy-mgmt-k3s |
+| Cluster        | Name Pattern                | Count | Specs               | Tags                |
+| -------------- | --------------------------- | ----- | ------------------- | ------------------- |
+| tools          | ops-vm-tools-k3s-nyc3-0X    | 3     | 4 vCPU, 8GB, 160GB  | k3s, tools_k3s      |
+| gxy-management | ops-vm-gxy-mgmt-k3s-fra1-0X | 3     | 8 vCPU, 16GB, 320GB | k3s, \_gxy-mgmt-k3s |
 
 ### Load Balancer
 
@@ -116,11 +116,13 @@ See `tailscale/README.md` (repo root) for device inventory.
 
 ## DNS (Cloudflare)
 
-| Record                    | Type | Value             |
-| ------------------------- | ---- | ----------------- |
-| appsmith.freecodecamp.net | A    | tools LB          |
-| outline.freecodecamp.net  | A    | tools LB          |
-| windmill.freecodecamp.net | A    | gxy-management LB |
+| Record                    | Type | Value                   |
+| ------------------------- | ---- | ----------------------- |
+| appsmith.freecodecamp.net | A    | tools LB                |
+| outline.freecodecamp.net  | A    | tools LB                |
+| windmill.freecodecamp.net | A    | gxy-management node IPs |
+| argocd.freecodecamp.net   | A    | gxy-management node IPs |
+| registry.freecodecamp.net | A    | gxy-management node IPs |
 
 ---
 
@@ -165,19 +167,20 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 ### gxy-management
 
 ```
-Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → Windmill
-                                                            │
-Tailscale ──────────────────────────────────────────────────→├── ArgoCD
-                                                            └── Zot
+Internet → Cloudflare → Node Public IPs → Traefik (ServiceLB) → Gateway API → Apps
+                (Access)                                               │
+                                                         ┌─────────────┼─────────────┐
+                                                         ↓             ↓             ↓
+                                                     Windmill       ArgoCD         Zot
 
-CNI: Cilium    Storage: Longhorn (2 replicas)    SSH/kubectl: Tailscale
+CNI: Cilium    Storage: local-path    SSH/kubectl: Tailscale
 ```
 
-| App      | Replicas            | Access         | Notes      |
-| -------- | ------------------- | -------------- | ---------- |
-| Windmill | 1 server, 2 workers | Public (HTTPS) |            |
-| ArgoCD   | 1 (single replica)  | Tailscale-only |            |
-| Zot      | 1 (single replica)  | Tailscale-only | S3 backend |
+| App      | Replicas            | Access            | Notes      |
+| -------- | ------------------- | ----------------- | ---------- |
+| Windmill | 1 server, 2 workers | Cloudflare Access |            |
+| ArgoCD   | 1 (single replica)  | Cloudflare Access |            |
+| Zot      | 1 (single replica)  | Cloudflare Access | S3 backend |
 
 ---
 

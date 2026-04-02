@@ -8,3 +8,4 @@
 apps/*/manifests/base/secrets/.secrets.env
 apps/*/manifests/base/secrets/tls.crt
 apps/*/manifests/base/secrets/tls.key
+apps/*/manifests/base/secrets/tls.yaml
