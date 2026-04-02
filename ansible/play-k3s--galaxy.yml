@@ -131,10 +131,10 @@
     k3s_version: "v1.34.5+k3s1"
     cluster_cidr: "10.1.0.0/16"
     service_cidr: "10.11.0.0/16"
-    etcd_s3_endpoint: "nyc3.digitaloceanspaces.com"
-    etcd_s3_bucket: "net.freecodecamp.ops-k3s-backups"
+    etcd_s3_endpoint: "fra1.digitaloceanspaces.com"
+    etcd_s3_bucket: "net.freecodecamp.universe-backups"
     etcd_s3_folder: "etcd/{{ galaxy_name }}"
-    etcd_s3_region: "nyc3"
+    etcd_s3_region: "fra1"
     etcd_snapshot_schedule: "0 */6 * * *"
     etcd_snapshot_retention: 20
     api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
@@ -146,7 +146,6 @@
       --flannel-backend=none
       --disable-network-policy
       --disable-kube-proxy
-      --disable=servicelb
       --secrets-encryption
       --protect-kernel-defaults
       --cluster-cidr={{ cluster_cidr }}
@@ -191,12 +190,13 @@
   gather_facts: false
   become: true
   vars:
+    galaxy_name: "gxy-management"
     gateway_api_version: "v1.5.1"
 
   tasks:
     - name: Apply Traefik HelmChartConfig
       copy:
-        src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
+        src: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/cluster/traefik-config.yaml"
         dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
         mode: "0600"
 

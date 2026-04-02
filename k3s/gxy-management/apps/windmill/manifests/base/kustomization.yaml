@@ -4,6 +4,8 @@ namespace: windmill
 
 resources:
   - namespace.yaml
+  - gateway.yaml
+  - httproutes.yaml
 
 secretGenerator:
   - name: windmill-secrets

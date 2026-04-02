@@ -1,7 +1,7 @@
 # Zot OCI Registry Helm values for gxy-management cluster
 # Chart: zot (https://github.com/project-zot/helm-charts)
 # Chart version: 0.1.104, Image: v2.1.15
-# Tailscale-only access (no public ingress)
+# Cloudflare Access-gated (platform team + Woodpecker CI)
 
 replicaCount: 1
 
@@ -14,7 +14,7 @@ service:
   type: ClusterIP
   port: 5000
 
-# No public ingress — Tailscale-only access via separate Service manifest
+# Routing managed via Gateway API (see manifests/base/gateway.yaml)
 ingress:
   enabled: false
 
@@ -27,9 +27,9 @@ configFiles:
         "rootDirectory": "/var/lib/registry",
         "storageDriver": {
           "name": "s3",
-          "regionendpoint": "https://nyc3.digitaloceanspaces.com",
-          "region": "nyc3",
-          "bucket": "CHANGEME",
+          "regionendpoint": "https://fra1.digitaloceanspaces.com",
+          "region": "fra1",
+          "bucket": "net.freecodecamp.universe-registry",
           "secure": true,
           "skipverify": false,
           "forcepathstyle": true
@@ -71,7 +71,7 @@ env:
         name: zot-secrets
         key: S3_SECRET_KEY
 
-# Longhorn PVC for local cache
+# Local PVC for registry cache
 persistence: true
 pvc:
   create: true

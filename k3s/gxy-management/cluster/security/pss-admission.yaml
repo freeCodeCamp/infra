@@ -3,7 +3,7 @@
 #
 # - baseline: enforced (blocks privileged containers, host networking, hostPath)
 # - restricted: audit + warn only (logs violations, does not block)
-# - System namespaces exempted (Rancher, cert-manager, Longhorn, Tailscale need elevated privileges)
+# - System namespaces exempted (Cilium, Windmill workers, and Tailscale need elevated privileges)
 apiVersion: apiserver.config.k8s.io/v1
 kind: AdmissionConfiguration
 plugins:
@@ -21,11 +21,6 @@ plugins:
       exemptions:
         namespaces:
           - kube-system
-          - cattle-system
-          - cattle-fleet-system
-          - cattle-fleet-local-system
-          - cattle-resources-system
-          - cattle-provisioning-capi-system
-          - cert-manager
-          - longhorn-system
+          - cilium
+          - windmill
           - tailscale
