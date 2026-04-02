@@ -133,6 +133,8 @@ k8s-validate:
       -ignore-filename-pattern 'audit-policy\.yaml' \
       -ignore-filename-pattern '\.sample' \
       -ignore-filename-pattern 'node_modules' \
+      -ignore-filename-pattern '\.json' \
+      -ignore-filename-pattern 'dashboards/' \
       k3s/ k8s/
 
 # ---------------------------------------------------------------------------
