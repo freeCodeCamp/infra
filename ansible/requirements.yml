@@ -8,6 +8,8 @@ collections:
     version: ">=1.27.0,<2.0.0"
   - name: ansible.posix
     version: ">=2.0.0,<3.0.0"
+  - name: kubernetes.core
+    version: ">=5.0.0,<7.0.0"
   - name: grafana.grafana
     version: ">=5.7.0,<6.0.0"
   - name: https://github.com/k3s-io/k3s-ansible.git

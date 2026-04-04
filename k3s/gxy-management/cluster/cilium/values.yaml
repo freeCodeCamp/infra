@@ -18,6 +18,9 @@ operator:
 
 hubble:
   enabled: true
+  tls:
+    auto:
+      method: cronJob
   relay:
     enabled: true
   ui:
