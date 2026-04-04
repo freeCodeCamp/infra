@@ -1,30 +1,20 @@
 ---
 # Deploy k3s HA galaxy cluster with Cilium CNI
 #
-# Provisions any Universe galaxy cluster. All nodes are control-plane (HA).
-# Uses Cilium as CNI (flannel/kube-proxy disabled). Tailscale on nodes for
-# SSH/kubectl access (NOT the K8s operator — ADR-009).
+# Generic playbook for any Universe galaxy. All galaxy-specific config
+# lives in inventory/group_vars/<group>.yml — not in this file.
 #
-# Prerequisites (manual, one-time per galaxy):
-#   - 3x Ubuntu VMs on DigitalOcean with VPC attached (eth1)
-#   - Tailscale installed and connected on all nodes (play-tailscale--*.yml)
+# Prerequisites:
+#   - VMs provisioned with VPC (eth1) and Tailscale connected
 #   - Env vars loaded via direnv (cd into cluster dir first)
-#   - Cluster config directory: k3s/<galaxy_name>/cluster/
+#   - Group vars populated for the target inventory group
 #
 # Usage:
-#   cd k3s/gxy-management   # direnv loads DO_API_TOKEN, DO_SPACES_*, etc.
-#   just play k3s--galaxy gxy_mgmt_k3s
-#
-# What this playbook does (6 plays):
-#   1. Validate prerequisites (VPC, Tailscale, vault secrets)
-#   2. Prepare system (k3s prerequisites + security configs)
-#   3. Deploy k3s server (Cilium flags, etcd S3 backups, security hardening)
-#   4. Configure ingress (Traefik + Gateway API CRDs)
-#   5. Install Cilium CNI
-#   6. Fetch kubeconfig (copy to local machine, replace server IP with Tailscale IP)
+#   cd k3s/<galaxy>
+#   just play k3s--galaxy <inventory_group>
 
 # Play 1: Validate prerequisites
-- name: "K3s {{ galaxy_name | default('galaxy') }} - Validate prerequisites"
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Validate prerequisites"
   hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
@@ -33,19 +23,28 @@
     do_spaces_secret_key: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
 
   tasks:
-    - name: Validate galaxy_name is provided
+    - name: Validate required group_vars are set
       assert:
         that:
-          - galaxy_name is defined
-          - galaxy_name | length > 0
-        fail_msg: "galaxy_name not set. Pass via: -e galaxy_name=gxy-management"
+          - galaxy_name is defined and galaxy_name | length > 0
+          - k3s_version is defined and k3s_version | length > 0
+          - cluster_cidr is defined and cluster_cidr | length > 0
+          - service_cidr is defined and service_cidr | length > 0
+          - cilium_cluster_id is defined and cilium_cluster_id | string | length > 0
+          - gateway_api_version is defined and gateway_api_version | length > 0
+          - etcd_s3_endpoint is defined and etcd_s3_endpoint | length > 0
+          - etcd_s3_bucket is defined and etcd_s3_bucket | length > 0
+          - etcd_s3_region is defined and etcd_s3_region | length > 0
+          - etcd_snapshot_schedule is defined and etcd_snapshot_schedule | length > 0
+          - etcd_snapshot_retention is defined
+        fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
-    - name: Validate env vars loaded (cd into cluster dir for direnv)
+    - name: Validate env vars loaded
       assert:
         that:
           - do_spaces_access_key | length > 0
           - do_spaces_secret_key | length > 0
-        fail_msg: "DO_SPACES_ACCESS_KEY/SECRET_KEY not set. cd into cluster dir first (direnv loads them)."
+        fail_msg: "DO_SPACES_ACCESS_KEY/SECRET_KEY not set. cd into cluster dir first."
 
     - name: Validate VPC interface exists (eth1)
       assert:
@@ -53,15 +52,7 @@
           - ansible_eth1 is defined
           - ansible_eth1.ipv4 is defined
           - ansible_eth1.ipv4.address is defined
-        fail_msg: "VPC interface eth1 not found. Ensure VM is attached to DO VPC."
-
-    - name: Validate Tailscale is connected
-      assert:
-        that:
-          - ansible_tailscale0 is defined
-          - ansible_tailscale0.ipv4 is defined
-          - ansible_tailscale0.ipv4.address is defined
-        fail_msg: "Tailscale interface not found. Ensure Tailscale is installed and connected."
+        fail_msg: "VPC interface eth1 not found."
 
     - name: Validate VPC IP is in expected range
       assert:
@@ -69,25 +60,35 @@
           - ansible_eth1.ipv4.address | regex_search('^10\.')
         fail_msg: "VPC IP {{ ansible_eth1.ipv4.address }} not in 10.x.x.x range."
 
+    - name: Validate Tailscale is connected
+      assert:
+        that:
+          - ansible_tailscale0 is defined
+          - ansible_tailscale0.ipv4 is defined
+          - ansible_tailscale0.ipv4.address is defined
+        fail_msg: "Tailscale not connected."
+
     - name: Set network facts
       set_fact:
         vpc_ip: "{{ ansible_eth1.ipv4.address }}"
         tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
 
-    - name: Display network configuration
+    - name: Display configuration
       debug:
-        msg: "{{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }}"
+        msg: >-
+          {{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }},
+          galaxy={{ galaxy_name }}, k3s={{ k3s_version }},
+          pods={{ cluster_cidr }}, svc={{ service_cidr }}
 
-    - name: Build k3s_cluster group
+    - name: Build dynamic groups
       group_by:
-        key: k3s_cluster
-
-    - name: Build server group
-      group_by:
-        key: server
+        key: "{{ item }}"
+      loop:
+        - k3s_cluster
+        - server
 
 # Play 2: System prerequisites
-- name: "K3s {{ galaxy_name | default('galaxy') }} - System prerequisites"
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - System prerequisites"
   hosts: k3s_cluster
   gather_facts: true
   become: true
@@ -95,7 +96,7 @@
     cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
 
   pre_tasks:
-    - name: Set kubelet kernel parameters (required for --protect-kernel-defaults)
+    - name: Set kubelet kernel parameters (CIS hardening)
       ansible.posix.sysctl:
         name: "{{ item.key }}"
         value: "{{ item.value }}"
@@ -112,8 +113,6 @@
         path: /etc/rancher/k3s
         state: directory
         mode: "0755"
-        owner: root
-        group: root
 
     - name: Copy PSS admission config
       copy:
@@ -131,22 +130,13 @@
     - role: k3s.orchestration.prereq
 
 # Play 3: Deploy k3s server
-- name: "K3s {{ galaxy_name | default('galaxy') }} - Deploy k3s server"
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Deploy k3s server"
   hosts: server
   gather_facts: true
   become: true
   vars:
     do_spaces_access_key: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
     do_spaces_secret_key: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
-    k3s_version: "v1.34.5+k3s1"
-    cluster_cidr: "10.1.0.0/16"
-    service_cidr: "10.11.0.0/16"
-    etcd_s3_endpoint: "fra1.digitaloceanspaces.com"
-    etcd_s3_bucket: "net.freecodecamp.universe-backups"
-    etcd_s3_folder: "etcd/{{ galaxy_name }}"
-    etcd_s3_region: "fra1"
-    etcd_snapshot_schedule: "0 */6 * * *"
-    etcd_snapshot_retention: 20
     api_endpoint: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
     extra_server_args: >-
       --node-ip={{ hostvars[inventory_hostname]['vpc_ip'] }}
@@ -166,41 +156,40 @@
       --etcd-s3
       --etcd-s3-endpoint={{ etcd_s3_endpoint }}
       --etcd-s3-bucket={{ etcd_s3_bucket }}
-      --etcd-s3-folder={{ etcd_s3_folder }}
+      --etcd-s3-folder=etcd/{{ galaxy_name }}
       --etcd-s3-region={{ etcd_s3_region }}
+      # Cron string MUST be double-quoted — systemd word-splits without them
       --etcd-snapshot-schedule-cron="{{ etcd_snapshot_schedule }}"
       --etcd-snapshot-retention={{ etcd_snapshot_retention }}
     server_group: server
+
   pre_tasks:
-    - name: Create k3s audit log directory
+    - name: Create audit log directory
       file:
         path: /var/log/k3s
         state: directory
         mode: "0750"
-        owner: root
-        group: root
 
-    - name: Write k3s service environment (S3 credentials)
-      copy:
-        content: |
-          AWS_ACCESS_KEY_ID={{ do_spaces_access_key }}
-          AWS_SECRET_ACCESS_KEY={{ do_spaces_secret_key }}
-        dest: /etc/systemd/system/k3s.service.env
+    - name: Write S3 credentials to service environment
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system/k3s.service.env
+        regexp: "^{{ item.key }}="
+        line: "{{ item.key }}={{ item.value }}"
+        create: true
         mode: "0600"
-        owner: root
-        group: root
+      loop:
+        - { key: AWS_ACCESS_KEY_ID, value: "{{ do_spaces_access_key }}" }
+        - { key: AWS_SECRET_ACCESS_KEY, value: "{{ do_spaces_secret_key }}" }
       no_log: true
 
   roles:
     - role: k3s.orchestration.k3s_server
 
 # Play 4: Configure ingress
-- name: "K3s {{ galaxy_name | default('galaxy') }} - Configure ingress"
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Configure ingress"
   hosts: server[0]
   gather_facts: false
   become: true
-  vars:
-    gateway_api_version: "v1.5.1"
 
   tasks:
     - name: Apply Traefik HelmChartConfig
@@ -230,12 +219,11 @@
         msg: "{{ cluster_status.stdout_lines }}"
 
 # Play 5: Install Cilium
-- name: "K3s {{ galaxy_name | default('galaxy') }} - Install Cilium"
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Install Cilium"
   hosts: server[0]
   gather_facts: false
   become: true
   vars:
-    cilium_cluster_id: 1
     cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
   roles:
     - role: cilium
@@ -245,7 +233,7 @@
         cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
 
 # Play 6: Fetch kubeconfig
-- name: "K3s {{ galaxy_name | default('galaxy') }} - Fetch kubeconfig"
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Fetch kubeconfig"
   hosts: server[0]
   gather_facts: false
   become: true
@@ -280,9 +268,4 @@
         msg:
           - "=== {{ galaxy_name }} cluster ready ==="
           - "Kubeconfig: k3s/{{ galaxy_name }}/.kubeconfig.yaml"
-          - "Nodes: {{ kubectl_result.stdout }}"
-          - ""
-          - "Next steps:"
-          - "  1. Verify Cilium: kubectl exec -n kube-system ds/cilium -c cilium-agent -- cilium status"
-          - "  2. Verify etcd snapshots: ssh root@<node> k3s etcd-snapshot list"
-          - "  3. Deploy apps: kubectl apply -k k3s/{{ galaxy_name }}/apps/<app>/manifests/base/"
+          - "{{ kubectl_result.stdout }}"

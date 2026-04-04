@@ -191,13 +191,13 @@ Deploy sequentially. Verify each before moving to the next.
 
 ### Phase A: Bootstrap Cluster
 
-| #   | Task                          | Status | Command / Notes                                            |
-| --- | ----------------------------- | ------ | ---------------------------------------------------------- |
-| A1  | Populate Windmill secrets     | TODO   | Create `windmill.values.yaml.enc` (PG password, DB URL)    |
-| A2  | Populate Windmill app secrets | TODO   | Create `windmill.secrets.env.enc` (admin email + password) |
-| A3  | Run K3s galaxy playbook       | TODO   | `just play k3s--galaxy gxy_mgmt_k3s` (from cluster dir)    |
-| A4  | Verify cluster health         | TODO   | 3 nodes Ready, Cilium green, Traefik running, Gateway CRDs |
-| A5  | Encrypt kubeconfig            | TODO   | sops encrypt to infra-secrets                              |
+| #   | Task                            | Status | Command / Notes                                                      |
+| --- | ------------------------------- | ------ | -------------------------------------------------------------------- |
+| A1  | Populate Windmill secrets       | DONE   | `windmill.values.yaml.enc` + `windmill.secrets.env.enc`              |
+| A2  | Refactor playbook to group_vars | BLOCK  | Playbook has hardcoded values — needs proper Ansible design          |
+| A3  | Run K3s galaxy playbook         | BLOCK  | Failed: missing CIS sysctls (sysctl fix added, needs rerun after A2) |
+| A4  | Verify cluster health           | TODO   | 3 nodes Ready, Cilium green, Traefik running, Gateway CRDs           |
+| A5  | Encrypt kubeconfig              | TODO   | sops encrypt to infra-secrets                                        |
 
 ### Phase B: Windmill (Day 0 Deliverable)
 
@@ -281,18 +281,29 @@ e72beb5 feat(k3s): add ops-mgmt cluster configs and tooling
 
 ## Errors and Fixes (for Future Reference)
 
-| Issue                                                | Root Cause                                | Fix                                                       |
-| ---------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
-| cloud-init heredoc syntax error                      | runcmd `\|` strings don't support heredoc | Moved to write_files section                              |
-| `systemctl restart sshd` fails on Ubuntu 24.04       | Service renamed to `ssh.service`          | `ssh \|\| sshd \|\| true` fallback                        |
-| SSH hardening sed had no effect                      | Ubuntu 24.04 ships commented defaults     | Drop-in file at sshd_config.d/99-hardening.conf           |
-| sops `path_regex: .*\.enc$` didn't match input files | Regex matches input path, not output      | Changed to `.*` (match all)                               |
-| sops `dotenv` format failed on YAML file             | ansible vars are YAML, not dotenv         | Renamed to `.yaml.enc`, format detection in verify recipe |
-| direnv `$(dirname "$0")` empty                       | Not available in direnv context           | Use `expand_path ../infra-secrets`                        |
+| Issue                                                 | Root Cause                                                                     | Fix                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| cloud-init heredoc syntax error                       | runcmd `\|` strings don't support heredoc                                      | Moved to write_files section                              |
+| `systemctl restart sshd` fails on Ubuntu 24.04        | Service renamed to `ssh.service`                                               | `ssh \|\| sshd \|\| true` fallback                        |
+| SSH hardening sed had no effect                       | Ubuntu 24.04 ships commented defaults                                          | Drop-in file at sshd_config.d/99-hardening.conf           |
+| sops `path_regex: .*\.enc$` didn't match input files  | Regex matches input path, not output                                           | Changed to `.*` (match all)                               |
+| sops `dotenv` format failed on YAML file              | ansible vars are YAML, not dotenv                                              | Renamed to `.yaml.enc`, format detection in verify recipe |
+| direnv `$(dirname "$0")` empty                        | Not available in direnv context                                                | Use `expand_path ../infra-secrets`                        |
+| k3s fails: `invalid kernel flag vm/overcommit_memory` | `--protect-kernel-defaults` requires CIS sysctls, prereq role doesn't set them | Add sysctl pre_task (90-kubelet.conf) before k3s starts   |
+| Ansible `galaxy_name` recursive template loop         | `vars: galaxy_name: "{{ galaxy_name \| default(...) }}"` self-references       | Remove from vars, pass via `-e`, add assert validation    |
+| Galaxy playbook hardcodes all environment values      | CIDRs, versions, bucket names, Cilium ID in playbook not group_vars            | **BLOCKING** — refactor to group_vars before re-run       |
 
 ## Open Questions
 
-- **Helm chart versions**: Need to verify latest stable for ArgoCD, Windmill, Zot before install
+- **Playbook refactor**: Move all galaxy-specific config to `inventory/group_vars/<group>.yml`. Playbook must be generic.
+- **Helm chart versions**: Pin versions — Windmill 4.0.124, ArgoCD 9.4.17, Zot 0.1.104
 - **Cloudflare Access policies**: Exact group/email configuration TBD
-- **Windmill DB**: Using embedded SQLite or external PostgreSQL? (ADR-008 says CNPG later)
-- **TLS for gxy-management apps**: Need to create Cloudflare origin cert for \*.freecodecamp.net
+- **Windmill DB**: Embedded PostgreSQL for Day 0 (ADR-008: CNPG later)
+
+## Lessons Learned
+
+1. **Use tool primitives.** Ansible has group_vars, roles, templates — use them. Don't write shell scripts disguised as YAML.
+2. **Research before coding.** The `--protect-kernel-defaults` failure was predictable from the k3s hardening guide. Read the docs first.
+3. **The spike IS production.** No shortcuts, no "fix later." Every line of code must be production-quality.
+4. **Aggressive review.** Every change gets independent hostile review before presenting. The review that caught 3 CRITICALs was correct — but more should have been caught at design time.
+5. **Validate before suggesting.** Never tell the operator to "try it" without dry-run, syntax check, or verified expansion.
