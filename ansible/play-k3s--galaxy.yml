@@ -16,7 +16,7 @@
 #   just play k3s--galaxy <inventory_group>
 
 # Play 1: Validate prerequisites
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Validate prerequisites"
+- name: "K3s {{ variable_host }} - Validate prerequisites"
   hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
@@ -90,7 +90,7 @@
         - server
 
 # Play 2: System prerequisites
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - System prerequisites"
+- name: "K3s {{ variable_host }} - System prerequisites"
   hosts: k3s_cluster
   gather_facts: true
   become: true
@@ -132,7 +132,7 @@
     - role: k3s.orchestration.prereq
 
 # Play 3: Deploy k3s server
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Deploy k3s server"
+- name: "K3s {{ variable_host }} - Deploy k3s server"
   hosts: server
   gather_facts: true
   become: true
@@ -188,7 +188,7 @@
     - role: k3s.orchestration.k3s_server
 
 # Play 4: Configure ingress
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Configure ingress"
+- name: "K3s {{ variable_host }} - Configure ingress"
   hosts: server[0]
   gather_facts: false
   become: true
@@ -208,7 +208,7 @@
       changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
 
 # Play 5: Install Cilium (must run before nodes can be Ready)
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Install Cilium"
+- name: "K3s {{ variable_host }} - Install Cilium"
   hosts: server[0]
   gather_facts: false
   become: true
@@ -222,7 +222,7 @@
         cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
 
 # Play 6: Wait for cluster ready (after Cilium provides the CNI)
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Verify cluster"
+- name: "K3s {{ variable_host }} - Verify cluster"
   hosts: server[0]
   gather_facts: false
   become: true
@@ -242,7 +242,7 @@
         msg: "{{ cluster_status.stdout_lines }}"
 
 # Play 7: Fetch kubeconfig
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Fetch kubeconfig"
+- name: "K3s {{ variable_host }} - Fetch kubeconfig"
   hosts: server[0]
   gather_facts: false
   become: true
