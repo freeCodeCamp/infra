@@ -101,6 +101,18 @@ galaxy-play galaxy_name host:
       -e variable_host={{host}} \
       -e galaxy_name={{galaxy_name}}
 
+# Install Tailscale on hosts
+[group('ansible')]
+tailscale-install host inventory="digitalocean.yml":
+    cd ansible && uv run ansible-playbook -i inventory/{{inventory}} play-tailscale--0-install.yml \
+      -e variable_host={{host}}
+
+# Connect hosts to Tailscale network (with SSH)
+[group('ansible')]
+tailscale-up host inventory="digitalocean.yml":
+    cd ansible && uv run ansible-playbook -i inventory/{{inventory}} play-tailscale--1b-up-with-ssh.yml \
+      -e variable_host={{host}}
+
 # Install ansible and dependencies
 [group('ansible')]
 ansible-install:
