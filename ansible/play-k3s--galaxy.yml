@@ -29,7 +29,7 @@
   gather_facts: true
   become: true
   vars:
-    galaxy_name: "gxy-management"
+    galaxy_name: "{{ galaxy_name | default('gxy-management') }}"
     do_spaces_access_key: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
     do_spaces_secret_key: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
 
@@ -86,7 +86,7 @@
   gather_facts: true
   become: true
   vars:
-    galaxy_name: "gxy-management"
+    galaxy_name: "{{ galaxy_name | default('gxy-management') }}"
     cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
 
   pre_tasks:
@@ -119,7 +119,7 @@
   gather_facts: true
   become: true
   vars:
-    galaxy_name: "gxy-management"
+    galaxy_name: "{{ galaxy_name | default('gxy-management') }}"
     do_spaces_access_key: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
     do_spaces_secret_key: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
     k3s_version: "v1.34.5+k3s1"
@@ -152,7 +152,7 @@
       --etcd-s3-bucket={{ etcd_s3_bucket }}
       --etcd-s3-folder={{ etcd_s3_folder }}
       --etcd-s3-region={{ etcd_s3_region }}
-      --etcd-snapshot-schedule-cron={{ etcd_snapshot_schedule }}
+      --etcd-snapshot-schedule-cron="{{ etcd_snapshot_schedule }}"
       --etcd-snapshot-retention={{ etcd_snapshot_retention }}
     server_group: server
   pre_tasks:
@@ -184,7 +184,7 @@
   gather_facts: false
   become: true
   vars:
-    galaxy_name: "gxy-management"
+    galaxy_name: "{{ galaxy_name | default('gxy-management') }}"
     gateway_api_version: "v1.5.1"
 
   tasks:
@@ -220,7 +220,7 @@
   gather_facts: false
   become: true
   vars:
-    galaxy_name: "gxy-management"
+    galaxy_name: "{{ galaxy_name | default('gxy-management') }}"
     cilium_cluster_id: 1
     cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
   roles:
@@ -236,7 +236,7 @@
   gather_facts: false
   become: true
   vars:
-    galaxy_name: "gxy-management"
+    galaxy_name: "{{ galaxy_name | default('gxy-management') }}"
     cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
 
   tasks:

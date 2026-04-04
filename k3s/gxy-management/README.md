@@ -61,7 +61,7 @@ just helm-upgrade gxy-management windmill
 just helm-upgrade gxy-management zot
 ```
 
-Release names match the app directory names. The recipe reads the chart repo URL from `charts/<chart>/repo.txt` and the values from `charts/<chart>/values.yaml`.
+Release names match the app directory names. The recipe reads the chart repo URL from `charts/<chart>/repo` and the values from `charts/<chart>/values.yaml`.
 
 ### App Secrets and Manifests
 

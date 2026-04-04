@@ -31,9 +31,7 @@ k3s/
 │   │   └── zot/
 │   └── cluster/
 │       ├── cilium/
-│       ├── longhorn/
-│       ├── security/
-│       └── tailscale/
+│       └── security/
 ├── ops-backoffice-tools/
 │   ├── apps/
 │   │   ├── appsmith/

@@ -1,9 +1,10 @@
 # Pod Security Standards admission configuration
-# Copied to /var/lib/rancher/k3s/server/pss.yaml by Ansible
+# Copied to /etc/rancher/k3s/pss-admission.yaml by Ansible
 #
 # - baseline: enforced (blocks privileged containers, host networking, hostPath)
 # - restricted: audit + warn only (logs violations, does not block)
-# - System namespaces exempted (Cilium, Windmill workers, and Tailscale need elevated privileges)
+# - System namespaces exempted (Windmill workers and Tailscale need elevated privileges;
+#   Cilium installs into kube-system which is already exempted)
 apiVersion: apiserver.config.k8s.io/v1
 kind: AdmissionConfiguration
 plugins:
@@ -21,6 +22,5 @@ plugins:
       exemptions:
         namespaces:
           - kube-system
-          - cilium
           - windmill
           - tailscale

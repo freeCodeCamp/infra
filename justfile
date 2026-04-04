@@ -55,6 +55,7 @@ kubeconfig-sync cluster:
     SRC="{{secrets_dir}}/k3s/{{cluster}}/kubeconfig.yaml.enc"
     DST="k3s/{{cluster}}/.kubeconfig.yaml"
     [ -f "$SRC" ] || { echo "Error: $SRC not found (cluster not yet bootstrapped?)"; exit 1; }
+    umask 077
     sops -d --input-type yaml --output-type yaml "$SRC" > "$DST"
     chmod 600 "$DST"
     echo "Synced kubeconfig → $DST"
@@ -71,18 +72,20 @@ deploy cluster app:
     if [ -f "$ENC_DIR/{{app}}.secrets.env.enc" ]; then
       sops -d --input-type dotenv --output-type dotenv "$ENC_DIR/{{app}}.secrets.env.enc" > "$APP_SECRETS/.secrets.env"
       CLEANUP="$APP_SECRETS/.secrets.env"
+      trap "rm -f $CLEANUP" EXIT
     fi
     if [ -f "$ENC_DIR/{{app}}.tls.crt.enc" ]; then
       sops -d "$ENC_DIR/{{app}}.tls.crt.enc" > "$APP_SECRETS/tls.crt"
       CLEANUP="$CLEANUP $APP_SECRETS/tls.crt"
+      trap "rm -f $CLEANUP" EXIT
     fi
     if [ -f "$ENC_DIR/{{app}}.tls.key.enc" ]; then
       sops -d "$ENC_DIR/{{app}}.tls.key.enc" > "$APP_SECRETS/tls.key"
       CLEANUP="$CLEANUP $APP_SECRETS/tls.key"
+      trap "rm -f $CLEANUP" EXIT
     fi
 
     [ -n "$CLEANUP" ] || { echo "Error: no secrets found for {{app}} in $ENC_DIR"; exit 1; }
-    trap "rm -f $CLEANUP" EXIT
 
     cd k3s/{{cluster}}
     export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
@@ -168,15 +171,6 @@ tf cmd workspace="all":
       [ -d "$ws" ] || { echo "Error: $ws not found"; exit 1; }
       terraform -chdir=$ws {{cmd}}
     fi
-
-# Format all terraform files
-[group('terraform')]
-tf-fmt:
-    #!/usr/bin/env bash
-    set -eu
-    for ws in $(find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort); do
-      terraform -chdir=$ws fmt
-    done
 
 # List terraform workspaces
 [group('terraform')]

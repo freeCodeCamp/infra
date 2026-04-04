@@ -21,27 +21,21 @@ kubectl get nodes
 Everything is managed by a single Ansible playbook (8 plays):
 
 ```bash
-cd ansible/
-ansible-playbook -i inventory/digitalocean.yml play-k3s--ops-mgmt.yml \
-  -e variable_host=mgmt_k3s \
-  --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+just play k3s--ops-mgmt mgmt_k3s
 ```
 
 The playbook handles: k3s install, security hardening (secrets-encryption, PSS, audit logging),
 cert-manager, Rancher, rancher-backup + schedule, Tailscale operator + Connector,
 kubeconfig fetch, and DO firewall lockdown.
 
-Prerequisites: VM provisioned with Tailscale installed, Ansible Vault populated.
+Prerequisites: VM provisioned with Tailscale installed, secrets populated in infra-secrets repo.
 
 ## Re-runs
 
 After first run, the DO firewall restricts SSH to Tailscale only. Re-run via Tailscale IP:
 
 ```bash
-ansible-playbook -i inventory/digitalocean.yml play-k3s--ops-mgmt.yml \
-  -e variable_host=mgmt_k3s \
-  -e ansible_host=<tailscale_ip> \
-  --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+just play k3s--ops-mgmt mgmt_k3s -e ansible_host=<tailscale_ip>
 ```
 
 ## Disaster Recovery

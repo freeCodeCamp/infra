@@ -14,3 +14,10 @@ secretGenerator:
       - secrets/.secrets.env
     options:
       disableNameSuffixHash: true
+  - name: zot-tls-cloudflare
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=secrets/tls.crt
+      - tls.key=secrets/tls.key
+    options:
+      disableNameSuffixHash: true

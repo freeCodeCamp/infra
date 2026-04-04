@@ -48,15 +48,6 @@ ansible/inventory/hosts
 # Secrets
 *.env
 *.env.*
-.envrc
-
-# Allow .envrc files (direnv config, not secrets)
-!.envrc
-!k3s/**/.envrc
-
-# Secrets live in the private infra-secrets repo (sibling clone)
-
-
 
 .kubeconfig.yaml
 *.crt
