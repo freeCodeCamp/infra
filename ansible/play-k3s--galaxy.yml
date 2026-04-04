@@ -4,6 +4,8 @@
 # Generic playbook for any Universe galaxy. All galaxy-specific config
 # lives in inventory/group_vars/<group>.yml — not in this file.
 #
+# Plays: validate → sysctl + prereqs → k3s server → traefik + gateway CRDs → cilium → verify → fetch kubeconfig
+#
 # Prerequisites:
 #   - VMs provisioned with VPC (eth1) and Tailscale connected
 #   - Env vars loaded via direnv (cd into cluster dir first)
@@ -205,20 +207,7 @@
       register: gateway_result
       changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
 
-    - name: Wait for all nodes ready
-      command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
-      changed_when: false
-
-    - name: Display cluster status
-      command: k3s kubectl get nodes -o wide
-      register: cluster_status
-      changed_when: false
-
-    - name: Cluster ready
-      debug:
-        msg: "{{ cluster_status.stdout_lines }}"
-
-# Play 5: Install Cilium
+# Play 5: Install Cilium (must run before nodes can be Ready)
 - name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Install Cilium"
   hosts: server[0]
   gather_facts: false
@@ -232,7 +221,27 @@
         cilium_values_file: "{{ cluster_config_dir }}/cluster/cilium/values.yaml"
         cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
 
-# Play 6: Fetch kubeconfig
+# Play 6: Wait for cluster ready (after Cilium provides the CNI)
+- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Verify cluster"
+  hosts: server[0]
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Wait for all nodes ready
+      command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      changed_when: false
+
+    - name: Display cluster status
+      command: k3s kubectl get nodes -o wide
+      register: cluster_status
+      changed_when: false
+
+    - name: Cluster ready
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"
+
+# Play 7: Fetch kubeconfig
 - name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Fetch kubeconfig"
   hosts: server[0]
   gather_facts: false
