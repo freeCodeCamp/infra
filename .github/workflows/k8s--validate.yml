@@ -32,4 +32,4 @@ jobs:
           kubeconform -v
 
       - name: Validate K8s manifests
-        run: just k8s-validate
+        run: just k8s-validate 1.32.0

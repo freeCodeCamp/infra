@@ -1,5 +1,5 @@
 # Pod Security Standards admission configuration
-# Copied to /var/lib/rancher/k3s/server/pss.yaml by Ansible
+# Copied to /etc/rancher/k3s/pss-admission.yaml by Ansible
 #
 # - baseline: enforced (blocks privileged containers, host networking, hostPath)
 # - restricted: audit + warn only (logs violations, does not block)

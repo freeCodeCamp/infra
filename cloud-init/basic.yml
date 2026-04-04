@@ -17,7 +17,7 @@ users:
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_import_id:
       - gh:camperbot
-      - raisedadead
+      - gh:raisedadead
 write_files:
   - path: /etc/fail2ban/jail.local
     content: |

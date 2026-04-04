@@ -1,5 +1,5 @@
 # Kubernetes API audit policy
-# Copied to /var/lib/rancher/k3s/server/audit-policy.yaml by Ansible
+# Copied to /etc/rancher/k3s/audit-policy.yaml by Ansible
 #
 # Phase 1: minimal — log secret access and anonymous requests only
 # Phase 2: expand to full request/response logging for sensitive resources

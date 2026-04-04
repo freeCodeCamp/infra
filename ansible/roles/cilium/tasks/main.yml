@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - cilium_cluster_name | length > 0
-      - cilium_cluster_id | length > 0
+      - cilium_cluster_id | string | length > 0
       - cilium_values_file | length > 0
       - cilium_k8s_service_host | length > 0
     fail_msg: >-
@@ -15,6 +15,12 @@
     src: "{{ cilium_values_file }}"
     dest: /tmp/cilium-values.yaml
     mode: "0600"
+
+- name: Install Helm
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    executable: /bin/bash
+    creates: /usr/local/bin/helm
 
 - name: Add Cilium Helm repo
   kubernetes.core.helm_repository:

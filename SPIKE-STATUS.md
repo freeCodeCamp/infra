@@ -78,10 +78,8 @@ global/.env.enc ──── direnv ───────────→  env: L
                                                HCP_CLIENT_ID, CLOUDFLARE_*, GRAFANA_*
 
 do-primary/.env.enc ── direnv ─────────→  env: DO_API_TOKEN (ops-backoffice-tools)
-do-universe/.env.enc ── direnv ────────→  env: DO_API_TOKEN (gxy-management)
-
-ansible/vault-k3s.yaml.enc
-  └── just galaxy-play ── sops -d ────→  ansible/vars/vault-k3s.yml (temp, deleted after)
+do-universe/.env.enc ── direnv ────────→  env: DO_API_TOKEN, DO_SPACES_ACCESS_KEY,
+                                               DO_SPACES_SECRET_KEY (gxy-management)
 
 k3s/<cluster>/kubeconfig.yaml.enc
   └── just kubeconfig-sync ── sops -d →  k3s/<cluster>/.kubeconfig.yaml (persists)
@@ -143,19 +141,20 @@ scratchpad/                     — dev.env.enc, org.env.enc, sample.env.enc
 
 ## justfile Recipes
 
-| Recipe                                 | Purpose                             | Requires                          |
-| -------------------------------------- | ----------------------------------- | --------------------------------- |
-| `just secret-verify-all`               | Verify all secrets decrypt          | age key                           |
-| `just secret-view <name>`              | View a secret                       | age key                           |
-| `just secret-edit <name>`              | Edit a secret in $EDITOR            | age key                           |
-| `just kubeconfig-sync <cluster>`       | Decrypt kubeconfig (run once)       | age key                           |
-| `just tailscale-install <host> [inv]`  | Install Tailscale on hosts          | DO_API_TOKEN via direnv           |
-| `just tailscale-up <host> [inv]`       | Connect hosts to Tailscale          | DO_API_TOKEN + TAILSCALE_AUTH_KEY |
-| `just galaxy-play <name> <host> [inv]` | Bootstrap k3s cluster               | DO_API_TOKEN + vault vars         |
-| `just deploy <cluster> <app>`          | Deploy app to cluster               | KUBECONFIG via direnv             |
-| `just k8s-validate`                    | Validate manifests with kubeconform | —                                 |
-| `just ansible-install`                 | Install ansible + dependencies      | —                                 |
-| `just ansible-test [inv]`              | Ping a random VM                    | API token for inventory           |
+| Recipe                              | Purpose                             | Requires              |
+| ----------------------------------- | ----------------------------------- | --------------------- |
+| `just secret-verify-all`            | Verify all secrets decrypt          | age key               |
+| `just secret-view <name>`           | View a secret (auto-detects format) | age key               |
+| `just secret-edit <name>`           | Edit a secret in $EDITOR            | age key               |
+| `just kubeconfig-sync <cluster>`    | Decrypt kubeconfig (run once)       | age key               |
+| `just play <playbook> <host> [inv]` | Run any ansible playbook            | API token via direnv  |
+| `just deploy <cluster> <app>`       | Deploy app (secrets + TLS → apply)  | KUBECONFIG via direnv |
+| `just helm-upgrade <cluster> <app>` | Install/upgrade Helm chart          | KUBECONFIG via direnv |
+| `just k8s-validate [version]`       | Validate manifests with kubeconform | —                     |
+| `just ansible-install`              | Install ansible + dependencies      | —                     |
+| `just tf <cmd> [workspace]`         | Run terraform (selective or all)    | API tokens via direnv |
+| `just tf-fmt`                       | Format all terraform files          | —                     |
+| `just tf-list`                      | List terraform workspaces           | —                     |
 
 ## What's Done
 
@@ -163,7 +162,7 @@ scratchpad/                     — dev.env.enc, org.env.enc, sample.env.enc
 - [x] Cloud-init hardening (fail2ban, SSH, user creation) tested on OrbStack + deployed
 - [x] Secrets migration: ansible-vault → sops+age in private infra-secrets repo
 - [x] direnv wiring: root + cluster .envrc files with use_sops
-- [x] justfile recipes: secrets, deploy, galaxy-play, tailscale, kubeconfig-sync
+- [x] justfile recipes: secrets, deploy, play, helm-upgrade, kubeconfig-sync, tf
 - [x] gxy-management cluster configs (Cilium values, security policies, Traefik config)
 - [x] App manifests (ArgoCD, Windmill, Zot — kustomization, gateway, httproutes)
 - [x] Helm chart values (ArgoCD, Windmill, Zot)
@@ -171,18 +170,18 @@ scratchpad/                     — dev.env.enc, org.env.enc, sample.env.enc
 
 ## What's Next
 
-| #   | Task                          | Blocked By | Notes                                                                       |
-| --- | ----------------------------- | ---------- | --------------------------------------------------------------------------- |
-| 1   | Install Tailscale on 3 nodes  | —          | `just tailscale-install gxy_mgmt_k3s` then `just tailscale-up gxy_mgmt_k3s` |
-| 2   | Cloudflare origin certificate | #1         | \*.freecodecamp.net, 15-year RSA, encrypt to infra-secrets                  |
-| 3   | Populate app secrets          | —          | argocd, windmill, zot .secrets.env from samples                             |
-| 4   | Run K3s galaxy playbook       | #1, #3     | `just galaxy-play gxy-management gxy_mgmt_k3s`                              |
-| 5   | Install ArgoCD via Helm       | #4         | `helm install argocd ...` from gxy-management dir                           |
-| 6   | Install Windmill via Helm     | #4         | `helm install windmill ...`                                                 |
-| 7   | Install Zot via Helm          | #4         | `helm install zot ...`                                                      |
-| 8   | DNS + Cloudflare Access       | #5, #6, #7 | A records + Access policies (ClickOps)                                      |
-| 9   | Smoke tests                   | #8         | nodes Ready, Cilium green, curl endpoints, Access gate                      |
-| 10  | Commit infra-secrets repo     | —          | Push to GitHub                                                              |
+| #   | Task                          | Blocked By | Notes                                                                                                 |
+| --- | ----------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
+| 1   | Install Tailscale on 3 nodes  | —          | `just play tailscale--0-install gxy_mgmt_k3s` then `just play tailscale--1b-up-with-ssh gxy_mgmt_k3s` |
+| 2   | Cloudflare origin certificate | #1         | \*.freecodecamp.net, 15-year RSA, encrypt to infra-secrets                                            |
+| 3   | Populate app secrets          | —          | argocd, windmill, zot .secrets.env from samples                                                       |
+| 4   | Run K3s galaxy playbook       | #1, #3     | `just play k3s--galaxy gxy_mgmt_k3s`                                                                  |
+| 5   | Install ArgoCD via Helm       | #4         | `just helm-upgrade gxy-management argocd`                                                             |
+| 6   | Install Windmill via Helm     | #4         | `just helm-upgrade gxy-management windmill`                                                           |
+| 7   | Install Zot via Helm          | #4         | `just helm-upgrade gxy-management zot`                                                                |
+| 8   | DNS + Cloudflare Access       | #5, #6, #7 | A records + Access policies (ClickOps)                                                                |
+| 9   | Smoke tests                   | #8         | nodes Ready, Cilium green, curl endpoints, Access gate                                                |
+| 10  | Commit infra-secrets repo     | —          | Push to GitHub                                                                                        |
 
 Unblocked right now: #1 (Tailscale), #3 (app secrets), #10 (infra-secrets commit).
 

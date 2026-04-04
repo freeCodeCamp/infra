@@ -31,9 +31,7 @@ k3s/
 │   │   └── zot/
 │   └── cluster/
 │       ├── cilium/
-│       ├── longhorn/
-│       ├── security/
-│       └── tailscale/
+│       └── security/
 ├── ops-backoffice-tools/
 │   ├── apps/
 │   │   ├── appsmith/
@@ -75,19 +73,14 @@ k3s/
 ## Ansible Deployment
 
 ```bash
-cd ansible
-
 # Deploy tools cluster
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
-  -e variable_host=tools_k3s
+just play k3s--cluster tools_k3s
 
 # Longhorn storage (tools)
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
-  -e variable_host=tools_k3s
+just play k3s--longhorn tools_k3s
 
-# Deploy gxy-management galaxy
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--galaxy.yml \
-  -e variable_host=gxy_mgmt_k3s
+# Deploy gxy-management galaxy (decrypts vault vars automatically)
+just play k3s--galaxy gxy_mgmt_k3s
 ```
 
 ---
@@ -137,7 +130,7 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ### Update Apps
 
 ```bash
-kubectl apply -k apps/<app>/manifests/base/
+just deploy <cluster> <app>
 ```
 
 ---
