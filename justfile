@@ -92,7 +92,7 @@ deploy cluster app:
     kubectl apply -k apps/{{app}}/manifests/base/
     echo "Deployed {{app}} to {{cluster}}"
 
-# Install or upgrade a Helm chart for a cluster app
+# Install or upgrade a Helm chart (overlays secret values from infra-secrets if present)
 [group('k3s')]
 helm-upgrade cluster app:
     #!/usr/bin/env bash
@@ -107,11 +107,23 @@ helm-upgrade cluster app:
     REPO_FILE="$CHART_DIR/repo"
     [ -f "$REPO_FILE" ] || { echo "Error: $REPO_FILE not found (one line: chart repo URL)"; exit 1; }
     REPO_URL=$(cat "$REPO_FILE")
+
+    HELM_ARGS="-f $VALUES"
+    CLEANUP=""
+    SECRET_VALUES="{{secrets_dir}}/k3s/{{cluster}}/{{app}}.values.yaml.enc"
+    if [ -f "$SECRET_VALUES" ]; then
+      TMPVALS=$(mktemp)
+      sops -d --input-type yaml --output-type yaml "$SECRET_VALUES" > "$TMPVALS"
+      HELM_ARGS="$HELM_ARGS -f $TMPVALS"
+      CLEANUP="$TMPVALS"
+      trap "rm -f $CLEANUP" EXIT
+    fi
+
     echo "Installing {{app}} (chart: $CHART_NAME) from $REPO_URL"
     helm upgrade --install {{app}} "$CHART_NAME" \
       --repo "$REPO_URL" \
       -n {{app}} --create-namespace \
-      -f "$VALUES"
+      $HELM_ARGS
 
 # Validate K8s manifests with kubeconform
 [group('k3s')]
