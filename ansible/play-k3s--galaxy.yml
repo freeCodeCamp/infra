@@ -8,12 +8,12 @@
 # Prerequisites (manual, one-time per galaxy):
 #   - 3x Ubuntu VMs on DigitalOcean with VPC attached (eth1)
 #   - Tailscale installed and connected on all nodes (play-tailscale--*.yml)
-#   - Vault secrets decrypted: sops -d $SECRETS_DIR/ansible/vault-k3s.yaml.enc > vars/vault-k3s.yml
+#   - Env vars loaded via direnv (cd into cluster dir first)
 #   - Cluster config directory: k3s/<galaxy_name>/cluster/
 #
 # Usage:
-#   cd ansible/   # direnv loads .env + activates venv
-#   just galaxy-play gxy-management gxy_mgmt_k3s
+#   cd k3s/gxy-management   # direnv loads DO_API_TOKEN, DO_SPACES_*, etc.
+#   just play k3s--galaxy gxy_mgmt_k3s
 #
 # What this playbook does (6 plays):
 #   1. Validate prerequisites (VPC, Tailscale, vault secrets)
@@ -28,20 +28,18 @@
   hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
-  vars_files:
-    - vars/vault-k3s.yml
   vars:
     galaxy_name: "gxy-management"
+    do_spaces_access_key: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
+    do_spaces_secret_key: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
 
   tasks:
-    - name: Validate vault secrets loaded
+    - name: Validate env vars loaded (cd into cluster dir for direnv)
       assert:
         that:
-          - vault_do_spaces_access_key is defined
-          - vault_do_spaces_access_key | length > 0
-          - vault_do_spaces_secret_key is defined
-          - vault_do_spaces_secret_key | length > 0
-        fail_msg: "Vault secrets missing. Run: sops -d $SECRETS_DIR/ansible/vault-k3s.yaml.enc > vars/vault-k3s.yml"
+          - do_spaces_access_key | length > 0
+          - do_spaces_secret_key | length > 0
+        fail_msg: "DO_SPACES_ACCESS_KEY/SECRET_KEY not set. cd into cluster dir first (direnv loads them)."
 
     - name: Validate VPC interface exists (eth1)
       assert:
@@ -120,10 +118,10 @@
   hosts: server
   gather_facts: true
   become: true
-  vars_files:
-    - vars/vault-k3s.yml
   vars:
     galaxy_name: "gxy-management"
+    do_spaces_access_key: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
+    do_spaces_secret_key: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
     k3s_version: "v1.34.5+k3s1"
     cluster_cidr: "10.1.0.0/16"
     service_cidr: "10.11.0.0/16"
@@ -169,8 +167,8 @@
     - name: Write k3s service environment (S3 credentials)
       copy:
         content: |
-          AWS_ACCESS_KEY_ID={{ vault_do_spaces_access_key }}
-          AWS_SECRET_ACCESS_KEY={{ vault_do_spaces_secret_key }}
+          AWS_ACCESS_KEY_ID={{ do_spaces_access_key }}
+          AWS_SECRET_ACCESS_KEY={{ do_spaces_secret_key }}
         dest: /etc/systemd/system/k3s.service.env
         mode: "0600"
         owner: root
