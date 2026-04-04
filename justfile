@@ -1,7 +1,7 @@
 set shell := ["bash", "-cu"]
 
-ansible_vault := "uv run --project ansible ansible-vault"
-vault_password := "--vault-password-file <(op read \"op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password\")"
+secrets_dir := env("SECRETS_DIR", justfile_directory() + "/../infra-secrets")
+sops_config := secrets_dir + "/.sops.yaml"
 crds_schema := 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 
 # Show available recipes
@@ -9,82 +9,31 @@ default:
     @just --list
 
 # ---------------------------------------------------------------------------
-# Secrets
+# Secrets (sops + age — stored in infra-secrets private repo)
 # ---------------------------------------------------------------------------
-
-# Bootstrap root .env (global tokens only — Cloudflare, Linode)
-[group('secrets')]
-secret-bootstrap:
-    #!/usr/bin/env bash
-    set -eu
-    SRC="secrets/global/.env"
-    [ -f "$SRC" ] || { echo "Error: $SRC not found. Get it from 1Password."; exit 1; }
-    {{ansible_vault}} decrypt --output .env {{vault_password}} "$SRC"
-    echo "Bootstrapped .env (global tokens)"
-    echo "Run: direnv allow"
-
-# Bootstrap a cluster .env (DO_API_TOKEN + KUBECONFIG)
-[group('secrets')]
-secret-bootstrap-cluster cluster team:
-    #!/usr/bin/env bash
-    set -eu
-    SRC="secrets/do-{{team}}/.env"
-    DEST="k3s/{{cluster}}/.env"
-    [ -f "$SRC" ] || { echo "Error: $SRC not found. Get it from 1Password."; exit 1; }
-    {{ansible_vault}} decrypt --output - {{vault_password}} "$SRC" > "$DEST"
-    echo "KUBECONFIG=.kubeconfig.yaml" >> "$DEST"
-    echo "Bootstrapped $DEST (team: {{team}})"
-    echo "Run: cd k3s/{{cluster}} && direnv allow"
-
-# Encrypt a secret
-[group('secrets')]
-secret-encrypt name:
-    {{ansible_vault}} encrypt {{vault_password}} secrets/{{name}}/.env
-
-# Decrypt a secret to stdout
-[group('secrets')]
-secret-decrypt name:
-    {{ansible_vault}} decrypt --output - {{vault_password}} secrets/{{name}}/.env
-
-# Decrypt a secret to a file
-[group('secrets')]
-secret-decrypt-to name dest:
-    {{ansible_vault}} decrypt --output {{dest}} {{vault_password}} secrets/{{name}}/.env
 
 # View a secret
 [group('secrets')]
 secret-view name:
-    {{ansible_vault}} view {{vault_password}} secrets/{{name}}/.env
+    sops -d --input-type dotenv --output-type dotenv "{{secrets_dir}}/{{name}}/.env.enc"
 
 # Edit a secret
 [group('secrets')]
 secret-edit name:
-    {{ansible_vault}} edit {{vault_password}} secrets/{{name}}/.env
-
-# Encrypt all unencrypted .env files in secrets/
-[group('secrets')]
-secret-encrypt-all:
-    #!/usr/bin/env bash
-    set -eu
-    for f in secrets/*/.env; do
-      [ -f "$f" ] || continue
-      if ! head -1 "$f" | grep -q '^\$ANSIBLE_VAULT'; then
-        echo "Encrypting $f"
-        {{ansible_vault}} encrypt {{vault_password}} "$f"
-      else
-        echo "Already encrypted: $f"
-      fi
-    done
+    sops "{{secrets_dir}}/{{name}}/.env.enc"
 
 # Verify all encrypted secrets are readable
 [group('secrets')]
 secret-verify-all:
     #!/usr/bin/env bash
     set -eu
-    for f in secrets/*/.env; do
-      [ -f "$f" ] || continue
+    for f in $(find "{{secrets_dir}}" -name '*.enc' -type f | sort); do
       echo -n "$f: "
-      {{ansible_vault}} view {{vault_password}} "$f" > /dev/null 2>&1 && echo "OK" || echo "FAILED"
+      case "$f" in
+        *.env.enc)       sops -d --input-type dotenv --output-type dotenv "$f" > /dev/null 2>&1 ;;
+        *.yaml.enc|*.yml.enc) sops -d --input-type yaml --output-type yaml "$f" > /dev/null 2>&1 ;;
+        *)               sops -d "$f" > /dev/null 2>&1 ;;
+      esac && echo "OK" || echo "FAILED"
     done
 
 # ---------------------------------------------------------------------------
@@ -96,16 +45,12 @@ secret-verify-all:
 deploy cluster app:
     #!/usr/bin/env bash
     set -eu
-    SECRETS_SRC="secrets/{{app}}/.env"
+    SECRETS_SRC="{{secrets_dir}}/k3s/{{cluster}}/{{app}}.secrets.env.enc"
     SECRETS_DST="k3s/{{cluster}}/apps/{{app}}/manifests/base/secrets/.secrets.env"
 
-    if [ ! -f "$SECRETS_SRC" ]; then
-      echo "Error: $SECRETS_SRC not found"
-      echo "Create it: cp secrets/{{app}}/.env.sample secrets/{{app}}/.env && just secret-encrypt {{app}}"
-      exit 1
-    fi
+    [ -f "$SECRETS_SRC" ] || { echo "Error: $SECRETS_SRC not found"; exit 1; }
 
-    {{ansible_vault}} decrypt --output "$SECRETS_DST" {{vault_password}} "$SECRETS_SRC"
+    sops -d --input-type dotenv --output-type dotenv "$SECRETS_SRC" > "$SECRETS_DST"
     trap 'rm -f "$SECRETS_DST"' EXIT
 
     cd k3s/{{cluster}}
@@ -140,6 +85,21 @@ k8s-validate:
 # ---------------------------------------------------------------------------
 # Ansible
 # ---------------------------------------------------------------------------
+
+# Run galaxy playbook (decrypt vault → run → clean up)
+[group('ansible')]
+galaxy-play galaxy_name host:
+    #!/usr/bin/env bash
+    set -eu
+    VAULT_SRC="{{secrets_dir}}/ansible/vault-k3s.yaml.enc"
+    VAULT_DST="ansible/vars/vault-k3s.yml"
+    [ -f "$VAULT_SRC" ] || { echo "Error: $VAULT_SRC not found"; exit 1; }
+    sops -d --input-type yaml --output-type yaml "$VAULT_SRC" > "$VAULT_DST"
+    trap 'rm -f "$VAULT_DST"' EXIT
+    cd ansible
+    uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--galaxy.yml \
+      -e variable_host={{host}} \
+      -e galaxy_name={{galaxy_name}}
 
 # Install ansible and dependencies
 [group('ansible')]
