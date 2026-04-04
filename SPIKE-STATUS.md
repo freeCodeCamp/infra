@@ -165,25 +165,80 @@ scratchpad/                     — dev.env.enc, org.env.enc, sample.env.enc
 - [x] justfile recipes: secrets, deploy, play, helm-upgrade, kubeconfig-sync, tf
 - [x] gxy-management cluster configs (Cilium values, security policies, Traefik config)
 - [x] App manifests (ArgoCD, Windmill, Zot — kustomization, gateway, httproutes)
-- [x] Helm chart values (ArgoCD, Windmill, Zot)
+- [x] Helm chart values (ArgoCD, Windmill, Zot — credentials stripped to secret overlays)
 - [x] Documentation (infra-secrets README wiring doc, gxy-management README runbook)
+- [x] Tailscale installed and connected on all 3 nodes (verified: online, SSH enabled)
+- [x] Cloudflare origin certs encrypted for all 3 apps (reused existing wildcard)
+- [x] Code review: 3 CRITICALs + 10 WARNINGs + 6 SUGGESTIONs found and fixed
+- [x] Justfile overhaul: 18 → 11 parametric recipes, no special-case orchestration
+
+## Secrets → Helm Flow
+
+Public values.yaml (structure, resources, flags) are overlaid with secret values from infra-secrets:
+
+```
+Public: k3s/<cluster>/apps/<app>/charts/<chart>/values.yaml
+Secret: infra-secrets/k3s/<cluster>/<app>.values.yaml.enc  (optional, sops-encrypted)
+
+just helm-upgrade → helm upgrade --install -f values.yaml -f /tmp/secret-values.yaml → cleanup
+```
+
+Apps that only need K8s Secrets (ArgoCD, Zot) use `just deploy` which decrypts `.secrets.env` + TLS.
 
 ## What's Next
 
-| #   | Task                          | Blocked By | Notes                                                                                                 |
-| --- | ----------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
-| 1   | Install Tailscale on 3 nodes  | —          | `just play tailscale--0-install gxy_mgmt_k3s` then `just play tailscale--1b-up-with-ssh gxy_mgmt_k3s` |
-| 2   | Cloudflare origin certificate | #1         | \*.freecodecamp.net, 15-year RSA, encrypt to infra-secrets                                            |
-| 3   | Populate app secrets          | —          | argocd, windmill, zot .secrets.env from samples                                                       |
-| 4   | Run K3s galaxy playbook       | #1, #3     | `just play k3s--galaxy gxy_mgmt_k3s`                                                                  |
-| 5   | Install ArgoCD via Helm       | #4         | `just helm-upgrade gxy-management argocd`                                                             |
-| 6   | Install Windmill via Helm     | #4         | `just helm-upgrade gxy-management windmill`                                                           |
-| 7   | Install Zot via Helm          | #4         | `just helm-upgrade gxy-management zot`                                                                |
-| 8   | DNS + Cloudflare Access       | #5, #6, #7 | A records + Access policies (ClickOps)                                                                |
-| 9   | Smoke tests                   | #8         | nodes Ready, Cilium green, curl endpoints, Access gate                                                |
-| 10  | Commit infra-secrets repo     | —          | Push to GitHub                                                                                        |
+Deploy sequentially. Verify each before moving to the next.
 
-Unblocked right now: #1 (Tailscale), #3 (app secrets), #10 (infra-secrets commit).
+### Phase A: Bootstrap Cluster
+
+| #   | Task                          | Status | Command / Notes                                            |
+| --- | ----------------------------- | ------ | ---------------------------------------------------------- |
+| A1  | Populate Windmill secrets     | TODO   | Create `windmill.values.yaml.enc` (PG password, DB URL)    |
+| A2  | Populate Windmill app secrets | TODO   | Create `windmill.secrets.env.enc` (admin email + password) |
+| A3  | Run K3s galaxy playbook       | TODO   | `just play k3s--galaxy gxy_mgmt_k3s` (from cluster dir)    |
+| A4  | Verify cluster health         | TODO   | 3 nodes Ready, Cilium green, Traefik running, Gateway CRDs |
+| A5  | Encrypt kubeconfig            | TODO   | sops encrypt to infra-secrets                              |
+
+### Phase B: Windmill (Day 0 Deliverable)
+
+| #   | Task                  | Status | Command / Notes                                       |
+| --- | --------------------- | ------ | ----------------------------------------------------- |
+| B1  | Install Windmill Helm | TODO   | `just helm-upgrade gxy-management windmill`           |
+| B2  | Verify pods ready     | TODO   | `kubectl get pods -n windmill`                        |
+| B3  | Deploy manifests      | TODO   | `just deploy gxy-management windmill` (Gateway + TLS) |
+| B4  | Cloudflare DNS        | TODO   | ClickOps: A records (proxied) → 3 node public IPs     |
+| B5  | Cloudflare Access     | TODO   | ClickOps: email OTP gate, all staff                   |
+| B6  | Smoke test            | TODO   | curl + browser, verify Access gate                    |
+
+### Phase C: ArgoCD (Platform Team)
+
+| #   | Task                    | Status | Command / Notes                                         |
+| --- | ----------------------- | ------ | ------------------------------------------------------- |
+| C1  | Populate ArgoCD secrets | TODO   | Create `argocd.secrets.env.enc` (bcrypt admin password) |
+| C2  | Install ArgoCD Helm     | TODO   | `just helm-upgrade gxy-management argocd`               |
+| C3  | Deploy manifests        | TODO   | `just deploy gxy-management argocd`                     |
+| C4  | DNS + Access            | TODO   | ClickOps: argocd.freecodecamp.net, platform team only   |
+| C5  | Verify                  | TODO   | Login, verify dashboard                                 |
+
+### Phase D: Zot (Platform Team)
+
+| #   | Task                 | Status | Command / Notes                                         |
+| --- | -------------------- | ------ | ------------------------------------------------------- |
+| D1  | Populate Zot secrets | TODO   | Create `zot.secrets.env.enc` (S3 creds, htpasswd)       |
+| D2  | Install Zot Helm     | TODO   | `just helm-upgrade gxy-management zot`                  |
+| D3  | Deploy manifests     | TODO   | `just deploy gxy-management zot`                        |
+| D4  | DNS + Access         | TODO   | ClickOps: registry.freecodecamp.net, platform team only |
+| D5  | Verify               | TODO   | Push/pull test image                                    |
+
+### Phase E: Cleanup
+
+| #   | Task                   | Status | Notes                                          |
+| --- | ---------------------- | ------ | ---------------------------------------------- |
+| E1  | Commit infra-secrets   | TODO   | Push to GitHub                                 |
+| E2  | Remove SPIKE-STATUS.md | TODO   | Absorb permanent decisions into cluster README |
+| E3  | Clean up stale files   | TODO   | Orphaned samples, archive cruft                |
+
+Unblocked now: A1, A2 (populate secrets).
 
 ## Existing Infrastructure (Unchanged)
 

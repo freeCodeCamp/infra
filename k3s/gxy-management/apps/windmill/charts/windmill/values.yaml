@@ -8,7 +8,7 @@ windmill:
   baseProtocol: https
   appReplicas: 1
   extraReplicas: 1
-  databaseUrl: postgres://postgres:windmill@windmill-postgresql/windmill?sslmode=disable
+  # databaseUrl set via secret values overlay (infra-secrets)
 
   app:
     resources:
@@ -60,8 +60,7 @@ windmill:
 postgresql:
   enabled: true
   auth:
-    postgresUser: postgres
-    postgresPassword: windmill
+    # Credentials set via secret values overlay (infra-secrets)
     database: windmill
   persistence:
     enabled: true
