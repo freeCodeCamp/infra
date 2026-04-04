@@ -153,11 +153,17 @@ k8s-validate version="1.32.0":
 # Ansible
 # ---------------------------------------------------------------------------
 
-# Run any ansible playbook
+# Run any ansible playbook (logs to ansible/.ansible/logs/)
 [group('ansible')]
-play playbook host inv="digitalocean.yml":
-    cd ansible && uv run ansible-playbook -i inventory/{{inv}} play-{{playbook}}.yml \
-      -e variable_host={{host}}
+[positional-arguments]
+play playbook host *args:
+    #!/usr/bin/env bash
+    set -eu
+    mkdir -p ansible/.ansible/logs
+    LOGFILE="$(pwd)/ansible/.ansible/logs/$(date +%Y%m%d-%H%M%S)-{{playbook}}.log"
+    cd ansible && uv run ansible-playbook -i inventory/digitalocean.yml play-{{playbook}}.yml \
+      -e variable_host={{host}} {{args}} 2>&1 | tee "$LOGFILE"
+    echo "Log: $LOGFILE"
 
 # Install ansible dependencies
 [group('ansible')]
