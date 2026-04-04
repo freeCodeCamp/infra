@@ -1,5 +1,6 @@
 ---
 cilium_version: "1.19.2"
+helm_version: "v3.17.3"
 cilium_cluster_name: ""
 cilium_cluster_id: ""
 cilium_values_file: ""

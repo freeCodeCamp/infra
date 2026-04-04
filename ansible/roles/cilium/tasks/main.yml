@@ -13,12 +13,12 @@
 - name: Copy Cilium values file to server
   ansible.builtin.copy:
     src: "{{ cilium_values_file }}"
-    dest: /tmp/cilium-values.yaml
+    dest: /etc/rancher/k3s/cilium-values.yaml
     mode: "0600"
 
 - name: Install Helm
   ansible.builtin.shell:
-    cmd: set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    cmd: set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | DESIRED_VERSION={{ helm_version }} bash
     executable: /bin/bash
     creates: /usr/local/bin/helm
 
@@ -37,7 +37,7 @@
     release_namespace: kube-system
     update_repo_cache: true
     values_files:
-      - /tmp/cilium-values.yaml
+      - /etc/rancher/k3s/cilium-values.yaml
     set_values:
       - value: "k8sServiceHost={{ cilium_k8s_service_host }}"
       - value: "k8sServicePort={{ cilium_k8s_service_port }}"
@@ -48,7 +48,7 @@
 
 - name: Clean up Cilium values file
   ansible.builtin.file:
-    path: /tmp/cilium-values.yaml
+    path: /etc/rancher/k3s/cilium-values.yaml
     state: absent
 
 - name: Wait for Cilium agent DaemonSet rollout

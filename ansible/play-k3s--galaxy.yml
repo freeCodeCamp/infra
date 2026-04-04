@@ -160,7 +160,6 @@
       --etcd-s3-bucket={{ etcd_s3_bucket }}
       --etcd-s3-folder=etcd/{{ galaxy_name }}
       --etcd-s3-region={{ etcd_s3_region }}
-      # Cron string MUST be double-quoted — systemd word-splits without them
       --etcd-snapshot-schedule-cron="{{ etcd_snapshot_schedule }}"
       --etcd-snapshot-retention={{ etcd_snapshot_retention }}
     server_group: server
@@ -205,7 +204,7 @@
         k3s kubectl apply -f
         https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
       register: gateway_result
-      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
+      changed_when: "'created' in gateway_result.stdout"
 
 # Play 5: Install Cilium (must run before nodes can be Ready)
 - name: "K3s {{ variable_host }} - Install Cilium"
@@ -254,6 +253,7 @@
       slurp:
         src: /etc/rancher/k3s/k3s.yaml
       register: kubeconfig_raw
+      no_log: true
 
     - name: Write kubeconfig locally (replace server IP with Tailscale IP)
       copy:
@@ -261,6 +261,7 @@
         dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         mode: "0600"
       delegate_to: localhost
+      no_log: true
       become: false
 
     - name: Verify kubectl connectivity
