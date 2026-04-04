@@ -54,10 +54,7 @@ ansible/inventory/hosts
 !.envrc
 !k3s/**/.envrc
 
-# Allow secrets/ samples and docs (NOT encrypted .env files)
-!secrets/**/.env.sample
-!secrets/.gitignore
-!secrets/README.md
+# Secrets live in the private infra-secrets repo (sibling clone)
 
 
 

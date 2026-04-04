@@ -8,16 +8,12 @@
 # Prerequisites (manual, one-time per galaxy):
 #   - 3x Ubuntu VMs on DigitalOcean with VPC attached (eth1)
 #   - Tailscale installed and connected on all nodes (play-tailscale--*.yml)
-#   - Ansible Vault password in 1Password
-#   - Vault secrets populated in vars/vault-k3s.yml (encrypted)
+#   - Vault secrets decrypted: sops -d $SECRETS_DIR/ansible/vault-k3s.yaml.enc > vars/vault-k3s.yml
 #   - Cluster config directory: k3s/<galaxy_name>/cluster/
 #
 # Usage:
 #   cd ansible/   # direnv loads .env + activates venv
-#   ansible-playbook -i inventory/digitalocean.yml play-k3s--galaxy.yml \
-#     -e variable_host=gxy_mgmt_k3s \
-#     -e galaxy_name=gxy-management \
-#     --vault-password-file <(op read "op://Service-Automation/Ansible-Vault-Password/Ansible-Vault-Password")
+#   just galaxy-play gxy-management gxy_mgmt_k3s
 #
 # What this playbook does (6 plays):
 #   1. Validate prerequisites (VPC, Tailscale, vault secrets)
@@ -45,7 +41,7 @@
           - vault_do_spaces_access_key | length > 0
           - vault_do_spaces_secret_key is defined
           - vault_do_spaces_secret_key | length > 0
-        fail_msg: "Vault secrets missing. Run: ansible-vault edit vars/vault-k3s.yml"
+        fail_msg: "Vault secrets missing. Run: sops -d $SECRETS_DIR/ansible/vault-k3s.yaml.enc > vars/vault-k3s.yml"
 
     - name: Validate VPC interface exists (eth1)
       assert:
