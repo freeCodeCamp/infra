@@ -33,7 +33,6 @@
           - cluster_cidr is defined and cluster_cidr | length > 0
           - service_cidr is defined and service_cidr | length > 0
           - cilium_cluster_id is defined and cilium_cluster_id | string | length > 0
-          - gateway_api_version is defined and gateway_api_version | length > 0
           - etcd_s3_endpoint is defined and etcd_s3_endpoint | length > 0
           - etcd_s3_bucket is defined and etcd_s3_bucket | length > 0
           - etcd_s3_region is defined and etcd_s3_region | length > 0
@@ -198,13 +197,8 @@
         src: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/cluster/traefik-config.yaml"
         dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
         mode: "0600"
-
-    - name: Install Gateway API CRDs
-      command: >
-        k3s kubectl apply -f
-        https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
-      register: gateway_result
-      changed_when: "'created' in gateway_result.stdout"
+    # Gateway API CRDs are bundled in the Traefik CRD Helm chart (traefik-crd).
+    # Do NOT install them manually — conflicts with Helm ownership labels.
 
 # Play 5: Install Cilium (must run before nodes can be Ready)
 - name: "K3s {{ variable_host }} - Install Cilium"

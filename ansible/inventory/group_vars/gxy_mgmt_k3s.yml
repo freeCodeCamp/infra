@@ -14,9 +14,6 @@ service_cidr: "10.11.0.0/16"
 # Cilium CNI
 cilium_cluster_id: 1
 
-# Gateway API
-gateway_api_version: v1.5.1
-
 # etcd S3 backups (DO Spaces)
 etcd_s3_endpoint: fra1.digitaloceanspaces.com
 etcd_s3_bucket: net.freecodecamp.universe-backups
