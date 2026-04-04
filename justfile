@@ -40,18 +40,45 @@ secret-verify-all:
 # K8s / K3s
 # ---------------------------------------------------------------------------
 
-# Deploy a K8s app (decrypt secrets → apply → clean up)
+# Decrypt kubeconfig from infra-secrets to cluster dir (run once after clone)
+[group('k3s')]
+kubeconfig-sync cluster:
+    #!/usr/bin/env bash
+    set -eu
+    SRC="{{secrets_dir}}/k3s/{{cluster}}/kubeconfig.yaml.enc"
+    DST="k3s/{{cluster}}/.kubeconfig.yaml"
+    [ -f "$SRC" ] || { echo "Error: $SRC not found (cluster not yet bootstrapped?)"; exit 1; }
+    sops -d --input-type yaml --output-type yaml "$SRC" > "$DST"
+    chmod 600 "$DST"
+    echo "Synced kubeconfig → $DST"
+
+# Deploy a K8s app (decrypt secrets + TLS → apply → clean up)
 [group('k3s')]
 deploy cluster app:
     #!/usr/bin/env bash
     set -eu
-    SECRETS_SRC="{{secrets_dir}}/k3s/{{cluster}}/{{app}}.secrets.env.enc"
-    SECRETS_DST="k3s/{{cluster}}/apps/{{app}}/manifests/base/secrets/.secrets.env"
+    ENC_DIR="{{secrets_dir}}/k3s/{{cluster}}"
+    APP_SECRETS="k3s/{{cluster}}/apps/{{app}}/manifests/base/secrets"
+    CLEANUP=""
 
-    [ -f "$SECRETS_SRC" ] || { echo "Error: $SECRETS_SRC not found"; exit 1; }
+    # Decrypt app secrets (.secrets.env)
+    if [ -f "$ENC_DIR/{{app}}.secrets.env.enc" ]; then
+      sops -d --input-type dotenv --output-type dotenv "$ENC_DIR/{{app}}.secrets.env.enc" > "$APP_SECRETS/.secrets.env"
+      CLEANUP="$APP_SECRETS/.secrets.env"
+    fi
 
-    sops -d --input-type dotenv --output-type dotenv "$SECRETS_SRC" > "$SECRETS_DST"
-    trap 'rm -f "$SECRETS_DST"' EXIT
+    # Decrypt TLS cert + key
+    if [ -f "$ENC_DIR/{{app}}.tls.crt.enc" ]; then
+      sops -d "$ENC_DIR/{{app}}.tls.crt.enc" > "$APP_SECRETS/tls.crt"
+      CLEANUP="$CLEANUP $APP_SECRETS/tls.crt"
+    fi
+    if [ -f "$ENC_DIR/{{app}}.tls.key.enc" ]; then
+      sops -d "$ENC_DIR/{{app}}.tls.key.enc" > "$APP_SECRETS/tls.key"
+      CLEANUP="$CLEANUP $APP_SECRETS/tls.key"
+    fi
+
+    [ -n "$CLEANUP" ] || { echo "Error: no secrets found for {{app}} in $ENC_DIR"; exit 1; }
+    trap "rm -f $CLEANUP" EXIT
 
     cd k3s/{{cluster}}
     export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
@@ -87,17 +114,19 @@ k8s-validate:
 # ---------------------------------------------------------------------------
 
 # Run galaxy playbook (decrypt vault → run → clean up)
+# Must be run from a cluster dir (e.g., cd k3s/gxy-management) so DO_API_TOKEN is loaded via direnv
 [group('ansible')]
-galaxy-play galaxy_name host:
+galaxy-play galaxy_name host inventory="digitalocean.yml":
     #!/usr/bin/env bash
     set -eu
+    [ -n "${DO_API_TOKEN:-}" ] || { echo "Error: DO_API_TOKEN not set. Run from cluster dir (cd k3s/{{galaxy_name}})"; exit 1; }
     VAULT_SRC="{{secrets_dir}}/ansible/vault-k3s.yaml.enc"
     VAULT_DST="ansible/vars/vault-k3s.yml"
     [ -f "$VAULT_SRC" ] || { echo "Error: $VAULT_SRC not found"; exit 1; }
     sops -d --input-type yaml --output-type yaml "$VAULT_SRC" > "$VAULT_DST"
     trap 'rm -f "$VAULT_DST"' EXIT
     cd ansible
-    uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--galaxy.yml \
+    uv run ansible-playbook -i inventory/{{inventory}} play-k3s--galaxy.yml \
       -e variable_host={{host}} \
       -e galaxy_name={{galaxy_name}}
 
