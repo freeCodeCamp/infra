@@ -4,6 +4,8 @@
 # Generic playbook for any Universe galaxy. All galaxy-specific config
 # lives in inventory/group_vars/<group>.yml — not in this file.
 #
+# Plays: validate → sysctl + prereqs → k3s server → traefik + gateway CRDs → cilium → verify → fetch kubeconfig
+#
 # Prerequisites:
 #   - VMs provisioned with VPC (eth1) and Tailscale connected
 #   - Env vars loaded via direnv (cd into cluster dir first)
@@ -14,7 +16,7 @@
 #   just play k3s--galaxy <inventory_group>
 
 # Play 1: Validate prerequisites
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Validate prerequisites"
+- name: "K3s {{ variable_host }} - Validate prerequisites"
   hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
@@ -88,7 +90,7 @@
         - server
 
 # Play 2: System prerequisites
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - System prerequisites"
+- name: "K3s {{ variable_host }} - System prerequisites"
   hosts: k3s_cluster
   gather_facts: true
   become: true
@@ -130,7 +132,7 @@
     - role: k3s.orchestration.prereq
 
 # Play 3: Deploy k3s server
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Deploy k3s server"
+- name: "K3s {{ variable_host }} - Deploy k3s server"
   hosts: server
   gather_facts: true
   become: true
@@ -186,7 +188,7 @@
     - role: k3s.orchestration.k3s_server
 
 # Play 4: Configure ingress
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Configure ingress"
+- name: "K3s {{ variable_host }} - Configure ingress"
   hosts: server[0]
   gather_facts: false
   become: true
@@ -205,6 +207,27 @@
       register: gateway_result
       changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
 
+# Play 5: Install Cilium (must run before nodes can be Ready)
+- name: "K3s {{ variable_host }} - Install Cilium"
+  hosts: server[0]
+  gather_facts: false
+  become: true
+  vars:
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
+  roles:
+    - role: cilium
+      vars:
+        cilium_cluster_name: "{{ galaxy_name }}"
+        cilium_values_file: "{{ cluster_config_dir }}/cluster/cilium/values.yaml"
+        cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
+
+# Play 6: Wait for cluster ready (after Cilium provides the CNI)
+- name: "K3s {{ variable_host }} - Verify cluster"
+  hosts: server[0]
+  gather_facts: false
+  become: true
+
+  tasks:
     - name: Wait for all nodes ready
       command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
       changed_when: false
@@ -218,22 +241,8 @@
       debug:
         msg: "{{ cluster_status.stdout_lines }}"
 
-# Play 5: Install Cilium
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Install Cilium"
-  hosts: server[0]
-  gather_facts: false
-  become: true
-  vars:
-    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
-  roles:
-    - role: cilium
-      vars:
-        cilium_cluster_name: "{{ galaxy_name }}"
-        cilium_values_file: "{{ cluster_config_dir }}/cluster/cilium/values.yaml"
-        cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
-
-# Play 6: Fetch kubeconfig
-- name: "K3s {{ galaxy_name | default('UNKNOWN') }} - Fetch kubeconfig"
+# Play 7: Fetch kubeconfig
+- name: "K3s {{ variable_host }} - Fetch kubeconfig"
   hosts: server[0]
   gather_facts: false
   become: true

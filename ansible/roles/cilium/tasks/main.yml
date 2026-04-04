@@ -26,6 +26,8 @@
   kubernetes.core.helm_repository:
     name: cilium
     repo_url: https://helm.cilium.io/
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
 - name: Install Cilium
   kubernetes.core.helm:
@@ -41,6 +43,8 @@
       - value: "k8sServicePort={{ cilium_k8s_service_port }}"
     wait: true
     timeout: "5m0s"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
 - name: Clean up Cilium values file
   ansible.builtin.file:
@@ -50,6 +54,8 @@
 - name: Wait for Cilium agent DaemonSet rollout
   ansible.builtin.command:
     cmd: kubectl -n kube-system rollout status daemonset/cilium --timeout=180s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
 
 - name: Wait for Cilium operator Deployment rollout
@@ -57,6 +63,8 @@
     cmd: >-
       kubectl -n kube-system rollout status
       deployment/cilium-operator --timeout=180s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
 
 - name: Verify Cilium status
@@ -64,6 +72,8 @@
     cmd: >-
       kubectl -n kube-system exec ds/cilium
       -c cilium-agent -- cilium status --brief
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   register: cilium_status
   changed_when: false
 
