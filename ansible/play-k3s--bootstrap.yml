@@ -191,18 +191,28 @@
 
     - name: Write kubeconfig locally
       copy:
-        content: >-
-          {{ kubeconfig_raw.content | b64decode
-             | regex_replace('127\\.0\\.0\\.1', hostvars[inventory_hostname]['tailscale_ip'])
-             | regex_replace('name: default', 'name: ' + galaxy_name)
-             | regex_replace('cluster: default', 'cluster: ' + galaxy_name)
-             | regex_replace('user: default', 'user: ' + galaxy_name)
-             | regex_replace('current-context: default', 'current-context: ' + galaxy_name) }}
+        content: "{{ kubeconfig_raw.content | b64decode }}"
         dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         mode: "0600"
       delegate_to: localhost
       become: false
       no_log: true
+
+    - name: Fix kubeconfig server address (use Tailscale IP)
+      delegate_to: localhost
+      become: false
+      ansible.builtin.replace:
+        path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
+        regexp: 'https://127\.0\.0\.1:6443'
+        replace: "https://{{ hostvars[inventory_hostname]['tailscale_ip'] }}:6443"
+
+    - name: Fix kubeconfig context name
+      delegate_to: localhost
+      become: false
+      ansible.builtin.replace:
+        path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
+        regexp: '(\s+)(name|cluster|user|current-context): default'
+        replace: '\1\2: {{ galaxy_name }}'
 
     - name: Verify kubectl connectivity
       command: kubectl get nodes
