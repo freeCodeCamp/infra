@@ -18,7 +18,7 @@
 
 - name: Install Helm
   ansible.builtin.shell:
-    cmd: set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | DESIRED_VERSION={{ helm_version }} bash
+    cmd: set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/{{ helm_version }}/scripts/get-helm-3 | DESIRED_VERSION={{ helm_version }} bash
     executable: /bin/bash
     creates: /usr/local/bin/helm
 
@@ -39,6 +39,8 @@
     values_files:
       - /etc/rancher/k3s/cilium-values.yaml
     set_values:
+      - value: "cluster.name={{ cilium_cluster_name }}"
+      - value: "cluster.id={{ cilium_cluster_id }}"
       - value: "k8sServiceHost={{ cilium_k8s_service_host }}"
       - value: "k8sServicePort={{ cilium_k8s_service_port }}"
     wait: true

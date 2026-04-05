@@ -15,6 +15,7 @@ cilium_cluster_id: 1
 # https://docs.k3s.io/installation/configuration
 # https://docs.k3s.io/security/hardening-guide
 server_config_yaml: |
+  # Do NOT add tls-san here — managed by the playbook's extra_server_args (per-node)
   # Networking (ADR-009)
   flannel-backend: "none"
   disable-network-policy: true
