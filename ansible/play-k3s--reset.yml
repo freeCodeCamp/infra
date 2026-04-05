@@ -17,6 +17,7 @@
 
 - name: "K3s {{ variable_host }} - Reset"
   hosts: k3s_cluster
+  gather_facts: true
   become: true
   tasks:
     - name: Run k3s uninstall (server)
@@ -36,7 +37,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - "~{{ ansible_user }}/.kube/config"
+        - "~{{ ansible_user_id }}/.kube/config"
         - /usr/local/bin/k3s-install.sh
         - /etc/rancher/k3s
         - /etc/systemd/system/k3s.service.env
