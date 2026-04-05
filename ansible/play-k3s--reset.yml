@@ -48,6 +48,13 @@
         cmd: rm -rf /sys/fs/bpf/cilium
         removes: /sys/fs/bpf/cilium
 
+    - name: Flush Cilium iptables chains
+      shell: |
+        iptables-save | grep -iv cilium | iptables-restore
+        ip6tables-save | grep -iv cilium | ip6tables-restore
+      changed_when: true
+      ignore_errors: true
+
 - name: "K3s {{ variable_host }} - Clean local kubeconfig"
   hosts: server[0]
   gather_facts: false
