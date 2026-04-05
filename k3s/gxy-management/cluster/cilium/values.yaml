@@ -1,9 +1,4 @@
-cluster:
-  name: "gxy-management"
-  id: 1
-
-# Set at deploy time via Ansible --set flags
-# k8sServiceHost: <VPC IP of first server node>
+# cluster.name, cluster.id, k8sServiceHost set at deploy time via Ansible --set flags
 k8sServicePort: "6443"
 
 kubeProxyReplacement: true
