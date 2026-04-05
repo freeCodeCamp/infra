@@ -1,0 +1,78 @@
+---
+# Reset k3s cluster — removes k3s, Cilium, etcd data, all k8s state.
+# Preserves: Tailscale, cloud-init hardening, DO infrastructure, CIS sysctls.
+#
+# Usage:
+#   cd k3s/<galaxy>
+#   just play k3s--reset <inventory_group>
+
+- name: "K3s {{ variable_host }} - Build groups for reset"
+  hosts: "{{ variable_host }}"
+  gather_facts: false
+  tasks:
+    - name: Build k3s_cluster group
+      group_by:
+        key: k3s_cluster
+
+    - name: Build server group
+      group_by:
+        key: server
+
+- name: "K3s {{ variable_host }} - Reset cluster"
+  hosts: k3s_cluster
+  become: true
+  tasks:
+    - name: Run k3s uninstall script (server)
+      when: "'server' in group_names"
+      ansible.builtin.command:
+        cmd: k3s-uninstall.sh
+        removes: /var/lib/rancher/k3s/*
+
+    - name: Run k3s uninstall script (agent)
+      when: "'agent' in group_names"
+      ansible.builtin.command:
+        cmd: k3s-agent-uninstall.sh
+        removes: /var/lib/rancher/k3s/*
+
+    - name: Remove user kubeconfig
+      ansible.builtin.file:
+        path: "~{{ ansible_user }}/.kube/config"
+        state: absent
+
+    - name: Remove k3s install script
+      ansible.builtin.file:
+        path: /usr/local/bin/k3s-install.sh
+        state: absent
+
+    - name: Remove k3s config directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: absent
+
+    - name: Remove k3s service environment
+      ansible.builtin.file:
+        path: /etc/systemd/system/k3s.service.env
+        state: absent
+
+    - name: Remove Helm binary
+      ansible.builtin.file:
+        path: /usr/local/bin/helm
+        state: absent
+
+    - name: Remove k3s audit logs
+      ansible.builtin.file:
+        path: /var/log/k3s
+        state: absent
+
+- name: "K3s {{ variable_host }} - Clean up local kubeconfig"
+  hosts: "{{ variable_host }}"
+  gather_facts: false
+  connection: local
+  become: false
+  run_once: true
+  tasks:
+    - name: Remove local kubeconfig
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+        state: absent
+      when: galaxy_name is defined
