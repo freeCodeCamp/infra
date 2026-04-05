@@ -45,8 +45,8 @@ helm upgrade tailscale-operator tailscale/tailscale-operator \
 All apps use Kustomize:
 
 ```bash
-# Deploy
-kubectl apply -k apps/<app>/manifests/base/
+# Deploy (decrypts secrets + TLS, applies, cleans up)
+just deploy ops-backoffice-tools <app>
 
 # Check
 kubectl get all -n <app>

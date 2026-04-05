@@ -1,0 +1,70 @@
+---
+# Reset k3s cluster — removes k3s, Cilium, etcd data, all k8s state.
+# Preserves: Tailscale, cloud-init hardening, DO infrastructure, CIS sysctls.
+#
+# Usage:
+#   cd k3s/<galaxy>
+#   just play k3s--reset <inventory_group>
+
+- name: "K3s {{ variable_host }} - Build groups"
+  hosts: "{{ variable_host }}"
+  gather_facts: false
+  tasks:
+    - name: Build dynamic groups
+      group_by:
+        key: "{{ item }}"
+      loop: [k3s_cluster, server]
+
+- name: "K3s {{ variable_host }} - Reset"
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Run k3s uninstall (server)
+      when: "'server' in group_names"
+      command:
+        cmd: k3s-uninstall.sh
+        removes: /var/lib/rancher/k3s/*
+
+    - name: Run k3s uninstall (agent)
+      when: "'agent' in group_names"
+      command:
+        cmd: k3s-agent-uninstall.sh
+        removes: /var/lib/rancher/k3s/*
+
+    - name: Clean up remaining files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "~{{ ansible_user_id }}/.kube/config"
+        - /usr/local/bin/k3s-install.sh
+        - /etc/rancher
+        - /var/lib/rancher
+        - /etc/systemd/system/k3s.service.env
+        - /usr/local/bin/helm
+        - /var/log/k3s
+
+    - name: Clean up Cilium BPF state
+      command:
+        cmd: rm -rf /sys/fs/bpf/cilium
+        removes: /sys/fs/bpf/cilium
+
+    - name: Flush Cilium iptables chains
+      shell: |
+        iptables-save | grep -iv cilium | iptables-restore
+        ip6tables-save | grep -iv cilium | ip6tables-restore
+      changed_when: true
+      ignore_errors: true
+
+- name: "K3s {{ variable_host }} - Clean local kubeconfig"
+  hosts: server[0]
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Remove local kubeconfig
+      file:
+        path: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+        state: absent
+      delegate_to: localhost
+      when: galaxy_name is defined
