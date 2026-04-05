@@ -8,7 +8,7 @@ spec:
   listeners:
     - name: websecure
       protocol: HTTPS
-      port: 8443
+      port: 443
       hostname: registry.freecodecamp.net
       tls:
         mode: Terminate
@@ -19,7 +19,7 @@ spec:
           from: Same
     - name: web
       protocol: HTTP
-      port: 8000
+      port: 80
       hostname: registry.freecodecamp.net
       allowedRoutes:
         namespaces:

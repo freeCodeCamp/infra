@@ -16,17 +16,31 @@ spec:
       kubernetesGateway:
         enabled: true
 
-    # Enable Gateway provisioning
+    # Disable built-in Gateway (we define per-app Gateways in manifests)
     gateway:
-      enabled: true
+      enabled: false
 
-    # Use LoadBalancer with ServiceLB (Klipper) to bind host ports 80/443
+    # DaemonSet + hostNetwork: Traefik binds 80/443 directly on every node
+    deployment:
+      kind: DaemonSet
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+        maxSurge: 0
+
+    hostNetwork: true
+
     service:
-      type: LoadBalancer
+      type: ClusterIP
 
     ports:
-      web: {}
+      web:
+        port: 80
+        exposedPort: 80
       websecure:
+        port: 443
+        exposedPort: 443
         tls:
           enabled: true
         transport:
@@ -48,8 +62,12 @@ spec:
         drop: [ALL]
         add: [NET_BIND_SERVICE]
       readOnlyRootFilesystem: true
-      runAsNonRoot: true
-      runAsUser: 65532
+      allowPrivilegeEscalation: false
+      runAsNonRoot: false
+      runAsUser: 0
 
     podSecurityContext:
       fsGroup: 65532
+      runAsGroup: 65532
+      seccompProfile:
+        type: RuntimeDefault
