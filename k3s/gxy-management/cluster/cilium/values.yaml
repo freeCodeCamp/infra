@@ -1,7 +1,7 @@
 # cluster.name, cluster.id, k8sServiceHost set at deploy time via Ansible --set flags
 k8sServicePort: "6443"
 
-kubeProxyReplacement: false
+kubeProxyReplacement: true
 devices: [eth0, eth1]
 mtu: 1500
 

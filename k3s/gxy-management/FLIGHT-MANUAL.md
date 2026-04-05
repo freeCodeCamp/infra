@@ -228,9 +228,10 @@ VPC, firewall, Spaces persist (shared infrastructure).
 
 ## Known Issues
 
-| Issue                            | Workaround                               | See                         |
-| -------------------------------- | ---------------------------------------- | --------------------------- |
-| Pod→nodeVPCIP broken             | `hostNetwork: true` for monitoring       | Field notes Failure 8b      |
-| kubeProxyReplacement breaks etcd | Keep `false`                             | Field notes Failure 7       |
-| Cilium picks up tailscale0 MTU   | Pin `devices: [eth0, eth1]`, `mtu: 1500` | Field notes Failure 8a      |
-| DO native routing blocked        | Use VXLAN tunnel (DO anti-spoofing)      | Field notes Cilium pitfalls |
+| Issue                          | Workaround                               | See                         |
+| ------------------------------ | ---------------------------------------- | --------------------------- |
+| Pod→nodeVPCIP broken           | `hostNetwork: true` for monitoring       | Field notes Failure 8b      |
+| Cilium picks up tailscale0 MTU | Pin `devices: [eth0, eth1]`, `mtu: 1500` | Field notes Failure 8a      |
+| DO native routing blocked      | Use VXLAN tunnel (DO anti-spoofing)      | Field notes Cilium pitfalls |
+
+**Resolved:** `kubeProxyReplacement: true` works on k3s HA when devices/MTU are pinned. Failure 7 was a misdiagnosis (root cause: MTU pollution). See field notes.
