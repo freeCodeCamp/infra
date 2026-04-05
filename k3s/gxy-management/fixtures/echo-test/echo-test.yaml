@@ -1,0 +1,95 @@
+# Routing validation fixture: 3-replica whoami spread across all nodes
+# Verifies: Traefik hostNetwork → Cilium eBPF → cross-node VXLAN → pod
+#
+# Apply:  kubectl apply -f echo-test.yaml
+# Test:   curl -s -H "Host: echo.test" http://<node-public-ip>
+# Tear:   kubectl delete ns echo-test
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: echo-test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: echo-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - whoami
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: whoami
+          image: traefik/whoami:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+  namespace: echo-test
+spec:
+  selector:
+    app: whoami
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: echo-gateway
+  namespace: echo-test
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: web
+      protocol: HTTP
+      port: 80
+      hostname: echo.test
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: whoami-route
+  namespace: echo-test
+spec:
+  parentRefs:
+    - name: echo-gateway
+      namespace: echo-test
+  hostnames:
+    - echo.test
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: whoami
+          port: 80
