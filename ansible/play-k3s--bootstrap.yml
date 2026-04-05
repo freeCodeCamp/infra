@@ -223,6 +223,20 @@
       delegate_to: localhost
       become: false
 
+    - name: Patch metrics-server for hostNetwork (pod→nodeIP workaround)
+      command: >-
+        k3s kubectl -n kube-system patch deploy metrics-server
+        --type=json
+        -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},
+             {"op":"replace","path":"/spec/template/spec/containers/0/ports/0/containerPort","value":4443},
+             {"op":"replace","path":"/spec/template/spec/containers/0/args","value":["--cert-dir=/tmp","--secure-port=4443","--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname","--kubelet-use-node-status-port","--metric-resolution=15s"]}]'
+      register: patch_result
+      changed_when: "'patched' in patch_result.stdout"
+      failed_when: false
+      retries: 5
+      delay: 10
+      until: patch_result.rc == 0
+
     - name: Done
       debug:
         msg:
