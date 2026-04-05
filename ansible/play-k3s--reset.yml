@@ -72,7 +72,6 @@
 - name: "K3s {{ variable_host }} - Clean up local kubeconfig"
   hosts: "{{ variable_host }}"
   gather_facts: false
-  connection: local
   become: false
   run_once: true
   tasks:
@@ -80,4 +79,5 @@
       ansible.builtin.file:
         path: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
         state: absent
+      delegate_to: localhost
       when: galaxy_name is defined

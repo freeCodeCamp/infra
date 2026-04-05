@@ -223,9 +223,15 @@
       register: kubeconfig_raw
       no_log: true
 
-    - name: Write kubeconfig locally (replace server IP with Tailscale IP)
+    - name: Write kubeconfig locally (replace server IP and context name)
       copy:
-        content: "{{ kubeconfig_raw.content | b64decode | regex_replace('127\\.0\\.0\\.1', hostvars[inventory_hostname]['tailscale_ip']) }}"
+        content: >-
+          {{ kubeconfig_raw.content | b64decode
+             | regex_replace('127\\.0\\.0\\.1', hostvars[inventory_hostname]['tailscale_ip'])
+             | regex_replace('name: default', 'name: ' + galaxy_name)
+             | regex_replace('cluster: default', 'cluster: ' + galaxy_name)
+             | regex_replace('user: default', 'user: ' + galaxy_name)
+             | regex_replace('current-context: default', 'current-context: ' + galaxy_name) }}
         dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         mode: "0600"
       delegate_to: localhost
