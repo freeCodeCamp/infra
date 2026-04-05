@@ -39,7 +39,8 @@
       loop:
         - "~{{ ansible_user_id }}/.kube/config"
         - /usr/local/bin/k3s-install.sh
-        - /etc/rancher/k3s
+        - /etc/rancher
+        - /var/lib/rancher
         - /etc/systemd/system/k3s.service.env
         - /usr/local/bin/helm
         - /var/log/k3s

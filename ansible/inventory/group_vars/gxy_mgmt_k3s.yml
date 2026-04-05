@@ -18,7 +18,10 @@ cilium_cluster_id: 1
 server_config_yaml: |
   flannel-backend: "none"
   disable-network-policy: true
-  disable-kube-proxy: true
+  # kube-proxy replacement disabled — breaks etcd on k3s HA (see field-notes Failure 7)
+  # Cilium still provides CNI + network policies + Hubble without it
+  # Revisit on bare metal where performance matters
+  disable-kube-proxy: false
   cluster-cidr: "10.1.0.0/16"
   service-cidr: "10.11.0.0/16"
   protect-kernel-defaults: true
