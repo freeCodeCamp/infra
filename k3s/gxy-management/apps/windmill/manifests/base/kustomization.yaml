@@ -8,12 +8,6 @@ resources:
   - httproutes.yaml
 
 secretGenerator:
-  - name: windmill-secrets
-    type: Opaque
-    envs:
-      - secrets/.secrets.env
-    options:
-      disableNameSuffixHash: true
   - name: windmill-tls-cloudflare
     type: kubernetes.io/tls
     files:
