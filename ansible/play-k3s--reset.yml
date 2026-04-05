@@ -17,6 +17,7 @@
 
 - name: "K3s {{ variable_host }} - Reset"
   hosts: k3s_cluster
+  gather_facts: true
   become: true
   tasks:
     - name: Run k3s uninstall (server)
@@ -36,7 +37,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - "~{{ ansible_user }}/.kube/config"
+        - "~{{ ansible_user_id }}/.kube/config"
         - /usr/local/bin/k3s-install.sh
         - /etc/rancher/k3s
         - /etc/systemd/system/k3s.service.env
@@ -47,6 +48,13 @@
       command:
         cmd: rm -rf /sys/fs/bpf/cilium
         removes: /sys/fs/bpf/cilium
+
+    - name: Flush Cilium iptables chains
+      shell: |
+        iptables-save | grep -iv cilium | iptables-restore
+        ip6tables-save | grep -iv cilium | ip6tables-restore
+      changed_when: true
+      ignore_errors: true
 
 - name: "K3s {{ variable_host }} - Clean local kubeconfig"
   hosts: server[0]
