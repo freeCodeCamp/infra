@@ -66,9 +66,7 @@
 
 - name: Wait for Cilium operator Deployment rollout
   ansible.builtin.command:
-    cmd: >-
-      kubectl -n kube-system rollout status
-      deployment/cilium-operator --timeout=180s
+    cmd: kubectl -n kube-system rollout status deployment/cilium-operator --timeout=180s
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
@@ -79,9 +77,7 @@
 
 - name: Verify Cilium status
   ansible.builtin.command:
-    cmd: >-
-      kubectl -n kube-system exec ds/cilium
-      -c cilium-agent -- cilium status --brief
+    cmd: kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium status --brief
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   register: cilium_status
