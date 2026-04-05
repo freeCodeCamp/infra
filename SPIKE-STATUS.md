@@ -187,17 +187,21 @@ Apps that only need K8s Secrets (ArgoCD, Zot) use `just deploy` which decrypts `
 
 ## What's Next
 
-Deploy sequentially. Verify each before moving to the next.
+**BLOCKED on playbook rewrite.** The galaxy playbook failed on every run for different reasons (CIS sysctls, folded scalar bugs, Gateway CRD conflicts, KUBECONFIG missing, etcd peer timeout). The playbook needs to be rewritten from scratch following standard k3s-ansible + Cilium patterns. Cluster has been torn down.
 
-### Phase A: Bootstrap Cluster
+### Parked Tasks (resume after playbooks are solid)
 
-| #   | Task                            | Status | Command / Notes                                                      |
-| --- | ------------------------------- | ------ | -------------------------------------------------------------------- |
-| A1  | Populate Windmill secrets       | DONE   | `windmill.values.yaml.enc` + `windmill.secrets.env.enc`              |
-| A2  | Refactor playbook to group_vars | BLOCK  | Playbook has hardcoded values — needs proper Ansible design          |
-| A3  | Run K3s galaxy playbook         | BLOCK  | Failed: missing CIS sysctls (sysctl fix added, needs rerun after A2) |
-| A4  | Verify cluster health           | TODO   | 3 nodes Ready, Cilium green, Traefik running, Gateway CRDs           |
-| A5  | Encrypt kubeconfig              | TODO   | sops encrypt to infra-secrets                                        |
+| Task                      | Notes                                        |
+| ------------------------- | -------------------------------------------- |
+| Run galaxy playbook       | Needs rewritten playbook                     |
+| Verify cluster health     | 3 nodes Ready, Cilium green, Traefik running |
+| Encrypt kubeconfig        | sops encrypt to infra-secrets                |
+| Install Windmill Helm     | `just helm-upgrade gxy-management windmill`  |
+| Deploy Windmill manifests | Gateway + TLS via `just deploy`              |
+| Cloudflare DNS + Access   | ClickOps: A records, email OTP gate          |
+| Smoke test Windmill       | curl + browser                               |
+| Commit infra-secrets      | Push to GitHub                               |
+| Clean up stale files      | Remove SPIKE-STATUS.md, archive cruft        |
 
 ### Phase B: Windmill (Day 0 Deliverable)
 

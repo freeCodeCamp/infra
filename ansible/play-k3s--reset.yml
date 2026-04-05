@@ -6,77 +6,55 @@
 #   cd k3s/<galaxy>
 #   just play k3s--reset <inventory_group>
 
-- name: "K3s {{ variable_host }} - Build groups for reset"
+- name: "K3s {{ variable_host }} - Build groups"
   hosts: "{{ variable_host }}"
   gather_facts: false
   tasks:
-    - name: Build k3s_cluster group
+    - name: Build dynamic groups
       group_by:
-        key: k3s_cluster
+        key: "{{ item }}"
+      loop: [k3s_cluster, server]
 
-    - name: Build server group
-      group_by:
-        key: server
-
-- name: "K3s {{ variable_host }} - Reset cluster"
+- name: "K3s {{ variable_host }} - Reset"
   hosts: k3s_cluster
   become: true
   tasks:
-    - name: Run k3s uninstall script (server)
+    - name: Run k3s uninstall (server)
       when: "'server' in group_names"
-      ansible.builtin.command:
+      command:
         cmd: k3s-uninstall.sh
         removes: /var/lib/rancher/k3s/*
 
-    - name: Run k3s uninstall script (agent)
+    - name: Run k3s uninstall (agent)
       when: "'agent' in group_names"
-      ansible.builtin.command:
+      command:
         cmd: k3s-agent-uninstall.sh
         removes: /var/lib/rancher/k3s/*
 
-    - name: Remove user kubeconfig
-      ansible.builtin.file:
-        path: "~{{ ansible_user }}/.kube/config"
+    - name: Clean up remaining files
+      file:
+        path: "{{ item }}"
         state: absent
+      loop:
+        - "~{{ ansible_user }}/.kube/config"
+        - /usr/local/bin/k3s-install.sh
+        - /etc/rancher/k3s
+        - /etc/systemd/system/k3s.service.env
+        - /usr/local/bin/helm
+        - /var/log/k3s
 
-    - name: Remove k3s install script
-      ansible.builtin.file:
-        path: /usr/local/bin/k3s-install.sh
-        state: absent
-
-    - name: Remove k3s config directory
-      ansible.builtin.file:
-        path: /etc/rancher/k3s
-        state: absent
-
-    - name: Remove k3s service environment
-      ansible.builtin.file:
-        path: /etc/systemd/system/k3s.service.env
-        state: absent
-
-    - name: Remove Cilium BPF state
-      ansible.builtin.command:
+    - name: Clean up Cilium BPF state
+      command:
         cmd: rm -rf /sys/fs/bpf/cilium
         removes: /sys/fs/bpf/cilium
 
-    - name: Remove Helm binary
-      ansible.builtin.file:
-        path: /usr/local/bin/helm
-        state: absent
-
-    - name: Remove k3s audit logs
-      ansible.builtin.file:
-        path: /var/log/k3s
-        state: absent
-
-- name: "K3s {{ variable_host }} - Clean up local kubeconfig"
-  hosts: "{{ variable_host }}"
+- name: "K3s {{ variable_host }} - Clean local kubeconfig"
+  hosts: server[0]
   gather_facts: false
   become: false
-  run_once: true
   tasks:
     - name: Remove local kubeconfig
-      ansible.builtin.file:
+      file:
         path: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
         state: absent
       delegate_to: localhost

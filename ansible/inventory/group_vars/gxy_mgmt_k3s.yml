@@ -1,29 +1,26 @@
 ---
 # gxy-management galaxy configuration
 # Applied automatically when targeting the gxy_mgmt_k3s inventory group
+#
+# To add a new galaxy: create a new file matching the DO inventory tag.
 
 galaxy_name: gxy-management
-
-# k3s
 k3s_version: v1.34.5+k3s1
-
-# Cilium CNI
 cilium_cluster_id: 1
 
-# k3s config.yaml — written to /etc/rancher/k3s/config.yaml
-# Keys are hyphenated (matching CLI flags). Per k3s docs:
-# https://docs.k3s.io/installation/configuration
-# https://docs.k3s.io/security/hardening-guide
+# k3s config.yaml — written to /etc/rancher/k3s/config.yaml by the role
+# Keys are hyphenated, matching CLI flags. Docs:
+#   https://docs.k3s.io/installation/configuration
+#   https://docs.k3s.io/security/hardening-guide
+#
+# Do NOT add tls-san, token, cluster-init, or server here —
+# those are managed by the k3s-ansible role via extra_server_args.
 server_config_yaml: |
-  # Do NOT add tls-san here — managed by the playbook's extra_server_args (per-node)
-  # Networking (ADR-009)
   flannel-backend: "none"
   disable-network-policy: true
   disable-kube-proxy: true
   cluster-cidr: "10.1.0.0/16"
   service-cidr: "10.11.0.0/16"
-
-  # Security (CIS hardening)
   protect-kernel-defaults: true
   secrets-encryption: true
   kube-apiserver-arg:
@@ -33,8 +30,6 @@ server_config_yaml: |
     - "audit-log-maxage=30"
     - "audit-log-maxbackup=10"
     - "audit-log-maxsize=100"
-
-  # etcd S3 backups (DO Spaces FRA1)
   etcd-s3: true
   etcd-s3-endpoint: "fra1.digitaloceanspaces.com"
   etcd-s3-bucket: "net.freecodecamp.universe-backups"
