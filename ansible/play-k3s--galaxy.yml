@@ -4,7 +4,7 @@
 # Generic playbook for any Universe galaxy. All galaxy-specific config
 # lives in inventory/group_vars/<group>.yml — not in this file.
 #
-# Plays: validate → sysctl + prereqs → k3s server → traefik + gateway CRDs → cilium → verify → fetch kubeconfig
+# Plays: validate → sysctl + prereqs + traefik config → k3s server → cilium → verify → fetch kubeconfig
 #
 # Prerequisites:
 #   - VMs provisioned with VPC (eth1) and Tailscale connected
@@ -72,8 +72,7 @@
       debug:
         msg: >-
           {{ inventory_hostname }}: VPC={{ vpc_ip }}, Tailscale={{ tailscale_ip }},
-          galaxy={{ galaxy_name }}, k3s={{ k3s_version }},
-          pods={{ cluster_cidr }}, svc={{ service_cidr }}
+          galaxy={{ galaxy_name }}, k3s={{ k3s_version }}
 
     - name: Build dynamic groups
       group_by:
@@ -121,6 +120,18 @@
         dest: /etc/rancher/k3s/audit-policy.yaml
         mode: "0600"
 
+    - name: Ensure k3s manifests directory exists
+      file:
+        path: /var/lib/rancher/k3s/server/manifests
+        state: directory
+        mode: "0755"
+
+    - name: Copy Traefik HelmChartConfig (before k3s starts)
+      copy:
+        src: "{{ cluster_config_dir }}/cluster/traefik-config.yaml"
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: "0600"
+
   roles:
     - role: k3s.orchestration.prereq
 
@@ -162,22 +173,8 @@
   roles:
     - role: k3s.orchestration.k3s_server
 
-# Play 4: Configure ingress
-- name: "K3s {{ variable_host }} - Configure ingress"
-  hosts: server[0]
-  gather_facts: false
-  become: true
-
-  tasks:
-    - name: Apply Traefik HelmChartConfig
-      copy:
-        src: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/cluster/traefik-config.yaml"
-        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
-        mode: "0600"
-    # Gateway API CRDs are bundled in the Traefik CRD Helm chart (traefik-crd).
-    # Do NOT install them manually — conflicts with Helm ownership labels.
-
-# Play 5: Install Cilium (must run before nodes can be Ready)
+# Play 4: Install Cilium (must run before nodes can be Ready)
+# Gateway API CRDs are bundled in the Traefik CRD Helm chart — do NOT install manually.
 - name: "K3s {{ variable_host }} - Install Cilium"
   hosts: server[0]
   gather_facts: false
@@ -191,7 +188,7 @@
         cilium_values_file: "{{ cluster_config_dir }}/cluster/cilium/values.yaml"
         cilium_k8s_service_host: "{{ hostvars[groups['server'][0]]['vpc_ip'] }}"
 
-# Play 6: Wait for cluster ready (after Cilium provides the CNI)
+# Play 5: Wait for cluster ready (after Cilium provides the CNI)
 - name: "K3s {{ variable_host }} - Verify cluster"
   hosts: server[0]
   gather_facts: false
@@ -211,7 +208,7 @@
       debug:
         msg: "{{ cluster_status.stdout_lines }}"
 
-# Play 7: Fetch kubeconfig
+# Play 6: Fetch kubeconfig
 - name: "K3s {{ variable_host }} - Fetch kubeconfig"
   hosts: server[0]
   gather_facts: false

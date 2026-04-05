@@ -54,6 +54,11 @@
         path: /etc/systemd/system/k3s.service.env
         state: absent
 
+    - name: Remove Cilium BPF state
+      ansible.builtin.command:
+        cmd: rm -rf /sys/fs/bpf/cilium
+        removes: /sys/fs/bpf/cilium
+
     - name: Remove Helm binary
       ansible.builtin.file:
         path: /usr/local/bin/helm
