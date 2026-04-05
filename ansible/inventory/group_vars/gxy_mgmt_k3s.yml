@@ -7,16 +7,37 @@ galaxy_name: gxy-management
 # k3s
 k3s_version: v1.34.5+k3s1
 
-# Networking (ADR-009: non-overlapping per galaxy)
-cluster_cidr: "10.1.0.0/16"
-service_cidr: "10.11.0.0/16"
-
 # Cilium CNI
 cilium_cluster_id: 1
 
-# etcd S3 backups (DO Spaces)
-etcd_s3_endpoint: fra1.digitaloceanspaces.com
-etcd_s3_bucket: net.freecodecamp.universe-backups
-etcd_s3_region: fra1
-etcd_snapshot_schedule: "0 */6 * * *"
-etcd_snapshot_retention: 20
+# k3s config.yaml — written to /etc/rancher/k3s/config.yaml
+# Keys are hyphenated (matching CLI flags). Per k3s docs:
+# https://docs.k3s.io/installation/configuration
+# https://docs.k3s.io/security/hardening-guide
+server_config_yaml: |
+  # Networking (ADR-009)
+  flannel-backend: "none"
+  disable-network-policy: true
+  disable-kube-proxy: true
+  cluster-cidr: "10.1.0.0/16"
+  service-cidr: "10.11.0.0/16"
+
+  # Security (CIS hardening)
+  protect-kernel-defaults: true
+  secrets-encryption: true
+  kube-apiserver-arg:
+    - "admission-control-config-file=/etc/rancher/k3s/pss-admission.yaml"
+    - "audit-log-path=/var/log/k3s/audit.log"
+    - "audit-policy-file=/etc/rancher/k3s/audit-policy.yaml"
+    - "audit-log-maxage=30"
+    - "audit-log-maxbackup=10"
+    - "audit-log-maxsize=100"
+
+  # etcd S3 backups (DO Spaces FRA1)
+  etcd-s3: true
+  etcd-s3-endpoint: "fra1.digitaloceanspaces.com"
+  etcd-s3-bucket: "net.freecodecamp.universe-backups"
+  etcd-s3-folder: "etcd/gxy-management"
+  etcd-s3-region: "fra1"
+  etcd-snapshot-schedule-cron: "0 */6 * * *"
+  etcd-snapshot-retention: 20

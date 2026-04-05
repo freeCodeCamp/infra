@@ -30,14 +30,8 @@
         that:
           - galaxy_name is defined and galaxy_name | length > 0
           - k3s_version is defined and k3s_version | length > 0
-          - cluster_cidr is defined and cluster_cidr | length > 0
-          - service_cidr is defined and service_cidr | length > 0
+          - server_config_yaml is defined and server_config_yaml | length > 0
           - cilium_cluster_id is defined and cilium_cluster_id | string | length > 0
-          - etcd_s3_endpoint is defined and etcd_s3_endpoint | length > 0
-          - etcd_s3_bucket is defined and etcd_s3_bucket | length > 0
-          - etcd_s3_region is defined and etcd_s3_region | length > 0
-          - etcd_snapshot_schedule is defined and etcd_snapshot_schedule | length > 0
-          - etcd_snapshot_retention is defined
         fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
     - name: Validate env vars loaded
@@ -144,23 +138,6 @@
       --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --tls-san={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --tls-san={{ hostvars[inventory_hostname]['tailscale_ip'] }}
-      --flannel-backend=none
-      --disable-network-policy
-      --disable-kube-proxy
-      --secrets-encryption
-      --protect-kernel-defaults
-      --cluster-cidr={{ cluster_cidr }}
-      --service-cidr={{ service_cidr }}
-      --kube-apiserver-arg=admission-control-config-file=/etc/rancher/k3s/pss-admission.yaml
-      --kube-apiserver-arg=audit-log-path=/var/log/k3s/audit.log
-      --kube-apiserver-arg=audit-policy-file=/etc/rancher/k3s/audit-policy.yaml
-      --etcd-s3
-      --etcd-s3-endpoint={{ etcd_s3_endpoint }}
-      --etcd-s3-bucket={{ etcd_s3_bucket }}
-      --etcd-s3-folder=etcd/{{ galaxy_name }}
-      --etcd-s3-region={{ etcd_s3_region }}
-      --etcd-snapshot-schedule-cron="{{ etcd_snapshot_schedule }}"
-      --etcd-snapshot-retention={{ etcd_snapshot_retention }}
     server_group: server
 
   pre_tasks:
