@@ -44,7 +44,7 @@
       - value: "k8sServiceHost={{ cilium_k8s_service_host }}"
       - value: "k8sServicePort={{ cilium_k8s_service_port }}"
     wait: true
-    timeout: "5m0s"
+    timeout: "10m0s"
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
@@ -59,6 +59,10 @@
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
+  retries: 3
+  delay: 15
+  register: cilium_agent_rollout
+  until: cilium_agent_rollout.rc == 0
 
 - name: Wait for Cilium operator Deployment rollout
   ansible.builtin.command:
@@ -68,6 +72,10 @@
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
+  retries: 3
+  delay: 15
+  register: cilium_operator_rollout
+  until: cilium_operator_rollout.rc == 0
 
 - name: Verify Cilium status
   ansible.builtin.command:
@@ -78,6 +86,9 @@
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   register: cilium_status
   changed_when: false
+  retries: 5
+  delay: 20
+  until: cilium_status.rc == 0
 
 - name: Display Cilium status
   ansible.builtin.debug:

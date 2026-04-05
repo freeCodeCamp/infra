@@ -80,7 +80,7 @@ just play k3s--cluster tools_k3s
 just play k3s--longhorn tools_k3s
 
 # Deploy gxy-management galaxy (decrypts vault vars automatically)
-just play k3s--galaxy gxy_mgmt_k3s
+just play k3s--bootstrap gxy_mgmt_k3s
 ```
 
 ---
@@ -179,8 +179,8 @@ CNI: Cilium    Storage: local-path    SSH/kubectl: Tailscale
 
 ## Playbooks Reference
 
-| Playbook               | Purpose                                               |
-| ---------------------- | ----------------------------------------------------- |
-| play-k3s--cluster.yml  | Deploy k3s HA cluster                                 |
-| play-k3s--longhorn.yml | Install Longhorn storage                              |
-| play-k3s--galaxy.yml   | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |
+| Playbook                | Purpose                                               |
+| ----------------------- | ----------------------------------------------------- |
+| play-k3s--cluster.yml   | Deploy k3s HA cluster                                 |
+| play-k3s--longhorn.yml  | Install Longhorn storage                              |
+| play-k3s--bootstrap.yml | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |

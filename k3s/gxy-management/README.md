@@ -29,7 +29,7 @@ kubectl get nodes
 ## Deploy
 
 ```bash
-just play k3s--galaxy gxy_mgmt_k3s
+just play k3s--bootstrap gxy_mgmt_k3s
 ```
 
 ## Deployment Runbook
@@ -46,7 +46,7 @@ just play k3s--galaxy gxy_mgmt_k3s
 ### K3s Bootstrap
 
 ```bash
-just play k3s--galaxy gxy_mgmt_k3s
+just play k3s--bootstrap gxy_mgmt_k3s
 ```
 
 Deploys k3s HA cluster with Cilium CNI, Traefik ingress, etcd S3 backups, and fetches kubeconfig.

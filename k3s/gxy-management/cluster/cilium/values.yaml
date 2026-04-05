@@ -2,6 +2,8 @@
 k8sServicePort: "6443"
 
 kubeProxyReplacement: true
+bpf:
+  masquerade: true
 
 ipam:
   operator:
