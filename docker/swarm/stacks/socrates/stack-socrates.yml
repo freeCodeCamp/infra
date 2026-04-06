@@ -22,8 +22,6 @@ x-deploy-config: &deploy-config
         memory: 512M
     restart_policy:
       condition: any
-    labels:
-      - org.freecodecamp.autoupdate=true
   extra_hosts:
     - "host.docker.internal:host-gateway"
   healthcheck:
@@ -76,14 +74,14 @@ x-port-config: &port-config
 
 services:
   svc-socrates-alpha:
-    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:${DEPLOYMENT_VERSION}
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:latest
     ports:
       - published: 4010
         <<: *port-config
     <<: *deploy-config
 
   svc-socrates-bravo:
-    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:${DEPLOYMENT_VERSION}
+    image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:latest
     ports:
       - published: 4011
         <<: *port-config
