@@ -209,6 +209,128 @@ curl -s https://zot.freecodecamp.net/v2/ | head
 # Should return OCI registry response
 ```
 
+## Backups
+
+### What is backed up
+
+| Data                 | Method                                            | Schedule                    | Storage                                                           | Restore time                 |
+| -------------------- | ------------------------------------------------- | --------------------------- | ----------------------------------------------------------------- | ---------------------------- |
+| etcd (cluster state) | k3s built-in S3 snapshots                         | Every 6h, 20 retained       | `s3://net.freecodecamp.universe-backups/etcd/gxy-management/`     | Minutes (k3s native restore) |
+| Windmill PostgreSQL  | CronJob pg_dump → S3                              | Daily 02:00 UTC, 7 retained | `s3://net.freecodecamp.universe-backups/windmill/gxy-management/` | Minutes (pg_restore)         |
+| ArgoCD               | Not backed up — state is in git                   | N/A                         | N/A                                                               | Re-deploy from git           |
+| Zot                  | Not backed up — images stored on S3               | N/A                         | DO Spaces (primary storage)                                       | N/A                          |
+| Helm releases        | Not backed up — reproducible from values + charts | N/A                         | infra repo                                                        | `just helm-upgrade`          |
+| TLS certs, secrets   | Not backed up — reproducible from infra-secrets   | N/A                         | infra-secrets repo                                                | `just deploy`                |
+
+### Ad-hoc Windmill backup (before maintenance)
+
+```
+just windmill-backup gxy-management
+```
+
+This runs pg_dump inside the PostgreSQL pod and saves to `k3s/gxy-management/.backups/`. Run before any Helm upgrade, teardown, or PostgreSQL change.
+
+### Automated Windmill backup (CronJob)
+
+Deploy the backup CronJob after Windmill is running:
+
+```
+kubectl apply -f k3s/gxy-management/apps/windmill/manifests/base/backup-cronjob.yaml
+```
+
+The CronJob:
+
+- Runs daily at 02:00 UTC
+- Dumps Windmill PostgreSQL via pg_dumpall
+- Compresses with gzip
+- Uploads to DO Spaces (`windmill/gxy-management/windmill-YYYYMMDD-HHMMSS.sql.gz`)
+- Deletes backups older than 7 days from S3
+- Requires a Kubernetes Secret `windmill-backup-s3` with S3 credentials (create via infra-secrets)
+
+Verify CronJob is running:
+
+```
+kubectl get cronjob -n windmill
+# windmill-backup   0 2 * * *   ...
+
+kubectl get jobs -n windmill --sort-by=.metadata.creationTimestamp
+# Most recent job should show Completed
+```
+
+### Restore Windmill from backup
+
+**From ad-hoc backup (local file):**
+
+```
+# Copy backup into the PostgreSQL pod
+kubectl cp k3s/gxy-management/.backups/windmill-YYYYMMDD.sql.gz windmill/windmill-postgresql-0:/tmp/
+
+# Restore
+kubectl exec -n windmill windmill-postgresql-0 -- bash -c \
+  'gunzip -c /tmp/windmill-YYYYMMDD.sql.gz | psql -U postgres'
+```
+
+**From S3 backup:**
+
+```
+# Download from S3 (use aws-cli or s3cmd with DO Spaces endpoint)
+s3cmd get s3://net.freecodecamp.universe-backups/windmill/gxy-management/windmill-YYYYMMDD-HHMMSS.sql.gz /tmp/
+
+# Copy into pod and restore
+kubectl cp /tmp/windmill-YYYYMMDD-HHMMSS.sql.gz windmill/windmill-postgresql-0:/tmp/
+kubectl exec -n windmill windmill-postgresql-0 -- bash -c \
+  'gunzip -c /tmp/windmill-YYYYMMDD-HHMMSS.sql.gz | psql -U postgres'
+```
+
+**After restore:** Restart Windmill pods to pick up restored data:
+
+```
+kubectl rollout restart deployment -n windmill -l app.kubernetes.io/name=windmill
+```
+
+### Restore etcd from S3
+
+If the entire cluster is lost and needs rebuilding from etcd snapshot:
+
+```
+# List available snapshots
+k3s etcd-snapshot list --s3 \
+  --s3-bucket net.freecodecamp.universe-backups \
+  --s3-folder etcd/gxy-management \
+  --s3-endpoint fra1.digitaloceanspaces.com \
+  --s3-region fra1
+
+# Restore (run on the --cluster-init node only)
+k3s server \
+  --cluster-reset \
+  --cluster-reset-restore-path=s3://net.freecodecamp.universe-backups/etcd/gxy-management/SNAPSHOT_NAME
+```
+
+Then rejoin the other nodes. See [k3s backup/restore docs](https://docs.k3s.io/datastore/backup-restore).
+
+### Verify backups
+
+After setting up automated backups, verify monthly:
+
+- [ ] Check CronJob last success: `kubectl get cronjob -n windmill`
+- [ ] List S3 backups: `s3cmd ls s3://net.freecodecamp.universe-backups/windmill/gxy-management/`
+- [ ] Test restore to a scratch database (not production)
+- [ ] Confirm etcd snapshots: `k3s etcd-snapshot list --s3 ...`
+
+### Migration to CNPG (production path)
+
+The bundled PostgreSQL (Bitnami subchart) is single-instance with no replication, no WAL archiving, and no PITR. For production:
+
+1. Deploy CloudNativePG operator on gxy-management
+2. Create a CNPG Cluster resource with S3 WAL archiving (same DO Spaces bucket)
+3. pg_dump from bundled PostgreSQL → pg_restore into CNPG cluster
+4. Update Windmill `databaseUrl` to point to CNPG service
+5. Remove the bundled PostgreSQL (set `postgresql.enabled: false` in Helm values)
+
+CNPG provides: continuous WAL archiving, PITR, automated base backups, replica failover. This replaces both the CronJob and the bundled PostgreSQL.
+
+---
+
 ## Teardown
 
 ### Cluster only (preserves VMs)
