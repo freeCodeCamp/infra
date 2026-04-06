@@ -60,18 +60,20 @@ All application stacks use Gantry webhook-triggered updates:
 
 ## Migration Steps
 
-### API (freeCodeCamp repo + infra repo)
+### API (freeCodeCamp repo + infra repo) -- PARKED
 
-#### infra repo: `docker/swarm/stacks/api/stack-api.yml`
+API migration to Gantry webhook is deferred. The SSH-based deploy path remains active.
 
-- [ ] Add `org.freecodecamp.autoupdate=true` deploy label to the `x-deploy-config` anchor
-- [ ] Switch image tag from `${DEPLOYMENT_VERSION}` to `latest` (or keep both, with `:latest` as the running tag)
+#### Completed
 
-#### freeCodeCamp repo: `.github/workflows/`
+- [x] PR #66826: add missing required vars (`SES_SMTP_USERNAME`, `SES_SMTP_PASSWORD`, `SOCRATES_API_KEY`, `SOCRATES_ENDPOINT`) to deploy script
 
-- [ ] In the build workflow (`docker-docr.yml` or equivalent): push a `:latest` tag alongside the pinned version tag
-- [ ] In `deploy-api.yml`: replace the SSH deploy job with a Gantry webhook trigger job (model on socrates `deploy-gantry`)
-- [ ] Remove the age-decrypt, remote script, SSH connection validation, and `Configure SSH` steps
+#### Future work (Gantry migration)
+
+- [ ] Bake `BUILD_VERSION` into API Docker image (Dockerfile `ARG` → `ENV`)
+- [ ] Replace SSH deploy job with Gantry webhook trigger
+- [ ] Switch stack image tag to `:latest`
+- [ ] Remove age-decrypt and SSH connection steps from GHA workflow
 
 #### Gantry webhook call (reference from socrates)
 
@@ -95,7 +97,7 @@ All application stacks use Gantry webhook-triggered updates:
 - [x] Remove the `deploy-full` job entirely
 - [x] Remove the `deploy_mode` input and validation (always Gantry)
 - [x] Simplify `build.yml` to remove the `deploy_mode` input passthrough
-- [x] Bake `DEPLOYMENT_VERSION` into image via Dockerfile `ARG` → `ENV`
+- [x] Bake `BUILD_VERSION` into image via Dockerfile `ARG` → `ENV`
 - [x] Pass tagname as build arg in `build.yml`
 - [x] Add `/health/version` endpoint returning baked version
 - [x] Webhook verified working against `stg-socrates` (2026-04-06)
@@ -104,7 +106,7 @@ All application stacks use Gantry webhook-triggered updates:
 
 - [x] Remove `org.freecodecamp.autoupdate=true` label (webhook-only, no cron watch)
 - [x] Switch image tag to `:latest`
-- [x] Remove `DEPLOYMENT_VERSION` from stack YAML and `.env.sample` (baked in image)
+- [x] Remove `BUILD_VERSION` from stack YAML and `.env.sample` (baked in image)
 
 #### Deployed
 
