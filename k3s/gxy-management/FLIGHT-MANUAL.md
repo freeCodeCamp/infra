@@ -331,6 +331,65 @@ CNPG provides: continuous WAL archiving, PITR, automated base backups, replica f
 
 ---
 
+## Windmill IaC (CLI Sync)
+
+Windmill CE does not have Git Sync. Scripts, flows, and apps are managed via `wmill` CLI in a dedicated repo (`~/DEV/fCC/windmill`).
+
+### Repository structure
+
+```
+wmill.yaml                              # CLI config, branch → workspace mapping
+.sops.yaml                              # sops+age encryption rules for resources
+github_app.resource-type.yaml           # Custom resource type definitions (repo root)
+f/
+  <folder>/
+    folder.meta.yaml                    # Required — folder permissions
+    <script>.deno.ts                    # Code (.deno.ts = Deno, .ts = Bun)
+    <script>.script.yaml                # Metadata (summary, schema, lock ref)
+    <script>.script.lock                # Dependency lockfile
+  integration/
+    apollo-11_github_app.resource.yaml  # sops-encrypted credentials
+```
+
+### Sync workflow
+
+Always run from the windmill repo directory (`cd ~/DEV/fCC/windmill`).
+
+**Push local → remote:**
+
+```bash
+cd ~/DEV/fCC/windmill
+sops -d -i f/integration/apollo-11_github_app.resource.yaml   # decrypt credentials
+wmill sync push --dry-run                                       # verify: all + creates, zero - deletes
+wmill sync push --yes                                           # push to Windmill
+sops -e -i f/integration/apollo-11_github_app.resource.yaml   # re-encrypt
+```
+
+**Pull remote → local:**
+
+```bash
+cd ~/DEV/fCC/windmill
+wmill sync pull
+sops -e -i f/integration/apollo-11_github_app.resource.yaml   # encrypt before committing
+```
+
+**Regenerate metadata after code changes:**
+
+```bash
+wmill generate-metadata
+```
+
+### Branch strategy
+
+- `main` — config only (`wmill.yaml`, `.sops.yaml`, `.gitignore`)
+- `gxy-management` — scripts, flows, apps for the gxy-management workspace
+
+### Critical warnings
+
+- **NEVER run `wmill sync push` from the wrong directory.** "No wmill.yaml found" = wrong directory. Without config, push sees empty local state and deletes everything remote.
+- **ALWAYS decrypt resources before push, re-encrypt after.** Pushing encrypted ciphertext stores `ENC[AES256_GCM,...]` as literal values in Windmill.
+- **ALWAYS use `--dry-run` first.** Review that changes show `+` (creates) or `~` (updates), not `-` (deletes of resources you want to keep).
+
 ## Teardown
 
 ### Cluster only (preserves VMs)
