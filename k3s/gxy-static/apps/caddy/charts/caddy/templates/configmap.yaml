@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-caddyfile
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  Caddyfile: |
+    {
+      auto_https off
+      admin :2019
+
+      filesystem r2 s3 {
+        bucket {{ .Values.s3.bucket }}
+        region {{ .Values.s3.region }}
+        endpoint {$S3_ENDPOINT}
+        use_path_style
+      }
+    }
+
+    :80 {
+      log {
+        output stdout
+        format json
+      }
+
+      # Health check
+      handle /healthz {
+        respond "ok" 200
+      }
+
+      # Primary: serve from local SSD
+      root * /srv/sites/{host}
+      file_server
+
+      # Fallback: cache miss → R2
+      handle_errors {
+        @404 expression {err.status_code} == 404
+        root * /{host}
+        file_server {
+          fs r2
+        }
+      }
+    }
