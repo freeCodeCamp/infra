@@ -35,7 +35,7 @@ just secret-verify-all
 
 ### 1.4 DO Spaces
 
-- [ ] Bucket `net.freecodecamp.universe-backups` in FRA1 (etcd snapshots + Zot storage)
+- [ ] Bucket `net-freecodecamp-universe-backups` in FRA1 (etcd snapshots + Zot storage)
 
 ### 1.5 Tailscale
 
@@ -215,8 +215,8 @@ curl -s https://zot.freecodecamp.net/v2/ | head
 
 | Data                 | Method                                            | Schedule                    | Storage                                                           | Restore time                 |
 | -------------------- | ------------------------------------------------- | --------------------------- | ----------------------------------------------------------------- | ---------------------------- |
-| etcd (cluster state) | k3s built-in S3 snapshots                         | Every 6h, 20 retained       | `s3://net.freecodecamp.universe-backups/etcd/gxy-management/`     | Minutes (k3s native restore) |
-| Windmill PostgreSQL  | CronJob pg_dump → S3                              | Daily 02:00 UTC, 7 retained | `s3://net.freecodecamp.universe-backups/windmill/gxy-management/` | Minutes (pg_restore)         |
+| etcd (cluster state) | k3s built-in S3 snapshots                         | Every 6h, 20 retained       | `s3://net-freecodecamp-universe-backups/etcd/gxy-management/`     | Minutes (k3s native restore) |
+| Windmill PostgreSQL  | CronJob pg_dump → S3                              | Daily 02:00 UTC, 7 retained | `s3://net-freecodecamp-universe-backups/windmill/gxy-management/` | Minutes (pg_restore)         |
 | ArgoCD               | Not backed up — state is in git                   | N/A                         | N/A                                                               | Re-deploy from git           |
 | Zot                  | Not backed up — images stored on S3               | N/A                         | DO Spaces (primary storage)                                       | N/A                          |
 | Helm releases        | Not backed up — reproducible from values + charts | N/A                         | infra repo                                                        | `just helm-upgrade`          |
@@ -274,7 +274,7 @@ kubectl exec -n windmill windmill-postgresql-0 -- bash -c \
 
 ```
 # Download from S3 (use aws-cli or s3cmd with DO Spaces endpoint)
-s3cmd get s3://net.freecodecamp.universe-backups/windmill/gxy-management/windmill-YYYYMMDD-HHMMSS.sql.gz /tmp/
+s3cmd get s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-YYYYMMDD-HHMMSS.sql.gz /tmp/
 
 # Copy into pod and restore
 kubectl cp /tmp/windmill-YYYYMMDD-HHMMSS.sql.gz windmill/windmill-postgresql-0:/tmp/
@@ -295,7 +295,7 @@ If the entire cluster is lost and needs rebuilding from etcd snapshot:
 ```
 # List available snapshots
 k3s etcd-snapshot list --s3 \
-  --s3-bucket net.freecodecamp.universe-backups \
+  --s3-bucket net-freecodecamp-universe-backups \
   --s3-folder etcd/gxy-management \
   --s3-endpoint fra1.digitaloceanspaces.com \
   --s3-region fra1
@@ -303,7 +303,7 @@ k3s etcd-snapshot list --s3 \
 # Restore (run on the --cluster-init node only)
 k3s server \
   --cluster-reset \
-  --cluster-reset-restore-path=s3://net.freecodecamp.universe-backups/etcd/gxy-management/SNAPSHOT_NAME
+  --cluster-reset-restore-path=s3://net-freecodecamp-universe-backups/etcd/gxy-management/SNAPSHOT_NAME
 ```
 
 Then rejoin the other nodes. See [k3s backup/restore docs](https://docs.k3s.io/datastore/backup-restore).
@@ -313,7 +313,7 @@ Then rejoin the other nodes. See [k3s backup/restore docs](https://docs.k3s.io/d
 After setting up automated backups, verify monthly:
 
 - [ ] Check CronJob last success: `kubectl get cronjob -n windmill`
-- [ ] List S3 backups: `s3cmd ls s3://net.freecodecamp.universe-backups/windmill/gxy-management/`
+- [ ] List S3 backups: `s3cmd ls s3://net-freecodecamp-universe-backups/windmill/gxy-management/`
 - [ ] Test restore to a scratch database (not production)
 - [ ] Confirm etcd snapshots: `k3s etcd-snapshot list --s3 ...`
 

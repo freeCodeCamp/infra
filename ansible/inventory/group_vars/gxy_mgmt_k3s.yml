@@ -34,7 +34,7 @@ server_config_yaml: |
     - "audit-log-maxsize=100"
   etcd-s3: true
   etcd-s3-endpoint: "fra1.digitaloceanspaces.com"
-  etcd-s3-bucket: "net.freecodecamp.universe-backups"
+  etcd-s3-bucket: "net-freecodecamp-universe-backups"
   etcd-s3-folder: "etcd/gxy-management"
   etcd-s3-region: "fra1"
   etcd-snapshot-schedule-cron: "0 */6 * * *"
