@@ -84,6 +84,11 @@ deploy cluster app:
       CLEANUP="$CLEANUP $APP_SECRETS/tls.key"
       trap "rm -f $CLEANUP" EXIT
     fi
+    if [ -f "$ENC_DIR/{{app}}-backup.secrets.env.enc" ]; then
+      sops -d --input-type dotenv --output-type dotenv "$ENC_DIR/{{app}}-backup.secrets.env.enc" > "$APP_SECRETS/.backup-secrets.env"
+      CLEANUP="$CLEANUP $APP_SECRETS/.backup-secrets.env"
+      trap "rm -f $CLEANUP" EXIT
+    fi
 
     [ -n "$CLEANUP" ] || { echo "Error: no secrets found for {{app}} in $ENC_DIR"; exit 1; }
 
@@ -124,6 +129,24 @@ helm-upgrade cluster app:
       --repo "$REPO_URL" \
       -n {{app}} --create-namespace \
       $HELM_ARGS
+
+# Ad-hoc Windmill PostgreSQL backup (local file)
+[group('k3s')]
+windmill-backup cluster:
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{cluster}}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    mkdir -p .backups
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    FILENAME="windmill-${TIMESTAMP}.sql.gz"
+    PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
+    [ -n "${PG_POD}" ] || { echo "Error: no PostgreSQL pod found in windmill namespace"; exit 1; }
+    echo "Backing up Windmill PostgreSQL from ${PG_POD}..."
+    kubectl exec -n windmill "${PG_POD}" -- bash -c 'PGPASSWORD="${POSTGRES_PASSWORD}" pg_dumpall -U postgres --clean --if-exists' | gzip > ".backups/${FILENAME}"
+    FILESIZE=$(stat -f%z ".backups/${FILENAME}" 2>/dev/null || stat -c%s ".backups/${FILENAME}")
+    [ "${FILESIZE}" -gt 100 ] || { echo "Error: backup file too small (${FILESIZE} bytes) — likely empty dump"; exit 1; }
+    echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
 
 # Validate K8s manifests with kubeconform
 [group('k3s')]

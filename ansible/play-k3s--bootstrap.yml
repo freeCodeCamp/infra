@@ -135,13 +135,34 @@
       --advertise-address={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --tls-san={{ hostvars[inventory_hostname]['vpc_ip'] }}
       --tls-san={{ hostvars[inventory_hostname]['tailscale_ip'] }}
-    extra_service_envs:
-      - "AWS_ACCESS_KEY_ID={{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}"
-      - "AWS_SECRET_ACCESS_KEY={{ lookup('env', 'DO_SPACES_SECRET_KEY') }}"
     server_group: server
     user_kubectl: false
   roles:
     - role: k3s.orchestration.k3s_server
+  post_tasks:
+    - name: Inject S3 credentials into k3s config.yaml
+      ansible.builtin.lineinfile:
+        path: /etc/rancher/k3s/config.yaml
+        regexp: "^{{ item.key }}:"
+        line: '{{ item.key }}: "{{ item.value }}"'
+        mode: "0600"
+      loop:
+        - {
+            key: "etcd-s3-access-key",
+            value: "{{ lookup('env', 'DO_SPACES_ACCESS_KEY') }}",
+          }
+        - {
+            key: "etcd-s3-secret-key",
+            value: "{{ lookup('env', 'DO_SPACES_SECRET_KEY') }}",
+          }
+      no_log: true
+      notify: restart k3s
+  handlers:
+    - name: restart k3s
+      systemd:
+        name: k3s
+        state: restarted
+        daemon_reload: true
 
 # Play 4: Install Cilium CNI
 - name: "K3s {{ variable_host }} - Cilium"

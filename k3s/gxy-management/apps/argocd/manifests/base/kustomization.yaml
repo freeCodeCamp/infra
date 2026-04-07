@@ -8,12 +8,6 @@ resources:
   - httproutes.yaml
 
 secretGenerator:
-  - name: argocd-secrets
-    type: Opaque
-    envs:
-      - secrets/.secrets.env
-    options:
-      disableNameSuffixHash: true
   - name: argocd-tls-cloudflare
     type: kubernetes.io/tls
     files:

@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: windmill-backup
+  namespace: windmill
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: bitnami/postgresql:16
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  FILENAME="windmill-${TIMESTAMP}.sql.gz"
+                  S3_PATH="windmill/gxy-management/${FILENAME}"
+
+                  echo "Starting backup: ${FILENAME}"
+                  PGPASSWORD="${PGPASSWORD}" pg_dumpall \
+                    -h windmill-postgresql \
+                    -U postgres \
+                    --clean \
+                    --if-exists | gzip > "/tmp/${FILENAME}"
+
+                  FILESIZE=$(stat -c%s "/tmp/${FILENAME}" 2>/dev/null || stat -f%z "/tmp/${FILENAME}")
+                  echo "Backup size: ${FILESIZE} bytes"
+
+                  echo "Uploading to s3://${S3_BUCKET}/${S3_PATH}"
+                  apt-get update -qq && apt-get install -y -qq awscli > /dev/null 2>&1
+                  aws s3 cp "/tmp/${FILENAME}" "s3://${S3_BUCKET}/${S3_PATH}" \
+                    --endpoint-url "${S3_ENDPOINT}"
+
+                  echo "Cleaning up backups older than 7 days"
+                  CUTOFF=$(date -d '7 days ago' +%Y%m%d 2>/dev/null || date -v-7d +%Y%m%d)
+                  aws s3 ls "s3://${S3_BUCKET}/windmill/gxy-management/" \
+                    --endpoint-url "${S3_ENDPOINT}" | while read -r line; do
+                    FILE=$(echo "$line" | awk '{print $4}')
+                    FILE_DATE=$(echo "$FILE" | grep -oP '\d{8}' | head -1)
+                    if [ -n "${FILE_DATE}" ] && [ "${FILE_DATE}" -lt "${CUTOFF}" ]; then
+                      echo "Deleting old backup: ${FILE}"
+                      aws s3 rm "s3://${S3_BUCKET}/windmill/gxy-management/${FILE}" \
+                        --endpoint-url "${S3_ENDPOINT}"
+                    fi
+                  done
+
+                  echo "Backup complete: ${S3_PATH}"
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: windmill-backup-s3
+                      key: PG_PASSWORD
+                - name: S3_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: windmill-backup-s3
+                      key: S3_BUCKET
+                - name: S3_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: windmill-backup-s3
+                      key: S3_ENDPOINT
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: windmill-backup-s3
+                      key: S3_ACCESS_KEY
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: windmill-backup-s3
+                      key: S3_SECRET_KEY
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
