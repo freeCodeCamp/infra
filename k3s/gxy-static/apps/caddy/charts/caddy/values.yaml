@@ -30,9 +30,12 @@ rcloneResources:
     memory: 128Mi
 
 s3:
-  bucket: static
-  endpoint: ""
+  bucket: gxy-static-1
   region: auto
+  # Credentials set via secret values overlay (infra-secrets)
+  accessKeyId: ""
+  secretAccessKey: ""
+  endpoint: ""
 
 nodeSelector: {}
 tolerations: []

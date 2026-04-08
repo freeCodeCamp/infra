@@ -6,16 +6,6 @@ metadata:
 spec:
   gatewayClassName: traefik
   listeners:
-    - name: websecure
-      protocol: HTTPS
-      port: 443
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: caddy-tls-cloudflare
-      allowedRoutes:
-        namespaces:
-          from: Same
     - name: web
       protocol: HTTP
       port: 80

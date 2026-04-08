@@ -10,39 +10,6 @@ spec:
       X-Forwarded-Proto: "https"
 
 ---
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: redirect-https
-  namespace: caddy
-spec:
-  redirectScheme:
-    scheme: https
-    permanent: true
-
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: http-redirect
-  namespace: caddy
-spec:
-  parentRefs:
-    - name: caddy-gateway
-      namespace: caddy
-      sectionName: web
-  rules:
-    - filters:
-        - type: ExtensionRef
-          extensionRef:
-            group: traefik.io
-            kind: Middleware
-            name: redirect-https
-      backendRefs:
-        - name: caddy
-          port: 80
-
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -52,7 +19,7 @@ spec:
   parentRefs:
     - name: caddy-gateway
       namespace: caddy
-      sectionName: websecure
+      sectionName: web
   rules:
     - matches:
         - path:

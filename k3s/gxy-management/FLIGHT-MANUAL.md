@@ -39,10 +39,9 @@ just secret-verify-all
 
 ### 1.5 Tailscale
 
-SSH into each node and join:
-
 ```
-tailscale up --ssh
+just play tailscale--0-install gxy_mgmt_k3s
+just play tailscale--1b-up-with-ssh gxy_mgmt_k3s
 ```
 
 Verify from local:

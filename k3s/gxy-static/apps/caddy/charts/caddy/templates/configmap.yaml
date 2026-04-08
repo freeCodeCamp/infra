@@ -20,6 +20,11 @@ data:
     }
 
     :80 {
+      @apex host freecode.camp www.freecode.camp
+      handle @apex {
+        redir https://www.freecodecamp.org{uri} 302
+      }
+
       log {
         output stdout
         format json
