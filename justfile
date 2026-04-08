@@ -90,8 +90,6 @@ deploy cluster app:
       trap "rm -f $CLEANUP" EXIT
     fi
 
-    [ -n "$CLEANUP" ] || { echo "Error: no secrets found for {{app}} in $ENC_DIR"; exit 1; }
-
     cd k3s/{{cluster}}
     export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
     kubectl apply -k apps/{{app}}/manifests/base/
@@ -109,10 +107,6 @@ helm-upgrade cluster app:
     CHART_NAME=$(basename "$CHART_DIR")
     VALUES="$CHART_DIR/values.yaml"
     [ -f "$VALUES" ] || { echo "Error: $VALUES not found"; exit 1; }
-    REPO_FILE="$CHART_DIR/repo"
-    [ -f "$REPO_FILE" ] || { echo "Error: $REPO_FILE not found (one line: chart repo URL)"; exit 1; }
-    REPO_URL=$(cat "$REPO_FILE")
-
     HELM_ARGS="-f $VALUES"
     CLEANUP=""
     SECRET_VALUES="{{secrets_dir}}/k3s/{{cluster}}/{{app}}.values.yaml.enc"
@@ -124,11 +118,20 @@ helm-upgrade cluster app:
       trap "rm -f $CLEANUP" EXIT
     fi
 
-    echo "Installing {{app}} (chart: $CHART_NAME) from $REPO_URL"
-    helm upgrade --install {{app}} "$CHART_NAME" \
-      --repo "$REPO_URL" \
-      -n {{app}} --create-namespace \
-      $HELM_ARGS
+    REPO_FILE="$CHART_DIR/repo"
+    if [ -f "$REPO_FILE" ]; then
+      REPO_URL=$(cat "$REPO_FILE")
+      echo "Installing {{app}} (chart: $CHART_NAME) from $REPO_URL"
+      helm upgrade --install {{app}} "$CHART_NAME" \
+        --repo "$REPO_URL" \
+        -n {{app}} --create-namespace \
+        $HELM_ARGS
+    else
+      echo "Installing {{app}} (chart: $CHART_NAME) from local directory"
+      helm upgrade --install {{app}} "$CHART_DIR" \
+        -n {{app}} --create-namespace \
+        $HELM_ARGS
+    fi
 
 # Ad-hoc Windmill PostgreSQL backup (local file)
 [group('k3s')]

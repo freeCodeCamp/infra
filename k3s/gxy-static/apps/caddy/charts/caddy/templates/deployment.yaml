@@ -40,7 +40,7 @@ spec:
             - -c
             - |
               mkdir -p /srv/sites
-              rclone sync "r2:{{ .Values.s3.bucket }}" /srv/sites \
+              rclone sync ":s3:{{ .Values.s3.bucket }}" /srv/sites \
                 --s3-provider=Cloudflare \
                 --s3-endpoint="${S3_ENDPOINT}" \
                 --s3-access-key-id="${AWS_ACCESS_KEY_ID}" \
@@ -48,10 +48,11 @@ spec:
                 --s3-no-check-bucket \
                 --copy-links \
                 --transfers=16 \
-                --checkers=16
+                --checkers=16 \
+                --create-empty-src-dirs || true
           envFrom:
             - secretRef:
-                name: caddy-s3-credentials
+                name: {{ .Release.Name }}-s3-credentials
           volumeMounts:
             - name: site-data
               mountPath: /srv/sites
@@ -71,7 +72,7 @@ spec:
               protocol: TCP
           envFrom:
             - secretRef:
-                name: caddy-s3-credentials
+                name: {{ .Release.Name }}-s3-credentials
           volumeMounts:
             - name: site-data
               mountPath: /srv/sites
@@ -104,7 +105,7 @@ spec:
             - -c
             - |
               while true; do
-                rclone sync "r2:{{ .Values.s3.bucket }}" /srv/sites \
+                rclone sync ":s3:{{ .Values.s3.bucket }}" /srv/sites \
                   --s3-provider=Cloudflare \
                   --s3-endpoint="${S3_ENDPOINT}" \
                   --s3-access-key-id="${AWS_ACCESS_KEY_ID}" \
@@ -117,7 +118,7 @@ spec:
               done
           envFrom:
             - secretRef:
-                name: caddy-s3-credentials
+                name: {{ .Release.Name }}-s3-credentials
           volumeMounts:
             - name: site-data
               mountPath: /srv/sites
