@@ -35,7 +35,7 @@ just secret-verify-all
 
 ### 1.4 DO Spaces
 
-- [ ] Bucket `net-freecodecamp-universe-backups` in FRA1 (etcd snapshots + Zot storage)
+- [ ] Bucket `net-freecodecamp-universe-backups` in FRA1 (etcd snapshots + Windmill backups)
 
 ### 1.5 Tailscale
 
@@ -131,7 +131,7 @@ doctl compute droplet list --tag-name gxy-mgmt-k3s --format Name,PublicIPv4
 - [ ] Proxy: ON (orange cloud)
 - [ ] SSL mode: Full (Strict)
 
-### 4.3 Cloudflare Access
+### 4.3 Cloudflare Access (deferred)
 
 - [ ] Create Access application for `windmill.freecodecamp.net`
 - [ ] Policy: email OTP, allow all `@freecodecamp.org`
@@ -140,12 +140,11 @@ doctl compute droplet list --tag-name gxy-mgmt-k3s --format Name,PublicIPv4
 
 ```
 curl -sI https://windmill.freecodecamp.net
-# Should return 200 or 302 (Cloudflare Access redirect)
+# Should return 200
 ```
 
 - [ ] Browser: visit `https://windmill.freecodecamp.net`
-- [ ] Cloudflare Access gate prompts for email
-- [ ] After auth, Windmill login page loads
+- [ ] Windmill login page loads
 
 ## Phase 5: ArgoCD
 
@@ -169,7 +168,7 @@ kubectl get httproute -n argocd
 ### 5.3 DNS + Access
 
 - [ ] A records: `argocd.freecodecamp.net` → same 3 node public IPs
-- [ ] Cloudflare Access application (same pattern)
+- [ ] Cloudflare Access application (deferred)
 
 ### 5.4 Get initial admin password
 
@@ -177,7 +176,7 @@ kubectl get httproute -n argocd
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 ```
 
-## Phase 6: Zot
+## Phase 6: Zot (deferred — Phase 1)
 
 ### 6.1 Deploy
 
@@ -217,7 +216,7 @@ curl -s https://zot.freecodecamp.net/v2/ | head
 | etcd (cluster state) | k3s built-in S3 snapshots                         | Every 6h, 20 retained       | `s3://net-freecodecamp-universe-backups/etcd/gxy-management/`     | Minutes (k3s native restore) |
 | Windmill PostgreSQL  | CronJob pg_dump → S3 (not yet active)             | Daily 02:00 UTC, 7 retained | `s3://net-freecodecamp-universe-backups/windmill/gxy-management/` | Minutes (pg_restore)         |
 | ArgoCD               | Not backed up — state is in git                   | N/A                         | N/A                                                               | Re-deploy from git           |
-| Zot                  | Not backed up — images stored on S3               | N/A                         | DO Spaces (primary storage)                                       | N/A                          |
+| Zot (deferred)       | Not backed up — images stored on S3               | N/A                         | DO Spaces (primary storage)                                       | N/A                          |
 | Helm releases        | Not backed up — reproducible from values + charts | N/A                         | infra repo                                                        | `just helm-upgrade`          |
 | TLS certs, secrets   | Not backed up — reproducible from infra-secrets   | N/A                         | infra-secrets repo                                                | `just deploy`                |
 
@@ -321,7 +320,7 @@ After setting up automated backups, verify monthly:
 
 ### Migration to CNPG (production path)
 
-The bundled PostgreSQL (Bitnami subchart) is single-instance with no replication, no WAL archiving, and no PITR. For production:
+The bundled PostgreSQL (Windmill chart inline template) is single-instance with no replication, no WAL archiving, and no PITR. For production:
 
 1. Deploy CloudNativePG operator on gxy-management
 2. Create a CNPG Cluster resource with S3 WAL archiving (same DO Spaces bucket)
