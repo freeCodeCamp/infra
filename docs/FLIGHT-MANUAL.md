@@ -1,6 +1,8 @@
-# gxy-management Flight Manual
+# Universe Flight Manual
 
-Checklist for spinning up the gxy-management galaxy from scratch. Each step is sequenced — do not skip ahead. ClickOps steps will be codified into OpenTofu later.
+Rebuild the entire Universe platform from scratch. Each phase is sequenced — do not skip ahead. ClickOps steps will be codified into OpenTofu later.
+
+# Part 1: gxy-management
 
 ## Pre-flight
 
@@ -391,7 +393,132 @@ wmill generate-metadata
 - **ALWAYS decrypt resources before push, re-encrypt after.** Pushing encrypted ciphertext stores `ENC[AES256_GCM,...]` as literal values in Windmill.
 - **ALWAYS use `--dry-run` first.** Review that changes show `+` (creates) or `~` (updates), not `-` (deletes of resources you want to keep).
 
-## Teardown
+# Part 2: gxy-static
+
+Static content hosting galaxy. Serves `freecode.camp` via Caddy + R2.
+
+## Phase 7: Infrastructure (ClickOps)
+
+### 7.1 DO Droplets
+
+- [ ] Create 3× `s-4vcpu-8gb-amd` in FRA1
+- [ ] Names: `gxy-vm-static-k3s-{1,2,3}`
+- [ ] Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-static-k3s`
+- [ ] Cloud-init: `cloud-init/basic.yml`
+
+### 7.2 DO Cloud Firewall
+
+- [ ] Add tag `gxy-static-k3s` to existing `gxy-fw-fra1`
+
+### 7.3 Tailscale
+
+```
+just play tailscale--0-install gxy_static_k3s
+just play tailscale--1b-up-with-ssh gxy_static_k3s
+```
+
+Verify: `tailscale status | grep gxy-vm-static`
+
+## Phase 8: Cluster Bootstrap
+
+```
+cd k3s/gxy-static
+just play k3s--bootstrap gxy_static_k3s
+```
+
+### Post-bootstrap checks
+
+```
+export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+kubectl get nodes -o wide
+# All 3 Ready, InternalIP = VPC IPs (10.110.0.x)
+
+kubectl get pods -n kube-system
+# All Running, no CrashLoopBackOff
+```
+
+## Phase 9: Caddy
+
+### 9.1 Helm install
+
+```
+just helm-upgrade gxy-static caddy
+```
+
+Requires `caddy.values.yaml.enc` in infra-secrets (R2 credentials: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_ENDPOINT`).
+
+### 9.2 Deploy manifests (namespace, gateway, httproutes)
+
+```
+just deploy gxy-static caddy
+```
+
+### 9.3 Verify
+
+```
+kubectl get pods -n caddy
+# 3 pods Running (2/2 containers: caddy + rclone-sync)
+
+kubectl get gateway -n caddy
+# caddy-gateway Programmed=True
+
+kubectl get httproute -n caddy
+# caddy-route
+
+curl -sI -H "Host: freecode.camp" http://<node-public-ip>
+# 302 redirect to freecodecamp.org
+```
+
+## Phase 10: DNS (ClickOps)
+
+### 10.1 Get node public IPs
+
+```
+doctl compute droplet list --tag-name gxy-static-k3s --format Name,PublicIPv4
+```
+
+### 10.2 Cloudflare DNS
+
+- [ ] 3× A records: `freecode.camp` → node public IPs (Proxy ON)
+- [ ] 3× A records: `*.freecode.camp` → node public IPs (Proxy ON)
+- [ ] SSL mode: Flexible (no origin cert)
+
+### 10.3 Smoke test
+
+```
+curl -sI https://freecode.camp
+# 302 → https://www.freecodecamp.org
+
+curl -sI https://test.freecode.camp
+# 404 (no content yet — expected)
+```
+
+## Phase 11: First Static Site (smoke test)
+
+```bash
+mkdir -p /tmp/test-site && echo '<h1>freecode.camp works</h1>' > /tmp/test-site/index.html
+
+rclone sync /tmp/test-site :s3:gxy-static-1/test.freecode.camp/ \
+  --s3-provider=Cloudflare \
+  --s3-endpoint=<endpoint-from-secrets> \
+  --s3-access-key-id=<key-from-secrets> \
+  --s3-secret-access-key=<secret-from-secrets> \
+  --s3-no-check-bucket
+```
+
+Wait ~5min for rclone sidecar sync (or `kubectl rollout restart deployment caddy -n caddy`).
+
+```
+curl -s https://test.freecode.camp
+# Should return the HTML
+```
+
+---
+
+# Teardowns
+
+## gxy-management Teardown
 
 ### Cluster only (preserves VMs)
 
@@ -406,7 +533,24 @@ just play k3s--teardown gxy_mgmt_k3s
 doctl compute droplet delete gxy-vm-mgmt-k3s-1 gxy-vm-mgmt-k3s-2 gxy-vm-mgmt-k3s-3 --force
 ```
 
+## gxy-static Teardown
+
+### Cluster only (preserves VMs)
+
+```
+just play k3s--teardown gxy_static_k3s
+```
+
+### Full teardown (VMs too)
+
+```
+just play k3s--teardown gxy_static_k3s
+doctl compute droplet delete gxy-vm-static-k3s-1 gxy-vm-static-k3s-2 gxy-vm-static-k3s-3 --force
+```
+
 VPC, firewall, Spaces persist (shared infrastructure).
+
+---
 
 ## Known Issues
 
