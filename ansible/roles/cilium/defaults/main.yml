@@ -1,0 +1,8 @@
+---
+cilium_version: "1.19.2"
+helm_version: "v3.17.3"
+cilium_cluster_name: ""
+cilium_cluster_id: ""
+cilium_values_file: ""
+cilium_k8s_service_host: ""
+cilium_k8s_service_port: "6443"

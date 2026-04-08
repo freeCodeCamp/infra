@@ -1,0 +1,55 @@
+# Traefik HelmChartConfig for gxy-management galaxy
+# Reference: https://docs.k3s.io/networking/networking-services#customizing-the-traefik-helm-chart
+#
+# This file is copied to /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+# by Ansible play-k3s--galaxy.yml
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    # Enable Gateway API provider
+    providers:
+      kubernetesGateway:
+        enabled: true
+
+    # Enable Gateway provisioning
+    gateway:
+      enabled: true
+
+    # Use LoadBalancer with ServiceLB (Klipper) to bind host ports 80/443
+    service:
+      type: LoadBalancer
+
+    ports:
+      web: {}
+      websecure:
+        tls:
+          enabled: true
+        transport:
+          respondingTimeouts:
+            readTimeout: "0s"
+            writeTimeout: "0s"
+            idleTimeout: "180s"
+
+    # Logging
+    logs:
+      general:
+        level: INFO
+      access:
+        enabled: true
+
+    # Security context
+    securityContext:
+      capabilities:
+        drop: [ALL]
+        add: [NET_BIND_SERVICE]
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532
+
+    podSecurityContext:
+      fsGroup: 65532

@@ -36,7 +36,7 @@ terraform.rc
 .vscode/
 
 # Ignore User-specific temporary files
-__scratchpad__/
+.scratchpad
 
 # Ignore generated files
 manifest.json
@@ -48,7 +48,6 @@ ansible/inventory/hosts
 # Secrets
 *.env
 *.env.*
-.envrc
 
 .kubeconfig.yaml
 *.crt
@@ -61,3 +60,7 @@ secrets.overrides.yaml
 o11y/defaults/
 
 .beads-credential-key
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db

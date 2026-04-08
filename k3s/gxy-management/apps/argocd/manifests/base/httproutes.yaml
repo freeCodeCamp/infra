@@ -1,0 +1,75 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: secure-headers
+  namespace: argocd
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: argocd
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+
+---
+# HTTP to HTTPS redirect
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-redirect
+  namespace: argocd
+spec:
+  parentRefs:
+    - name: argocd-gateway
+      namespace: argocd
+      sectionName: web
+  hostnames:
+    - argocd.freecodecamp.net
+  rules:
+    - filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: redirect-https
+      backendRefs:
+        - name: argocd-server
+          port: 80
+
+---
+# Main ArgoCD route
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-route
+  namespace: argocd
+spec:
+  parentRefs:
+    - name: argocd-gateway
+      namespace: argocd
+      sectionName: websecure
+  hostnames:
+    - argocd.freecodecamp.net
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: secure-headers
+      backendRefs:
+        - name: argocd-server
+          port: 80

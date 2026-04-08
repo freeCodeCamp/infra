@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: windmill
+
+resources:
+  - namespace.yaml
+  - gateway.yaml
+  - httproutes.yaml
+
+secretGenerator:
+  - name: windmill-tls-cloudflare
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=secrets/tls.crt
+      - tls.key=secrets/tls.key
+    options:
+      disableNameSuffixHash: true
