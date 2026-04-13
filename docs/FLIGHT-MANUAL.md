@@ -494,7 +494,7 @@ curl -sI https://test.freecode.camp
 # 404 (no content yet — expected)
 ```
 
-## Phase 11: First Static Site (smoke test)
+## Phase 11: First Static Site (smoke test — raw rclone)
 
 ```bash
 mkdir -p /tmp/test-site && echo '<h1>freecode.camp works</h1>' > /tmp/test-site/index.html
@@ -509,9 +509,92 @@ rclone sync /tmp/test-site :s3:gxy-static-1/test.freecode.camp/ \
 
 Wait ~5min for rclone sidecar sync (or `kubectl rollout restart deployment caddy -n caddy`).
 
-```
+```bash
 curl -s https://test.freecode.camp
 # Should return the HTML
+```
+
+Teardown: `rclone purge :s3:gxy-static-1/test.freecode.camp/` (same flags as above).
+
+## Phase 12: Immutable Deploy via Universe CLI
+
+Phase 11 validated raw R2 serving. Phase 12 validates the full deploy pipeline: immutable deploys with alias-based promotion through the `universe` CLI.
+
+### 12.1 Upgrade Caddy chart (alias resolver)
+
+```bash
+cd k3s/gxy-static
+just helm-upgrade gxy-static caddy
+```
+
+This deploys the alias resolver (rclone sidecar reads `production` alias files, creates `live` symlinks) and updates Caddy to serve from `{host}/live/`.
+
+### 12.2 Verify pods restarted
+
+```bash
+kubectl get pods -n caddy
+# 3 pods Running, 2/2 containers, AGE should be recent
+```
+
+### 12.3 Create test site
+
+```bash
+mkdir -p /tmp/test-static && cd /tmp/test-static
+
+cat > platform.yaml <<'EOF'
+name: hello-world.freecode.camp
+stack: static
+domain:
+  production: hello-world.freecode.camp
+  preview: preview-hello-world.freecode.camp
+EOF
+
+mkdir dist
+echo '<h1>hello from gxy-static</h1>' > dist/index.html
+```
+
+### 12.4 Deploy via CLI
+
+Credentials from `infra-secrets/k3s/gxy-static/caddy.values.yaml.enc` (decrypt with sops).
+
+```bash
+S3_ACCESS_KEY_ID=<from-secrets> \
+S3_SECRET_ACCESS_KEY=<from-secrets> \
+S3_ENDPOINT=<from-secrets> \
+node ~/DEV/fCC-U/universe-cli/dist/index.js static deploy --force
+```
+
+Expected output: deploy ID, file count, preview alias set.
+
+### 12.5 Promote to production
+
+```bash
+S3_ACCESS_KEY_ID=<from-secrets> \
+S3_SECRET_ACCESS_KEY=<from-secrets> \
+S3_ENDPOINT=<from-secrets> \
+node ~/DEV/fCC-U/universe-cli/dist/index.js static promote
+```
+
+### 12.6 Wait for sync + verify
+
+Wait ~5min for rclone sidecar sync, or restart the deployment to trigger init container sync.
+
+```bash
+curl -s https://hello-world.freecode.camp
+# Expected: <h1>hello from gxy-static</h1>
+```
+
+### 12.7 Teardown test site
+
+```bash
+rclone purge :s3:gxy-static-1/hello-world.freecode.camp/ \
+  --s3-provider=Cloudflare \
+  --s3-endpoint=<from-secrets> \
+  --s3-access-key-id=<from-secrets> \
+  --s3-secret-access-key=<from-secrets> \
+  --s3-no-check-bucket
+
+rm -rf /tmp/test-static
 ```
 
 ---
