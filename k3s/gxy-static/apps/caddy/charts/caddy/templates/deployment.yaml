@@ -49,7 +49,18 @@ spec:
                 --copy-links \
                 --transfers=16 \
                 --checkers=16 \
-                --create-empty-src-dirs || true
+                --create-empty-src-dirs
+              # Resolve production alias → live symlink per site
+              # DUPLICATED — keep in sync with rclone-sync sidecar
+              for alias_file in /srv/sites/*/production; do
+                [ -f "$alias_file" ] || continue
+                site_dir=$(dirname "$alias_file")
+                deploy_id=$(cat "$alias_file" | tr -d '[:space:]')
+                case "$deploy_id" in *[!a-zA-Z0-9._-]*) continue ;; esac
+                case "$deploy_id" in *..*) continue ;; esac
+                [ -d "$site_dir/deploys/$deploy_id" ] || continue
+                ln -sfn "deploys/$deploy_id" "$site_dir/live"
+              done
           envFrom:
             - secretRef:
                 name: {{ .Release.Name }}-s3-credentials
@@ -114,6 +125,17 @@ spec:
                   --copy-links \
                   --transfers=8 \
                   --checkers=8
+                # Resolve production alias → live symlink per site
+                # DUPLICATED — keep in sync with sync-init container
+                for alias_file in /srv/sites/*/production; do
+                  [ -f "$alias_file" ] || continue
+                  site_dir=$(dirname "$alias_file")
+                  deploy_id=$(cat "$alias_file" | tr -d '[:space:]')
+                  case "$deploy_id" in *[!a-zA-Z0-9._-]*) continue ;; esac
+                  case "$deploy_id" in *..*) continue ;; esac
+                  [ -d "$site_dir/deploys/$deploy_id" ] || continue
+                  ln -sfn "deploys/$deploy_id" "$site_dir/live"
+                done
                 sleep 300
               done
           envFrom:
