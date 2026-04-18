@@ -246,3 +246,32 @@ cf-notifications-apply *args:
 [group('monitoring')]
 uptime-robot-apply *args:
     scripts/uptime-robot-apply.sh {{args}}
+
+# ---------------------------------------------------------------------------
+# Cutover tooling (DNS flip from gxy-static to gxy-cassiopeia, RFC §6.8)
+# ---------------------------------------------------------------------------
+
+# Machine-checked cutover preflight (D25). Exits non-zero on any failing site.
+# Requires: rclone r2 remote configured; CASSIOPEIA_NODE_IP,
+# WOODPECKER_ADMIN_TOKEN, WOODPECKER_ENDPOINT in env (from direnv).
+[group('cutover')]
+cutover-preflight:
+    bash scripts/cutover-preflight.sh
+
+# Snapshot current DNS records for a zone to stdout (JSON). Pipe to a file.
+# Requires: CF_API_TOKEN with Zone:DNS:Read.
+[group('cutover')]
+cf-dns-export zone:
+    bash scripts/cf-dns-export.sh {{zone}}
+
+# Cut `@`, `www`, `*` A records on a zone to target IPs. Default is --dry-run.
+# Use --apply to commit. Requires: CF_API_TOKEN with Zone:DNS:Edit.
+[group('cutover')]
+cf-dns-cutover zone ips mode="--dry-run":
+    bash scripts/cf-dns-cutover.sh {{zone}} {{ips}} {{mode}}
+
+# Restore `@`, `www`, `*` A records from a cf-dns-export snapshot. Default
+# is --dry-run. Use --apply to commit. Requires: CF_API_TOKEN with Zone:DNS:Edit.
+[group('cutover')]
+cf-dns-restore snapshot mode="--dry-run":
+    bash scripts/cf-dns-restore.sh {{snapshot}} {{mode}}
