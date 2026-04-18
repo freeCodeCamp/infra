@@ -4,10 +4,6 @@ import (
 	"testing"
 )
 
-// TestParseSiteAndAlias_TableDriven covers the full grammar per RFC §4.3.7:
-// preview is identified by a `--preview` suffix on the LEFTMOST label only;
-// the preview site key is always the production subdomain (deploys are shared
-// between production and preview — only the alias file differs).
 func TestParseSiteAndAlias_TableDriven(t *testing.T) {
 	t.Parallel()
 
@@ -82,9 +78,8 @@ func TestParseSiteAndAlias_TableDriven(t *testing.T) {
 	}
 }
 
-// TestParseSiteAndAlias_PreviewOnNonLeftmostLabel asserts the preview suffix
-// is recognized ONLY on the leftmost label. A `--preview` suffix on any
-// inner label is part of the site name, not an alias indicator.
+// A `--preview` suffix on any inner label is part of the site name, not an
+// alias indicator — only the leftmost label triggers preview routing.
 func TestParseSiteAndAlias_PreviewOnNonLeftmostLabel(t *testing.T) {
 	t.Parallel()
 	site, alias, err := parseSiteAndAlias("foo.bar--preview.freecode.camp", "freecode.camp", "--preview")

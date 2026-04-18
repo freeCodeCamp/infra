@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// TestCache_HitAfterMiss asserts a first call invokes fetchFn; a second call
-// within TTL does not.
 func TestCache_HitAfterMiss(t *testing.T) {
 	c := newAliasCache(10, 1*time.Second)
 	var calls int32
@@ -40,7 +38,6 @@ func TestCache_HitAfterMiss(t *testing.T) {
 	}
 }
 
-// TestCache_TTLExpiry asserts a second call AFTER TTL invokes fetchFn again.
 func TestCache_TTLExpiry(t *testing.T) {
 	c := newAliasCache(10, 50*time.Millisecond)
 	var calls int32
@@ -61,7 +58,6 @@ func TestCache_TTLExpiry(t *testing.T) {
 	}
 }
 
-// TestCache_LRUEvictionAtCapacity asserts LRU evicts the oldest entry on overflow.
 func TestCache_LRUEvictionAtCapacity(t *testing.T) {
 	c := newAliasCache(3, 10*time.Second)
 	var mu sync.Mutex
@@ -102,8 +98,6 @@ func TestCache_LRUEvictionAtCapacity(t *testing.T) {
 	}
 }
 
-// TestCache_MissingSentinelCached asserts Present=false entries are cached
-// for the full TTL (not re-fetched on the next call).
 func TestCache_MissingSentinelCached(t *testing.T) {
 	c := newAliasCache(10, 1*time.Second)
 	var calls int32
@@ -132,8 +126,6 @@ func TestCache_MissingSentinelCached(t *testing.T) {
 	}
 }
 
-// TestCache_Singleflight asserts N concurrent calls for the same key produce
-// exactly ONE fetchFn invocation (stampede protection).
 func TestCache_Singleflight(t *testing.T) {
 	const concurrency = 1000
 	c := newAliasCache(10, 1*time.Second)
@@ -163,8 +155,7 @@ func TestCache_Singleflight(t *testing.T) {
 	}
 }
 
-// TestCache_ErrorNotCached asserts a fetchFn error is NOT stored — the next
-// call must retry. Sticky errors would amplify outages.
+// Sticky errors would amplify outages, so fetchFn errors are never cached.
 func TestCache_ErrorNotCached(t *testing.T) {
 	c := newAliasCache(10, 1*time.Second)
 	var calls int32
@@ -193,8 +184,6 @@ func TestCache_ErrorNotCached(t *testing.T) {
 	}
 }
 
-// TestCache_KeyComposition asserts the composed key is `bucket/site/aliasName`
-// so different tuples do not collide.
 func TestCache_KeyComposition(t *testing.T) {
 	c := newAliasCache(10, 1*time.Second)
 	var mu sync.Mutex

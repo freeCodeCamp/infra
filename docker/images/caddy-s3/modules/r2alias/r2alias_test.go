@@ -15,9 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TestValidate_RequiredFields covers the acceptance criterion:
-// "GIVEN Validate() runs with bucket=\"\" or endpoint=\"\" THEN an
-// explanatory error is returned".
 func TestValidate_RequiredFields(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -40,7 +37,6 @@ func TestValidate_RequiredFields(t *testing.T) {
 	}
 }
 
-// TestValidate_DefaultsApplied covers the RFC §4.3.4 default behavior.
 func TestValidate_DefaultsApplied(t *testing.T) {
 	r := R2Alias{Bucket: "b", Endpoint: "https://x"}
 	if err := r.Validate(); err != nil {
@@ -69,10 +65,7 @@ func TestValidate_DefaultsApplied(t *testing.T) {
 	}
 }
 
-// TestValidate_NegativeCacheParams covers the acceptance criterion:
-// "GIVEN Validate() runs with CacheTTL <= 0 or CacheMaxEntries <= 0 THEN
-// Validate returns an error".
-// Note: zero values trigger defaults (legitimate) — only negatives error.
+// Zero values trigger defaults (legitimate); only explicit negatives error.
 func TestValidate_NegativeCacheParams(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -103,8 +96,7 @@ func TestValidate_NegativeCacheParams(t *testing.T) {
 	}
 }
 
-// TestValidate_BadRegex asserts that a malformed deploy_id_regex surfaces as
-// a config error instead of a request-time panic.
+// A malformed regex must fail at config-parse, not at request time.
 func TestValidate_BadRegex(t *testing.T) {
 	r := R2Alias{Bucket: "b", Endpoint: "https://x", DeployIDRegex: "[unterminated"}
 	err := r.Validate()
@@ -113,9 +105,6 @@ func TestValidate_BadRegex(t *testing.T) {
 	}
 }
 
-// TestUnmarshalCaddyfile_FullBlock covers the full grammar from the directive.
-// Corresponds to the acceptance criterion that a Caddyfile with all options
-// parses without error (the `caddy adapt` check on the exit criterion).
 func TestUnmarshalCaddyfile_FullBlock(t *testing.T) {
 	const input = `r2_alias {
 		bucket foo
@@ -172,9 +161,6 @@ func TestUnmarshalCaddyfile_UnknownToken(t *testing.T) {
 	}
 }
 
-// TestCaddyModule_ID asserts the module registers at the documented ID.
-// (Lightweight sanity check; the real smoke test is `caddy list-modules`
-// after xcaddy build in T05.)
 func TestCaddyModule_ID(t *testing.T) {
 	info := R2Alias{}.CaddyModule()
 	if info.ID != "http.handlers.r2_alias" {
@@ -185,16 +171,9 @@ func TestCaddyModule_ID(t *testing.T) {
 	}
 }
 
-// --- ServeHTTP tests -------------------------------------------------------
-//
-// These tests bypass Provision (which loads AWS SDK config) by hand-wiring
-// the post-Provision state: deployIDRe compiled, cache constructed, logger
-// set, fetcher stub injected. This keeps the test suite independent of the
-// AWS SDK and network.
+// Tests below hand-wire post-Provision state (deployIDRe, cache, logger,
+// fetcher) to exercise ServeHTTP without an AWS SDK client.
 
-// newProvisionedForTest returns an R2Alias in the same post-Provision state
-// a real Caddy startup would leave it in, but without touching the AWS SDK.
-// Tests assign r.fetcher to control cache-miss behavior.
 func newProvisionedForTest(t *testing.T) *R2Alias {
 	t.Helper()
 	r := &R2Alias{
@@ -213,8 +192,7 @@ func newProvisionedForTest(t *testing.T) *R2Alias {
 	return r
 }
 
-// capturingNext records the path the handler chain sees after r2_alias
-// rewrites. Returning nil mimics a successful downstream response.
+// capturingNext records the path the handler chain sees after the rewrite.
 type capturingNext struct {
 	called bool
 	path   string
@@ -232,7 +210,6 @@ func stubFetcher(entry aliasEntry, err error) func(context.Context, string) (ali
 	return func(context.Context, string) (aliasEntry, error) { return entry, err }
 }
 
-// handlerStatus extracts the HTTP status from a returned caddyhttp error.
 func handlerStatus(t *testing.T, err error) int {
 	t.Helper()
 	if err == nil {

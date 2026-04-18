@@ -5,15 +5,13 @@ import (
 	"strings"
 )
 
-// parseSiteAndAlias extracts the (site, alias) tuple from a request Host.
+// parseSiteAndAlias extracts (site, alias) from a Host header.
 //
-// Production: "hello-world.freecode.camp" → ("hello-world.freecode.camp", "production").
-// Preview:    "hello-world--preview.freecode.camp" → ("hello-world.freecode.camp", "preview").
-//
-// The preview suffix is recognized ONLY on the leftmost label. An inner-label
-// match is part of the site name. The returned site is always the production
-// subdomain because production and preview share the same {site}/deploys/{id}/*
-// prefix in R2 — they differ only in which alias file they read (RFC §4.3.7).
+// The preview suffix is recognized ONLY on the leftmost label — an inner
+// label that ends in `--preview` is part of the site name. The returned
+// site always uses the production subdomain because preview and production
+// share the same {site}/deploys/{id}/* prefix in R2; only the alias file
+// differs.
 func parseSiteAndAlias(host, rootDomain, previewSuffix string) (site, alias string, err error) {
 	suffix := "." + rootDomain
 	if !strings.HasSuffix(host, suffix) {

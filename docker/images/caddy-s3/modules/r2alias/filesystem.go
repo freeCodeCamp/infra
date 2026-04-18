@@ -22,20 +22,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// defaultMaxFileSize caps the in-memory buffer for any single object. 100 MiB
-// comfortably covers typical static assets (HTML/CSS/JS/images, the few MB
-// range). Larger objects return fs.ErrInvalid from Open — ship them out of
-// band rather than streaming through a static-serving cluster.
+// defaultMaxFileSize caps the in-memory buffer for any single object.
+// Larger objects return fs.ErrInvalid from Open — ship them out of band
+// rather than streaming through a static-serving cluster.
 const defaultMaxFileSize int64 = 100 * 1024 * 1024
 
 // R2FS is a Caddy filesystem module (caddy.fs.r2) that serves objects from
-// an S3-compatible bucket (Cloudflare R2 in production). Lives in the same
-// Go package as R2Alias per RFC D32 (§5.30) — the audit on 2026-04-18
-// dropped the third-party caddy-fs-s3 dep after 14-month upstream silence.
-//
-// After R2Alias (http.handlers.r2_alias) rewrites req.URL.Path to
-// /{site}/deploys/{deployID}{origPath}, file_server calls R2FS.Open on
-// that path; the object comes straight from R2.
+// an S3-compatible bucket.
 type R2FS struct {
 	Bucket          string `json:"bucket"`
 	Endpoint        string `json:"endpoint"`
@@ -48,15 +41,11 @@ type R2FS struct {
 	client *s3.Client
 	logger *zap.Logger
 
-	// fetcher is the GetObject path invoked by Open. Provision wires it to
-	// r.getObject against the real S3 client; tests substitute a stub so the
-	// fs behavior can be exercised without AWS plumbing.
+	// fetcher is the GetObject path. Provision wires it to r.getObject;
+	// tests swap in a stub so Open/Stat run without an S3 client.
 	fetcher func(ctx context.Context, key string) (*r2Object, error)
 }
 
-// r2Object is the in-memory representation of a fetched R2 object. Body is
-// the complete payload (bounded by MaxFileSize); Size and LastModified are
-// copied from the GetObject / HeadObject response.
 type r2Object struct {
 	Body         []byte
 	Size         int64
@@ -68,7 +57,6 @@ func init() {
 	caddy.RegisterModule(R2FS{})
 }
 
-// CaddyModule returns the filesystem module information.
 func (R2FS) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "caddy.fs.r2",
@@ -76,8 +64,6 @@ func (R2FS) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-// Provision validates config, constructs the S3 client, and installs the
-// default fetcher. Called once at startup.
 func (r *R2FS) Provision(ctx caddy.Context) error {
 	if r.Bucket == "" {
 		return fmt.Errorf("caddy.fs.r2: bucket is required")
@@ -103,10 +89,7 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 	}
 	r.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(r.Endpoint)
-		// R2 requires path-style addressing and S3Mock supports it. The
-		// `use_path_style` Caddyfile flag is accepted for forward-compat but
-		// we always enable it — the bucket-in-hostname alternative would
-		// break the module's primary target (R2).
+		// R2 requires path-style; bucket-in-hostname would break the target.
 		o.UsePathStyle = true
 	})
 	r.logger = ctx.Logger()
@@ -116,11 +99,7 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-// UnmarshalCaddyfile parses the R2FS directive block. Every sub-directive
-// takes a single argument EXCEPT `use_path_style`, which is a no-argument
-// flag. Unknown tokens surface as parse errors.
-//
-// Grammar:
+// UnmarshalCaddyfile parses:
 //
 //	r2 {
 //	    bucket <str>
@@ -182,12 +161,8 @@ func (r *R2FS) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	return nil
 }
 
-// Open implements fs.FS. Invalid paths (absolute, traversal, double-slash)
-// return fs.ErrInvalid; missing objects return fs.ErrNotExist; all other
-// errors propagate so file_server can map them to 5xx.
-//
-// The returned file implements io.ReadSeeker + io.ReaderAt so file_server
-// (via http.ServeContent) can honor Range requests.
+// Open returns a file whose body implements io.ReadSeeker + io.ReaderAt so
+// http.ServeContent can honor Range requests.
 func (r *R2FS) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
@@ -209,13 +184,11 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 	}, nil
 }
 
-// Stat implements fs.StatFS. Delegates to Open so both paths share one
-// fetcher — simpler to test, and static-serving traffic opens the file
-// anyway (http.ServeContent calls Stat then reads the body).
+// Stat delegates to Open so both paths share one fetcher. Static-serving
+// traffic opens the file anyway (http.ServeContent calls Stat then reads).
 func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 	f, err := r.Open(name)
 	if err != nil {
-		// Rewrite PathError Op from "open" to "stat" for clarity.
 		var pe *fs.PathError
 		if errors.As(err, &pe) {
 			pe.Op = "stat"
@@ -226,9 +199,6 @@ func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 	return f.Stat()
 }
 
-// getObject is the default fetcher. Reads an object from R2 via GetObject,
-// bounds the body by MaxFileSize, and classifies upstream errors. NoSuchKey
-// is mapped to fs.ErrNotExist so callers can use errors.Is.
 func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 	out, err := r.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(r.Bucket),
@@ -272,10 +242,8 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 	}, nil
 }
 
-// isNoSuchKey classifies an error as a "not found" signal from R2/S3.
-// Matches both the typed s3types.NoSuchKey response and a generic 404
-// response wrapped in awshttp.ResponseError (R2 occasionally returns the
-// latter instead of a typed error).
+// isNoSuchKey matches the typed s3types.NoSuchKey AND a generic 404 wrapped
+// in awshttp.ResponseError (R2 sometimes returns the latter).
 func isNoSuchKey(err error) bool {
 	var nsk *s3types.NoSuchKey
 	if errors.As(err, &nsk) {
@@ -288,11 +256,6 @@ func isNoSuchKey(err error) bool {
 	return false
 }
 
-// --- fs.File + fs.FileInfo implementations --------------------------------
-
-// r2File is the fs.File returned by R2FS.Open. The body is in-memory so the
-// reader is a bytes.Reader — satisfies io.ReadSeeker + io.ReaderAt for
-// http.ServeContent's Range handling.
 type r2File struct {
 	reader *bytes.Reader
 	info   *r2FileInfo
@@ -304,8 +267,6 @@ func (f *r2File) Seek(offset int64, whence int) (int64, error) { return f.reader
 func (f *r2File) ReadAt(p []byte, off int64) (int, error)      { return f.reader.ReadAt(p, off) }
 func (f *r2File) Close() error                                 { return nil }
 
-// r2FileInfo is the fs.FileInfo for a single R2 object. Static objects are
-// read-only (Mode 0444) and never directories.
 type r2FileInfo struct {
 	name    string
 	size    int64
@@ -319,7 +280,6 @@ func (fi *r2FileInfo) ModTime() time.Time { return fi.modTime }
 func (fi *r2FileInfo) IsDir() bool        { return false }
 func (fi *r2FileInfo) Sys() any           { return nil }
 
-// Interface guards.
 var (
 	_ fs.StatFS             = (*R2FS)(nil)
 	_ caddy.Provisioner     = (*R2FS)(nil)

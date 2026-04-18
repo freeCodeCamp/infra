@@ -12,9 +12,8 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 )
 
-// newTestR2FS returns an R2FS pre-seeded with config fields and with the
-// tests' fetcher slot left open. Tests assign `r.fetcher` to control how
-// Open resolves S3 GetObject. No AWS SDK client is constructed.
+// Tests assign r.fetcher to control how Open resolves S3 GetObject. No AWS
+// SDK client is constructed.
 func newTestR2FS() *R2FS {
 	return &R2FS{
 		Bucket:   "test-bucket",
@@ -27,8 +26,6 @@ func stubFSFetcher(obj *r2Object, err error) func(context.Context, string) (*r2O
 	return func(context.Context, string) (*r2Object, error) { return obj, err }
 }
 
-// TestR2FS_Open_Success asserts a valid fetcher response yields a readable
-// fs.File whose Stat() reports the object's size and ModTime.
 func TestR2FS_Open_Success(t *testing.T) {
 	t.Parallel()
 	body := []byte("<html>V1</html>")
@@ -74,8 +71,7 @@ func TestR2FS_Open_Success(t *testing.T) {
 	}
 }
 
-// TestR2FS_Open_NotFound asserts NoSuchKey-equivalent fetcher errors
-// surface as fs.ErrNotExist so file_server returns 404.
+// file_server maps fs.ErrNotExist to 404, so NoSuchKey must surface that.
 func TestR2FS_Open_NotFound(t *testing.T) {
 	t.Parallel()
 	r := newTestR2FS()
@@ -94,8 +90,8 @@ func TestR2FS_Open_NotFound(t *testing.T) {
 	}
 }
 
-// TestR2FS_Open_5xx asserts an upstream 5xx error is distinguishable from
-// fs.ErrNotExist. file_server maps the former to 500/503, the latter to 404.
+// file_server maps fs.ErrNotExist to 404 and other errors to 5xx, so the
+// two must be distinguishable.
 func TestR2FS_Open_5xx(t *testing.T) {
 	t.Parallel()
 	upstreamErr := errors.New("r2: upstream 5xx: service unavailable")
@@ -111,8 +107,7 @@ func TestR2FS_Open_5xx(t *testing.T) {
 	}
 }
 
-// TestR2FS_Open_InvalidPath asserts paths that fail fs.ValidPath are
-// rejected with fs.ErrInvalid — protects against `..`, absolute, etc.
+// fs.ValidPath rejects absolute paths, traversal, and double-slash.
 func TestR2FS_Open_InvalidPath(t *testing.T) {
 	t.Parallel()
 	r := newTestR2FS()
@@ -137,8 +132,7 @@ func TestR2FS_Open_InvalidPath(t *testing.T) {
 	}
 }
 
-// TestR2FS_Seeker asserts the opened file implements io.ReadSeeker so
-// file_server can honor Range requests via http.ServeContent.
+// http.ServeContent needs io.ReadSeeker for Range requests.
 func TestR2FS_Seeker(t *testing.T) {
 	t.Parallel()
 	body := []byte("abcdefghijklmnopqrstuvwxyz")
@@ -171,8 +165,6 @@ func TestR2FS_Seeker(t *testing.T) {
 	}
 }
 
-// TestR2FS_UnmarshalCaddyfile_FullBlock asserts the Caddyfile parser
-// populates every R2FS config field from a complete directive block.
 func TestR2FS_UnmarshalCaddyfile_FullBlock(t *testing.T) {
 	t.Parallel()
 	const input = `r2 {
@@ -209,8 +201,6 @@ func TestR2FS_UnmarshalCaddyfile_FullBlock(t *testing.T) {
 	}
 }
 
-// TestR2FS_UnmarshalCaddyfile_UnknownToken asserts typos surface at parse
-// time. Matches the r2_alias handler's strictness.
 func TestR2FS_UnmarshalCaddyfile_UnknownToken(t *testing.T) {
 	t.Parallel()
 	const input = `r2 {
@@ -225,8 +215,6 @@ func TestR2FS_UnmarshalCaddyfile_UnknownToken(t *testing.T) {
 	}
 }
 
-// TestR2FS_CaddyModule_ID asserts the filesystem module registers at the
-// documented ID — file_server uses this namespace to resolve `fs <name>`.
 func TestR2FS_CaddyModule_ID(t *testing.T) {
 	t.Parallel()
 	info := R2FS{}.CaddyModule()

@@ -4,8 +4,6 @@ kind: Namespace
 metadata:
   name: woodpecker
   labels:
-    # PSS baseline — Woodpecker runs non-root, no capabilities needed.
-    # gxy-cassiopeia RFC §8 + cluster-wide PSS config in group_vars.
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/enforce-version: latest
     pod-security.kubernetes.io/audit: restricted

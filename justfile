@@ -248,10 +248,10 @@ uptime-robot-apply *args:
     scripts/uptime-robot-apply.sh {{args}}
 
 # ---------------------------------------------------------------------------
-# Cutover tooling (DNS flip from gxy-static to gxy-cassiopeia, RFC §6.8)
+# Cutover tooling (DNS flip from gxy-static to gxy-cassiopeia)
 # ---------------------------------------------------------------------------
 
-# Machine-checked cutover preflight (D25). Exits non-zero on any failing site.
+# Machine-checked cutover preflight. Exits non-zero on any failing site.
 # Requires: rclone r2 remote configured; CASSIOPEIA_NODE_IP,
 # WOODPECKER_ADMIN_TOKEN, WOODPECKER_ENDPOINT in env (from direnv).
 [group('cutover')]
