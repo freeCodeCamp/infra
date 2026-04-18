@@ -3,7 +3,7 @@
 # Applied automatically when targeting the gxy_launchbase_k3s inventory group
 #
 # CI galaxy — Woodpecker server + agents for Universe constellations
-# 3x s-4vcpu-8gb-amd in DO FRA1 (pre-Hetzner migration; see docs/rfc/gxy-cassiopeia.md D13)
+# 3x s-4vcpu-8gb-amd in DO FRA1 (pre-Hetzner migration).
 
 galaxy_name: gxy-launchbase
 k3s_version: v1.34.5+k3s1

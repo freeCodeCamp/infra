@@ -1,9 +1,6 @@
 {{- if .Values.networkPolicy.enabled }}
-# Cilium Network Policy: restrict Caddy egress to R2 + cluster DNS only.
-# Ingress: only port 80 from cluster + world (via Traefik).
-# Port 2019 is explicitly NOT allowed on ingress — Caddy binds admin API to
-# 127.0.0.1 (D23), and NetworkPolicy MUST NOT re-open it. Opening :2019
-# would re-introduce the lateral-movement risk (RFC §8, CRITICAL #3).
+# Egress: R2 + cluster DNS only. Ingress: :80 only — :2019 admin API MUST
+# stay blocked so a cluster-lateral attacker cannot reach it.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

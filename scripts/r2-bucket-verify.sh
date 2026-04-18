@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# scripts/r2-bucket-verify.sh — T12 R2 bucket verification
-#
-# Verifies that the R2 bucket is provisioned correctly per
-# docs/rfc/gxy-cassiopeia.md §4.4 and the rw/ro keys decrypt + work.
+# scripts/r2-bucket-verify.sh — verify the R2 bucket is provisioned
+# correctly and the rw/ro keys decrypt + work.
 #
 # Usage:
 #   just r2-bucket-verify gxy-cassiopeia-1

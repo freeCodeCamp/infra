@@ -9,15 +9,11 @@ data:
   Caddyfile: |
     {
       auto_https off
-      # Admin API bound to loopback only (D23, RFC §4.3.2) — prevents
-      # in-cluster lateral movement. NetworkPolicy does NOT allow :2019
-      # ingress; kubectl exec is the only admin reach path.
+      # Loopback-only admin API; NetworkPolicy blocks :2019 ingress.
       admin 127.0.0.1:2019
 
       order r2_alias before file_server
 
-      # D32 (RFC §5.30): filesystem backed by in-tree caddy.fs.r2 module
-      # (same Go package as http.handlers.r2_alias). No third-party plugins.
       filesystem r2 r2 {
         bucket            {$R2_BUCKET}
         endpoint          {$R2_ENDPOINT}
@@ -34,18 +30,15 @@ data:
         format json
       }
 
-      # Apex and www redirect to freecodecamp.org (parity with gxy-static).
       @apex host freecode.camp www.freecode.camp
       handle @apex {
         redir https://www.freecodecamp.org{uri} 302
       }
 
-      # Health check short-circuits alias resolution; used by liveness/readiness.
       handle /healthz {
         respond "ok" 200
       }
 
-      # Resolve {site}/{alias} and rewrite path, then serve from R2.
       r2_alias {
         bucket            {$R2_BUCKET}
         endpoint          {$R2_ENDPOINT}

@@ -1,15 +1,9 @@
 ---
-# uptime-robot/monitors.yaml
-# Declarative Uptime Robot monitors for gxy-cassiopeia (T24).
+# Declarative Uptime Robot monitors for gxy-cassiopeia.
+# Applied via: `just uptime-robot-apply`
 #
-# Spec: docs/rfc/gxy-cassiopeia.md §10.3.
-#
-# Applied via: just uptime-robot-apply
-#
-# Free tier: 50 monitors, 5-min interval. Paid tier only if we exceed.
-# Alert contacts referenced by name — the apply script resolves to IDs.
-# Expected contact names (provisioned ahead of time):
-#   - "Platform Team — Google Chat"  (Google Chat webhook contact)
+# Free tier: 50 monitors, 5-min interval. Contact names resolved to IDs by
+# the apply script; expected: "Platform Team — Google Chat".
 
 defaults:
   interval_seconds: 300 # Free tier floor
@@ -26,7 +20,7 @@ monitors:
     url: https://woodpecker.freecodecamp.net/api/healthz
     expected_status: [200]
     description: >-
-      Woodpecker API healthcheck (RFC §10.3). Alert on 2 consecutive
+      Woodpecker API healthcheck. Alert on 2 consecutive
       failures (5m + 5m = 10m detection).
 
   # ---------------------------------------------------------------------------
@@ -39,7 +33,7 @@ monitors:
     url: https://test.freecode.camp/
     expected_status: [200]
     description: >-
-      Phase 4 test site availability. Added at Phase 4, removed post-M5
+      Phase 4 test site availability. Added at Phase 4, removed after
       after real constellations replace it.
 
   # Production constellations are appended by the migration checklist in T25
@@ -53,7 +47,7 @@ monitors:
   # Canary: dedicated low-traffic site for W4 p95 latency detection
   # ---------------------------------------------------------------------------
   - name: gxy-cassiopeia-canary-latency
-    # W4 (post-review 2026-04-18): complements CF origin-response-time alert
+    # Complements the CF origin-response-time alert
     # by probing from multiple geographic regions. Free-tier UR does single-
     # region probes; if we need multi-region, upgrade to Pro.
     type: https

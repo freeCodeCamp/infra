@@ -1,27 +1,19 @@
 ---
-# cloudflare/notifications.yaml
-# Declarative Cloudflare Notifications for gxy-cassiopeia (T24).
+# Declarative Cloudflare Notifications for gxy-cassiopeia.
+# Applied via: `just cf-notifications-apply`
 #
-# Spec: docs/rfc/gxy-cassiopeia.md §10.3 + §12.2 row "Cache-fill attack detection lag"
-#       (post-review W4: canary-latency / origin-response-time alert).
-#
-# Applied via: just cf-notifications-apply
-#
-# Notes:
-# - The `destinations` field references CF Notification Destinations already
-#   provisioned in the account. The apply script reads the destination IDs via
-#   the CF API and substitutes by name.
-# - Google Chat destination name: "Platform Team — Google Chat" (existing,
-#   provisioned earlier for windmill alerts — verify in CF dashboard).
-# - Email destination name: "Platform Team Email" (distribution list).
-# - `zone` is resolved at apply time by scripts/cf-notifications-apply.sh.
+# `destinations` references CF Notification Destinations already provisioned
+# in the account. The apply script resolves destination IDs from names.
+# Expected names:
+#   - "Platform Team — Google Chat"  (webhook)
+#   - "Platform Team Email"          (distribution list)
 
 zone: freecode.camp
 
 notifications:
   - name: gxy-cassiopeia-zone-5xx
     description: >-
-      Zone-level 5xx rate spike on freecode.camp (RFC §10.3).
+      Zone-level 5xx rate spike on freecode.camp.
       Trigger: 5xx rate > 1% for 5m.
     alert_type: http_alert_origin_error
     enabled: true
@@ -35,7 +27,7 @@ notifications:
 
   - name: gxy-cassiopeia-origin-error-rate
     description: >-
-      Origin error rate > 5% for 5m (RFC §10.3). Indicates Caddy pod
+      Origin error rate > 5% for 5m. Indicates Caddy pod
       failure or R2 connectivity issue.
     alert_type: http_alert_origin_error
     enabled: true
@@ -47,7 +39,7 @@ notifications:
       - "Platform Team — Google Chat"
 
   - name: gxy-cassiopeia-origin-response-time
-    # W4 addition (post-review 2026-04-18): primary-signal cache-fill detection.
+    # Primary-signal cache-fill detection — catches LRU thrash before CF 5xx.
     # Detects LRU thrashing via origin p95 latency impact, hours earlier than
     # CF 5xx zone alerts. Not a replacement for the deferred
     # r2alias_cache_miss_rate metric (which waits for gxy-backoffice).

@@ -9,9 +9,6 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
-// parseCaddyfile is the directive registration entry point. It allocates a
-// new R2Alias, invokes UnmarshalCaddyfile, and returns the configured handler.
-// Called by the Caddyfile adapter when it encounters `r2_alias { ... }`.
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	r := new(R2Alias)
 	if err := r.UnmarshalCaddyfile(h.Dispenser); err != nil {
@@ -20,9 +17,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	return r, nil
 }
 
-// UnmarshalCaddyfile populates the R2Alias struct from Caddyfile tokens.
-//
-// Grammar:
+// UnmarshalCaddyfile parses:
 //
 //	r2_alias {
 //	    bucket <str>
@@ -37,8 +32,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    deploy_id_regex <str>
 //	}
 //
-// Every sub-directive accepts exactly one argument. Unknown tokens are rejected
-// so typos surface at config-parse time, not at request time.
+// Unknown tokens are rejected so typos surface at config-parse time.
 func (r *R2Alias) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		if d.NextArg() {

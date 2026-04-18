@@ -4,11 +4,10 @@ All secrets live in `../infra-secrets` (sops+age) and are decrypted automaticall
 by the `just deploy gxy-launchbase woodpecker` and `just helm-upgrade
 gxy-launchbase woodpecker` recipes.
 
-## `infra-secrets/k3s/gxy-launchbase/woodpecker-backup.secrets.env.enc` (T09)
+## `infra-secrets/k3s/gxy-launchbase/woodpecker-backup.secrets.env.enc`
 
 Dotenv format. Decrypted into `manifests/base/secrets/.backup-secrets.env` at
-deploy time via the `just deploy` recipe's `-backup.secrets.env.enc` pattern
-(justfile line 87). Consumed by the `secretGenerator` in
+deploy time. Consumed by the `secretGenerator` in
 `manifests/base/kustomization.yaml` to produce the
 `woodpecker-postgres-s3-backup` Secret used by CNPG's barman-cloud backups.
 
@@ -24,18 +23,16 @@ The DO Spaces key should be scoped to `net-freecodecamp-universe-backups` only
 Rotation: every 90 days, mint new DO Spaces key in the DO console, update the
 sops file, `just deploy gxy-launchbase woodpecker`.
 
-## `infra-secrets/k3s/gxy-launchbase/woodpecker.secrets.env.enc` (T10)
+## `infra-secrets/k3s/gxy-launchbase/woodpecker.secrets.env.enc`
 
 Dotenv format. Decrypted into `manifests/base/secrets/.secrets.env` at deploy
-time (justfile line 72). Holds Woodpecker chart secrets (T10 scope):
-`WOODPECKER_SERVER_SECRET`, GitHub OAuth app ID/secret, and the database URL
-derived from the CNPG-generated `woodpecker-postgres-app` secret. Not created
-by T09 — documented here so T10's handoff knows the file separation.
+time. Holds Woodpecker chart secrets: `WOODPECKER_SERVER_SECRET`,
+`WOODPECKER_AGENT_SECRET`, GitHub OAuth app ID/secret. The database URL
+comes from the CNPG-generated `woodpecker-postgres-app` secret.
 
-## `infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc` (T10)
+## `infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc`
 
-Optional Helm values overlay for the Woodpecker chart install. T10 decides
-whether to use this overlay vs inline env substitution.
+Optional Helm values overlay for the Woodpecker chart install.
 
 ## Verification
 

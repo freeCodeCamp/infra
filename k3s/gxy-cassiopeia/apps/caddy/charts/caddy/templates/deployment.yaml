@@ -17,7 +17,7 @@ spec:
         app.kubernetes.io/name: {{ .Chart.Name }}
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
-        # Roll pods when the Caddyfile changes (§11.5).
+        # Roll pods when the Caddyfile or secret changes.
         checksum/caddyfile: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
@@ -43,8 +43,6 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
-          # Admin API binds 127.0.0.1:2019 (D23) — not exposed as a container
-          # port. Reachable only from `kubectl exec` into the pod for diagnostics.
           envFrom:
             - secretRef:
                 name: {{ .Release.Name }}-r2-credentials

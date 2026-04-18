@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# DNS cutover preflight per RFC gxy-cassiopeia §6.8.1 (D25).
-# Enumerates sites in gxy-static-1, runs 8 checks per site against gxy-cassiopeia-1.
-# Exits non-zero on ANY site failing ANY check — cutover must not proceed.
+# DNS cutover preflight: enumerate sites in gxy-static-1, run 8 checks per
+# site against gxy-cassiopeia-1. Exits non-zero on ANY site failing ANY check
+# — cutover must not proceed.
 #
 # Usage:
 #   just cutover-preflight

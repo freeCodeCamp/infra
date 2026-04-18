@@ -1,8 +1,8 @@
 ---
-# HTTPRoute for Woodpecker CI server. Binds woodpecker.freecodecamp.net to the
-# cluster's Traefik Gateway. The CF DNS A record pointing traffic AT the
-# Traefik node IPs is provisioned separately by T32 (post-review W3 split).
-# Without the T32 DNS record, this HTTPRoute is inert but valid.
+# HTTPRoute for Woodpecker CI. Binds woodpecker.freecodecamp.net to the
+# cluster's Traefik Gateway. The CF DNS A record pointing at the Traefik
+# node IPs is provisioned separately; without it this route is inert but
+# valid.
 
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

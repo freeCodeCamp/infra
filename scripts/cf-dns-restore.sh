@@ -68,11 +68,10 @@ def req(method, path, body=None):
 RESTORE_NAMES = {zone_name, f"www.{zone_name}", f"*.{zone_name}"}
 restorable = [r for r in records if r["type"] == "A" and r["name"] in RESTORE_NAMES]
 
-# Rollback content-parity caveat per RFC gxy-cassiopeia §6.9.1 (C2).
-# Machine-enforced reminder: printed BEFORE any DNS flip. Operators WILL skim
-# the runbook; this ensures the regression warning is unavoidable at apply time.
+# Machine-enforced reminder: operators WILL skim the runbook, so the content
+# regression warning is printed inline before any DNS flip.
 print("=" * 72)
-print("ROLLBACK CONTENT-PARITY CAVEAT (RFC gxy-cassiopeia §6.9.1)")
+print("ROLLBACK CONTENT-PARITY CAVEAT")
 print("=" * 72)
 print("DNS revert restores AVAILABILITY, not content parity.")
 print("gxy-static is frozen at cutover-day state. A day-N rollback (N > 1)")
