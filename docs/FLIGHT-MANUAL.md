@@ -336,7 +336,7 @@ CNPG provides: continuous WAL archiving, PITR, automated base backups, replica f
 
 ## Windmill IaC (CLI Sync)
 
-Windmill CE does not have Git Sync. Scripts, flows, and apps are managed via `wmill` CLI in a dedicated repo (`~/DEV/fCC/windmill`).
+Windmill CE does not have Git Sync. Scripts, flows, and apps are managed via `wmill` CLI in a dedicated repo (`~/DEV/fCC-U/windmill`).
 
 ### Repository structure
 
@@ -356,12 +356,12 @@ f/
 
 ### Sync workflow
 
-Always run from the windmill repo directory (`cd ~/DEV/fCC/windmill`).
+Always run from the windmill repo directory (`cd ~/DEV/fCC-U/windmill`).
 
 **Push local → remote:**
 
 ```bash
-cd ~/DEV/fCC/windmill
+cd ~/DEV/fCC-U/windmill
 sops -d -i f/integration/apollo-11_github_app.resource.yaml   # decrypt credentials
 wmill sync push --dry-run                                       # verify: all + creates, zero - deletes
 wmill sync push --yes                                           # push to Windmill
@@ -371,7 +371,7 @@ sops -e -i f/integration/apollo-11_github_app.resource.yaml   # re-encrypt
 **Pull remote → local:**
 
 ```bash
-cd ~/DEV/fCC/windmill
+cd ~/DEV/fCC-U/windmill
 wmill sync pull
 sops -e -i f/integration/apollo-11_github_app.resource.yaml   # encrypt before committing
 ```

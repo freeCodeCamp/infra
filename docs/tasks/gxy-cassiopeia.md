@@ -13,7 +13,7 @@ Tasks span four repositories. Each agent prompt specifies a `## Repo and CWD` se
 | Repo             | Absolute path                           | Tasks that work here                                                                                                                               |
 | ---------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **infra**        | `/Users/mrugesh/DEV/fCC/infra`          | T01–T05, T07–T10, T12, T13, T15, T21, T23, T24, T25, T26, plus the infra-side parts of T14 and T11's justfile recipe; T06 deferred → T30 (post-M5) |
-| **windmill**     | `/Users/mrugesh/DEV/fCC/windmill`       | T11, T14 (flow portion), T22                                                                                                                       |
+| **windmill**     | `/Users/mrugesh/DEV/fCC-U/windmill`       | T11, T14 (flow portion), T22                                                                                                                       |
 | **universe-cli** | `/Users/mrugesh/DEV/fCC-U/universe-cli` | T16, T17, T18, T19, T20                                                                                                                            |
 | **Universe**     | `/Users/mrugesh/DEV/fCC-U/Universe`     | T25 (post-cutover field notes only), T27, T28, T29 (field notes only)                                                                              |
 
@@ -1467,7 +1467,7 @@ If the Woodpecker chart's env schema has changed, check https://github.com/woodp
 **Traceability:** Implements R3, D22 (per-repo R2 secrets) | Constrained by §4.2.4
 **Files:**
 
-- Create: `f/static/provision_site_r2_credentials.ts` (in windmill repo `~/DEV/fCC/windmill`)
+- Create: `f/static/provision_site_r2_credentials.ts` (in windmill repo `~/DEV/fCC-U/windmill`)
 - Create: `f/static/provision_site_r2_credentials.yaml` (flow metadata)
 - Create: `f/static/provision_site_r2_credentials.test.ts`
 - Modify: `~/DEV/fCC/infra/justfile` (add `constellation-register <site>` recipe)
@@ -1488,7 +1488,7 @@ This closes the CRITICAL #2 supply-chain finding. The flow is the canonical path
 #### Verification
 
 ```bash
-cd /Users/mrugesh/DEV/fCC/windmill && deno test f/static/provision_site_r2_credentials.test.ts
+cd /Users/mrugesh/DEV/fCC-U/windmill && deno test f/static/provision_site_r2_credentials.test.ts
 ```
 
 **Expected output:** tests pass.
@@ -1507,7 +1507,7 @@ You are implementing Task 11: Per-site R2 secret provisioning Windmill flow.
 
 ## Repo and CWD
 
-Work in the Windmill repo: `/Users/mrugesh/DEV/fCC/windmill`. NOT the infra repo. All paths below are relative to the windmill repo root.
+Work in the Windmill repo: `/Users/mrugesh/DEV/fCC-U/windmill`. NOT the infra repo. All paths below are relative to the windmill repo root.
 
 ## Your Task
 
@@ -1706,7 +1706,7 @@ constellation-register site:
 
 ### Step 6: Run tests
 ```bash
-cd /Users/mrugesh/DEV/fCC/windmill
+cd /Users/mrugesh/DEV/fCC-U/windmill
 deno test f/static/provision_site_r2_credentials.test.ts
 ```
 All tests pass.
@@ -2150,7 +2150,7 @@ Plus an initial static allow-list baked into the NetworkPolicy manifest (the flo
 #### Verification
 
 ```bash
-cd /Users/mrugesh/DEV/fCC/windmill && deno test f/ops/refresh_cf_ips.test.ts && \
+cd /Users/mrugesh/DEV/fCC-U/windmill && deno test f/ops/refresh_cf_ips.test.ts && \
   kubectl apply --dry-run=client -f /Users/mrugesh/DEV/fCC/infra/k3s/gxy-cassiopeia/apps/caddy/manifests/origin-allowlist-netpol.yaml
 ```
 
@@ -2170,7 +2170,7 @@ You are implementing Task 14: Origin IP allow-list + CF IP refresh cron.
 ## Repos and CWDs
 
 - Manifest in infra repo: `/Users/mrugesh/DEV/fCC/infra`
-- Windmill flow in windmill repo: `/Users/mrugesh/DEV/fCC/windmill`
+- Windmill flow in windmill repo: `/Users/mrugesh/DEV/fCC-U/windmill`
 
 ## Your Task
 
@@ -2332,7 +2332,7 @@ Deno.test("patches CiliumNetworkPolicy with fetched CIDRs", async () => {
 });
 ```
 
-Run: `cd /Users/mrugesh/DEV/fCC/windmill && deno test f/ops/refresh_cf_ips.test.ts`
+Run: `cd /Users/mrugesh/DEV/fCC-U/windmill && deno test f/ops/refresh_cf_ips.test.ts`
 
 ## Files
 
@@ -3750,9 +3750,9 @@ If `when.evaluate` syntax is unfamiliar, read https://woodpecker-ci.org/docs/usa
 **Traceability:** Implements R16, D28 (TOCTOU fix) | Constrained by §4.9.1
 **Files:**
 
-- Create: `/Users/mrugesh/DEV/fCC/windmill/f/static/cleanup_old_deploys.ts`
-- Create: `/Users/mrugesh/DEV/fCC/windmill/f/static/cleanup_old_deploys.yaml` (flow metadata — cron `0 4 * * *`)
-- Create: `/Users/mrugesh/DEV/fCC/windmill/f/static/cleanup_old_deploys.test.ts`
+- Create: `/Users/mrugesh/DEV/fCC-U/windmill/f/static/cleanup_old_deploys.ts`
+- Create: `/Users/mrugesh/DEV/fCC-U/windmill/f/static/cleanup_old_deploys.yaml` (flow metadata — cron `0 4 * * *`)
+- Create: `/Users/mrugesh/DEV/fCC-U/windmill/f/static/cleanup_old_deploys.test.ts`
 
 #### Context
 
@@ -3772,7 +3772,7 @@ Daily cleanup per RFC §4.9.1. Implements R2 lock + 1-hour grace window + per-si
 #### Verification
 
 ```bash
-cd /Users/mrugesh/DEV/fCC/windmill && deno test f/static/cleanup_old_deploys.test.ts
+cd /Users/mrugesh/DEV/fCC-U/windmill && deno test f/static/cleanup_old_deploys.test.ts
 ```
 
 **Expected output:** tests pass.
@@ -3790,7 +3790,7 @@ You are implementing Task 22: Cleanup cron Windmill flow.
 
 ## Repo and CWD
 
-Work in the Windmill repo: `/Users/mrugesh/DEV/fCC/windmill`.
+Work in the Windmill repo: `/Users/mrugesh/DEV/fCC-U/windmill`.
 
 ## Your Task
 
@@ -3903,7 +3903,7 @@ Deno.test("aborts if lock unavailable", async () => {
 });
 ```
 
-Run: `cd /Users/mrugesh/DEV/fCC/windmill && deno test f/static/cleanup_old_deploys.test.ts` — tests FAIL.
+Run: `cd /Users/mrugesh/DEV/fCC-U/windmill && deno test f/static/cleanup_old_deploys.test.ts` — tests FAIL.
 
 ### Step 2: Implement f/static/cleanup_old_deploys.ts
 Match the pseudocode in RFC §4.9.1 lines 1580-1639 exactly. Interface:
@@ -3962,7 +3962,7 @@ schema:
 
 ### Step 4: Verify
 ```bash
-cd /Users/mrugesh/DEV/fCC/windmill
+cd /Users/mrugesh/DEV/fCC-U/windmill
 deno test f/static/cleanup_old_deploys.test.ts
 ```
 
