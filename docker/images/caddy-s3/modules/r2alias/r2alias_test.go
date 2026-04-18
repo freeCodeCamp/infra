@@ -1,11 +1,18 @@
 package r2alias
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"go.uber.org/zap"
 )
 
 // TestValidate_RequiredFields covers the acceptance criterion:
@@ -175,5 +182,257 @@ func TestCaddyModule_ID(t *testing.T) {
 	}
 	if info.New == nil || info.New() == nil {
 		t.Fatalf("CaddyModule.New must produce a non-nil instance")
+	}
+}
+
+// --- ServeHTTP tests -------------------------------------------------------
+//
+// These tests bypass Provision (which loads AWS SDK config) by hand-wiring
+// the post-Provision state: deployIDRe compiled, cache constructed, logger
+// set, fetcher stub injected. This keeps the test suite independent of the
+// AWS SDK and network.
+
+// newProvisionedForTest returns an R2Alias in the same post-Provision state
+// a real Caddy startup would leave it in, but without touching the AWS SDK.
+// Tests assign r.fetcher to control cache-miss behavior.
+func newProvisionedForTest(t *testing.T) *R2Alias {
+	t.Helper()
+	r := &R2Alias{
+		Bucket:          "test-bucket",
+		Endpoint:        "https://r2.example",
+		Region:          "auto",
+		RootDomain:      "freecode.camp",
+		PreviewSuffix:   "--preview",
+		DeployIDRegex:   `^[A-Za-z0-9._-]{1,64}$`,
+		CacheTTL:        1 * time.Second,
+		CacheMaxEntries: 10,
+		logger:          zap.NewNop(),
+	}
+	r.deployIDRe = regexp.MustCompile(r.DeployIDRegex)
+	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL)
+	return r
+}
+
+// capturingNext records the path the handler chain sees after r2_alias
+// rewrites. Returning nil mimics a successful downstream response.
+type capturingNext struct {
+	called bool
+	path   string
+}
+
+func (c *capturingNext) asHandler() caddyhttp.Handler {
+	return caddyhttp.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) error {
+		c.called = true
+		c.path = req.URL.Path
+		return nil
+	})
+}
+
+func stubFetcher(entry aliasEntry, err error) func(context.Context, string) (aliasEntry, error) {
+	return func(context.Context, string) (aliasEntry, error) { return entry, err }
+}
+
+// handlerStatus extracts the HTTP status from a returned caddyhttp error.
+func handlerStatus(t *testing.T, err error) int {
+	t.Helper()
+	if err == nil {
+		return http.StatusOK
+	}
+	var he caddyhttp.HandlerError
+	if !errors.As(err, &he) {
+		t.Fatalf("expected caddyhttp.HandlerError, got %T: %v", err, err)
+	}
+	return he.StatusCode
+}
+
+func TestServeHTTP_RewriteProduction(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = stubFetcher(aliasEntry{DeployID: "20260501-120000-a1b2c3d", Present: true}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/assets/x.js", nil)
+	req.Host = "hello-world.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	if err := r.ServeHTTP(rec, req, next.asHandler()); err != nil {
+		t.Fatalf("ServeHTTP: %v", err)
+	}
+	if !next.called {
+		t.Fatal("next handler not called")
+	}
+	want := "/hello-world.freecode.camp/deploys/20260501-120000-a1b2c3d/assets/x.js"
+	if next.path != want {
+		t.Fatalf("path rewrite: want %q, got %q", want, next.path)
+	}
+}
+
+func TestServeHTTP_RewritePreview(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = stubFetcher(aliasEntry{DeployID: "20260501-130000-z9y8x7w", Present: true}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "hello-world--preview.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	if err := r.ServeHTTP(rec, req, next.asHandler()); err != nil {
+		t.Fatalf("ServeHTTP: %v", err)
+	}
+	// Site key is the PRODUCTION subdomain even though the request hit the
+	// --preview host — deploys are shared, only the alias file differs.
+	want := "/hello-world.freecode.camp/deploys/20260501-130000-z9y8x7w/"
+	if next.path != want {
+		t.Fatalf("path rewrite: want %q, got %q", want, next.path)
+	}
+}
+
+func TestServeHTTP_RootPathRewrite(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = stubFetcher(aliasEntry{DeployID: "v1", Present: true}, nil)
+
+	// Empty path — file_server treats `/site/deploys/id/` as an index lookup,
+	// so the rewrite must produce a trailing slash.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "site-a.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	_ = r.ServeHTTP(rec, req, next.asHandler())
+	want := "/site-a.freecode.camp/deploys/v1/"
+	if next.path != want {
+		t.Fatalf("root path rewrite: want %q, got %q", want, next.path)
+	}
+}
+
+func TestServeHTTP_HostNotUnderRootDomain(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	// fetcher must NOT be called — parse failure short-circuits.
+	r.fetcher = func(context.Context, string) (aliasEntry, error) {
+		t.Fatal("fetcher should not be called on non-root host")
+		return aliasEntry{}, nil
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "notaroot.example.com"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	err := r.ServeHTTP(rec, req, next.asHandler())
+	if got := handlerStatus(t, err); got != http.StatusNotFound {
+		t.Fatalf("status: want 404, got %d", got)
+	}
+	if next.called {
+		t.Fatal("next should not be called on parse failure")
+	}
+}
+
+func TestServeHTTP_AliasMissing(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = stubFetcher(aliasEntry{Present: false}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "dead-site.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	err := r.ServeHTTP(rec, req, next.asHandler())
+	if got := handlerStatus(t, err); got != http.StatusNotFound {
+		t.Fatalf("status: want 404, got %d", got)
+	}
+	if next.called {
+		t.Fatal("next should not be called on missing alias")
+	}
+}
+
+func TestServeHTTP_DeployIDRejected(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		deployID string
+	}{
+		{"contains dot-dot", "bad..name"},
+		{"contains slash", "v1/etc/passwd"},
+		{"over 64 chars", strings.Repeat("x", 65)},
+		{"empty-ish space only", "   "}, // fetchAlias trims, but defense-in-depth
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			r := newProvisionedForTest(t)
+			r.fetcher = stubFetcher(aliasEntry{DeployID: c.deployID, Present: true}, nil)
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Host = "site-a.freecode.camp"
+			rec := httptest.NewRecorder()
+			next := &capturingNext{}
+
+			err := r.ServeHTTP(rec, req, next.asHandler())
+			if got := handlerStatus(t, err); got != http.StatusNotFound {
+				t.Fatalf("status for %q: want 404, got %d", c.deployID, got)
+			}
+			if next.called {
+				t.Fatalf("next should not be called for rejected deploy id %q", c.deployID)
+			}
+		})
+	}
+}
+
+func TestServeHTTP_S3ServerError(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = stubFetcher(aliasEntry{}, errS3ServerError)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "site-a.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	err := r.ServeHTTP(rec, req, next.asHandler())
+	if got := handlerStatus(t, err); got != http.StatusServiceUnavailable {
+		t.Fatalf("status: want 503, got %d", got)
+	}
+	if got := rec.Header().Get("Retry-After"); got != "30" {
+		t.Errorf("Retry-After: want 30, got %q", got)
+	}
+}
+
+func TestServeHTTP_OtherFetchError(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = stubFetcher(aliasEntry{}, errors.New("unexpected failure"))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "site-a.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	err := r.ServeHTTP(rec, req, next.asHandler())
+	if got := handlerStatus(t, err); got != http.StatusInternalServerError {
+		t.Fatalf("status: want 500, got %d", got)
+	}
+}
+
+func TestServeHTTP_PanicRecovered(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedForTest(t)
+	r.fetcher = func(context.Context, string) (aliasEntry, error) {
+		panic("boom")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "site-a.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	// The test itself must not panic — the handler must catch it.
+	err := r.ServeHTTP(rec, req, next.asHandler())
+	if got := handlerStatus(t, err); got != http.StatusInternalServerError {
+		t.Fatalf("status: want 500 after panic recovery, got %d", got)
 	}
 }
