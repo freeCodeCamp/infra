@@ -1,0 +1,45 @@
+---
+# CiliumNetworkPolicy: restrict egress for all pods in the `woodpecker`
+# namespace — covers the server StatefulSet, agent Deployment, and
+# agent-spawned pipeline pods (which inherit the namespace scope).
+#
+# Egress allow-list (RFC §4.2.4 + §8):
+#   - api.github.com:443         — OAuth forge + git fetch
+#   - *.r2.cloudflarestorage.com — pipeline steps pushing deploy artifacts
+#   - api.cloudflare.com:443     — pipeline cache-purge step (R14)
+#   - *.digitaloceanspaces.com   — CNPG barman-cloud WAL/base backup push (T09)
+#   - kube-dns UDP/53            — name resolution
+#   - intra-namespace            — server ↔ agent ↔ postgres (CNPG)
+#
+# All other egress is dropped. No network policy covers :9000 ingress to the
+# server from agents inside the same namespace — that traffic is
+# intra-namespace and permitted by the intra-namespace allow rule.
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: woodpecker-egress
+  namespace: woodpecker
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: "api.github.com"
+        - matchPattern: "*.r2.cloudflarestorage.com"
+        - matchName: "api.cloudflare.com"
+        - matchPattern: "*.digitaloceanspaces.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": woodpecker

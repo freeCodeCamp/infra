@@ -197,6 +197,93 @@ If `go mod tidy` fails to resolve dependencies, check that the package path in `
 
 ---
 
+### Task 01b [M]: Caddy `r2_alias` module — `caddy.fs.r2` filesystem (added 2026-04-18, D32)
+
+**Traceability:** Implements R4 + D32 (§5.30) | Resolves `caddy-fs-s3` upstream-abandonment risk in 2026-04-18 audit.
+
+**Files:**
+
+- Create: `docker/images/caddy-s3/modules/r2alias/filesystem.go`
+- Create: `docker/images/caddy-s3/modules/r2alias/filesystem_test.go`
+- Modify: `docker/images/caddy-s3/modules/r2alias/caddyfile.go` (register filesystem Caddyfile directive parser)
+
+#### Context
+
+Per D32 (§5.30), the S3 filesystem layer moves in-tree instead of depending on `sagikazarmark/caddy-fs-s3@v0.12.0` (14 months stale at time of audit). This task adds a **sibling Caddy module** in the same Go package as `R2Alias`, registered at `caddy.fs.r2`, implementing `fs.FS` + `fs.StatFS`. Consumed by `file_server { fs <name> }` after `r2_alias` rewrites the path.
+
+Split out from the original T04 scope so the module can be tested (T04) and built (T05) with the FS layer already in place. No changes to the middleware handler (T01–T03) — those ship untouched.
+
+#### Acceptance Criteria
+
+- GIVEN a valid R2FS WHEN `Open("site-a/deploys/v1/index.html")` is called THEN returns `fs.File` whose `Stat()` reports the S3 ContentLength + LastModified.
+- GIVEN the object does not exist WHEN `Open` or `Stat` is called THEN returns an error that satisfies `errors.Is(err, fs.ErrNotExist)`.
+- GIVEN R2 returns 5xx WHEN `Open` is called THEN returns an error distinguishable from `fs.ErrNotExist` (tests use `errors.Is(err, fs.ErrNotExist)` returning false + non-nil error).
+- GIVEN the object body WHEN read in full THEN matches byte-for-byte what was PUT.
+- GIVEN a request for Range bytes 0-99 WHEN `file_server` calls `ReadAt` OR `Seek`+`Read` THEN the first 100 bytes match. (Implementation MAY buffer full body; Seeker interface MUST be satisfied.)
+- GIVEN Caddyfile `filesystem r2 r2 { bucket x endpoint y ... }` THEN `UnmarshalCaddyfile` populates R2FS struct fields.
+- GIVEN `caddy list-modules` run against the xcaddy-built image (T05) THEN output contains `caddy.fs.r2`.
+- GIVEN `go test -race -v` THEN passes including the new `TestR2FS_*` suite.
+
+#### Verification
+
+```bash
+cd docker/images/caddy-s3/modules/r2alias && go test -race -v -run TestR2FS
+```
+
+#### Constraints
+
+- Module ID: `caddy.fs.r2` (not `caddy.fs.r2_s3` — concise, distinct from upstream `caddy.fs.s3`).
+- Reuse AWS SDK v2 imports already in `r2alias.go`. Do NOT add new third-party Go deps.
+- Do NOT share the `R2Alias.client` field directly — R2FS has its own S3 client so each Caddyfile block can wire independent credentials if needed.
+- Body buffer limit: 100 MB per object (configurable via `max_file_size`). Larger returns an error.
+- No directory-listing support (file_server static serving doesn't need ReadDirFS).
+
+#### Agent Prompt
+
+```
+You are implementing Task 01b: r2_alias filesystem sibling module.
+
+## Your Task
+
+Add `caddy.fs.r2` to the same Go package as `R2Alias`. Implement fs.FS + fs.StatFS backed by S3 GetObject/HeadObject. Register as a Caddy module with Caddyfile grammar `filesystem r2 r2 { bucket ... endpoint ... access_key_id ... secret_access_key ... use_path_style }`.
+
+### Step 1: RED tests in filesystem_test.go
+- TestR2FS_Open_Success — stub fetcher returns body bytes; verify file content + Stat.Size matches.
+- TestR2FS_Open_NotFound — stub returns NoSuchKey; errors.Is(err, fs.ErrNotExist) is true.
+- TestR2FS_Open_5xx — stub returns 5xx; non-nil error, NOT fs.ErrNotExist.
+- TestR2FS_Stat_Success — HeadObject path returns correct size + modtime.
+- TestR2FS_Seeker — opened file implements io.ReadSeeker; Seek(50, 0) then read matches bytes [50:].
+- TestR2FS_UnmarshalCaddyfile — full block parses into struct.
+
+### Step 2: GREEN filesystem.go
+- R2FS struct with config fields
+- Open(name) returns *r2File{bytes.Reader + fileInfo}
+- Stat(name) uses HeadObject
+- Provision loads AWS SDK config, creates S3 client, sets UsePathStyle
+- UnmarshalCaddyfile parses directive tokens
+- Interface guards at end: fs.StatFS, caddy.Provisioner, caddyfile.Unmarshaler
+
+### Step 3: Register module in init()
+- caddy.RegisterModule(R2FS{}) in a new init() (or append to existing)
+
+### Step 4: go test -race -v — all pass
+
+## Files
+- Create: docker/images/caddy-s3/modules/r2alias/filesystem.go
+- Create: docker/images/caddy-s3/modules/r2alias/filesystem_test.go
+- Modify: docker/images/caddy-s3/modules/r2alias/caddyfile.go (if Caddyfile registration helper is shared)
+
+## Constraints
+- No new third-party deps
+- Same package as R2Alias; SEPARATE struct, SEPARATE module ID
+- TDD: RED first, verify fail, GREEN, verify pass
+- Do NOT run git write commands
+```
+
+**Depends on:** Task 01
+
+---
+
 ### Task 02 [M]: Caddy `r2_alias` module — alias cache (bounded LRU + singleflight)
 
 **Traceability:** Implements R4 | Constrained by D27 (bounded LRU + singleflight)
@@ -472,9 +559,9 @@ AWS SDK v2 S3 client with custom endpoint is sometimes tricky — R2 requires `U
 
 ---
 
-### Task 04 [M]: Caddy `r2_alias` module — integration tests with Minio
+### Task 04 [M]: Caddy `r2_alias` + `caddy.fs.r2` — integration tests with Adobe S3Mock
 
-**Traceability:** Implements R4 test strategy RFC §11.2
+**Traceability:** Implements R4 test strategy RFC §11.2 (revised 2026-04-18 for MinIO archival + D32).
 **Files:**
 
 - Create: `docker/images/caddy-s3/modules/r2alias/integration_test.go`
@@ -483,14 +570,18 @@ AWS SDK v2 S3 client with custom endpoint is sometimes tricky — R2 requires `U
 
 #### Context
 
-Integration test the full module in-process against a Minio container. Uses `testcontainers-go/modules/minio`. Boot Minio, populate deploy fixtures + aliases via the S3 client, run a full Caddy config in-process using `caddytest` helpers, curl requests with different Host headers, assert responses.
+Integration test the full module stack in-process against an **Adobe S3Mock** container (`adobe/s3mock`). Uses testcontainers-go's generic container API — no dedicated module required. Boot S3Mock, populate deploy fixtures + alias files via AWS SDK v2 PutObject, run a full Caddy config in-process using `caddytest.Tester`, curl requests with various Host headers, assert responses.
+
+**Dep substitution rationale.** The original draft used MinIO, which archived its community edition on 2026-02-12 (no more Docker images). Adobe S3Mock is Apache 2.0, actively maintained, purpose-built for S3 test harnesses, and runs cleanly under testcontainers-go. See infra field notes §"Dependency audit" (2026-04-18).
+
+This task now also exercises the sibling `caddy.fs.r2` module (T01b) — the file body in the response comes from it, not a third-party plugin.
 
 #### Acceptance Criteria
 
-- GIVEN Minio running with `site-a/deploys/v1/index.html` + alias `site-a/production=v1` WHEN GET `http://localhost:port/` with `Host: site-a.test.camp` THEN response body is v1's index.html
-- GIVEN alias flipped to `v2` WHEN next request after cache TTL (use short TTL like 500ms in test config) THEN response body is v2's index.html
-- GIVEN preview alias `site-a/preview=v2` WHEN GET with `Host: site-a--preview.test.camp` THEN response body is v2's index.html (site key `site-a.test.camp` + deploy v2)
-- GIVEN no alias for `dead.test.camp` WHEN GET with that Host THEN 404
+- GIVEN S3Mock running with `site-a/deploys/v1/index.html` + alias `site-a/production=v1` WHEN GET `http://localhost:port/` with `Host: site-a.test.camp` THEN response body contains `V1` (the fixture content).
+- GIVEN alias flipped to `v2` WHEN next request after cache TTL (500ms in test config) THEN response body contains `V2`.
+- GIVEN preview alias `site-a/preview=v2` WHEN GET with `Host: site-a--preview.test.camp` THEN response body contains `V2` — and the internally-rewritten path uses `site-a.test.camp` as the site key (production subdomain), not `site-a--preview.test.camp`.
+- GIVEN no alias for `dead.test.camp` WHEN GET with that Host THEN 404.
 
 #### Verification
 
@@ -498,78 +589,70 @@ Integration test the full module in-process against a Minio container. Uses `tes
 cd docker/images/caddy-s3/modules/r2alias && go test -race -v -tags=integration -run TestIntegration -timeout 180s
 ```
 
-**Expected output:** all integration tests pass. First run pulls Minio image (~1 min).
+**Expected output:** all integration tests pass. First run pulls `adobe/s3mock` image (~30 s, ~120 MB).
 
 #### Constraints
 
-- Use build tag `//go:build integration` so integration tests are opt-in
-- Use `test.camp` root domain in tests (not `freecode.camp`)
-- Cache TTL in test config: 500ms (to allow in-test alias flips)
-- Clean up Minio container on test exit (defer container.Terminate)
+- Build tag `//go:build integration` (opt-in).
+- Use `test.camp` as root domain in tests (NOT `freecode.camp`).
+- Cache TTL in test config: 500ms (allows in-test alias flips).
+- Pin S3Mock image by digest or explicit version tag — never `:latest`.
+- Clean up testcontainer on test exit (`t.Cleanup(...)` / `defer container.Terminate`).
 
 #### Agent Prompt
 
 ```
-You are implementing Task 04: Caddy r2_alias module integration tests with Minio.
+You are implementing Task 04: r2_alias + caddy.fs.r2 integration tests with Adobe S3Mock.
+
+## Preconditions
+- T01b (gxy-static-k7d.3X) is CLOSED — caddy.fs.r2 module exists and unit-tests pass.
+- Docker daemon reachable (OrbStack / Docker Desktop).
 
 ## Your Task
 
-Write build-tagged integration tests that boot Minio via testcontainers-go, populate fixtures, run a full Caddy server in-process, and make HTTP requests to verify end-to-end behavior.
+### Step 1: go.mod deps
+- go get github.com/testcontainers/testcontainers-go@latest
+- (caddytest is already a transitive dep of caddy/v2; no separate add needed)
 
-### Step 1: Add testcontainers to go.mod
-- `go get github.com/testcontainers/testcontainers-go/modules/minio`
-- `go get github.com/caddyserver/caddy/v2/caddytest`
+### Step 2: testdata fixtures
+- testdata/site-a/deploys/v1/index.html with body `<html>V1</html>`
+- testdata/site-a/deploys/v2/index.html with body `<html>V2</html>`
 
-### Step 2: Create testdata fixtures
-- `testdata/site-a/deploys/v1/index.html` with body `<html>V1</html>`
-- `testdata/site-a/deploys/v2/index.html` with body `<html>V2</html>`
+### Step 3: integration_test.go with build tag
+- `//go:build integration`
+- package r2alias_test (external test package — r2alias registers via init())
+- Helper: startS3Mock(t) *s3Mock — returns struct with endpoint + bucket name + S3 client; uses testcontainers generic container API against `adobe/s3mock:<PIN>`; env `initialBuckets=gxy-cassiopeia-test`; wait on port 9090 listening.
+- Helper: uploadDeployFixtures(t, client, site, version) — uploads testdata files under site/deploys/{version}/.
+- Helper: putAlias(t, client, site, aliasName, deployID) — PutObject of the alias file content.
+- Helper: startCaddy(t, s3mockEndpoint, cacheTTL string) *caddytest.Tester — caddytest.NewTester + InitServer with a Caddyfile that:
+  * order r2_alias before file_server
+  * filesystem r2 r2 { ... pointing at s3mockEndpoint ... }
+  * r2_alias { ... cache_ttl <cacheTTL> ... root_domain test.camp ... }
+  * file_server { fs r2 }
+- Helper: doGet(t, tester, host, path) (int, string) — HTTP request with custom Host header; returns status + body.
 
-### Step 3: Write integration_test.go with build tag
-- `//go:build integration` at top
-- `TestIntegration_ResolveProduction` — spins Minio, uploads v1 + alias=v1, makes HTTP GET with Host `site-a.test.camp`, asserts body contains "V1"
-- `TestIntegration_AliasFlip` — starts with alias=v1, GETs (body V1), flips to v2, waits >500ms (TTL), GETs again (body V2)
-- `TestIntegration_PreviewRouting` — preview alias=v2, GET with Host `site-a--preview.test.camp`, asserts V2
-- `TestIntegration_MissingSite404` — no alias for `dead.test.camp`, asserts 404
-
-### Step 4: Caddy in-process config (testcontainers + caddytest)
-- Full Caddyfile with global `order r2_alias before file_server`, `filesystem r2 s3 {...}` pointing at Minio endpoint
-- `r2_alias` block with Minio creds + cache_ttl=500ms + root_domain=test.camp
-- `file_server { fs r2 }`
-- Use `caddytest.Tester` to boot Caddy in-process and issue HTTP requests
+### Step 4: Test cases (all serial; no t.Parallel at top-level — shared Caddy/S3Mock restart is expensive)
+- TestIntegration_ResolveProduction
+- TestIntegration_AliasFlip (exercises cache TTL)
+- TestIntegration_PreviewRouting (site key = production)
+- TestIntegration_MissingSite404
 
 ### Step 5: Verify
 - `go test -race -v -tags=integration -run TestIntegration -timeout 180s`
-- All pass
 
 ## Files
-
-- Create: `docker/images/caddy-s3/modules/r2alias/integration_test.go`
-- Create: `docker/images/caddy-s3/modules/r2alias/testdata/site-a/deploys/v1/index.html`
-- Create: `docker/images/caddy-s3/modules/r2alias/testdata/site-a/deploys/v2/index.html`
-- Modify: `docker/images/caddy-s3/modules/r2alias/go.mod` (add testcontainers, caddytest)
-- Modify: `docker/images/caddy-s3/modules/r2alias/go.sum`
-
-## Acceptance Criteria
-
-All four integration tests pass with `go test -race -v -tags=integration`.
-
-## Context
-
-Unit tests (Task 02, 03) cover logic. These integration tests confirm the module wires correctly with `caddy-fs-s3` and Minio (a drop-in for R2 since both are S3-compatible). This is the last gate before pushing the Docker image.
-
-## When Stuck
-
-testcontainers may require Docker running — if the test env has no Docker, document the limitation but ensure the tests run green locally. Minio's default credentials are `minioadmin/minioadmin` — use those in test fixtures.
+- docker/images/caddy-s3/modules/r2alias/integration_test.go
+- docker/images/caddy-s3/modules/r2alias/testdata/site-a/deploys/v{1,2}/index.html
+- Modify: go.mod + go.sum
 
 ## Constraints
-
-- Integration build tag required (opt-in)
-- Do NOT put real R2 credentials in test code
-- Do NOT touch `k3s/gxy-static/` or other repos
-- Do NOT run git write commands
+- Adobe S3Mock image pinned (by version tag) — NEVER `:latest`.
+- r2_alias and caddy.fs.r2 share no code at the struct level; they DO share AWS SDK client construction patterns — fine.
+- Do NOT put real R2 credentials anywhere.
+- Do NOT run git write commands.
 ```
 
-**Depends on:** Task 03
+**Depends on:** Task 03 + Task 01b
 
 ---
 
@@ -584,31 +667,32 @@ testcontainers may require Docker running — if the test env has no Docker, doc
 
 #### Context
 
-Update the Dockerfile to pin Caddy + caddy-fs-s3 versions (D30) and add the custom r2_alias module via xcaddy. Also add a Woodpecker pipeline to the infra repo that rebuilds + pushes to GHCR on changes to `docker/images/caddy-s3/**`.
+Update the Dockerfile to pin Caddy 2.11.2 (D30) and build with ONLY the in-tree r2alias module via xcaddy (D32 — no third-party Caddy plugins). Also add a Woodpecker pipeline to the infra repo that rebuilds + pushes to GHCR on changes to `docker/images/caddy-s3/**`.
 
 #### Acceptance Criteria
 
-- GIVEN the Dockerfile WHEN `docker buildx build docker/images/caddy-s3/` runs THEN image builds successfully
-- GIVEN the built image WHEN `docker run --rm ghcr.io/freecodecamp-universe/caddy-s3:<tag> caddy list-modules` runs THEN output contains both `http.handlers.r2_alias` and the `fs.s3` module from caddy-fs-s3
-- GIVEN a change to `docker/images/caddy-s3/modules/r2alias/*.go` merged to main WHEN Woodpecker triggers THEN image builds, tests run, image pushed to `ghcr.io/freecodecamp-universe/caddy-s3:{YYYYMMDD}-{sha7}`
-- GIVEN `just caddy-s3-build` locally THEN builds + tags the image with `dev-<sha>`
+- GIVEN the Dockerfile WHEN `docker buildx build docker/images/caddy-s3/` runs THEN image builds successfully.
+- GIVEN the built image WHEN `docker run --rm ghcr.io/freecodecamp-universe/caddy-s3:<tag> caddy list-modules` runs THEN output contains both `http.handlers.r2_alias` (T01–T03) AND `caddy.fs.r2` (T01b). It does NOT contain `caddy.fs.s3` — the third-party `caddy-fs-s3` dep is removed per D32.
+- GIVEN a change to `docker/images/caddy-s3/modules/r2alias/*.go` merged to main WHEN Woodpecker triggers THEN image builds, tests run, image pushed to `ghcr.io/freecodecamp-universe/caddy-s3:{YYYYMMDD}-{sha7}`.
+- GIVEN `just caddy-s3-build` locally THEN builds + tags the image with `dev-<sha>`.
+- GIVEN `hadolint docker/images/caddy-s3/Dockerfile` THEN no errors (warnings OK).
 
 #### Verification
 
 ```bash
 docker buildx build -t caddy-s3-test:local docker/images/caddy-s3/ \
-  && docker run --rm caddy-s3-test:local caddy list-modules | grep -E 'r2_alias|fs.s3'
+  && docker run --rm caddy-s3-test:local caddy list-modules | grep -E 'r2_alias|caddy\.fs\.r2'
 ```
 
-**Expected output:** both modules listed.
+**Expected output:** both modules listed. `caddy.fs.s3` MUST NOT appear.
 
 #### Constraints
 
-- Pin `caddy:2.8-builder` and `caddy:2.8-alpine` exactly — no `:2` or `:latest`
-- Pin `caddy-fs-s3@v0.12.0` in xcaddy args
-- Pin `xcaddy build v2.8.4` (matching the base image Caddy version)
-- Use multi-stage build (already in use)
-- Pipeline uses Woodpecker, not GHA — this aligns with the Woodpecker-all-in decision
+- Pin `caddy:2.11-builder` and `caddy:2.11-alpine` exactly — no `:2`, `:latest`, or sub-2.11 tags.
+- Pin `xcaddy build v2.11.2`. Do NOT include `--with github.com/sagikazarmark/caddy-fs-s3` per D32.
+- Use multi-stage build (already in use).
+- Pipeline uses Woodpecker, not GHA (D1 — all-in on Woodpecker).
+- hadolint must pass with no errors.
 
 #### Agent Prompt
 
@@ -623,20 +707,21 @@ Update Dockerfile per RFC §4.3.8 (D30) and add a Woodpecker pipeline that rebui
 Replace `docker/images/caddy-s3/Dockerfile` with:
 
 ```dockerfile
-FROM caddy:2.8-builder AS builder
+FROM caddy:2.11-builder AS builder
 
 ENV GOTOOLCHAIN=auto
 
 COPY modules/r2alias /src/modules/r2alias
 
-RUN xcaddy build v2.8.4 \
-    --with github.com/sagikazarmark/caddy-fs-s3@v0.12.0 \
+# D32 (§5.30): no third-party Caddy plugins. The in-tree r2alias package
+# registers both http.handlers.r2_alias and caddy.fs.r2.
+RUN xcaddy build v2.11.2 \
     --with github.com/freeCodeCamp-Universe/infra/docker/images/caddy-s3/modules/r2alias=/src/modules/r2alias
 
-FROM caddy:2.8-alpine
+FROM caddy:2.11-alpine
 
 LABEL org.opencontainers.image.source=https://github.com/freeCodeCamp-Universe/infra
-LABEL org.opencontainers.image.description="Caddy with S3 filesystem + R2 alias resolution for Universe static constellations"
+LABEL org.opencontainers.image.description="Caddy with in-tree r2alias module (alias resolver + R2 filesystem) for Universe static constellations"
 LABEL org.opencontainers.image.licenses=Apache-2.0
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
@@ -692,7 +777,9 @@ caddy-s3-build:
 ### Step 4: Verify local build
 ```
 just caddy-s3-build
-docker run --rm ghcr.io/freecodecamp-universe/caddy-s3:dev-$(git rev-parse --short HEAD) caddy list-modules | grep -E 'r2_alias|fs.s3'
+docker run --rm ghcr.io/freecodecamp-universe/caddy-s3:dev-$(git rev-parse --short HEAD) caddy list-modules | grep -E 'r2_alias|caddy\.fs\.r2'
+# Also verify the third-party plugin is NOT present:
+docker run --rm ghcr.io/freecodecamp-universe/caddy-s3:dev-$(git rev-parse --short HEAD) caddy list-modules | grep -q 'caddy.fs.s3' && echo "FAIL: caddy.fs.s3 present (D32 violated)" || echo "OK: no third-party fs modules"
 ```
 
 ## Files
@@ -704,8 +791,9 @@ docker run --rm ghcr.io/freecodecamp-universe/caddy-s3:dev-$(git rev-parse --sho
 ## Acceptance Criteria
 
 - `just caddy-s3-build` completes with exit 0
-- `docker run ... caddy list-modules` lists both `http.handlers.r2_alias` and `fs.s3`
+- `docker run ... caddy list-modules` lists both `http.handlers.r2_alias` and `caddy.fs.r2`; does NOT list `caddy.fs.s3` (per D32)
 - Woodpecker pipeline YAML validates (syntactic check via `woodpecker-cli lint` if available, else manual review)
+- `hadolint Dockerfile` passes without errors
 
 ## Context
 

@@ -32,39 +32,40 @@
 
 ## Decision Index
 
-| ID  | Decision                                                                                                                       | Rationale                                                                                              | Alternatives § |
-| --- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | -------------- |
-| D1  | Woodpecker CI is the sole deploy path (no direct R2 access from CLI)                                                           | Keeps R2 credentials off developer machines                                                            | §5.1           |
-| D2  | Build in CI, not on developer machine                                                                                          | Matches Netlify/Vercel model; single source of truth                                                   | §5.2           |
-| D3  | R2-direct serving via custom Caddy module (no local disk, no rclone)                                                           | Simplest model; removes sync gap that plagued gxy-static                                               | §5.3           |
-| D4  | Custom Caddy Go module for alias resolution (~300 LOC)                                                                         | No existing plugin handles alias file → path rewrite                                                   | §5.4           |
-| D5  | Preview subdomain scheme: `{site}--preview.freecode.camp`                                                                      | Stays under `*.freecode.camp` free wildcard SSL                                                        | §5.5           |
-| D6  | ArgoCD manages Caddy infrastructure only; exits per-deploy hot path                                                            | Cleanly separates CD-of-platform from CD-of-sites                                                      | §5.6           |
-| D7  | Woodpecker on gxy-launchbase (not temporary on gxy-management)                                                                 | Spike plan Phase 1 expectation; isolates CI from mgmt                                                  | §5.7           |
-| D8  | R2 bucket name: `gxy-cassiopeia-1` (sequential suffix convention)                                                              | Matches gxy-static-1 naming; allows future buckets 2, 3…                                               | §5.8           |
-| D9  | Single Woodpecker pipeline with `OP` variable (deploy/promote/rollback)                                                        | Fewer pipeline files to maintain; same secrets/image cache                                             | §5.9           |
-| D10 | Alias files are plain text (single-line deploy ID, UTF-8, no trailing \n)                                                      | Matches current universe-cli convention; simplest to parse                                             | §5.10          |
-| D11 | Deploy ID format: `{YYYYMMDD-HHMMSS}-{git-sha7}`                                                                               | Sortable, informative, collision-resistant                                                             | §5.10          |
-| D12 | gxy-cassiopeia: 3× s-4vcpu-8gb-amd DO FRA1 (same as gxy-static)                                                                | Proven size; Cloudflare fronts most traffic                                                            | §5.11          |
-| D13 | gxy-launchbase: 3× s-4vcpu-8gb-amd DO FRA1 initially; Hetzner migration post-M5                                                | Hetzner account not yet provisioned; DO unblocks Phase 1                                               | §5.11          |
-| D14 | Caddy cache TTL for alias file: 15s                                                                                            | Balance between visibility latency and R2 request volume                                               | §5.12          |
-| D15 | Woodpecker namespace: `woodpecker`; Caddy namespace: `caddy`                                                                   | Match existing convention (`argocd`, `windmill`, `zot`)                                                | §5.13          |
-| D16 | Cloudflare Flexible TLS (no origin cert changes)                                                                               | Matches gxy-static; same DNS round-robin pattern                                                       | §5.14          |
-| D17 | Deploy events trigger on `push` to main + `manual` Woodpecker API                                                              | Covers automatic and CLI-triggered deploys                                                             | §5.15          |
-| D18 | Custom module lives in `infra/docker/images/caddy-s3/modules/r2alias/`                                                         | Keep module + xcaddy build colocated; single repo ownership                                            | §5.16          |
-| D19 | Site name regex: `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` (no `--`, no leading/trailing `-`)                                          | Matches RFC-1123 DNS label; prevents preview collision                                                 | §5.17          |
-| D20 | No backward compatibility with gxy-static (user directive)                                                                     | Reduces scope; gxy-static stays as sandbox for experiments                                             | §5.18          |
-| D21 | Woodpecker uses CloudNativePG (CNPG) at bootstrap, not SQLite                                                                  | Survives single-node PVC loss; no manual recovery procedure                                            | §5.19          |
-| D22 | R2 credentials are **repo-scoped**, not org-scoped                                                                             | Limits supply-chain blast radius of a compromised build dep                                            | §5.20          |
-| D23 | Caddy admin API binds to `127.0.0.1:2019` only                                                                                 | Prevents in-cluster lateral movement via admin endpoint                                                | §5.21          |
-| D24 | Promote pipeline order: smoke-test the candidate deploy before writing the alias                                               | Failed verify never leaves a bad alias; no in-pipeline revert required                                 | §5.22          |
-| D25 | DNS cutover preflight is a machine-checked list (`just cutover-preflight`)                                                     | Removes ambiguity; prevents missed-site 404s after cutover                                             | §5.23          |
-| D26 | gxy-static stays live as rollback substrate for ≥ 30 days post-cutover; DNS-availability only, not content-parity (see §6.9.1) | Preserves Phase-6 rollback path until user decommissions; content-parity mitigation deferred (§5.24.1) | §5.24, §6.9.1  |
-| D27 | Alias cache is bounded LRU (max 10k entries) with `singleflight` stampede control                                              | Bounds memory; prevents cache-fill attack and thundering herd                                          | §5.25          |
-| D28 | Cleanup cron uses an R2 lock object + 1-hour grace window                                                                      | Closes TOCTOU race between alias read and prefix delete                                                | §5.26          |
-| D29 | Origin access restricted to Cloudflare IP ranges (Cilium ingress allow-list)                                                   | Prevents bucket content enumeration via direct origin hit                                              | §5.27          |
-| D30 | Caddy pinned to `v2.11.2` (CVE-patched); caddy-fs-s3 pinned to `@v0.12.0`; 14-day CVE-bump SLA                                 | Reproducible builds without shipping known-vulnerable Caddy                                            | §5.28          |
-| D31 | Minimum viable observability at v1: CF uptime monitor + 5xx alert per site                                                     | Detects next 404 storm before users do                                                                 | §5.29          |
+| ID  | Decision                                                                                                                       | Rationale                                                                                                                                                      | Alternatives § |
+| --- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| D1  | Woodpecker CI is the sole deploy path (no direct R2 access from CLI)                                                           | Keeps R2 credentials off developer machines                                                                                                                    | §5.1           |
+| D2  | Build in CI, not on developer machine                                                                                          | Matches Netlify/Vercel model; single source of truth                                                                                                           | §5.2           |
+| D3  | R2-direct serving via custom Caddy module (no local disk, no rclone)                                                           | Simplest model; removes sync gap that plagued gxy-static                                                                                                       | §5.3           |
+| D4  | Custom Caddy Go module for alias resolution (~300 LOC)                                                                         | No existing plugin handles alias file → path rewrite                                                                                                           | §5.4           |
+| D5  | Preview subdomain scheme: `{site}--preview.freecode.camp`                                                                      | Stays under `*.freecode.camp` free wildcard SSL                                                                                                                | §5.5           |
+| D6  | ArgoCD manages Caddy infrastructure only; exits per-deploy hot path                                                            | Cleanly separates CD-of-platform from CD-of-sites                                                                                                              | §5.6           |
+| D7  | Woodpecker on gxy-launchbase (not temporary on gxy-management)                                                                 | Spike plan Phase 1 expectation; isolates CI from mgmt                                                                                                          | §5.7           |
+| D8  | R2 bucket name: `gxy-cassiopeia-1` (sequential suffix convention)                                                              | Matches gxy-static-1 naming; allows future buckets 2, 3…                                                                                                       | §5.8           |
+| D9  | Single Woodpecker pipeline with `OP` variable (deploy/promote/rollback)                                                        | Fewer pipeline files to maintain; same secrets/image cache                                                                                                     | §5.9           |
+| D10 | Alias files are plain text (single-line deploy ID, UTF-8, no trailing \n)                                                      | Matches current universe-cli convention; simplest to parse                                                                                                     | §5.10          |
+| D11 | Deploy ID format: `{YYYYMMDD-HHMMSS}-{git-sha7}`                                                                               | Sortable, informative, collision-resistant                                                                                                                     | §5.10          |
+| D12 | gxy-cassiopeia: 3× s-4vcpu-8gb-amd DO FRA1 (same as gxy-static)                                                                | Proven size; Cloudflare fronts most traffic                                                                                                                    | §5.11          |
+| D13 | gxy-launchbase: 3× s-4vcpu-8gb-amd DO FRA1 initially; Hetzner migration post-M5                                                | Hetzner account not yet provisioned; DO unblocks Phase 1                                                                                                       | §5.11          |
+| D14 | Caddy cache TTL for alias file: 15s                                                                                            | Balance between visibility latency and R2 request volume                                                                                                       | §5.12          |
+| D15 | Woodpecker namespace: `woodpecker`; Caddy namespace: `caddy`                                                                   | Match existing convention (`argocd`, `windmill`, `zot`)                                                                                                        | §5.13          |
+| D16 | Cloudflare Flexible TLS (no origin cert changes)                                                                               | Matches gxy-static; same DNS round-robin pattern                                                                                                               | §5.14          |
+| D17 | Deploy events trigger on `push` to main + `manual` Woodpecker API                                                              | Covers automatic and CLI-triggered deploys                                                                                                                     | §5.15          |
+| D18 | Custom module lives in `infra/docker/images/caddy-s3/modules/r2alias/`                                                         | Keep module + xcaddy build colocated; single repo ownership                                                                                                    | §5.16          |
+| D19 | Site name regex: `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` (no `--`, no leading/trailing `-`)                                          | Matches RFC-1123 DNS label; prevents preview collision                                                                                                         | §5.17          |
+| D20 | No backward compatibility with gxy-static (user directive)                                                                     | Reduces scope; gxy-static stays as sandbox for experiments                                                                                                     | §5.18          |
+| D21 | Woodpecker uses CloudNativePG (CNPG) at bootstrap, not SQLite                                                                  | Survives single-node PVC loss; no manual recovery procedure                                                                                                    | §5.19          |
+| D22 | R2 credentials are **repo-scoped**, not org-scoped                                                                             | Limits supply-chain blast radius of a compromised build dep                                                                                                    | §5.20          |
+| D23 | Caddy admin API binds to `127.0.0.1:2019` only                                                                                 | Prevents in-cluster lateral movement via admin endpoint                                                                                                        | §5.21          |
+| D24 | Promote pipeline order: smoke-test the candidate deploy before writing the alias                                               | Failed verify never leaves a bad alias; no in-pipeline revert required                                                                                         | §5.22          |
+| D25 | DNS cutover preflight is a machine-checked list (`just cutover-preflight`)                                                     | Removes ambiguity; prevents missed-site 404s after cutover                                                                                                     | §5.23          |
+| D26 | gxy-static stays live as rollback substrate for ≥ 30 days post-cutover; DNS-availability only, not content-parity (see §6.9.1) | Preserves Phase-6 rollback path until user decommissions; content-parity mitigation deferred (§5.24.1)                                                         | §5.24, §6.9.1  |
+| D27 | Alias cache is bounded LRU (max 10k entries) with `singleflight` stampede control                                              | Bounds memory; prevents cache-fill attack and thundering herd                                                                                                  | §5.25          |
+| D28 | Cleanup cron uses an R2 lock object + 1-hour grace window                                                                      | Closes TOCTOU race between alias read and prefix delete                                                                                                        | §5.26          |
+| D29 | Origin access restricted to Cloudflare IP ranges (Cilium ingress allow-list)                                                   | Prevents bucket content enumeration via direct origin hit                                                                                                      | §5.27          |
+| D30 | Caddy pinned to `v2.11.2` (CVE-patched); 14-day CVE-bump SLA; no third-party Caddy plugins in the image                        | Reproducible builds without shipping known-vulnerable Caddy; `caddy-fs-s3` removed per D32                                                                     | §5.28          |
+| D31 | Minimum viable observability at v1: CF uptime monitor + 5xx alert per site                                                     | Detects next 404 storm before users do                                                                                                                         | §5.29          |
+| D32 | Merge S3 filesystem into `r2_alias` module as `caddy.fs.r2`; drop `sagikazarmark/caddy-fs-s3` dependency                       | Upstream stale 14 months (last release Feb 1 2025) makes D30 SLA unenforceable; owning the FS layer preserves vendor-neutrality and removes single-vendor risk | §5.30          |
 
 ---
 
@@ -335,10 +336,10 @@ Personal access tokens are created per user via the Woodpecker UI (`/user/token`
 #### 4.3.1 Module Identity
 
 - **Go package path:** `github.com/freeCodeCamp-Universe/infra/docker/images/caddy-s3/modules/r2alias`
-- **Module file:** `infra/docker/images/caddy-s3/modules/r2alias/r2alias.go` (and companion `_test.go` files).
-- **Caddy module ID:** `http.handlers.r2_alias`
-- **Caddyfile directive:** `r2_alias`
-- **Directive order:** placed before `file_server` (registered via `order` global option).
+- **Package layout:** two Caddy modules register from this package — the middleware handler (alias resolver + path rewrite) and the filesystem (serves objects from R2). Shared S3 client, shared config fields, shared cache. Per D32 (§5.30), we own the FS layer instead of depending on `sagikazarmark/caddy-fs-s3`.
+- **Caddy module IDs:**
+  - `http.handlers.r2_alias` — middleware handler (T01–T03); Caddyfile directive `r2_alias`; ordered before `file_server`.
+  - `caddy.fs.r2` — filesystem module (T01b); registered via Caddyfile `filesystem <name> r2 { ... }` under the global options block; consumed by `file_server { fs <name> }`.
 
 #### 4.3.2 Responsibilities
 
@@ -399,7 +400,8 @@ import (
 // R2Alias is a Caddy HTTP handler that resolves {site}/{alias_name} files in
 // an S3-compatible bucket and rewrites the request path to the target deploy
 // prefix. It is positioned before file_server so the rewritten path is served
-// by a filesystem module (e.g. caddy-fs-s3 with fs r2).
+// by the sibling caddy.fs.r2 filesystem module (same Go package, registered
+// separately; see R2FS below).
 type R2Alias struct {
     Bucket           string        `json:"bucket"`
     Endpoint         string        `json:"endpoint"`
@@ -454,6 +456,49 @@ var (
     _ caddyfile.Unmarshaler       = (*R2Alias)(nil)
     _ caddyhttp.MiddlewareHandler = (*R2Alias)(nil)
 )
+
+// R2FS is a Caddy filesystem module (caddy.fs.r2) that serves objects from
+// R2. It is consumed by file_server after r2_alias has rewritten the path.
+// Registered in the same Go package as R2Alias — the two modules share config
+// conventions but are instantiated independently so each Caddyfile can wire
+// them with distinct credentials if desired.
+type R2FS struct {
+    Bucket          string `json:"bucket"`
+    Endpoint        string `json:"endpoint"`
+    Region          string `json:"region"`
+    AccessKeyID     string `json:"access_key_id,omitempty"`
+    SecretAccessKey string `json:"secret_access_key,omitempty"`
+    UsePathStyle    bool   `json:"use_path_style,omitempty"` // default true for R2
+
+    client *s3.Client
+    logger *zap.Logger
+}
+
+// CaddyModule returns the filesystem module information.
+func (R2FS) CaddyModule() caddy.ModuleInfo {
+    return caddy.ModuleInfo{
+        ID:  "caddy.fs.r2",
+        New: func() caddy.Module { return new(R2FS) },
+    }
+}
+
+// Provision sets up the S3 client. Called once at startup.
+func (r *R2FS) Provision(ctx caddy.Context) error { /* ... */ }
+
+// Open implements fs.FS — issues s3.GetObject and wraps the body in a
+// seekable reader backed by an in-memory buffer (bounded by upstream
+// Content-Length; files > R2FS.MaxFileSize return fs.ErrInvalid).
+func (r *R2FS) Open(name string) (fs.File, error) { /* ... */ }
+
+// Stat implements fs.StatFS — issues s3.HeadObject (lighter than GetObject).
+func (r *R2FS) Stat(name string) (fs.FileInfo, error) { /* ... */ }
+
+// Interface guards for R2FS
+var (
+    _ fs.StatFS             = (*R2FS)(nil)
+    _ caddy.Provisioner     = (*R2FS)(nil)
+    _ caddyfile.Unmarshaler = (*R2FS)(nil)
+)
 ```
 
 #### 4.3.5 Alias Cache
@@ -499,26 +544,26 @@ Extend `infra/docker/images/caddy-s3/Dockerfile`:
 
 ```dockerfile
 # Pin both stages to an exact minor to avoid drift on rebuild (D30).
-# Caddy v2.11.2 is the current stable patched against CVE-2026-27585 (file-matcher
-# backslash sanitization), CVE-2026-27587 (MatchPath %xx case-normalization bypass),
-# and CVE-2026-27588 (MatchHost case-sensitivity bypass on >100 host lists).
-# Caddy 2.8.x is vulnerable to all three — do NOT downgrade.
+# Caddy v2.11.2 is the current stable patched against the Q1 2026 CVE wave
+# (forward_auth identity injection + vars_regexp secret exposure + Feb 2026 batch
+# of 6 CVEs in 2.11.1 covering host/path matching, TLS client auth, file matcher).
+# Do NOT downgrade below 2.11.2.
 FROM caddy:2.11-builder AS builder
 
 ENV GOTOOLCHAIN=auto
 
 COPY modules/r2alias /src/modules/r2alias
 
-# Pin caddy-fs-s3 to a known-good version; bump via PR with regression tests.
-# caddy-fs-s3 compat with Caddy 2.11 is verified by T31 (Caddyfile PoC spike) before T01 dispatches.
+# Per D32 (§5.30): no third-party Caddy plugins. The r2alias Go package
+# registers both http.handlers.r2_alias (alias resolver) and caddy.fs.r2
+# (filesystem backend) from a single in-tree module.
 RUN xcaddy build v2.11.2 \
-    --with github.com/sagikazarmark/caddy-fs-s3@v0.12.0 \
     --with github.com/freeCodeCamp-Universe/infra/docker/images/caddy-s3/modules/r2alias=/src/modules/r2alias
 
 FROM caddy:2.11-alpine
 
 LABEL org.opencontainers.image.source=https://github.com/freeCodeCamp-Universe/infra
-LABEL org.opencontainers.image.description="Caddy with S3 filesystem + R2 alias resolution for Universe static constellations"
+LABEL org.opencontainers.image.description="Caddy with in-tree r2alias module (alias resolver + R2 filesystem) for Universe static constellations"
 LABEL org.opencontainers.image.licenses=Apache-2.0
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
@@ -729,10 +774,14 @@ data:
 
       order r2_alias before file_server
 
-      filesystem r2 s3 {
+      # D32 (§5.30): filesystem backed by the in-tree caddy.fs.r2 module
+      # (same Go package as http.handlers.r2_alias). No third-party plugins.
+      filesystem r2 r2 {
         bucket           {$R2_BUCKET}
         region           auto
         endpoint         {$R2_ENDPOINT}
+        access_key_id    {$AWS_ACCESS_KEY_ID}
+        secret_access_key {$AWS_SECRET_ACCESS_KEY}
         use_path_style
       }
     }
@@ -1681,6 +1730,8 @@ Ordering is set globally in the Caddyfile (`order r2_alias before file_server`) 
 **Cons (draft):** Research confirmed no existing plugin supports reading an alias file then using its content as a path prefix. `caddy-s3-proxy` (lindenlab) is unmaintained (AWS SDK v1, Go 1.13, Caddy 2.6.4, last release 2021). `caddy-fs-s3` is active and in the build but cannot resolve aliases directly. `caddy-aws-transport` cannot target custom endpoints → cannot use R2.
 **Initial rejection:** Scope of custom module is ~300 LOC; tractable. User confirmed willingness to maintain it given the existing xcaddy build already requires Go toolchain.
 
+**Audit revisit (2026-04-18, post-D32).** `caddy-fs-s3`'s last release is v0.12.0 on 2026-02-01 (14 months ago at audit time). Not archived, but solo-maintainer silence through two Caddy security wave releases (2.11.1 Feb, 2.11.2 March) made D30's "14-day CVE-bump SLA" unenforceable. D32 (§5.30) resolves this by absorbing the S3 filesystem into the in-tree `r2alias` package as a sibling `caddy.fs.r2` module. D4's core thesis — "own the Go code to own the schedule" — now extends to the FS layer as well.
+
 **Spike-revisit (post-review 2026-04-18):** The custom-module path represents 3.5 engineer-weeks (T01–T05 = Phase 0 critical path). Before committing, a 1-day spike (**T31**, beads `gxy-static-k7d.32`) validates whether `caddy-fs-s3` + Caddy built-in `map`/`rewrite`/sub-request primitives can resolve alias files using Caddyfile only. T31 produces `docs/rfc/spikes/gxy-cassiopeia-caddyfile-poc.md` with a VIABLE / VIABLE-WITH-CAVEATS / NOT-VIABLE verdict.
 
 **Post-spike decision tree** (binds the CTO, not the spike agent):
@@ -1874,8 +1925,9 @@ T01 (`gxy-static-k7d.2`) is `blocks`-blocked by T31 in beads; dispatch will not 
 **Cons:** Caddy 2.8.x was superseded by 2.9/2.10/2.11 and carries unpatched 2026 CVEs (CVE-2026-27585 file-matcher backslash bypass, CVE-2026-27587 MatchPath %xx bypass, CVE-2026-27588 MatchHost case-sensitivity bypass). Shipping 2.8.4 to production is non-starter.
 **Rejected** after review (2026-04-18): pinning to a vulnerable release is worse than the debugging cost it was meant to avoid.
 
-**Approach C (adopted):** Pin to the current CVE-patched stable. `FROM caddy:2.11-builder` + `xcaddy build v2.11.2` (2026-03-06 release). Bumping is a PR with regression tests, a CVE/changelog read, and a T04 Minio integration re-run.
-**Policy:** When a Caddy security release lands, the pin MUST be bumped within 14 days (or sooner if the CVE affects a handler or matcher used by gxy-cassiopeia). This is tracked by a recurring Windmill reminder (filed as follow-up after Phase 6 exit, not a blocker for M1).
+**Approach C (adopted):** Pin to the current CVE-patched stable. `FROM caddy:2.11-builder` + `xcaddy build v2.11.2` (2026-03-06 release). Bumping is a PR with regression tests, a CVE/changelog read, and a T04 integration re-run (against Adobe S3Mock per §11.2 post-audit).
+**Policy:** When a Caddy security release lands, the pin MUST be bumped within 14 days (or sooner if the CVE affects a handler or matcher used by gxy-cassiopeia). Tracked by a recurring Windmill reminder (filed as follow-up after Phase 6 exit, not a blocker for M1).
+**Audit revision (2026-04-18):** The original wording pinned `caddy-fs-s3@v0.12.0` alongside Caddy. That dep is dropped per D32 (§5.30) — the image now contains only `caddy-core` + our in-tree `r2alias` module. The 14-day SLA is enforceable again because we control every component on the build line.
 **Adopted.**
 
 ### 5.29 (D31) No alerts at v1
@@ -1884,6 +1936,30 @@ T01 (`gxy-static-k7d.2`) is `blocks`-blocked by T31 in beads; dispatch will not 
 **Pros:** Zero v1 setup cost.
 **Cons:** The motivation §2 is precisely that undetected 404 storms on gxy-static triggered this RFC. Shipping gxy-cassiopeia with zero alerting repeats the mistake; the first incident goes undetected until a user complains.
 **Rejected.** Cloudflare Notifications (zero infrastructure, configured via CF API) + Uptime Robot (free tier) provide zone-level 5xx alerts, origin error alerts, per-site uptime, and Woodpecker API health — all with no gxy-backoffice dependency. Deferred alerts remain deferred, but the minimum floor is non-negotiable.
+
+### 5.30 (D32) Merge S3 filesystem into r2_alias — drop caddy-fs-s3 (2026-04-18 audit)
+
+**Approach A (original D30):** Use `sagikazarmark/caddy-fs-s3@v0.12.0` for the filesystem backend + in-tree `r2alias` module for alias resolution. Two Caddy plugins, one image.
+**Audit trigger (2026-04-18):** Dispatch of T04 (integration tests) surfaced that the test harness depended on MinIO, which was archived on 2026-02-12. Widening the scope to every third-party dep caught `caddy-fs-s3` at v0.12.0 (2026-02-01) with no activity since — 14 months stale. Not archived, but solo-maintainer silence through the Caddy 2.11.1 / 2.11.2 security waves made the D30 "14-day CVE-bump SLA" unenforceable in practice.
+
+**Approach B (fork `freeCodeCamp-Universe/caddy-fs-s3`):** Take ownership via fork, absorb upstream maintenance burden (~500 LOC + AWS SDK upkeep + Caddy-API upkeep).
+**Pros:** Minimal change to D30 wiring.
+**Cons:** Fork maintenance surface is roughly the same as writing the module ourselves, without the benefit of shared config + shared S3 client + shared cache with `r2_alias`.
+
+**Approach C (adopted):** Register a second Caddy module `caddy.fs.r2` from the same Go package as `r2_alias`. ~150 LOC (fs.FS + fs.StatFS + Caddyfile unmarshaller + Provision) + tests. Shared config conventions; shared AWS SDK client initialization; optional shared object cache for hot-path objects (deferred — alias cache already bounds misses).
+**Pros:** No third-party Caddy plugins; entire serving path is one Go package we own; D30 SLA enforceable again; vendor-neutrality tenet preserved.
+**Cons:** ~150 LOC of new production code to maintain; tests of fs.FS behavior need Adobe S3Mock (part of T04's new harness anyway).
+**Adopted.**
+
+**Migration impact:**
+
+- T01–T03 (`r2alias` middleware handler) — unchanged. No refactor.
+- T01b (new) — implements `R2FS`, `caddy.fs.r2` registration, Caddyfile grammar.
+- T04 (integration tests) — uses Adobe S3Mock instead of MinIO; tests exercise the `r2_alias` + `caddy.fs.r2` pipeline end-to-end.
+- T05 (Dockerfile + xcaddy build) — drops `--with github.com/sagikazarmark/caddy-fs-s3@v0.12.0`; adds only the in-tree module.
+- §4.5.4 ConfigMap — `filesystem r2 r2 { ... }` (module name `r2` in our namespace) instead of `filesystem r2 s3 { ... }`.
+
+Corresponding ADR update (if any) belongs to the Universe team; this RFC records the implementation decision only.
 
 ---
 
@@ -2259,7 +2335,11 @@ Target coverage: ≥ 85% statement coverage on the module.
 
 ### 11.2 Integration Tests (Go + testcontainers)
 
-Run the full Caddy binary against a Minio container populated with test deploys. Hit `curl localhost:…` with various Host headers. Assert response content matches expected deploys.
+Run the full Caddy binary against an Adobe S3Mock container (`adobe/s3mock` — Apache 2.0, purpose-built for test harnesses) populated with test deploys. Hit `curl localhost:…` with various Host headers. Assert response content matches expected deploys.
+
+**Dependency rationale (2026-04-18 audit).** The original draft specified MinIO. MinIO archived the community edition on 2026-02-12; Docker images stopped shipping in Oct 2025. Adobe S3Mock is the replacement: single-purpose S3 API mock, testcontainer-ready (Java backend, small image), actively maintained, Apache 2.0. LocalStack was considered but archived its public repo on 2026-03-23. See infra field notes §"Dependency audit" (2026-04-18) for the full evaluation.
+
+Tests exercise both the `r2_alias` middleware (path rewrite) AND the `caddy.fs.r2` filesystem (object read) on the same Caddy instance — since D32, they live in the same Go package.
 
 ### 11.3 End-to-End Tests (Bash + Woodpecker sandbox)
 
@@ -2305,38 +2385,38 @@ Documented in §9.3. Run during Phase 4 exit criterion.
 - **GitHub OAuth app** under `freeCodeCamp-Universe` org.
 - **Hetzner Cloud account** (post-M5 only) for gxy-launchbase migration; `hetzner.hcloud` Ansible collection deferred with it.
 - **Woodpecker Helm chart v3.13.x.**
-- **Caddy v2.x** (xcaddy build already in use).
-- **`sagikazarmark/caddy-fs-s3` v0.12.0** (unchanged dependency).
+- **Caddy v2.11.2** (xcaddy build already in use). No third-party Caddy plugins — the `r2alias` module (both `http.handlers.r2_alias` and `caddy.fs.r2`) lives in-tree per D32.
+- **Adobe S3Mock** (`adobe/s3mock`) — test harness only, replaces MinIO per 2026-04-18 audit.
 - **`rclone/rclone:1.70.0`** Docker image for pipeline steps.
 - **`@aws-sdk/client-s3` v3.x** — REMOVED from universe-cli runtime deps (still used by test fixtures).
 - **GHCR push access** for `ghcr.io/freecodecamp-universe/caddy-s3` image.
 
 ### 12.2 Risks
 
-| Risk                                                             | Likelihood | Impact                                                                     | Mitigation                                                                                                                                                        |
-| ---------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Custom Caddy module bug serves wrong deploy                      | Medium     | Site serves wrong content to end users                                     | Strict regex, unit tests, staged rollout in Phase 4 test site before Phase 6                                                                                      |
-| Custom module crashes Caddy under load                           | Low        | All sites down                                                             | Go panic recovery in ServeHTTP; livenessProbe restarts pod; CDN absorbs                                                                                           |
-| R2 outage (R2 SLA is 99.9% ≈ 8.76h/year)                         | Low        | Sites 503 on cache miss; cached paths OK                                   | Accepted per §3.2.7. CDN absorbs cacheable. Status page language pre-written in FLIGHT-MANUAL.                                                                    |
-| Woodpecker outage                                                | Medium     | No deploys possible; serving unaffected                                    | Acceptable (Woodpecker is not in serve path). Rebuild from Helm values + CNPG backup.                                                                             |
-| Alias cache staleness after deploy                               | High       | Deploy not visible for up to 15s                                           | Accepted. Matches CDN invalidation patterns. Cache purge step clears CF edge BEFORE alias flip.                                                                   |
-| Cache-fill attack on alias cache (Host header scan)              | Medium     | Caddy memory inflation                                                     | Bounded LRU (10k entries) + singleflight. Attack cannot exceed cache capacity (D27).                                                                              |
-| Preview SSL breaks on `{site}--preview.freecode.camp`            | Low        | Preview URL invalid cert                                                   | Validated in Phase 4 test site. Single-level wildcard confirmed.                                                                                                  |
-| Deploy ID collision (same timestamp + 7-char SHA)                | Very Low   | One deploy overwrites another                                              | 7-char SHA × second-granularity timestamp. Retry in CLI if needed.                                                                                                |
-| Cleanup cron deletes live deploy (TOCTOU)                        | Low        | Alias points at deleted deploy → 404                                       | R2 lock + 1-hour grace + pre-delete alias re-check (D28). Dry-run mode on first run.                                                                              |
-| Woodpecker API token leak                                        | Medium     | Attacker triggers pipelines in repos                                       | Per-user 90-day rotation, revocable. Scope limited by GH perms. Incident runbook on laptop loss.                                                                  |
-| Supply-chain attack via compromised build dep in one site        | Medium     | R2 writes limited to that one site                                         | **Per-repo R2 secrets (D22)** bound blast radius to single constellation, not org.                                                                                |
-| DO FRA1 outage                                                   | Low        | No deploys AND sites down (shared region)                                  | DNS revert to gxy-static (still live for 30d). Hetzner migration (post-M5) separates launchbase from serving region. Long-term: multi-region.                     |
-| Hetzner migration regresses CI (post-M5)                         | Low        | Temporary deploy outage                                                    | Separate epic with its own cloud-init parity dry-run, staged rollout, and gxy-static still available for rollback if mid-migration.                               |
-| Woodpecker CNPG cluster loses primary                            | Low        | Brief pipeline queue stall                                                 | CNPG promotes replica automatically. WAL-archived to DO Spaces. Monthly restore drill (D21).                                                                      |
-| Woodpecker v3 project stalls or pivots                           | Low        | Replacement requires CLI+template rewrite                                  | CLI's Woodpecker client is isolated in `universe-cli/src/woodpecker/` — one module to swap.                                                                       |
-| caddy-fs-s3 upstream abandoned                                   | Low        | Image build breaks on Caddy API drift                                      | Pinned to v0.12.0 (D30). Fallback: extend custom module to handle S3 file serving directly.                                                                       |
-| Cloudflare cache purge API rate-limited during heavy promote day | Low        | Cache purges silently drop, stale reads                                    | CF purge has generous limits (1000/min zone-scoped); monitor via `purge-cache-pre` exit code.                                                                     |
-| GitHub OAuth session compromise (before GitHub App migration)    | Low        | r/w to all freeCodeCamp-Universe repos                                     | CF Access on woodpecker domain, 2FA mandatory at org, audit log shipping. GitHub App is target end state (D28).                                                   |
-| Cold site origin latency at high RPS (R2-direct, no disk cache)  | Medium     | p95 latency climbs                                                         | Cloudflare CDN handles warm traffic. If cold traffic becomes routine, reintroduce disk cache (two-way door §3.2.7). Trigger: CDN miss rate > 20% sustained.       |
-| Day-N rollback serves cutover-day content (content regression)   | Medium     | Constellations that deployed during soak silently regress to stale content | DNS-level rollback only (§6.9.1). Operator must announce regression and require site re-deploys. Dual-target writes (§5.24.1) deferred. Runbook-enforced via T25. |
-| Caddy CVEs unpatched on pinned version                           | Medium     | Matcher-bypass / ACL-bypass on r2_alias                                    | D30 revised (§5.28): pin to latest CVE-patched stable (2.11.2); 14-day bump SLA on security releases. Tracked by Windmill reminder cron (filed post-M1).          |
-| Cache-fill attack detection lag (LRU thrash → CF 5xx hours late) | Medium     | Attack detected only via downstream CF 5xx, not origin metric              | T24 adds canary-site p95 latency alert + CF origin-response-time threshold. Primary-signal detection <5min vs hours.                                              |
+| Risk                                                             | Likelihood   | Impact                                                                     | Mitigation                                                                                                                                                        |
+| ---------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom Caddy module bug serves wrong deploy                      | Medium       | Site serves wrong content to end users                                     | Strict regex, unit tests, staged rollout in Phase 4 test site before Phase 6                                                                                      |
+| Custom module crashes Caddy under load                           | Low          | All sites down                                                             | Go panic recovery in ServeHTTP; livenessProbe restarts pod; CDN absorbs                                                                                           |
+| R2 outage (R2 SLA is 99.9% ≈ 8.76h/year)                         | Low          | Sites 503 on cache miss; cached paths OK                                   | Accepted per §3.2.7. CDN absorbs cacheable. Status page language pre-written in FLIGHT-MANUAL.                                                                    |
+| Woodpecker outage                                                | Medium       | No deploys possible; serving unaffected                                    | Acceptable (Woodpecker is not in serve path). Rebuild from Helm values + CNPG backup.                                                                             |
+| Alias cache staleness after deploy                               | High         | Deploy not visible for up to 15s                                           | Accepted. Matches CDN invalidation patterns. Cache purge step clears CF edge BEFORE alias flip.                                                                   |
+| Cache-fill attack on alias cache (Host header scan)              | Medium       | Caddy memory inflation                                                     | Bounded LRU (10k entries) + singleflight. Attack cannot exceed cache capacity (D27).                                                                              |
+| Preview SSL breaks on `{site}--preview.freecode.camp`            | Low          | Preview URL invalid cert                                                   | Validated in Phase 4 test site. Single-level wildcard confirmed.                                                                                                  |
+| Deploy ID collision (same timestamp + 7-char SHA)                | Very Low     | One deploy overwrites another                                              | 7-char SHA × second-granularity timestamp. Retry in CLI if needed.                                                                                                |
+| Cleanup cron deletes live deploy (TOCTOU)                        | Low          | Alias points at deleted deploy → 404                                       | R2 lock + 1-hour grace + pre-delete alias re-check (D28). Dry-run mode on first run.                                                                              |
+| Woodpecker API token leak                                        | Medium       | Attacker triggers pipelines in repos                                       | Per-user 90-day rotation, revocable. Scope limited by GH perms. Incident runbook on laptop loss.                                                                  |
+| Supply-chain attack via compromised build dep in one site        | Medium       | R2 writes limited to that one site                                         | **Per-repo R2 secrets (D22)** bound blast radius to single constellation, not org.                                                                                |
+| DO FRA1 outage                                                   | Low          | No deploys AND sites down (shared region)                                  | DNS revert to gxy-static (still live for 30d). Hetzner migration (post-M5) separates launchbase from serving region. Long-term: multi-region.                     |
+| Hetzner migration regresses CI (post-M5)                         | Low          | Temporary deploy outage                                                    | Separate epic with its own cloud-init parity dry-run, staged rollout, and gxy-static still available for rollback if mid-migration.                               |
+| Woodpecker CNPG cluster loses primary                            | Low          | Brief pipeline queue stall                                                 | CNPG promotes replica automatically. WAL-archived to DO Spaces. Monthly restore drill (D21).                                                                      |
+| Woodpecker v3 project stalls or pivots                           | Low          | Replacement requires CLI+template rewrite                                  | CLI's Woodpecker client is isolated in `universe-cli/src/woodpecker/` — one module to swap.                                                                       |
+| caddy-fs-s3 upstream stalled (RESOLVED 2026-04-18 via D32)       | (historical) | Would have broken the 14-day CVE SLA in D30                                | **Resolved.** Absorbed S3 filesystem into the in-tree `r2alias` package as `caddy.fs.r2` (D32 §5.30). Dep removed from Dockerfile. No third-party Caddy plugins.  |
+| Cloudflare cache purge API rate-limited during heavy promote day | Low          | Cache purges silently drop, stale reads                                    | CF purge has generous limits (1000/min zone-scoped); monitor via `purge-cache-pre` exit code.                                                                     |
+| GitHub OAuth session compromise (before GitHub App migration)    | Low          | r/w to all freeCodeCamp-Universe repos                                     | CF Access on woodpecker domain, 2FA mandatory at org, audit log shipping. GitHub App is target end state (D28).                                                   |
+| Cold site origin latency at high RPS (R2-direct, no disk cache)  | Medium       | p95 latency climbs                                                         | Cloudflare CDN handles warm traffic. If cold traffic becomes routine, reintroduce disk cache (two-way door §3.2.7). Trigger: CDN miss rate > 20% sustained.       |
+| Day-N rollback serves cutover-day content (content regression)   | Medium       | Constellations that deployed during soak silently regress to stale content | DNS-level rollback only (§6.9.1). Operator must announce regression and require site re-deploys. Dual-target writes (§5.24.1) deferred. Runbook-enforced via T25. |
+| Caddy CVEs unpatched on pinned version                           | Medium       | Matcher-bypass / ACL-bypass on r2_alias                                    | D30 revised (§5.28): pin to latest CVE-patched stable (2.11.2); 14-day bump SLA on security releases. Tracked by Windmill reminder cron (filed post-M1).          |
+| Cache-fill attack detection lag (LRU thrash → CF 5xx hours late) | Medium       | Attack detected only via downstream CF 5xx, not origin metric              | T24 adds canary-site p95 latency alert + CF origin-response-time threshold. Primary-signal detection <5min vs hours.                                              |
 
 ---
 

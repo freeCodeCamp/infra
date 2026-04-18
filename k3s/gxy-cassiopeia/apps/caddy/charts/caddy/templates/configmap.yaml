@@ -16,10 +16,14 @@ data:
 
       order r2_alias before file_server
 
-      filesystem r2 s3 {
-        bucket           {$R2_BUCKET}
-        region           auto
-        endpoint         {$R2_ENDPOINT}
+      # D32 (RFC §5.30): filesystem backed by in-tree caddy.fs.r2 module
+      # (same Go package as http.handlers.r2_alias). No third-party plugins.
+      filesystem r2 r2 {
+        bucket            {$R2_BUCKET}
+        endpoint          {$R2_ENDPOINT}
+        region            auto
+        access_key_id     {$AWS_ACCESS_KEY_ID}
+        secret_access_key {$AWS_SECRET_ACCESS_KEY}
         use_path_style
       }
     }
