@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deploy v2 — gxy-cassiopeia demo</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 4rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 0.3rem;
+        font-weight: 600;
+      }
+      .v1 {
+        background: #d1f7c4;
+        color: #225511;
+      }
+      .v2 {
+        background: #c4dbf7;
+        color: #112255;
+      }
+      code {
+        background: #eee;
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Deploy <span class="badge v2">v2</span></h1>
+    <p>
+      The alias was flipped atomically. The request path became
+      <code>demo.test.camp/deploys/v2/index.html</code> — a different object on
+      the same bucket, same Caddy pod, no restart.
+    </p>
+    <p>Cache TTL in the demo config is <code>2s</code>. In prod it is 15s.</p>
+    <p>Flip back with: <code>docker compose run --rm seed -alias v1</code></p>
+  </body>
+</html>

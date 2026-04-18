@@ -1,0 +1,32 @@
+when:
+  - event: push
+    branch: main
+    path:
+      - "docker/images/caddy-s3/**"
+  - event: manual
+
+steps:
+  test:
+    image: golang:1.26.2-alpine3.22
+    commands:
+      - apk add --no-cache git
+      - cd docker/images/caddy-s3/modules/r2alias
+      - go test -race ./...
+
+  # Kaniko (rootless) — chosen over plugin-docker-buildx because the Woodpecker
+  # backend here is Kubernetes and the agent pods are not privileged. Both
+  # produce OCI-compliant images; kaniko needs no daemon.
+  build-push:
+    image: woodpeckerci/plugin-kaniko:2.3.1
+    settings:
+      registry: ghcr.io
+      repo: ghcr.io/freecodecamp-universe/caddy-s3
+      dockerfile: docker/images/caddy-s3/Dockerfile
+      context: docker/images/caddy-s3
+      username:
+        from_secret: ghcr_user
+      password:
+        from_secret: ghcr_token
+      tags:
+        - latest-main
+        - "${CI_COMMIT_SHA}"
