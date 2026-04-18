@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: woodpecker
+
+resources:
+  - namespace.yaml
+  - postgres-cluster.yaml
+  - scheduled-backup.yaml
+
+# Secret generator: the S3 backup credentials for CNPG barman-cloud.
+# `just deploy gxy-launchbase woodpecker` decrypts
+# infra-secrets/k3s/gxy-launchbase/woodpecker-backup.secrets.env.enc
+# to secrets/.backup-secrets.env (justfile line 87 — the -backup convention).
+# That env file MUST contain ACCESS_KEY_ID and SECRET_ACCESS_KEY for the
+# DO Spaces backup bucket. Separate from `.secrets.env` which T10 will use
+# for the Woodpecker chart's own secrets (SERVER_SECRET, OAuth, DATABASE_URL).
+secretGenerator:
+  - name: woodpecker-postgres-s3-backup
+    type: Opaque
+    envs:
+      - secrets/.backup-secrets.env
+    options:
+      disableNameSuffixHash: true

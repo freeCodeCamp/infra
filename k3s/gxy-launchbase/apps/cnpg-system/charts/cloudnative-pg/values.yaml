@@ -1,0 +1,53 @@
+# CloudNativePG Operator values — gxy-launchbase
+# Chart: cnpg-operator (github.com/cloudnative-pg/charts)
+# Repo:  https://cloudnative-pg.github.io/charts
+# Spec:  docs/rfc/gxy-cassiopeia.md §4.2.2 (D21) — CNPG at bootstrap
+#
+# The just helm-upgrade recipe installs into a namespace matching the app
+# directory name — `cnpg-system` — which aligns with the CNPG upstream
+# convention.
+#
+# Chart version pin is supplied at install-time via `just helm-upgrade` (no
+# version here — bumping happens via the same PR flow as other charts).
+
+# Reduce operator footprint on a 3x 8Gi cluster. Single replica is the
+# upstream recommendation for < 100 clusters managed; we manage exactly one.
+replicaCount: 1
+
+# Cluster-scoped install (watch all namespaces). Required so the operator
+# can reconcile Cluster CRs in `woodpecker` and, later, any other namespace.
+monitoring:
+  # Prometheus metrics at :8080 — scraped when gxy-backoffice exists (deferred).
+  # Enable the ServiceMonitor CR emission only when Prometheus Operator is present;
+  # disabled here to avoid dangling dependency on a non-existent CRD.
+  podMonitorEnabled: false
+  grafanaDashboard:
+    create: false
+
+# Resource sizing: operator is mostly idle; controller work is bursty on
+# failover. These are the upstream defaults for multi-cluster environments,
+# scaled down for our single-cluster workload.
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    cpu: 1000m
+    memory: 500Mi
+
+# Pod security — matches the baseline PSS admission posture used across gxy-*
+# clusters. CNPG operator runs with non-root UID and drops all capabilities by
+# default in chart v0.22+.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Tolerations / affinity: empty — runs on any node in the 3-worker pool.
+# If we ever want to pin it to a control-plane node, add node selectors here.
+
+# CRD management: let Helm install the CRDs on initial deploy. Upstream
+# recommends running `kubectl apply -f crds/` manually on major upgrades —
+# documented in the FLIGHT-MANUAL rotation section (post-T09 work).
+crds:
+  create: true
