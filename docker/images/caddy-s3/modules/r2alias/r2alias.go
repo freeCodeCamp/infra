@@ -18,9 +18,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/hashicorp/golang-lru/v2/expirable"
 	"go.uber.org/zap"
-	"golang.org/x/sync/singleflight"
 )
 
 // R2Alias is a Caddy HTTP handler that resolves {site}/{alias_name} files in
@@ -39,10 +37,9 @@ type R2Alias struct {
 	RootDomain      string        `json:"root_domain,omitempty"`
 	DeployIDRegex   string        `json:"deploy_id_regex,omitempty"`
 
-	client  *s3.Client
-	cache   *expirable.LRU[string, aliasEntry]
-	sfgroup *singleflight.Group
-	logger  *zap.Logger
+	client *s3.Client
+	cache  *aliasCache
+	logger *zap.Logger
 
 	// deployIDRe is the compiled DeployIDRegex; populated by Validate.
 	deployIDRe *regexp.Regexp
@@ -69,9 +66,12 @@ func (R2Alias) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-// Provision sets up the S3 client and alias cache. Called once at startup.
-// T01 scaffold: no-op. T02 populates s3.Client, expirable.LRU, and the logger.
-func (r *R2Alias) Provision(_ caddy.Context) error {
+// Provision sets up the alias cache. Called once at startup.
+// T02 initializes the aliasCache (bounded LRU + TTL + singleflight); T03
+// will add the S3 client + logger.
+func (r *R2Alias) Provision(ctx caddy.Context) error {
+	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL)
+	r.logger = ctx.Logger()
 	return nil
 }
 
