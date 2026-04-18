@@ -68,6 +68,26 @@ def req(method, path, body=None):
 RESTORE_NAMES = {zone_name, f"www.{zone_name}", f"*.{zone_name}"}
 restorable = [r for r in records if r["type"] == "A" and r["name"] in RESTORE_NAMES]
 
+# Rollback content-parity caveat per RFC gxy-cassiopeia §6.9.1 (C2).
+# Machine-enforced reminder: printed BEFORE any DNS flip. Operators WILL skim
+# the runbook; this ensures the regression warning is unavoidable at apply time.
+print("=" * 72)
+print("ROLLBACK CONTENT-PARITY CAVEAT (RFC gxy-cassiopeia §6.9.1)")
+print("=" * 72)
+print("DNS revert restores AVAILABILITY, not content parity.")
+print("gxy-static is frozen at cutover-day state. A day-N rollback (N > 1)")
+print("serves the cutover-day snapshot — every constellation that shipped")
+print("between cutover and now silently regresses to older content.")
+print("")
+print("Before proceeding you MUST:")
+print("  1. Announce the regression to platform-team + affected site owners.")
+print("  2. Enumerate regressed sites via:")
+print("     woodpecker pipeline list --after <cutover-date> --status success \\")
+print("         --repo freeCodeCamp-Universe/<site>")
+print("  3. Require regressed-site owners to re-deploy to gxy-static OR")
+print("     accept the regression until DNS re-flips to a repaired cassiopeia.")
+print("=" * 72)
+print("")
 print(f"Zone:     {zone_name} ({zone_id})")
 print(f"Snapshot: {len(records)} total records")
 print(f"To restore: {len(restorable)} A records across {{@, www, *}}")
