@@ -177,6 +177,6 @@ If operator runs the empirical test and disagrees with the preliminary verdict, 
 
 ## Footnotes
 
-- The spike artifacts (`Caddyfile.spike`, `docker-compose.spike.yml`) are kept so the empirical verification can be run later by any operator in <30 min. They are NOT production code.
+- The spike support artifacts (`Caddyfile.spike`, `docker-compose.spike.yml`) were removed on 2026-04-18 following the MinIO archival (2026-02-12) and D32 pivot (§5.30 — drop `sagikazarmark/caddy-fs-s3`). They referenced both dead upstreams and were no longer runnable as-is; the conclusion here was reached analytically and does not depend on them. If a future operator wants to reproduce the empirical test, rebuild the harness against Adobe S3Mock + the in-tree `caddy.fs.r2` module (T01b).
 - This report does NOT bind the operator — if empirical evidence contradicts the analysis, re-open the CTO re-plan with actual test output.
-- T01 (`gxy-static-k7d.2`) remains `blocks`-blocked by this spike; closing T31 unblocks it.
+- T01 (`gxy-static-k7d.2`) was `blocks`-blocked by this spike; it has since closed and downstream tasks T01b/T04/T05 are proceeding on the D32 path.
