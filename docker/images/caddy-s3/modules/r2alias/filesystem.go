@@ -27,6 +27,15 @@ import (
 // rather than streaming through a static-serving cluster.
 const defaultMaxFileSize int64 = 100 * 1024 * 1024
 
+// opTimeout bounds every S3 round-trip from Open. fs.FS has no context
+// parameter, so the ceiling is enforced here rather than by the caller.
+const opTimeout = 30 * time.Second
+
+// indexFile is the only filename probed when synthesizing virtual dirs. S3
+// has no directory concept, but static-site deploys always ship index.html,
+// so one HeadObject against that key fully decides the directory question.
+const indexFile = "index.html"
+
 // R2FS is a Caddy filesystem module (caddy.fs.r2) that serves objects from
 // an S3-compatible bucket.
 type R2FS struct {
@@ -44,6 +53,12 @@ type R2FS struct {
 	// fetcher is the GetObject path. Provision wires it to r.getObject;
 	// tests swap in a stub so Open/Stat run without an S3 client.
 	fetcher func(ctx context.Context, key string) (*r2Object, error)
+
+	// indexProbe reports whether a directory's index.html exists. Provision
+	// wires it to r.hasIndex, which issues a HeadObject — matching the Caddy
+	// key's GetObject-only IAM scope (RFC §4.2.4). Backs Open's virtual-
+	// directory synthesis so file_server can resolve directory paths.
+	indexProbe func(ctx context.Context, dirPath string) (bool, error)
 }
 
 type r2Object struct {
@@ -95,6 +110,9 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 	r.logger = ctx.Logger()
 	if r.fetcher == nil {
 		r.fetcher = r.getObject
+	}
+	if r.indexProbe == nil {
+		r.indexProbe = r.hasIndex
 	}
 	return nil
 }
@@ -162,17 +180,42 @@ func (r *R2FS) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 }
 
 // Open returns a file whose body implements io.ReadSeeker + io.ReaderAt so
-// http.ServeContent can honor Range requests.
+// http.ServeContent can honor Range requests. When the object is missing but
+// an index.html exists beneath the path, Open returns a synthetic directory
+// entry so file_server can locate that index.
 func (r *R2FS) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
-	obj, err := r.fetcher(context.Background(), name)
+	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
+	defer cancel()
+
+	obj, err := r.fetcher(ctx, name)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return nil, &fs.PathError{Op: "open", Path: name, Err: err}
 		}
-		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		// Only promote extensionless misses to a virtual-directory probe;
+		// paths with extensions are full object keys and a miss is terminal.
+		if path.Ext(name) == "" && r.indexProbe != nil {
+			has, probeErr := r.indexProbe(ctx, name)
+			if probeErr != nil {
+				r.logger.Warn("r2 index probe failed",
+					zap.String("path", name), zap.Error(probeErr))
+				return nil, &fs.PathError{Op: "open", Path: name, Err: probeErr}
+			}
+			if has {
+				r.logger.Debug("r2 virtual directory", zap.String("path", name))
+				return &r2File{
+					reader: bytes.NewReader(nil),
+					info: &r2FileInfo{
+						name:  path.Base(name),
+						isDir: true,
+					},
+				}, nil
+			}
+		}
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 	}
 	return &r2File{
 		reader: bytes.NewReader(obj.Body),
@@ -242,6 +285,25 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 	}, nil
 }
 
+// hasIndex reports whether a directory's index.html exists under dirPath by
+// issuing a HeadObject. HeadObject only requires the s3:GetObject permission
+// — matching the scope granted to the Caddy read-only key (RFC §4.2.4) —
+// where ListObjectsV2 would need s3:ListBucket, which is not granted.
+func (r *R2FS) hasIndex(ctx context.Context, dirPath string) (bool, error) {
+	key := dirPath + "/" + indexFile
+	_, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(r.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		if isNoSuchKey(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("caddy.fs.r2: HeadObject %s: %w", key, err)
+	}
+	return true, nil
+}
+
 // isNoSuchKey matches the typed s3types.NoSuchKey AND a generic 404 wrapped
 // in awshttp.ResponseError (R2 sometimes returns the latter).
 func isNoSuchKey(err error) bool {
@@ -271,13 +333,19 @@ type r2FileInfo struct {
 	name    string
 	size    int64
 	modTime time.Time
+	isDir   bool
 }
 
-func (fi *r2FileInfo) Name() string       { return fi.name }
-func (fi *r2FileInfo) Size() int64        { return fi.size }
-func (fi *r2FileInfo) Mode() fs.FileMode  { return 0o444 }
+func (fi *r2FileInfo) Name() string { return fi.name }
+func (fi *r2FileInfo) Size() int64  { return fi.size }
+func (fi *r2FileInfo) Mode() fs.FileMode {
+	if fi.isDir {
+		return fs.ModeDir | 0o555
+	}
+	return 0o444
+}
 func (fi *r2FileInfo) ModTime() time.Time { return fi.modTime }
-func (fi *r2FileInfo) IsDir() bool        { return false }
+func (fi *r2FileInfo) IsDir() bool        { return fi.isDir }
 func (fi *r2FileInfo) Sys() any           { return nil }
 
 var (
