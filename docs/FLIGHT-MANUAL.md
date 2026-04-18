@@ -644,3 +644,19 @@ VPC, firewall, Spaces persist (shared infrastructure).
 | DO native routing blocked      | Use VXLAN tunnel (DO anti-spoofing)      | Field notes Cilium pitfalls |
 
 **Resolved:** `kubeProxyReplacement: true` works on k3s HA when devices/MTU are pinned. Failure 7 was a misdiagnosis (root cause: MTU pollution). See field notes.
+
+---
+
+## Lifecycle Calendar
+
+Third-party pins with known end-of-life windows. Rolling these forward is an explicit task in the backlog — not something that happens automatically.
+
+| Component     | Current pin               | EOL / stale-after        | Action window    | Notes                                                                                               |
+| ------------- | ------------------------- | ------------------------ | ---------------- | --------------------------------------------------------------------------------------------------- |
+| k3s           | `v1.34.5+k3s1`            | 2026-10-27               | by Sept 2026     | All galaxies. Plan 1.35 upgrade (k3s tracks upstream Kubernetes). Test on gxy-management first.     |
+| Caddy         | `v2.11.2`                 | CVE-driven               | 14 days per D30  | Bump via PR with regression tests. Tracked by Windmill reminder (filed post-M1).                    |
+| Woodpecker    | `v3.13.0`                 | Community-driven         | On minor release | gxy-launchbase. CLI Woodpecker client in universe-cli is isolated for quick swap if project stalls. |
+| CloudNativePG | chart `0.28` / `1.29` op  | 1.28 EOL 2026-06-30      | During `1.29.x`  | gxy-launchbase. Rolling in place via operator-guided pg_upgrade.                                    |
+| Cilium        | chart default (1.19 line) | 3-minor community window | On minor bump    | All galaxies. Bump behind feature-gate tests.                                                       |
+
+When a pin crosses its action window, create a beads task in the relevant epic and announce in the platform-team channel.
