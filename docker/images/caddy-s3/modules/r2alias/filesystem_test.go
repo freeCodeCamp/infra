@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"go.uber.org/zap"
 )
 
 // Tests assign r.fetcher to control how Open resolves S3 GetObject. No AWS
@@ -19,11 +20,16 @@ func newTestR2FS() *R2FS {
 		Bucket:   "test-bucket",
 		Endpoint: "https://r2.example",
 		Region:   "auto",
+		logger:   zap.NewNop(),
 	}
 }
 
 func stubFSFetcher(obj *r2Object, err error) func(context.Context, string) (*r2Object, error) {
 	return func(context.Context, string) (*r2Object, error) { return obj, err }
+}
+
+func stubIndexProbe(has bool, err error) func(context.Context, string) (bool, error) {
+	return func(context.Context, string) (bool, error) { return has, err }
 }
 
 func TestR2FS_Open_Success(t *testing.T) {
@@ -223,5 +229,84 @@ func TestR2FS_CaddyModule_ID(t *testing.T) {
 	}
 	if info.New == nil || info.New() == nil {
 		t.Fatal("CaddyModule.New must produce a non-nil instance")
+	}
+}
+
+// file_server relies on IsDir() to discover index.html. S3 has no directories,
+// so Open/Stat synthesize one when the GetObject miss is backed by an
+// index.html under the path.
+func TestR2FS_Open_VirtualDirectory(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(true, nil)
+
+	f, err := r.Open("site-a.test.camp/deploys/v1")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	info, err := f.Stat()
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("virtual directory should report IsDir=true")
+	}
+	if info.Name() != "v1" {
+		t.Errorf("Name: want v1, got %q", info.Name())
+	}
+	if info.Mode()&fs.ModeDir == 0 {
+		t.Errorf("Mode should include ModeDir, got %v", info.Mode())
+	}
+}
+
+// A miss with no index.html under the path must still surface as ErrNotExist
+// so file_server returns a 404 instead of an empty-body 200.
+func TestR2FS_Open_NotFound_NoIndex(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(false, nil)
+
+	_, err := r.Open("site-a.test.camp/deploys/v1/missing")
+	if err == nil {
+		t.Fatal("Open should fail when neither object nor index.html exists")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error should wrap fs.ErrNotExist, got %v", err)
+	}
+}
+
+// Paths with a file extension are full object keys — probing for index.html
+// on scan traffic (e.g. `/wp-admin.php`) would amplify cost. Skip the probe.
+func TestR2FS_Open_NotFound_SkipsProbeForExtensionPath(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = func(context.Context, string) (bool, error) {
+		t.Fatal("indexProbe should NOT run when path has an extension")
+		return false, nil
+	}
+
+	_, err := r.Open("site-a.test.camp/deploys/v1/wp-admin.php")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error should wrap fs.ErrNotExist, got %v", err)
+	}
+}
+
+func TestR2FS_Stat_VirtualDirectory(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(true, nil)
+
+	info, err := r.Stat("site-a.test.camp/deploys/v1")
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("virtual directory Stat should report IsDir=true")
 	}
 }
