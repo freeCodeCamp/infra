@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: woodpecker
+
+resources:
+  - namespace.yaml
+  - postgres-cluster.yaml
+  - scheduled-backup.yaml
+  - httproute.yaml
+  - cilium-netpol.yaml
+
+# Secret generators:
+# 1. woodpecker-postgres-s3-backup — CNPG barman-cloud backup creds.
+#    `just deploy gxy-launchbase woodpecker` decrypts
+#    infra-secrets/k3s/gxy-launchbase/woodpecker-backup.secrets.env.enc
+#    to secrets/.backup-secrets.env (justfile line 87 `-backup` convention).
+#    Keys: ACCESS_KEY_ID, SECRET_ACCESS_KEY (DO Spaces).
+# 2. woodpecker-env — Woodpecker server/agent env from sops.
+#    `just deploy gxy-launchbase woodpecker` decrypts
+#    infra-secrets/k3s/gxy-launchbase/woodpecker.secrets.env.enc
+#    to secrets/.secrets.env (justfile line 72).
+#    Keys: WOODPECKER_SERVER_SECRET, WOODPECKER_AGENT_SECRET,
+#    WOODPECKER_GITHUB_CLIENT, WOODPECKER_GITHUB_SECRET.
+secretGenerator:
+  - name: woodpecker-postgres-s3-backup
+    type: Opaque
+    envs:
+      - secrets/.backup-secrets.env
+    options:
+      disableNameSuffixHash: true
+  - name: woodpecker-env
+    type: Opaque
+    envs:
+      - secrets/.secrets.env
+    options:
+      disableNameSuffixHash: true

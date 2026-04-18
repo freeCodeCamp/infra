@@ -1,0 +1,58 @@
+---
+# Default values for the gxy-cassiopeia Caddy chart.
+# Production overlay at ../../values.production.yaml.
+# Secret credentials overlay at (sops) infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/freecodecamp-universe/caddy-s3
+  tag: "dev"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Baseline PSS + hardening (RFC §8).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+    # CAP_NET_BIND_SERVICE so unprivileged user can bind :80 (below 1024).
+    add:
+      - NET_BIND_SERVICE
+
+# R2 credentials — populated by the sops values overlay.
+# The key here is the Caddy read-only key (D22) — it CANNOT write.
+r2:
+  bucket: ""
+  endpoint: ""
+  accessKeyId: "" # injected at deploy time via sops overlay
+  secretAccessKey: "" # injected at deploy time via sops overlay
+
+# Gateway API / HTTPRoute wiring.
+httpRoute:
+  # Parent Gateway exposed by Traefik; matches gxy-management/gxy-static.
+  parentName: traefik
+  parentNamespace: kube-system
+  hostnames:
+    - "*.freecode.camp"
+
+# NetworkPolicy toggles. Disable only for debugging in a sandbox.
+networkPolicy:
+  enabled: true
