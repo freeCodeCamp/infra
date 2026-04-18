@@ -220,3 +220,29 @@ tf cmd workspace="all":
 [group('terraform')]
 tf-list:
     @find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort
+
+# ---------------------------------------------------------------------------
+# Storage (R2 buckets, access keys)
+# ---------------------------------------------------------------------------
+
+# Verify an R2 bucket is provisioned correctly (exists, rw/ro keys work, ro cannot write).
+# Reads credentials from infra-secrets/<bucket-cluster>/r2-{rw,ro}.env.enc via sops.
+[group('storage')]
+r2-bucket-verify bucket:
+    scripts/r2-bucket-verify.sh {{bucket}}
+
+# ---------------------------------------------------------------------------
+# Monitoring (Cloudflare Notifications + Uptime Robot)
+# ---------------------------------------------------------------------------
+
+# Apply declarative Cloudflare Notifications from cloudflare/notifications.yaml.
+# Use --dry-run to preview without writing.
+[group('monitoring')]
+cf-notifications-apply *args:
+    scripts/cf-notifications-apply.sh {{args}}
+
+# Apply declarative Uptime Robot monitors from uptime-robot/monitors.yaml.
+# Use --dry-run to preview without writing.
+[group('monitoring')]
+uptime-robot-apply *args:
+    scripts/uptime-robot-apply.sh {{args}}

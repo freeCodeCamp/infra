@@ -1,0 +1,85 @@
+# Caddyfile.spike — T31 PoC attempt
+#
+# Hypothesis: caddy-fs-s3 + Caddy built-in directives (map / rewrite / file_server)
+# can resolve the alias-file → deploy-prefix indirection without the custom
+# r2_alias Go module (RFC §5.4 D4 spike revisit).
+#
+# Target routing (per RFC §4.4):
+#   Host: site-a.freecode.test           → read  spike-test/site-a/production (alias file)
+#                                          serve spike-test/site-a/deploys/{alias}/...
+#   Host: site-a--preview.freecode.test  → read  spike-test/site-a/preview
+#                                          serve spike-test/site-a/deploys/{alias}/...
+#
+# Status: this file is the BEST-EFFORT attempt. It is EXPECTED TO FAIL test case 1
+# because Caddy's built-in directives cannot fetch an S3 object and use its
+# content as a path substring at request time. See REPORT.md for the analysis.
+
+{
+    # Global options
+    log {
+        output stdout
+        format json
+    }
+    admin off
+}
+
+# ============================================================================
+# Attempt (a): `map` directive on Host → static alias value
+# ----------------------------------------------------------------------------
+# This proves Caddy can switch routing on Host header, but it does NOT read
+# the alias file — the deploy ID is hard-coded in the map. A real solution
+# would need the value to come from S3 at request time.
+# ============================================================================
+
+site-a.freecode.test, site-a--preview.freecode.test {
+    # Static map: host → hard-coded deploy ID (DOES NOT solve the problem)
+    map {host} {deploy_id} {
+        site-a.freecode.test          20260418-130000-def5678
+        site-a--preview.freecode.test 20260418-120000-abc1234
+    }
+
+    # Derive site prefix from host (strip `--preview` suffix if present)
+    @is_preview host site-a--preview.freecode.test
+    map {host} {site_prefix} {
+        site-a.freecode.test          site-a
+        site-a--preview.freecode.test site-a
+    }
+
+    # Rewrite using the map output. If `/` → `/index.html`
+    @root path /
+    rewrite @root /index.html
+
+    # Final path: /{site_prefix}/deploys/{deploy_id}{path}
+    rewrite * /{site_prefix}/deploys/{deploy_id}{uri}
+
+    file_server {
+        fs s3 {
+            bucket     spike-test
+            endpoint   http://minio:9000
+            region     auto
+            access_key_id     minioadmin
+            secret_access_key minioadmin
+            force_path_style  true
+        }
+    }
+}
+
+# ============================================================================
+# Why (a) is the best this file can do:
+#
+#   Caddy's `map` is build-time static; there is no `map_from_s3_object`.
+#   `rewrite` uses placeholders that Caddy populates from the HTTP request,
+#   cookies, headers — NOT from arbitrary S3 objects.
+#   `reverse_proxy` could pull content from Minio, but the result is a
+#   response body, not a substitutable placeholder.
+#
+#   The alias file → deploy prefix indirection is STATEFUL at request time
+#   (value depends on current state of an R2 object). Caddy's declarative
+#   handler pipeline has no primitive that fetches S3 content and uses it
+#   to rewrite the URL before the final handler runs.
+#
+#   A `caddy-exec`-style plugin that shells out per-request would work but
+#   (i) that's another plugin, (ii) it's dramatically slower than an in-
+#   process Go module with bounded LRU, (iii) it has no TTL/singleflight
+#   primitive — the r2_alias module's key value-adds.
+# ============================================================================

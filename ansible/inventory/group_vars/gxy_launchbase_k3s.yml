@@ -1,0 +1,35 @@
+---
+# gxy-launchbase galaxy configuration
+# Applied automatically when targeting the gxy_launchbase_k3s inventory group
+#
+# CI galaxy — Woodpecker server + agents for Universe constellations
+# 3x s-4vcpu-8gb-amd in DO FRA1 (pre-Hetzner migration; see docs/rfc/gxy-cassiopeia.md D13)
+
+galaxy_name: gxy-launchbase
+k3s_version: v1.34.5+k3s1
+cilium_cluster_id: 3
+
+server_config_yaml: |
+  flannel-backend: "none"
+  disable-network-policy: true
+  disable-kube-proxy: true
+  disable:
+    - servicelb
+  cluster-cidr: "10.6.0.0/16"
+  service-cidr: "10.16.0.0/16"
+  protect-kernel-defaults: true
+  secrets-encryption: true
+  kube-apiserver-arg:
+    - "admission-control-config-file=/etc/rancher/k3s/pss-admission.yaml"
+    - "audit-log-path=/var/log/k3s/audit.log"
+    - "audit-policy-file=/etc/rancher/k3s/audit-policy.yaml"
+    - "audit-log-maxage=30"
+    - "audit-log-maxbackup=10"
+    - "audit-log-maxsize=100"
+  etcd-s3: true
+  etcd-s3-endpoint: "fra1.digitaloceanspaces.com"
+  etcd-s3-bucket: "net-freecodecamp-universe-backups"
+  etcd-s3-folder: "etcd/gxy-launchbase"
+  etcd-s3-region: "fra1"
+  etcd-snapshot-schedule-cron: "0 */6 * * *"
+  etcd-snapshot-retention: 20
