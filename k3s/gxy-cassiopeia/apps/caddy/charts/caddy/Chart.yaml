@@ -1,0 +1,16 @@
+apiVersion: v2
+name: caddy
+description: >-
+  Caddy HTTP server with the r2_alias custom module + caddy-fs-s3,
+  serving *.freecode.camp static constellations directly from Cloudflare R2.
+type: application
+version: 0.1.0
+# The app version tracks the xcaddy-built image tag, not the Caddy upstream
+# version directly. Bump when rebuilding the ghcr.io/freecodecamp-universe/caddy-s3
+# image. Underlying Caddy is 2.11.2 (RFC §5.28, D30).
+appVersion: "0.1.0"
+keywords:
+  - caddy
+  - r2
+  - static
+home: https://github.com/freeCodeCamp-Universe/infra

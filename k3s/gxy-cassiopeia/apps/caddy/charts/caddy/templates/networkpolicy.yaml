@@ -1,0 +1,42 @@
+{{- if .Values.networkPolicy.enabled }}
+# Cilium Network Policy: restrict Caddy egress to R2 + cluster DNS only.
+# Ingress: only port 80 from cluster + world (via Traefik).
+# Port 2019 is explicitly NOT allowed on ingress — Caddy binds admin API to
+# 127.0.0.1 (D23), and NetworkPolicy MUST NOT re-open it. Opening :2019
+# would re-introduce the lateral-movement risk (RFC §8, CRITICAL #3).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-egress
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  egress:
+    - toFQDNs:
+        - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+  ingress:
+    - fromEntities:
+        - cluster
+        - world
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+{{- end }}

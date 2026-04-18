@@ -1,0 +1,37 @@
+---
+# Production overlay for the gxy-cassiopeia Caddy chart.
+# Consumed by `just helm-upgrade gxy-cassiopeia caddy`.
+# Secret credentials (r2.accessKeyId, r2.secretAccessKey) come from the
+# sops-encrypted overlay at infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc.
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/freecodecamp-universe/caddy-s3
+  # Image tag is pinned — bumped via PR with smoke-test re-run (T04 + T15).
+  # Build pipeline (T05) publishes {YYYYMMDD}-{git-sha7} tags.
+  tag: "20260418-6c65f0f"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+r2:
+  bucket: gxy-cassiopeia-1
+  # endpoint URL injected via sops overlay (contains the CF account ID);
+  # accessKeyId + secretAccessKey also come from the sops overlay.
+  # endpoint: "https://<cf-account>.r2.cloudflarestorage.com"
+
+httpRoute:
+  parentName: traefik
+  parentNamespace: kube-system
+  hostnames:
+    - "*.freecode.camp"
+
+networkPolicy:
+  enabled: true
