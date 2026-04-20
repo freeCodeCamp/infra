@@ -7,6 +7,21 @@
 
 ---
 
+## Current posture (2026-04-20)
+
+**Cloudflare Access is OFF for this deployment.** Login is gated by the
+GitHub-org membership check (`WOODPECKER_ORGS=freeCodeCamp-Universe`,
+`WOODPECKER_OPEN=true` for self-register) — that is considered sufficient
+for letting staff in without an extra OTP layer. The DNS + Origin TLS
+sections below are already reflected in the live cluster.
+
+This runbook is preserved as the authoritative procedure for re-enabling
+CF Access (e.g. if the gate needs to narrow below the org — team-level or
+email-domain — which Woodpecker alone cannot express). Follow the Access
+application section when you re-enable it.
+
+---
+
 ## Blast radius (CRITICAL — read first)
 
 Two things this runbook does are each hard to reverse on the fly:
@@ -40,6 +55,7 @@ ask the platform-team lead.
   ```
 
   As of 2026-04-20: `68.183.215.167 / 68.183.221.232 / 165.245.220.145`.
+
 - `WOODPECKER_HOST` already set to `https://woodpecker.freecodecamp.net`
   in the chart env (pre-set so that OAuth callbacks match the final hostname).
 
@@ -54,24 +70,24 @@ ask the platform-team lead.
 2. Type: **Self-hosted**.
 3. Basic config:
 
-   | Field                | Value                                  |
-   | -------------------- | -------------------------------------- |
-   | Application name     | `Woodpecker CI`                        |
-   | Session duration     | `24 hours`                             |
-   | Application domain   | `woodpecker.freecodecamp.net`          |
-   | Identity providers   | One-time PIN (email OTP)               |
-   | App launcher URL     | (leave default)                        |
+   | Field              | Value                         |
+   | ------------------ | ----------------------------- |
+   | Application name   | `Woodpecker CI`               |
+   | Session duration   | `24 hours`                    |
+   | Application domain | `woodpecker.freecodecamp.net` |
+   | Identity providers | One-time PIN (email OTP)      |
+   | App launcher URL   | (leave default)               |
 
 4. Policy — **Add a policy**:
 
-   | Field             | Value                                          |
-   | ----------------- | ---------------------------------------------- |
-   | Policy name       | `platform-team allowed`                        |
-   | Action            | `Allow`                                        |
-   | Session duration  | Same as application (24 h)                     |
-   | Include           | Emails in group: `platform-team`               |
-   | Require           | (none)                                         |
-   | Exclude           | (none)                                         |
+   | Field            | Value                            |
+   | ---------------- | -------------------------------- |
+   | Policy name      | `platform-team allowed`          |
+   | Action           | `Allow`                          |
+   | Session duration | Same as application (24 h)       |
+   | Include          | Emails in group: `platform-team` |
+   | Require          | (none)                           |
+   | Exclude          | (none)                           |
 
    If the `platform-team` group does not yet exist under **Access → Groups**,
    create it with the operator emails BEFORE saving the policy. Do NOT use

@@ -12,15 +12,24 @@ announcing the service as available.
 - [ ] `kubectl -n woodpecker get cluster woodpecker-postgres` — 2/2 healthy.
 - [ ] `docs/runbooks/woodpecker-oauth-app.md` exit criteria all ticked.
 
-## 1. DNS + Access (T32)
+## 1. DNS + TLS + auth (T32)
 
-Follow `docs/runbooks/woodpecker-cf-access.md` end-to-end.
+Current posture — Cloudflare Access is **off**; auth is the GitHub-org gate
+(`WOODPECKER_ORGS=freeCodeCamp-Universe`, `WOODPECKER_OPEN=true`). CF Access
+runbook `docs/runbooks/woodpecker-cf-access.md` is preserved for re-enable.
 
-- [ ] CF Access app created FIRST.
-- [ ] DNS A records published (three launchbase IPs, proxied).
-- [ ] `curl -sI https://woodpecker.freecodecamp.net` returns 302 to
-      `*.cloudflareaccess.com`.
-- [ ] Browser smoke — email OTP → GitHub OAuth → admin menu visible.
+- [ ] Gateway `woodpecker-gateway` in the `woodpecker` namespace with both
+      `:80` and `:443` listeners; `Programmed=True`.
+- [ ] Secret `woodpecker-tls-cloudflare` present (built by kustomize
+      secretGenerator from `manifests/base/secrets/tls.crt` + `tls.key`,
+      i.e. the `*.freecodecamp.net` CF Origin Cert).
+- [ ] DNS A records published (three launchbase IPs, proxied) on
+      `woodpecker.freecodecamp.net`.
+- [ ] `curl -sI https://woodpecker.freecodecamp.net` returns 200 (or 302
+      to `*.cloudflareaccess.com` if CF Access was re-enabled).
+- [ ] Browser smoke — GitHub OAuth with a `freeCodeCamp-Universe` member
+      reaches the Woodpecker dashboard; admin handle (see §2) sees the
+      admin menu.
 
 ## 2. Verify admin list matches reality
 
