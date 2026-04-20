@@ -133,6 +133,51 @@ helm-upgrade cluster app:
         $HELM_ARGS
     fi
 
+# Show app namespace status (deploys, sts, pods, secrets, recent warnings)
+[group('k3s')]
+app-status cluster app:
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{cluster}}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    NS={{app}}
+    echo "=== {{cluster}} / {{app}} ==="
+    echo "--- deployments ---"
+    kubectl -n "$NS" get deploy -o wide 2>&1 || true
+    echo "--- statefulsets ---"
+    kubectl -n "$NS" get sts -o wide 2>&1 || true
+    echo "--- pods ---"
+    kubectl -n "$NS" get pods -o wide 2>&1 || true
+    echo "--- services ---"
+    kubectl -n "$NS" get svc 2>&1 || true
+    echo "--- secrets ---"
+    kubectl -n "$NS" get secrets 2>&1 || true
+    echo "--- recent warning events ---"
+    kubectl -n "$NS" get events --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -10 || true
+
+# Wait for a CNPG Cluster CR to become Ready (default 5m)
+[group('k3s')]
+cnpg-wait cluster namespace name timeout="5m":
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{cluster}}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    echo "Waiting for CNPG Cluster {{namespace}}/{{name}} (timeout {{timeout}})..."
+    kubectl -n {{namespace}} wait --for=condition=Ready cluster/{{name}} --timeout={{timeout}}
+    echo "--- cluster summary ---"
+    kubectl -n {{namespace}} get cluster/{{name}} -o jsonpath='instances={.status.instances} readyInstances={.status.readyInstances} primary={.status.currentPrimary}{"\n"}'
+    echo "--- pods ---"
+    kubectl -n {{namespace}} get pods -l cnpg.io/cluster={{name}} -o wide
+
+# Show installed CRDs filtered by group (e.g. cnpg, gateway)
+[group('k3s')]
+crds-grep cluster filter:
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{cluster}}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    kubectl get crd | grep -i {{filter}}
+
 # Ad-hoc Windmill PostgreSQL backup (local file)
 [group('k3s')]
 windmill-backup cluster:
