@@ -9,6 +9,9 @@ spec:
   parentRefs:
     - name: {{ .Values.httpRoute.parentName }}
       namespace: {{ .Values.httpRoute.parentNamespace }}
+      {{- with .Values.httpRoute.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
   hostnames:
     {{- range .Values.httpRoute.hostnames }}
     - {{ . | quote }}
