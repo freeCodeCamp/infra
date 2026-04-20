@@ -8,7 +8,6 @@ resources:
   - scheduled-backup.yaml
   - gateway.yaml
   - httproute.yaml
-  - cilium-netpol.yaml
 
 # Secret generators:
 # 1. woodpecker-postgres-s3-backup — CNPG barman-cloud backup creds.
