@@ -23,7 +23,7 @@ claude
 
 ## Dispatch prompt
 
-```
+````
 You are implementing beads `gxy-static-k7d.28` — T27: Update infra field notes,
 Phase 0 readiness. Authoritative spec:
 
@@ -82,6 +82,27 @@ and `git diff spike/field-notes/infra.md` shows only the new subsection.
 - Do not edit ADRs or spike/spike-plan.md (wrong ownership).
 - Do not push.
 
+## Docs to update (primary artifact)
+
+This task IS a docs update. Primary artifact:
+
+- `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md` — append
+  Phase 0 entry dated 2026-04-20.
+
+Secondary: if the universe-cli / windmill side of Phase 0 surfaces a
+finding worth recording (e.g., image sizing affected T02 decisions),
+append to the matching team-owned field-notes file in
+`/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/`. Do not cross into
+ADRs or `spike-plan.md` (Universe-team owned).
+
+## Preconditions — shell only
+
+```sh
+# Caddy r2_alias image actually shipped
+find /Users/mrugesh/DEV/fCC/infra -name 'r2alias*.go' -o -name 'r2_alias*.go' 2>/dev/null | head -3
+# If empty, T05 is not yet green and this task is premature.
+````
+
 ## Output expected
 
 1. `git diff spike/field-notes/infra.md`
@@ -100,6 +121,7 @@ Prepare commit; do not push.
   `find ../fCC/infra -name 'r2_alias*.go' -o -name 'r2alias*.go'`.
 - If the GHCR image has never been pushed yet (T05 might be partial),
   STOP — T27 is premature. Surface to operator.
+
 ```
 
 ---
@@ -107,3 +129,4 @@ Prepare commit; do not push.
 ## Hand-off
 
 T27 closes independently.
+```

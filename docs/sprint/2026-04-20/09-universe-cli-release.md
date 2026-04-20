@@ -54,18 +54,36 @@ Authoritative spec:
 - Toolchain: pnpm, vitest, tsup, husky, oxlint (from package.json)
 - Registry: npm Trusted Publisher (OIDC via GitHub Actions — do NOT publish from local)
 
-## Preconditions — HARD GATES
+## Preconditions — HARD GATES (shell only, no bd)
 
 Verify EACH before continuing. Any failure → STOP and report.
 
-1. `dp_beads_show gxy-static-k7d.33` — T32 CLOSED (Woodpecker DNS + CF Access live)
-2. `dp_beads_show gxy-static-k7d.12` — T11 CLOSED (per-site R2 secret flow)
-3. `dp_beads_show gxy-static-k7d.22` — T21 CLOSED (pipeline template)
-4. `dp_beads_show gxy-static-k7d.16` — T15 CLOSED (Phase 4 smoke green)
-5. `git log --oneline origin/main..HEAD` — shows `a7dd58e` + `f6971cf`
-6. `git status` — clean tree
+```sh
+# 1. Woodpecker reachable + CF Access live
+curl -sI https://woodpecker.freecodecamp.net | head -3
+# MUST show 302 to *.cloudflareaccess.com
 
-If any of 1-4 is not closed, STOP. The release depends on real infra.
+# 2. Per-site R2 secret flow shipped
+test -f /Users/mrugesh/DEV/fCC-U/windmill/workspaces/platform/f/static/provision_site_r2_credentials.ts
+
+# 3. Pipeline template shipped
+test -f /Users/mrugesh/DEV/fCC/infra/docs/templates/woodpecker-static-deploy.yaml
+
+# 4. Phase 4 smoke script shipped + green (operator provides log path)
+test -f /Users/mrugesh/DEV/fCC/infra/scripts/phase4-test-site-smoke.sh
+
+# 5. Local main is 2 ahead of origin/main with the right SHAs
+cd /Users/mrugesh/DEV/fCC-U/universe-cli
+git log --oneline origin/main..HEAD
+# MUST show: f6971cf refactor!: rewrite deploy/promote/rollback ...
+#            a7dd58e feat(woodpecker): add API client ...
+
+# 6. Clean tree
+git status -sb
+# MUST show only "## main...origin/main [ahead 2]"
+```
+
+If any check fails, STOP. The release depends on real infra.
 
 ## Execute in order
 
@@ -226,6 +244,20 @@ without the removed modules.
 - Do NOT comment out code — delete.
 - Do NOT push to main if any validation (pnpm test/lint/typecheck/build) fails.
 
+## Docs to update (after successful release)
+
+1. **Field notes — Universe repo**:
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/universe-cli.md`
+   Append `### v0.4.0-beta.1 released (2026-04-20)` with: published SHA,
+   npm URL, bundle sizes, any CI/release-pipeline surprises, migration
+   notes for staff.
+2. **Flight manual — universe-cli repo**:
+   `/Users/mrugesh/DEV/fCC-U/universe-cli/docs/FLIGHT-MANUAL.md` — remove
+   the "pre-pivot" banner, update install instructions for v0.4.0-beta.1,
+   replace deploy/promote/rollback sections with Woodpecker-API flow.
+3. **README / CHANGELOG — universe-cli repo**: CHANGELOG already updated
+   in Phase D. Update README badges/version if any are pinned.
+
 ## Output expected
 
 1. Phase A: push confirmation + CI green URL
@@ -233,9 +265,9 @@ without the removed modules.
 3. Phase C: grep output proving no AWS/S3 residue
 4. Phase D: diff of package.json + CHANGELOG
 5. Phase E: tag URL + `npm view @freecodecamp/universe-cli@0.4.0-beta.1` output
-6. "T20 ready to close" signal
-7. Close beads: `dp_beads_close gxy-static-k7d.21 --resolution completed`
-   (operator runs this)
+6. Docs diffs (field notes + flight manual)
+7. "T20 ready to close" signal
+8. Close beads is operator action — NOT agent's job
 
 ## Commit policy
 

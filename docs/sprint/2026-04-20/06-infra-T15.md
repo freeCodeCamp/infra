@@ -95,14 +95,31 @@ output matches the documented 8 steps.
   is the only permitted FQDN.
 - Do NOT push.
 
+## Docs to update (same session)
+
+1. **Field notes — Universe repo** (requires `--add-dir`):
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md` — append
+   a terse `### Phase 4 smoke green (2026-04-20)` ENTRY (the rich
+   measurements-laden entry is T29's job; this one just records "smoke
+   passed + duration + any surprises discovered mid-run").
+2. **Flight manual — infra repo**:
+   `/Users/mrugesh/DEV/fCC/infra/docs/FLIGHT-MANUAL.md` — add section
+   pointing to `docs/runbooks/phase4-smoke.md` + `just phase4-smoke`
+   recipe under gxy-cassiopeia Phase 4 validation.
+3. **Local docs**:
+   - Script: `scripts/phase4-test-site-smoke.sh`
+   - Runbook: `docs/runbooks/phase4-smoke.md`
+   - justfile recipe: `phase4-smoke`
+
 ## Output expected
 
 1. Script + runbook + justfile recipe
 2. Live run stdout (with timestamps)
 3. `dig +short test.freecode.camp` post-cleanup: empty
 4. `rclone lsd r2:gxy-cassiopeia-1/test.freecode.camp/` post-cleanup: empty
-5. Proposed commit message
-6. "T15 ready to close — operator to record Phase 4 exit in field-notes via T29" signal
+5. Field-notes diff + flight-manual diff
+6. Proposed commit message
+7. "T15 ready to close — rich measurements will land in T29" signal
 
 ## Commit policy
 

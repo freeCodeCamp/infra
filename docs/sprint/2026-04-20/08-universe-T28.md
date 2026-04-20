@@ -20,7 +20,7 @@ claude
 
 ## Dispatch prompt
 
-```
+````
 You are implementing beads `gxy-static-k7d.29` — T28: Update infra field notes,
 Phase 1-2 readiness. Authoritative spec:
 
@@ -33,12 +33,17 @@ Phase 1-2 readiness. Authoritative spec:
 - cwd: `/Users/mrugesh/DEV/fCC-U/Universe`
 - Source of truth for measurements: live gxy-launchbase cluster + Woodpecker
 
-## Preconditions
+## Preconditions — shell only, do NOT call bd
 
-1. `dp_beads_show gxy-static-k7d.33` — T32 closed (Woodpecker reachable)
-2. gxy-launchbase cluster RUNNING: `kubectl --context gxy-launchbase get nodes` shows 3 Ready
-3. Woodpecker server has completed at least one successful pipeline run
-4. CNPG Cluster CR healthy: `kubectl --context gxy-launchbase -n woodpecker get cluster`
+```sh
+# Woodpecker reachable + CF Access live
+curl -sI https://woodpecker.freecodecamp.net | head -3
+# gxy-launchbase cluster up, 3 Ready
+kubectl --context gxy-launchbase get nodes
+# CNPG Cluster healthy
+kubectl --context gxy-launchbase -n woodpecker get cluster
+# At least one pipeline has completed (agent inspects Woodpecker UI or API)
+````
 
 If any precondition fails, STOP and ask operator whether to proceed with
 partial measurements + explicit "not yet measured" markers.
@@ -84,6 +89,12 @@ No tests. `markdownlint` + `git diff` review only.
 - Do not edit ADRs or spike-plan.md.
 - Do not push.
 
+## Docs to update (primary artifact)
+
+- `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md` — append
+  Phase 1-2 entry dated 2026-04-20 with real kubectl-measured numbers.
+  No placeholders.
+
 ## Output expected
 
 1. `git diff spike/field-notes/infra.md`
@@ -97,6 +108,7 @@ No tests. `markdownlint` + `git diff` review only.
   to provide kubeconfig access (should come via sops + `just kubeconfig-decrypt`).
 - If Woodpecker has not yet run any pipeline, leave that row blank with a
   note "no pipeline runs yet — follow up at Phase 4" rather than guessing.
+
 ```
 
 ---
@@ -104,3 +116,4 @@ No tests. `markdownlint` + `git diff` review only.
 ## Hand-off
 
 T28 closes independently.
+```

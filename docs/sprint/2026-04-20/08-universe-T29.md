@@ -21,7 +21,7 @@ claude
 
 ## Dispatch prompt
 
-```
+````
 You are implementing beads `gxy-static-k7d.30` — T29: Update infra field notes,
 Phase 4 and Phase 6 readiness. Authoritative spec:
 
@@ -33,12 +33,14 @@ Phase 4 and Phase 6 readiness. Authoritative spec:
 
 - cwd: `/Users/mrugesh/DEV/fCC-U/Universe`
 
-## Preconditions
+## Preconditions — shell only, do NOT call bd
 
-1. `dp_beads_show gxy-static-k7d.16` — T15 closed (Phase 4 smoke passed)
-2. `cat ../fCC/infra/scripts/phase4-test-site-smoke.sh` present
-3. The phase4-smoke run log is accessible (operator should have captured it
-   when closing T15)
+```sh
+test -f /Users/mrugesh/DEV/fCC/infra/scripts/phase4-test-site-smoke.sh && echo OK
+# Run smoke if operator hasn't captured a log yet:
+#   cd /Users/mrugesh/DEV/fCC/infra && just phase4-smoke 2>&1 | tee /tmp/phase4.log
+# Smoke must exit 0.
+````
 
 ## Execute in order
 
@@ -86,6 +88,12 @@ No tests.
 - Do not edit ADRs.
 - Do not push.
 
+## Docs to update (primary artifact)
+
+- `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md` — append
+  Phase 4 entry dated 2026-04-20. Phase 6 cutover entry is a placeholder
+  only — not populated today.
+
 ## Output expected
 
 1. `git diff spike/field-notes/infra.md`
@@ -99,6 +107,7 @@ No tests.
   `cd ../fCC/infra && just phase4-smoke 2>&1 | tee /tmp/phase4-smoke.log`
   Then extract the numbers from the log.
 - If kubectl context is not configured for gxy-cassiopeia, ask operator.
+
 ```
 
 ---
@@ -108,3 +117,4 @@ No tests.
 T29 closing is the docs-stream terminal. Combined with T15 closing,
 universe-cli release session ([09-universe-cli-release.md](09-universe-cli-release.md))
 has full green signal.
+```

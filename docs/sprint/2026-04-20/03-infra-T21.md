@@ -104,13 +104,27 @@ a template file.
   repo exists yet — v1 keeps it here per task doc §Repo and CWD).
 - Do NOT push.
 
+## Docs to update (same session)
+
+1. **Field notes — Universe repo** (requires `--add-dir`):
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md` — append
+   `### Canonical deploy pipeline template shipped (2026-04-20)`: step
+   count, any RFC-to-YAML divergence, woodpecker-cli lint outcome.
+2. **Flight manual — infra repo**:
+   `/Users/mrugesh/DEV/fCC/infra/docs/FLIGHT-MANUAL.md` — add section under
+   gxy-cassiopeia Phase 6 explaining how staff copy the template into
+   their constellation's `.woodpecker/deploy.yaml`.
+3. **Local docs**:
+   - `docs/templates/README.md` — usage for template copy.
+
 ## Output expected back to operator
 
 1. File paths created/modified
 2. python yaml validation output
 3. woodpecker-cli lint output (or "CLI unavailable" note)
-4. Proposed Conventional Commits message
-5. "T21 ready to close" signal
+4. Field-notes diff + flight-manual diff
+5. Proposed Conventional Commits message
+6. "T21 ready to close" signal
 
 ## Commit policy
 

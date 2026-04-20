@@ -25,7 +25,7 @@ Then paste the prompt below.
 
 ## Dispatch prompt
 
-```
+````
 You are implementing beads `gxy-static-k7d.12` — T11: Per-site R2 secret
 provisioning Windmill flow. The authoritative spec is in:
 
@@ -45,14 +45,25 @@ Read §4.2.4 + §5.20 (D22 rationale against org-scope) before writing any code.
 - Testing: vitest + mocked windmill-client. Preview-run via Windmill MCP
   `runScriptPreviewAndWaitResult` before `just plan`.
 
-## Preconditions to verify
+## Preconditions — shell only, do NOT call bd
 
-1. `dp_beads_show gxy-static-k7d.33` — T32 must be CLOSED
-   (`woodpecker.freecodecamp.net` reachable, CF Access live). Otherwise the
-   Woodpecker API call in Step 7 cannot be tested end-to-end.
-2. Local wmill CLI wired up: `just drift` succeeds without errors.
-3. CF API token with Account → R2 write permission is provisioned (check
-   `../infra-secrets/do-primary/cloudflare.secrets.env.enc`).
+1. Woodpecker reachable + CF Access live:
+   ```sh
+   curl -sI https://woodpecker.freecodecamp.net | head -3
+   # MUST show 302 Location: https://<team>.cloudflareaccess.com/...
+````
+
+2. Local wmill CLI works:
+   ```sh
+   cd /Users/mrugesh/DEV/fCC-U/windmill && just drift 2>&1 | head -5
+   # MUST exit 0 with no auth error
+   ```
+3. CF R2 admin creds present:
+   ```sh
+   test -f /Users/mrugesh/DEV/fCC/infra-secrets/do-primary/cloudflare.secrets.env.enc && echo OK
+   ```
+
+If any check fails, STOP and surface to operator. Do not work around.
 
 ## Execute in order — TDD mandated (RED-GREEN-REFACTOR)
 
@@ -119,13 +130,30 @@ go back. (feedback: `feedback_local_test_first.md`.)
 - Test file extension `.test.ts`, not `.spec.ts` (repo convention).
 - Vitest + mocked windmill-client only; no live CF/Woodpecker calls in tests.
 
+## Docs to update (same session, after code green)
+
+1. **Field notes — Universe repo** (cross-repo write; requires `--add-dir`):
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/windmill.md`
+   Append a `### Per-site R2 secret flow landed (2026-04-20)` subsection
+   with: flow path, test coverage %, preview-run outcome, CF R2 API
+   surprises, sops write-path pattern learned, anything non-obvious.
+2. **Flight manual — windmill repo**:
+   `/Users/mrugesh/DEV/fCC-U/windmill/docs/FLIGHT-MANUAL.md` (create if
+   absent). Add or update the "Per-site R2 provisioning" section with the
+   wmill CLI recipe to invoke the flow for a new site.
+3. **Local project docs**:
+   - `workspaces/platform/README.md` — link to the new flow if a flow index
+     exists there.
+   - windmill-side field notes if the repo carries its own (most work now
+     lives in Universe's windmill.md per ownership).
+
 ## Output expected back to operator
 
-1. Files created + modified
+1. Files created + modified (by repo)
 2. `vitest run` output (paste short summary)
 3. `just drift` output
 4. Preview-run result (Woodpecker secret URL + timestamp)
-5. Proposed Conventional Commits message
+5. Proposed Conventional Commits message per repo (windmill + Universe)
 6. "T11 ready to close" signal
 
 ## Commit policy
@@ -142,6 +170,7 @@ Prepare commits; do NOT push. Operator runs `/cmd-git-rules` before commit.
 - Path `/Users/mrugesh/DEV/fCC/windmill` is WRONG (cross-repo drift finding).
   Canonical is `/Users/mrugesh/DEV/fCC-U/windmill` (current cwd). If any
   reference uses the wrong path, flag it.
+
 ```
 
 ---
@@ -152,3 +181,4 @@ When T11 closes, unblock:
 
 - [06-infra-T15.md](06-infra-T15.md) (can now also start via T21 track)
 - [08-universe-T28.md](08-universe-T28.md) (Phase 1-2 field notes)
+```

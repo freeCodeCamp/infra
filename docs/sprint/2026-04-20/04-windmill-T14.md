@@ -26,7 +26,7 @@ Dispatch from the repo the agent will touch most.)
 
 ## Dispatch prompt
 
-```
+````
 You are implementing beads `gxy-static-k7d.15` — T14: Origin IP allow-list +
 CF IP refresh cron. Authoritative spec:
 
@@ -105,14 +105,41 @@ manifest, validated by `kubectl apply --dry-run=server`.
 - Do NOT hardcode the kubeconfig path — Windmill Resource only.
 - Do NOT push.
 
+## Docs to update (same session, after code green)
+
+1. **Field notes — Universe repo**:
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md`
+   Append `### Origin allow-list + CF IP refresh cron (2026-04-20)`:
+   initial IP-list snapshot date, any format-drift surprises from the CF
+   endpoint, first cron run outcome, cross-pod health impact.
+2. **Flight manual — infra repo**:
+   `/Users/mrugesh/DEV/fCC/infra/docs/FLIGHT-MANUAL.md` — add section to
+   the gxy-cassiopeia rebuild covering the manifest path + the Windmill
+   flow schedule. Link runbook.
+3. **Flight manual — windmill repo**:
+   `/Users/mrugesh/DEV/fCC-U/windmill/docs/FLIGHT-MANUAL.md` — add or
+   update flow bootstrap section.
+
+## Preconditions — shell only
+
+```sh
+# gxy-cassiopeia reachable
+kubectl --context gxy-cassiopeia get nodes 2>&1 | head -3
+# Cilium CRD installed
+kubectl --context gxy-cassiopeia get crd ciliumnetworkpolicies.cilium.io
+# CF IP endpoint returns lines
+curl -s https://www.cloudflare.com/ips-v4 | wc -l  # >5
+````
+
 ## Output expected back
 
 1. Infra files + windmill files created
 2. `kubectl apply --dry-run=server` output
 3. vitest output
-4. Preview-run output
-5. Two proposed commit messages (one per repo)
-6. "T14 ready to close" signal
+4. Preview-run output (dry-run)
+5. External curl-through-node-IP test output (proves allow-list enforces)
+6. Two proposed commit messages (one per repo)
+7. "T14 ready to close" signal
 
 ## Commit policy
 
@@ -124,6 +151,7 @@ Prepare commits in each repo; do not push either.
   documented format at https://developers.cloudflare.com/fundamentals/reference/cloudflare-ip-addresses/
 - If kubectl patch fails with "resource version conflict", add retry with
   `kubectl get cnp ... -o yaml | ... | kubectl replace -f -` pattern.
+
 ```
 
 ---
@@ -132,3 +160,4 @@ Prepare commits in each repo; do not push either.
 
 T14 closing partially unblocks T15 (origin restriction must be live before
 smoke can assert "CF-only").
+```

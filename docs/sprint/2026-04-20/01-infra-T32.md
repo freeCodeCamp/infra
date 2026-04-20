@@ -94,14 +94,30 @@ the runbook + `curl -sI`, not a unit test.
   orchestrator pick up T11 after T32 closes.
 - Do NOT `git push` — operator controls git writes.
 
+## Docs to update (same session)
+
+1. **Field notes — Universe repo** (requires `--add-dir`):
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md` — append
+   `### Woodpecker DNS + CF Access live (2026-04-20)`: runbook path, CF
+   Access session duration, admin identity, any CF-dashboard surprises,
+   curl 302 evidence.
+2. **Flight manual — infra repo**:
+   `/Users/mrugesh/DEV/fCC/infra/docs/FLIGHT-MANUAL.md` — update
+   gxy-launchbase Phase 5 (DNS + Access) to reference
+   `docs/runbooks/woodpecker-cf-access.md` + note that admin list lives in
+   `values.production.yaml`.
+3. **Local docs**:
+   - Runbook you created: `docs/runbooks/woodpecker-cf-access.md`
+   - Handoff checklist: `k3s/gxy-launchbase/apps/woodpecker/docs/post-t10-operator.md`
+
 ## Output expected back to operator
 
 1. Diffs ready to commit (list the files touched, no raw diffs inline)
 2. The runbook path
 3. The curl output confirming CF Access 302
-4. A one-line proposed commit message (Conventional Commits style)
-5. Explicit statement: "T32 ready to close — operator to run `dp_beads_close
-   gxy-static-k7d.33` after verifying field-notes entry"
+4. Field-notes diff + flight-manual diff
+5. A one-line proposed commit message (Conventional Commits style)
+6. Explicit statement: "T32 ready to close — operator verifies + runs beads close"
 
 ## Commit policy
 

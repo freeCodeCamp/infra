@@ -90,6 +90,18 @@ No unit tests. Verification:
 - Do NOT put design rationale in the manual — that lives in ADRs and the RFC.
 - Do NOT push.
 
+## Docs to update
+
+This task IS a docs update. Primary artifact:
+
+- `/Users/mrugesh/DEV/fCC/infra/docs/FLIGHT-MANUAL.md` — new gxy-launchbase
+  + gxy-cassiopeia Parts.
+
+Secondary: if the edit surfaces a missing justfile recipe or a broken
+runbook link, fix at source — justfile or `docs/runbooks/*.md`. No
+field-notes update unless a genuine operational finding surfaces during
+the edit (e.g., a path inconsistency worth flagging for Universe team).
+
 ## Output expected
 
 1. Diff of FLIGHT-MANUAL.md

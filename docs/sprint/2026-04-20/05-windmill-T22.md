@@ -20,7 +20,7 @@ claude
 
 ## Dispatch prompt
 
-```
+````
 You are implementing beads `gxy-static-k7d.23` — T22: Cleanup cron Windmill
 flow. Authoritative spec:
 
@@ -84,13 +84,34 @@ production code without a red test, stop and go back.
 - Do NOT hold the R2 lock across network I/O beyond the delete call.
 - Do NOT push.
 
+## Docs to update (same session, after code green)
+
+1. **Field notes — Universe repo**:
+   `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/windmill.md`
+   Append `### Cleanup cron flow (2026-04-20)`: TOCTOU algorithm landed
+   verbatim per D28, dry-run result on healthy bucket, any R2 pagination
+   or rate-limit findings, lock-primitive choice.
+2. **Flight manual — windmill repo**:
+   `/Users/mrugesh/DEV/fCC-U/windmill/docs/FLIGHT-MANUAL.md` — add section
+   on how to invoke the flow manually, how to interpret the dry-run output,
+   what "lock held" means and how to release if stuck.
+
+## Preconditions — shell only
+
+```sh
+# wmill CLI works
+cd /Users/mrugesh/DEV/fCC-U/windmill && just drift 2>&1 | head -5
+# R2 admin creds resource present (check via wmill API or resource dir)
+ls workspaces/platform/resources/ 2>&1 | grep -i r2 || echo "no r2 resource yet — create in Step 4"
+````
+
 ## Output expected
 
 1. Files
 2. vitest summary
 3. Preview dry-run report
 4. `just drift` output
-5. Proposed commit message
+5. Proposed commit message (windmill + Universe)
 6. "T22 ready to close" signal
 
 ## Commit policy
@@ -104,6 +125,7 @@ Prepare commit; do not push.
   standard pattern; reference AWS SDK docs via Context7.
 - If the "re-check alias" test is flaky, the algorithm has a race — fix the
   algorithm, do not weaken the test.
+
 ```
 
 ---
@@ -111,3 +133,4 @@ Prepare commit; do not push.
 ## Hand-off
 
 T22 closes independently. No downstream unblocks.
+```
