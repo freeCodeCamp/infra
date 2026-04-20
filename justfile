@@ -169,6 +169,23 @@ cnpg-wait cluster namespace name timeout="5m":
     echo "--- pods ---"
     kubectl -n {{namespace}} get pods -l cnpg.io/cluster={{name}} -o wide
 
+# Reset a CNPG Cluster: delete the CR, all PVCs, and pods. DESTRUCTIVE.
+# After reset, re-run `just deploy {{cluster}} {{app}}` to recreate.
+[group('k3s')]
+cnpg-reset cluster namespace name:
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{cluster}}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    echo "Deleting CNPG Cluster {{namespace}}/{{name}} ..."
+    kubectl -n {{namespace}} delete cluster/{{name}} --ignore-not-found
+    echo "Waiting for cluster pods to terminate ..."
+    kubectl -n {{namespace}} wait --for=delete pod -l cnpg.io/cluster={{name}} --timeout=120s 2>/dev/null || true
+    echo "Deleting PVCs for {{name}} ..."
+    kubectl -n {{namespace}} delete pvc -l cnpg.io/cluster={{name}} --ignore-not-found
+    kubectl -n {{namespace}} get pvc -o name | grep -E "{{name}}-[0-9]+$" | xargs -r kubectl -n {{namespace}} delete --ignore-not-found
+    echo "Done. Re-run `just deploy {{cluster}} <app>` to recreate."
+
 # Show installed CRDs filtered by group (e.g. cnpg, gateway)
 [group('k3s')]
 crds-grep cluster filter:
