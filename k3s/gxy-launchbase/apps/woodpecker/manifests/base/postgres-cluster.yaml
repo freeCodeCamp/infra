@@ -72,22 +72,3 @@ spec:
   # Re-enable once a Prometheus operator is present.
   monitoring:
     enablePodMonitor: false
-
-  backup:
-    barmanObjectStore:
-      destinationPath: s3://net-freecodecamp-universe-backups/cnpg/gxy-launchbase/woodpecker
-      endpointURL: https://fra1.digitaloceanspaces.com
-      s3Credentials:
-        accessKeyId:
-          name: woodpecker-postgres-s3-backup
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: woodpecker-postgres-s3-backup
-          key: SECRET_ACCESS_KEY
-      wal:
-        compression: gzip
-        maxParallel: 4
-      data:
-        compression: gzip
-        jobs: 2
-    retentionPolicy: "14d"
