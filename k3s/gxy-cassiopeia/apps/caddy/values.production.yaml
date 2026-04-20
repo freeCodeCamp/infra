@@ -12,7 +12,7 @@ image:
   # Tag is the dev-<sha> produced by `just caddy-s3-build` until the Woodpecker
   # pipeline activates (then switch to latest-main or commit-SHA tag). Bump via
   # PR with `just caddy-s3-verify` + cluster smoke-test re-run.
-  tag: "dev-509c1d1@sha256:51777286b4e26206fde749604c02834f834b226381e142e8ddb6797a712e34bd"
+  tag: "dev-7f5144f@sha256:39bbecf91847f5d0625c95a8634e569ca120ee2f4e20b03e70c0e2e0de18c26b"
   pullPolicy: IfNotPresent
 
 resources:
