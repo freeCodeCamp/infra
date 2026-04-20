@@ -85,6 +85,13 @@ agent:
   enabled: true
   replicaCount: 2
 
+  # We do NOT use the chart-auto-created woodpecker-default-agent-secret
+  # (server.createAgentSecret: false above). WOODPECKER_AGENT_SECRET comes from
+  # our woodpecker-env Secret (sops-managed). Without this flag, the agent
+  # statefulset envFrom-references a Secret that doesn't exist and the pods
+  # fail with CreateContainerConfigError.
+  mapAgentSecret: false
+
   image:
     registry: docker.io
     repository: woodpeckerci/woodpecker-agent
