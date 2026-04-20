@@ -1,6 +1,7 @@
 ---
 # Egress allow-list for the woodpecker namespace (server + agents +
 # agent-spawned pipeline pods):
+#   - kube-apiserver             — CNPG instance manager fetches own Cluster CR
 #   - api.github.com:443         — OAuth forge + git fetch
 #   - *.r2.cloudflarestorage.com — deploy artifact push
 #   - api.cloudflare.com:443     — cache-purge step
@@ -17,6 +18,13 @@ metadata:
 spec:
   endpointSelector: {}
   egress:
+    # CNPG instance manager + every controller-style workload polls the
+    # apiserver. `kube-apiserver` is a Cilium-managed entity selector
+    # that resolves to the apiserver IPs (works with kube-proxy
+    # replacement). Without this rule, initdb pods deadlock on
+    # `wait-for-get-cluster` and the Cluster never reaches Ready.
+    - toEntities:
+        - kube-apiserver
     - toFQDNs:
         - matchName: "api.github.com"
         - matchPattern: "*.r2.cloudflarestorage.com"
