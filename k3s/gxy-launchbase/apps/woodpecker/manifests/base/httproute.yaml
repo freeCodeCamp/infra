@@ -14,8 +14,8 @@ metadata:
     app.kubernetes.io/part-of: woodpecker
 spec:
   parentRefs:
-    - name: traefik
-      namespace: kube-system
+    - name: woodpecker-gateway
+      namespace: woodpecker
   hostnames:
     - "woodpecker.freecodecamp.net"
   rules:
