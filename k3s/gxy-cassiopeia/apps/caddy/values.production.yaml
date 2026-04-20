@@ -1,0 +1,33 @@
+---
+# Consumed by `just helm-upgrade gxy-cassiopeia caddy`.
+# Secret credentials come from infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc.
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/freecodecamp-universe/caddy-s3
+  # Pinned — bumped via PR with smoke-test re-run.
+  tag: "20260418-6c65f0f"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+r2:
+  bucket: gxy-cassiopeia-1
+  # endpoint + accessKeyId + secretAccessKey come from the sops overlay
+  # (endpoint embeds the CF account ID).
+
+httpRoute:
+  parentName: traefik
+  parentNamespace: kube-system
+  hostnames:
+    - "*.freecode.camp"
+
+networkPolicy:
+  enabled: true

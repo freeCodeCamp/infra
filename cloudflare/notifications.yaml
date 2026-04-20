@@ -1,0 +1,77 @@
+---
+# Declarative Cloudflare Notifications for gxy-cassiopeia.
+# Applied via: `just cf-notifications-apply`
+#
+# `destinations` references CF Notification Destinations already provisioned
+# in the account. The apply script resolves destination IDs from names.
+# Expected names:
+#   - "Platform Team — Google Chat"  (webhook)
+#   - "Platform Team Email"          (distribution list)
+
+zone: freecode.camp
+
+notifications:
+  - name: gxy-cassiopeia-zone-5xx
+    description: >-
+      Zone-level 5xx rate spike on freecode.camp.
+      Trigger: 5xx rate > 1% for 5m.
+    alert_type: http_alert_origin_error
+    enabled: true
+    filters:
+      new_health: [unhealthy]
+      zones: [freecode.camp]
+      incident_impact: [INCIDENT_IMPACT_NONE, INCIDENT_IMPACT_MINOR]
+    destinations:
+      - "Platform Team Email"
+      - "Platform Team — Google Chat"
+
+  - name: gxy-cassiopeia-origin-error-rate
+    description: >-
+      Origin error rate > 5% for 5m. Indicates Caddy pod
+      failure or R2 connectivity issue.
+    alert_type: http_alert_origin_error
+    enabled: true
+    mechanisms:
+      threshold_pct: 5
+      duration_minutes: 5
+    destinations:
+      - "Platform Team Email"
+      - "Platform Team — Google Chat"
+
+  - name: gxy-cassiopeia-origin-response-time
+    # Primary-signal cache-fill detection — catches LRU thrash before CF 5xx.
+    # Detects LRU thrashing via origin p95 latency impact, hours earlier than
+    # CF 5xx zone alerts. Not a replacement for the deferred
+    # r2alias_cache_miss_rate metric (which waits for gxy-backoffice).
+    description: >-
+      Origin p95 response time > 1500ms over 5m (W4 canary). Detects
+      cache-fill thrashing before it surfaces as 5xx.
+    alert_type: real_origin_monitoring
+    enabled: true
+    mechanisms:
+      threshold_ms: 1500
+      duration_minutes: 5
+      percentile: p95
+    destinations:
+      - "Platform Team Email"
+      - "Platform Team — Google Chat"
+
+  - name: gxy-cassiopeia-ssl-expiry
+    description: >-
+      SSL certificate expiry for freecode.camp < 7 days. Universal SSL
+      auto-renews but this catches renewal failures.
+    alert_type: universal_ssl_event_type
+    enabled: true
+    filters:
+      zones: [freecode.camp]
+    destinations:
+      - "Platform Team Email"
+
+verification:
+  # Synthetic cache-fill trigger procedure (T25 cutover runbook references this):
+  # 1. From a staging node: `hey -z 5m -c 200 -H "Host: nonexistent-$(date +%s).freecode.camp" https://gxy-cassiopeia-1.r2.edge/`
+  #    to generate unique Host headers.
+  # 2. Confirm gxy-cassiopeia-origin-response-time fires within 10 minutes.
+  # 3. Stop the synthetic load; alert clears within 15 minutes.
+  # If verification fails, W4 coverage is broken — block T25 until resolved.
+  cache_fill_synthetic_test_required: true

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deploy v1 — gxy-cassiopeia demo</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 4rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 0.3rem;
+        font-weight: 600;
+      }
+      .v1 {
+        background: #d1f7c4;
+        color: #225511;
+      }
+      .v2 {
+        background: #c4dbf7;
+        color: #112255;
+      }
+      code {
+        background: #eee;
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Deploy <span class="badge v1">v1</span></h1>
+    <p>
+      This HTML is object <code>demo.test.camp/deploys/v1/index.html</code> in
+      the R2 bucket.
+    </p>
+    <p>
+      The Caddy <code>r2_alias</code> handler read the alias file
+      <code>demo.test.camp/production</code>, found the string <code>v1</code>,
+      rewrote the request path to include that deploy ID, and asked the
+      <code>caddy.fs.r2</code> filesystem to stream this file from R2.
+    </p>
+    <p>
+      Flip the alias with: <code>docker compose run --rm seed -alias v2</code>
+    </p>
+  </body>
+</html>

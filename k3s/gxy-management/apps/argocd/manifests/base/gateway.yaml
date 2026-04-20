@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: argocd-gateway
+  namespace: argocd
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: websecure
+      protocol: HTTPS
+      port: 443
+      hostname: argocd.freecodecamp.net
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: argocd-tls-cloudflare
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: web
+      protocol: HTTP
+      port: 80
+      hostname: argocd.freecodecamp.net
+      allowedRoutes:
+        namespaces:
+          from: Same

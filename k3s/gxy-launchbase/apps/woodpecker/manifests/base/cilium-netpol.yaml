@@ -1,0 +1,39 @@
+---
+# Egress allow-list for the woodpecker namespace (server + agents +
+# agent-spawned pipeline pods):
+#   - api.github.com:443         — OAuth forge + git fetch
+#   - *.r2.cloudflarestorage.com — deploy artifact push
+#   - api.cloudflare.com:443     — cache-purge step
+#   - *.digitaloceanspaces.com   — CNPG barman-cloud WAL/base backup push
+#   - kube-dns UDP/53            — name resolution
+#   - intra-namespace            — server ↔ agent ↔ postgres
+# All other egress dropped.
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: woodpecker-egress
+  namespace: woodpecker
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: "api.github.com"
+        - matchPattern: "*.r2.cloudflarestorage.com"
+        - matchName: "api.cloudflare.com"
+        - matchPattern: "*.digitaloceanspaces.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": woodpecker

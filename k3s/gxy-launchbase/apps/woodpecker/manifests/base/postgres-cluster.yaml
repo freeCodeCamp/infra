@@ -1,0 +1,93 @@
+---
+# CNPG Cluster CR — Woodpecker postgres backend.
+#
+# Deploy order:
+#   1. just helm-upgrade gxy-launchbase cnpg-system
+#   2. kubectl -n cnpg-system rollout status deploy/cnpg-system-cloudnative-pg --timeout=3m
+#   3. just deploy gxy-launchbase woodpecker
+#
+# Secret `woodpecker-postgres-s3-backup` is materialized by the deploy
+# recipe from infra-secrets/k3s/gxy-launchbase/woodpecker.secrets.env.enc
+# (see SECRETS.md).
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: woodpecker-postgres
+  namespace: woodpecker
+  labels:
+    app.kubernetes.io/name: woodpecker-postgres
+    app.kubernetes.io/part-of: woodpecker
+    app.kubernetes.io/managed-by: cnpg-operator
+spec:
+  instances: 2
+
+  # Bump via PR with a PITR drill run first.
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie
+
+  # remote_write acks after WAL hits the replica's OS (not fsync) — balances
+  # durability with commit latency.
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      maxStandbyNamesFromCluster: 1
+    parameters:
+      synchronous_commit: remote_write
+      max_connections: "200"
+      shared_buffers: 256MB
+      effective_cache_size: 768MB
+      work_mem: 4MB
+      maintenance_work_mem: 128MB
+      log_statement: ddl
+      log_connections: "on"
+      log_disconnections: "on"
+
+  # Operator auto-generates credentials into Secret/woodpecker-postgres-app.
+  bootstrap:
+    initdb:
+      database: woodpecker
+      owner: woodpecker
+      encoding: UTF8
+      localeCType: C
+      localeCollate: C
+
+  # Uses the cluster's default StorageClass (local-path on k3s).
+  storage:
+    size: 20Gi
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+
+  # Re-enable once a Prometheus operator is present.
+  monitoring:
+    enablePodMonitor: false
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://net-freecodecamp-universe-backups/cnpg/gxy-launchbase/woodpecker
+      endpointURL: https://fra1.digitaloceanspaces.com
+      s3Credentials:
+        accessKeyId:
+          name: woodpecker-postgres-s3-backup
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: woodpecker-postgres-s3-backup
+          key: SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+        maxParallel: 4
+      data:
+        compression: gzip
+        jobs: 2
+    retentionPolicy: "14d"

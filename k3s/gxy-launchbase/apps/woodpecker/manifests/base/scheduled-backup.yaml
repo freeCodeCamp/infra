@@ -1,0 +1,20 @@
+---
+# Scheduled base backup for woodpecker-postgres.
+# 6-hour cadence aligns with etcd snapshot schedule (group_vars) for consistent
+# recovery planning. WAL archiving runs continuously; these are the base
+# snapshots that WAL replay rebuilds from.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: woodpecker-postgres-base
+  namespace: woodpecker
+spec:
+  # Every 6 hours: :00 :06 :12 :18. Six fields: seconds minutes hours dom month dow.
+  # CNPG cron uses 6-field syntax (seconds first) per operator docs.
+  schedule: "0 0 0,6,12,18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: woodpecker-postgres
+  # Plugin method for CNPG 1.28+; barman-cloud is the only backend configured.
+  method: barmanObjectStore

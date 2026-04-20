@@ -1,0 +1,39 @@
+{{- if .Values.networkPolicy.enabled }}
+# Egress: R2 + cluster DNS only. Ingress: :80 only — :2019 admin API MUST
+# stay blocked so a cluster-lateral attacker cannot reach it.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-egress
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  egress:
+    - toFQDNs:
+        - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+  ingress:
+    - fromEntities:
+        - cluster
+        - world
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+{{- end }}

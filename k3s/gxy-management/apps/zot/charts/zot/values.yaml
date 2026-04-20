@@ -1,0 +1,90 @@
+# Zot OCI Registry Helm values for gxy-management cluster
+# Chart: zot (https://github.com/project-zot/helm-charts)
+# Chart version: 0.1.104, Image: v2.1.15
+# Cloudflare Access-gated (platform team + Woodpecker CI)
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/project-zot/zot
+  pullPolicy: IfNotPresent
+  tag: "v2.1.15"
+
+service:
+  type: ClusterIP
+  port: 5000
+
+# Routing managed via Gateway API (see manifests/base/gateway.yaml)
+ingress:
+  enabled: false
+
+# Mount config.json from ConfigMap
+mountConfig: true
+configFiles:
+  config.json: |-
+    {
+      "storage": {
+        "rootDirectory": "/var/lib/registry",
+        "storageDriver": {
+          "name": "s3",
+          "regionendpoint": "https://fra1.digitaloceanspaces.com",
+          "region": "fra1",
+          "bucket": "net.freecodecamp.universe-registry",
+          "secure": true,
+          "skipverify": false,
+          "forcepathstyle": true
+        }
+      },
+      "http": {
+        "address": "0.0.0.0",
+        "port": "5000",
+        "auth": {
+          "htpasswd": {
+            "path": "/secret/htpasswd"
+          }
+        }
+      },
+      "log": {
+        "level": "info"
+      }
+    }
+
+# Mount htpasswd from Secret (managed via kustomize secretGenerator)
+mountSecret: true
+secretFiles:
+  # Placeholder — actual htpasswd managed via kustomize secrets/.secrets.env
+  # Generate entries with: htpasswd -nbBC 10 <username> <password>
+  htpasswd: ""
+
+# S3 credentials injected as environment variables
+# The S3 driver picks up AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+# automatically when accesskey/secretkey are omitted from config.json
+env:
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: zot-secrets
+        key: S3_ACCESS_KEY
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: zot-secrets
+        key: S3_SECRET_KEY
+
+# Local PVC for registry cache
+persistence: true
+pvc:
+  create: true
+  accessModes:
+    - ReadWriteOnce
+  storage: 8Gi
+  storageClassName: local-path
+
+# Probes
+httpGet:
+  scheme: HTTP
+  port: 5000
+startupProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3

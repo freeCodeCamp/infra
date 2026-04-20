@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-caddyfile
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  Caddyfile: |
+    {
+      auto_https off
+      # Loopback-only admin API; NetworkPolicy blocks :2019 ingress.
+      admin 127.0.0.1:2019
+
+      order r2_alias before file_server
+
+      filesystem r2 r2 {
+        bucket            {$R2_BUCKET}
+        endpoint          {$R2_ENDPOINT}
+        region            auto
+        access_key_id     {$AWS_ACCESS_KEY_ID}
+        secret_access_key {$AWS_SECRET_ACCESS_KEY}
+        use_path_style
+      }
+    }
+
+    :80 {
+      log {
+        output stdout
+        format json
+      }
+
+      @apex host freecode.camp www.freecode.camp
+      handle @apex {
+        redir https://www.freecodecamp.org{uri} 302
+      }
+
+      handle /healthz {
+        respond "ok" 200
+      }
+
+      r2_alias {
+        bucket            {$R2_BUCKET}
+        endpoint          {$R2_ENDPOINT}
+        region            auto
+        access_key_id     {$AWS_ACCESS_KEY_ID}
+        secret_access_key {$AWS_SECRET_ACCESS_KEY}
+        cache_ttl         15s
+        cache_max_entries 10000
+        preview_suffix    "--preview"
+        root_domain       "freecode.camp"
+      }
+
+      file_server {
+        fs r2
+      }
+
+      handle_errors {
+        @404 expression {err.status_code} == 404
+        respond @404 "Not Found" 404
+
+        @503 expression {err.status_code} == 503
+        respond @503 "Service Unavailable" 503
+
+        respond "Server Error" 500
+      }
+    }

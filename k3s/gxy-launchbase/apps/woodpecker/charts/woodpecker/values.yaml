@@ -1,0 +1,122 @@
+---
+# Woodpecker CI Helm values — gxy-launchbase
+# Chart: woodpecker/woodpecker. Repo: https://woodpecker-ci.org/
+#
+# Secrets sources:
+#   - woodpecker-postgres-app  (CNPG-generated)
+#   - woodpecker-env           (kustomize secretGenerator from .secrets.env)
+#
+# Apply with: `just helm-upgrade gxy-launchbase woodpecker`
+# (recipe overlays infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc if present).
+
+server:
+  enabled: true
+
+  image:
+    registry: docker.io
+    repository: woodpeckerci/woodpecker-server
+    tag: "v3.13.0"
+    pullPolicy: IfNotPresent
+
+  statefulSet:
+    replicaCount: 1
+    revisionHistoryLimit: 5
+
+  # Small PVC for Woodpecker internal state (pipeline cache, OAuth session).
+  # Authoritative store is CNPG postgres.
+  persistentVolume:
+    enabled: true
+    size: 5Gi
+    mountPath: /var/lib/woodpecker
+
+  # Agent-server shared secret lifecycle is sops-owned, not Helm-owned.
+  createAgentSecret: false
+
+  extraSecretNamesForEnvFrom:
+    # Must contain WOODPECKER_SERVER_SECRET, WOODPECKER_AGENT_SECRET,
+    # WOODPECKER_GITHUB_CLIENT, WOODPECKER_GITHUB_SECRET.
+    - woodpecker-env
+
+  env:
+    WOODPECKER_BACKEND: kubernetes
+    WOODPECKER_MAX_WORKFLOWS: "2"
+
+    WOODPECKER_GITHUB: "true"
+    WOODPECKER_GITHUB_URL: "https://github.com"
+
+    WOODPECKER_HOST: "https://woodpecker.freecodecamp.net"
+
+    # WOODPECKER_ADMIN / WOODPECKER_ORGS added post-DNS+CF-Access gate.
+    WOODPECKER_OPEN: "false"
+
+    WOODPECKER_DATABASE_DRIVER: postgres
+    WOODPECKER_DATABASE_DATASOURCE:
+      valueFrom:
+        secretKeyRef:
+          name: woodpecker-postgres-app
+          key: uri
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false # writes to PVC at /var/lib/woodpecker
+    capabilities:
+      drop:
+        - ALL
+
+agent:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    registry: docker.io
+    repository: woodpeckerci/woodpecker-agent
+    tag: "v3.13.0"
+    pullPolicy: IfNotPresent
+
+  env:
+    WOODPECKER_SERVER: "woodpecker-server:9000"
+    WOODPECKER_BACKEND: kubernetes
+    WOODPECKER_BACKEND_K8S_NAMESPACE: woodpecker
+    WOODPECKER_BACKEND_K8S_NAMESPACE_PER_ORGANIZATION: false
+    WOODPECKER_BACKEND_K8S_VOLUME_SIZE: 10G
+    WOODPECKER_CONNECT_RETRY_COUNT: "5"
+
+  extraSecretNamesForEnvFrom:
+    - woodpecker-env # supplies WOODPECKER_AGENT_SECRET
+
+  persistence:
+    enabled: true
+    size: 1Gi
+    mountPath: /etc/woodpecker
+    accessModes:
+      - ReadWriteOnce
+
+  # Agents spawn pipeline pods; chart creates Role+RoleBinding for the SA.
+  serviceAccount:
+    create: true
+    rbac:
+      create: true
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi

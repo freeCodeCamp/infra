@@ -1,0 +1,31 @@
+{
+	admin :2019
+	auto_https off
+	grace_period 1ns
+
+	order r2_alias before file_server
+
+	filesystem r2 r2 {
+		bucket demo
+		endpoint http://s3mock:9090
+		region us-east-1
+		access_key_id demo
+		secret_access_key demo
+		use_path_style
+	}
+}
+
+:80 {
+	r2_alias {
+		bucket demo
+		endpoint http://s3mock:9090
+		region us-east-1
+		access_key_id demo
+		secret_access_key demo
+		cache_ttl 2s
+		root_domain test.camp
+	}
+	file_server {
+		fs r2
+	}
+}

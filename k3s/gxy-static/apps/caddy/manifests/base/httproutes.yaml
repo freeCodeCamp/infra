@@ -1,0 +1,36 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: secure-headers
+  namespace: caddy
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: caddy-route
+  namespace: caddy
+spec:
+  parentRefs:
+    - name: caddy-gateway
+      namespace: caddy
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: secure-headers
+      backendRefs:
+        - name: caddy
+          port: 80

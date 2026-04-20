@@ -1,0 +1,34 @@
+# cluster.name, cluster.id, k8sServiceHost set at deploy time via Ansible --set flags
+k8sServicePort: "6443"
+
+kubeProxyReplacement: true
+devices: [eth0, eth1]
+mtu: 1500
+
+ipam:
+  operator:
+    clusterPoolIPv4PodCIDRList:
+      - "10.1.0.0/16"
+
+operator:
+  replicas: 1
+
+hubble:
+  enabled: true
+  tls:
+    auto:
+      method: cronJob
+  relay:
+    enabled: true
+  ui:
+    enabled: false
+
+gatewayAPI:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

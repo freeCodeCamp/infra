@@ -4,15 +4,23 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose        | Apps              |
-| -------------------- | -------------- | ----------------- |
-| ops-backoffice-tools | Internal tools | Appsmith, Outline |
+| Cluster              | Purpose           | Apps                             |
+| -------------------- | ----------------- | -------------------------------- |
+| ops-backoffice-tools | Internal tools    | Appsmith, Outline                |
+| gxy-management       | Universe platform | Windmill, ArgoCD, Zot (deferred) |
+| gxy-static           | Static hosting    | Caddy                            |
 
 ## Quick Access
 
 ```bash
 # Tools cluster
 cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+# Galaxy management cluster
+cd k3s/gxy-management && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+# Galaxy static cluster
+cd k3s/gxy-static && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 ```
 
 ## Structure
@@ -20,6 +28,20 @@ cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 ```
 k3s/
 ├── archive/                       # Archived configs (historical reference)
+├── gxy-management/
+│   ├── apps/
+│   │   ├── argocd/
+│   │   ├── windmill/
+│   │   └── zot/
+│   └── cluster/
+│       ├── cilium/
+│       └── security/
+├── gxy-static/
+│   ├── apps/
+│   │   └── caddy/
+│   └── cluster/
+│       ├── cilium/
+│       └── security/
 ├── ops-backoffice-tools/
 │   ├── apps/
 │   │   ├── appsmith/
@@ -45,9 +67,11 @@ k3s/
 
 ### Droplets
 
-| Cluster | Name Pattern             | Count | Specs              | Tags           |
-| ------- | ------------------------ | ----- | ------------------ | -------------- |
-| tools   | ops-vm-tools-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | k3s, tools_k3s |
+| Cluster        | Name Pattern              | Count | Specs               | Tags           |
+| -------------- | ------------------------- | ----- | ------------------- | -------------- |
+| tools          | ops-vm-tools-k3s-nyc3-0X  | 3     | 4 vCPU, 8GB, 160GB  | tools_k3s      |
+| gxy-management | gxy-vm-mgmt-k3s-{1,2,3}   | 3     | 8 vCPU, 16GB, 320GB | gxy-mgmt-k3s   |
+| gxy-static     | gxy-vm-static-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-static-k3s |
 
 ### Load Balancer
 
@@ -60,22 +84,24 @@ k3s/
 ## Ansible Deployment
 
 ```bash
-cd ansible
+# Deploy tools cluster
+just play k3s--cluster tools_k3s
 
-# Deploy cluster
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--cluster.yml \
-  -e variable_host=tools_k3s
+# Longhorn storage (tools)
+just play k3s--longhorn tools_k3s
 
-# Longhorn storage
-uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
-  -e variable_host=tools_k3s
+# Deploy gxy-management galaxy
+just play k3s--bootstrap gxy_mgmt_k3s
+
+# Deploy gxy-static galaxy
+just play k3s--bootstrap gxy_static_k3s
 ```
 
 ---
 
 ## Tailscale Network
 
-All inter-cluster communication via Tailscale.
+Tailscale on nodes for SSH/kubectl access only (under review).
 
 See `tailscale/README.md` (repo root) for device inventory.
 
@@ -97,10 +123,15 @@ See `tailscale/README.md` (repo root) for device inventory.
 
 ## DNS (Cloudflare)
 
-| Record                    | Type | Value    |
-| ------------------------- | ---- | -------- |
-| appsmith.freecodecamp.net | A    | tools LB |
-| outline.freecodecamp.net  | A    | tools LB |
+| Record                    | Type | Value                   | SSL Mode                 |
+| ------------------------- | ---- | ----------------------- | ------------------------ |
+| appsmith.freecodecamp.net | A    | tools LB                | Full (Strict)            |
+| outline.freecodecamp.net  | A    | tools LB                | Full (Strict)            |
+| windmill.freecodecamp.net | A    | gxy-management node IPs | Full (Strict)            |
+| argocd.freecodecamp.net   | A    | gxy-management node IPs | Full (Strict)            |
+| registry.freecodecamp.net | A    | gxy-management node IPs | Full (Strict) (deferred) |
+| freecode.camp             | A    | gxy-static node IPs     | Flexible                 |
+| \*.freecode.camp          | A    | gxy-static node IPs     | Flexible                 |
 
 ---
 
@@ -115,7 +146,7 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ### Update Apps
 
 ```bash
-kubectl apply -k apps/<app>/manifests/base/
+just deploy <cluster> <app>
 ```
 
 ---
@@ -142,11 +173,46 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 | Appsmith | 1        | 10Gi        | Embedded           |
 | Outline  | 1        | 10Gi + 10Gi | PostgreSQL sidecar |
 
+### gxy-management
+
+```
+Internet → Cloudflare (Full Strict) → Node Public IPs → Traefik (hostNetwork) → Gateway API → Apps
+                                                                                       │
+                                                                         ┌─────────────┘
+                                                                         ↓
+                                                                     Windmill, ArgoCD
+
+CNI: Cilium    Storage: local-path    SSH/kubectl: Tailscale
+```
+
+| App      | Replicas            | Access | Notes              |
+| -------- | ------------------- | ------ | ------------------ |
+| Windmill | 1 server, 2 workers | Direct | CF Access deferred |
+| ArgoCD   | 1 (single replica)  | Direct | CF Access deferred |
+| Zot      | deferred            | —      | Phase 1            |
+
+### gxy-static
+
+```
+Internet → Cloudflare (Flexible) → Node Public IPs → Traefik (hostNetwork) → Gateway API → Caddy
+                                                                                              │
+                                                                              ┌───────────────┘
+                                                                              ↓
+                                                                    Local SSD ← rclone ← R2
+
+CNI: Cilium    Storage: emptyDir    SSH/kubectl: Tailscale
+```
+
+| App   | Replicas | Domain        | Notes                                |
+| ----- | -------- | ------------- | ------------------------------------ |
+| Caddy | 3        | freecode.camp | R2 bucket gxy-static-1, apex→fcc.org |
+
 ---
 
 ## Playbooks Reference
 
-| Playbook               | Purpose                  |
-| ---------------------- | ------------------------ |
-| play-k3s--cluster.yml  | Deploy k3s HA cluster    |
-| play-k3s--longhorn.yml | Install Longhorn storage |
+| Playbook                | Purpose                                               |
+| ----------------------- | ----------------------------------------------------- |
+| play-k3s--cluster.yml   | Deploy k3s HA cluster                                 |
+| play-k3s--longhorn.yml  | Install Longhorn storage                              |
+| play-k3s--bootstrap.yml | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |

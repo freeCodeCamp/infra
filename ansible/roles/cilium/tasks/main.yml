@@ -1,0 +1,91 @@
+---
+- name: Validate required Cilium variables
+  ansible.builtin.assert:
+    that:
+      - cilium_cluster_name | length > 0
+      - cilium_cluster_id | string | length > 0
+      - cilium_values_file | length > 0
+      - cilium_k8s_service_host | length > 0
+    fail_msg: >-
+      Required variables missing. Set cilium_cluster_name, cilium_cluster_id,
+      cilium_values_file, and cilium_k8s_service_host.
+
+- name: Copy Cilium values file to server
+  ansible.builtin.copy:
+    src: "{{ cilium_values_file }}"
+    dest: /etc/rancher/k3s/cilium-values.yaml
+    mode: "0600"
+
+- name: Install Helm
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl https://raw.githubusercontent.com/helm/helm/{{ helm_version }}/scripts/get-helm-3 | DESIRED_VERSION={{ helm_version }} bash
+    executable: /bin/bash
+    creates: /usr/local/bin/helm
+
+- name: Add Cilium Helm repo
+  kubernetes.core.helm_repository:
+    name: cilium
+    repo_url: https://helm.cilium.io/
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Install Cilium
+  kubernetes.core.helm:
+    name: cilium
+    chart_ref: cilium/cilium
+    chart_version: "{{ cilium_version }}"
+    release_namespace: kube-system
+    update_repo_cache: true
+    values_files:
+      - /etc/rancher/k3s/cilium-values.yaml
+    set_values:
+      - value: "cluster.name={{ cilium_cluster_name }}"
+      - value: "cluster.id={{ cilium_cluster_id }}"
+      - value: "k8sServiceHost={{ cilium_k8s_service_host }}"
+      - value: "k8sServicePort={{ cilium_k8s_service_port }}"
+    wait: true
+    timeout: "10m0s"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Clean up Cilium values file
+  ansible.builtin.file:
+    path: /etc/rancher/k3s/cilium-values.yaml
+    state: absent
+
+- name: Wait for Cilium agent DaemonSet rollout
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status daemonset/cilium --timeout=180s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  retries: 3
+  delay: 15
+  register: cilium_agent_rollout
+  until: cilium_agent_rollout.rc == 0
+
+- name: Wait for Cilium operator Deployment rollout
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status deployment/cilium-operator --timeout=180s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  retries: 3
+  delay: 15
+  register: cilium_operator_rollout
+  until: cilium_operator_rollout.rc == 0
+
+- name: Verify Cilium status
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium status --brief
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: cilium_status
+  changed_when: false
+  retries: 5
+  delay: 20
+  until: cilium_status.rc == 0
+
+- name: Display Cilium status
+  ansible.builtin.debug:
+    msg: "{{ cilium_status.stdout_lines }}"

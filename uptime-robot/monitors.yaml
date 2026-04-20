@@ -1,0 +1,71 @@
+---
+# Declarative Uptime Robot monitors for gxy-cassiopeia.
+# Applied via: `just uptime-robot-apply`
+#
+# Free tier: 50 monitors, 5-min interval. Contact names resolved to IDs by
+# the apply script; expected: "Platform Team — Google Chat".
+
+defaults:
+  interval_seconds: 300 # Free tier floor
+  timeout_seconds: 30
+  alert_contacts:
+    - "Platform Team — Google Chat"
+
+monitors:
+  # ---------------------------------------------------------------------------
+  # Woodpecker CI health — critical for deploy pipeline availability
+  # ---------------------------------------------------------------------------
+  - name: woodpecker-api
+    type: http
+    url: https://woodpecker.freecodecamp.net/api/healthz
+    expected_status: [200]
+    description: >-
+      Woodpecker API healthcheck. Alert on 2 consecutive
+      failures (5m + 5m = 10m detection).
+
+  # ---------------------------------------------------------------------------
+  # Per-site uptime — constellations on freecode.camp
+  # Add one entry per live constellation. For M1 launch, seed with test-site
+  # used by Phase 4; expand as constellations migrate.
+  # ---------------------------------------------------------------------------
+  - name: site-test-camp
+    type: https
+    url: https://test.freecode.camp/
+    expected_status: [200]
+    description: >-
+      Phase 4 test site availability. Added at Phase 4, removed after
+      after real constellations replace it.
+
+  # Production constellations are appended by the migration checklist in T25
+  # as each constellation cuts over. Example entries (commented until live):
+  #
+  # - name: site-hello-world-camp
+  #   type: https
+  #   url: https://hello-world.freecode.camp/
+  #   expected_status: [200]
+  # ---------------------------------------------------------------------------
+  # Canary: dedicated low-traffic site for W4 p95 latency detection
+  # ---------------------------------------------------------------------------
+  - name: gxy-cassiopeia-canary-latency
+    # Complements the CF origin-response-time alert
+    # by probing from multiple geographic regions. Free-tier UR does single-
+    # region probes; if we need multi-region, upgrade to Pro.
+    type: https
+    url: https://canary.freecode.camp/
+    expected_status: [200]
+    response_time_threshold_ms: 1500
+    description: >-
+      W4 canary probe. Serves a ~4KB static asset from R2 via the Caddy
+      module. Response time > 1500ms for 3 consecutive samples triggers
+      alert (detects LRU thrashing or R2 slowdown before 5xx manifests).
+    # The canary site is itself deployed via the standard Woodpecker pipeline
+    # (T21). Deploy it as part of Phase 4 bring-up; document in T15 runbook.
+
+verification:
+  # After `just uptime-robot-apply`:
+  # 1. Log in to UR dashboard; confirm each monitor shows status "Up".
+  # 2. `curl https://stats.uptimerobot.com/<public-id>` returns monitor list.
+  # 3. Synthetic canary-latency test: deploy a version of canary.freecode.camp
+  #    that sleeps 2s before responding (via header-controlled delay). Confirm
+  #    the UR response-time threshold alert fires within 2 cycles (~10m).
+  canary_latency_synthetic_test_required: true

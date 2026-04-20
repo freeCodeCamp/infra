@@ -1,0 +1,30 @@
+# CloudNativePG operator values — gxy-launchbase.
+# Chart: cloudnative-pg (https://cloudnative-pg.github.io/charts).
+# Chart version pin is set at install time by `just helm-upgrade`.
+
+# Single replica — upstream recommendation for < 100 clusters managed.
+replicaCount: 1
+
+# Re-enable podMonitorEnabled once a Prometheus operator is present.
+monitoring:
+  podMonitorEnabled: false
+  grafanaDashboard:
+    create: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    cpu: 1000m
+    memory: 500Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# CRD installs on first deploy; major-version bumps require a manual
+# `kubectl apply -f crds/` step documented in the FLIGHT-MANUAL.
+crds:
+  create: true
