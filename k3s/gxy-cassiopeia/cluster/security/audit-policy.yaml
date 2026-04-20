@@ -1,0 +1,28 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets"]
+
+  - level: Metadata
+    users: ["system:anonymous"]
+
+  - level: Metadata
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources:
+          ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+
+  - level: None
+    users: ["system:kube-proxy"]
+  - level: None
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "services/status"]
+    verbs: ["get", "watch", "list"]
+
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"
