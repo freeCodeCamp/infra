@@ -64,7 +64,7 @@ server:
       cpu: 1000m
       memory: 1Gi
 
-  securityContext:
+  podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
     runAsGroup: 1000
@@ -72,9 +72,11 @@ server:
     seccompProfile:
       type: RuntimeDefault
 
-  containerSecurityContext:
+  # Container-level (PSS baseline + restricted-friendly).
+  # readOnlyRootFilesystem stays false — server writes to PVC at /var/lib/woodpecker.
+  securityContext:
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false # writes to PVC at /var/lib/woodpecker
+    readOnlyRootFilesystem: false
     capabilities:
       drop:
         - ALL
@@ -120,3 +122,19 @@ agent:
     limits:
       cpu: 1000m
       memory: 512Mi
+
+  # PSS baseline / restricted-friendly. Agent writes to PVC at /etc/woodpecker.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
