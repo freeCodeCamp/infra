@@ -599,6 +599,64 @@ rm -rf /tmp/test-static
 
 ---
 
+# gxy-launchbase (Universe CI)
+
+Full phase-by-phase runbook for gxy-launchbase is an outstanding backlog item
+(beads `gxy-static-k7d.TP-milestone`). Until that lands, rebuild instructions
+live in-tree alongside the apps and runbooks; the pointers below are the
+canonical entry points.
+
+### Cluster bootstrap
+
+Same mechanism as gxy-management / gxy-static. After droplets + VPC + Tailscale
+are in place (see Phase 1 + Phase 7 for the generic template — only the tag
+and VPC name change), run:
+
+```
+just play k3s--bootstrap gxy_launchbase_k3s
+```
+
+Per-galaxy config lives in `ansible/inventory/group_vars/gxy_launchbase_k3s.yml`
+and `k3s/gxy-launchbase/cluster/*`.
+
+### Apps
+
+| App        | Chart / manifests                                 | Runbook                                         |
+| ---------- | ------------------------------------------------- | ----------------------------------------------- |
+| CNPG       | `apps/cnpg-operator` (cluster-scoped)             | See `apps/woodpecker/SECRETS.md` §Postgres      |
+| Woodpecker | `apps/woodpecker` (chart + manifests + HTTPRoute) | `docs/runbooks/woodpecker-oauth-app.md` (T10) + |
+|            |                                                   | `docs/runbooks/woodpecker-cf-access.md` (T32)   |
+
+### DNS + Access (T32)
+
+For `woodpecker.freecodecamp.net`, follow
+`docs/runbooks/woodpecker-cf-access.md` end-to-end. That runbook gates:
+
+1. Cloudflare Access application (created first — email OTP, platform-team
+   group, 24 h session, self-hosted).
+2. Three A records to the launchbase node public IPs, all proxied, SSL mode
+   Full (Strict).
+3. Verification: `curl -sI https://woodpecker.freecodecamp.net` returns 302
+   to `*.cloudflareaccess.com` + admin browser login reaches the admin menu.
+
+The admin list (`WOODPECKER_ADMIN`) and allowed orgs (`WOODPECKER_ORGS`) are
+read from the sops overlay
+`infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc` into the
+chart's `server.env` block — not from `values.production.yaml` (which holds
+only public toggles). Mutate via the rotation flow documented in the CF
+Access runbook §Admin list.
+
+### Known Postgres constraint
+
+The `woodpecker-postgres` CNPG `Cluster` CR was bootstrapped without
+`spec.backup` because `barmanObjectStore` native mode is deprecated
+(CNPG >= 1.26) and deadlocked the fresh cluster on `restore_command`. The
+plugin-based replacement is tracked as `gxy-static-k7d.TP03b` in beads.
+Until it lands, a belt-and-braces weekly `pg_dump` export to R2 is the
+operator-side compensating control.
+
+---
+
 # Teardowns
 
 ## gxy-management Teardown
@@ -632,6 +690,28 @@ doctl compute droplet delete gxy-vm-static-k3s-1 gxy-vm-static-k3s-2 gxy-vm-stat
 ```
 
 VPC, firewall, Spaces persist (shared infrastructure).
+
+## gxy-launchbase Teardown
+
+Destructive: this kills the CNPG cluster and Woodpecker state. Export any
+needed pipeline state before teardown.
+
+### Cluster only (preserves VMs)
+
+```
+just play k3s--teardown gxy_launchbase_k3s
+```
+
+### Full teardown (VMs too)
+
+```
+just play k3s--teardown gxy_launchbase_k3s
+doctl compute droplet delete gxy-vm-launchbase-k3s-1 gxy-vm-launchbase-k3s-2 gxy-vm-launchbase-k3s-3 --force
+```
+
+Also pull the DNS records for `woodpecker.freecodecamp.net` and disable or
+delete the `Woodpecker CI` Access application — see the rollback section of
+`docs/runbooks/woodpecker-cf-access.md`.
 
 ---
 
