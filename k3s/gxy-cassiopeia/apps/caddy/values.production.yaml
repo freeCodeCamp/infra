@@ -6,8 +6,13 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp-universe/caddy-s3
-  # Pinned — bumped via PR with smoke-test re-run.
-  tag: "20260418-6c65f0f"
+  # Pinned by digest — OCI spec: when tag+digest both present, digest wins.
+  # Kubelet/containerd pull by digest (immutable). Resolve digest with:
+  #   docker buildx imagetools inspect ghcr.io/freecodecamp-universe/caddy-s3:<tag>
+  # Tag is the dev-<sha> produced by `just caddy-s3-build` until the Woodpecker
+  # pipeline activates (then switch to latest-main or commit-SHA tag). Bump via
+  # PR with `just caddy-s3-verify` + cluster smoke-test re-run.
+  tag: "dev-7f5144f@sha256:39bbecf91847f5d0625c95a8634e569ca120ee2f4e20b03e70c0e2e0de18c26b"
   pullPolicy: IfNotPresent
 
 resources:

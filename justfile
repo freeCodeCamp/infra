@@ -349,27 +349,33 @@ cf-dns-restore snapshot mode="--dry-run":
 # Docker images (caddy-s3 — in-tree r2alias module via xcaddy)
 # ---------------------------------------------------------------------------
 
-# Build the caddy-s3 image locally and tag with dev-<sha>. Woodpecker builds
-# the canonical `ghcr.io/freecodecamp-universe/caddy-s3:{sha}` tag on push.
+# Build the caddy-s3 image locally and tag with dev-<sha>. Platform pinned to
+# linux/amd64 — DO droplets run on AMD64, and buildx defaults to the host
+# architecture (arm64 on Apple Silicon → exec format error in cluster).
+# Woodpecker builds the canonical `ghcr.io/freecodecamp-universe/caddy-s3:{sha}`
+# tag on push.
 [group('docker')]
 caddy-s3-build:
     #!/usr/bin/env bash
     set -euo pipefail
     TAG="dev-$(git rev-parse --short HEAD)"
     docker buildx build \
+        --platform linux/amd64 \
+        --load \
         -t "ghcr.io/freecodecamp-universe/caddy-s3:${TAG}" \
         docker/images/caddy-s3/
-    echo "Built: ghcr.io/freecodecamp-universe/caddy-s3:${TAG}"
+    echo "Built: ghcr.io/freecodecamp-universe/caddy-s3:${TAG} (linux/amd64)"
 
 # Verify the built image lists both in-tree modules AND does NOT list the
-# third-party caddy.fs.s3 (D32 — no third-party Caddy plugins).
+# third-party caddy.fs.s3 (D32 — no third-party Caddy plugins). Runs the image
+# under emulation since the host is usually arm64.
 [group('docker')]
 caddy-s3-verify:
     #!/usr/bin/env bash
     set -euo pipefail
     TAG="dev-$(git rev-parse --short HEAD)"
     IMG="ghcr.io/freecodecamp-universe/caddy-s3:${TAG}"
-    MODULES=$(docker run --rm "${IMG}" caddy list-modules)
+    MODULES=$(docker run --rm --platform linux/amd64 "${IMG}" caddy list-modules)
     echo "${MODULES}" | grep -q '^http.handlers.r2_alias$' || { echo "FAIL: http.handlers.r2_alias not listed"; exit 1; }
     echo "${MODULES}" | grep -q '^caddy.fs.r2$' || { echo "FAIL: caddy.fs.r2 not listed"; exit 1; }
     ! echo "${MODULES}" | grep -q '^caddy.fs.s3$' || { echo "FAIL: caddy.fs.s3 present (D32 violated)"; exit 1; }
