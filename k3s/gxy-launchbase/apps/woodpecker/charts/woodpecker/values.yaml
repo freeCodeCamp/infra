@@ -64,7 +64,7 @@ server:
       cpu: 1000m
       memory: 1Gi
 
-  securityContext:
+  podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
     runAsGroup: 1000
@@ -72,9 +72,11 @@ server:
     seccompProfile:
       type: RuntimeDefault
 
-  containerSecurityContext:
+  # Container-level (PSS baseline + restricted-friendly).
+  # readOnlyRootFilesystem stays false — server writes to PVC at /var/lib/woodpecker.
+  securityContext:
     allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false # writes to PVC at /var/lib/woodpecker
+    readOnlyRootFilesystem: false
     capabilities:
       drop:
         - ALL
@@ -82,6 +84,13 @@ server:
 agent:
   enabled: true
   replicaCount: 2
+
+  # We do NOT use the chart-auto-created woodpecker-default-agent-secret
+  # (server.createAgentSecret: false above). WOODPECKER_AGENT_SECRET comes from
+  # our woodpecker-env Secret (sops-managed). Without this flag, the agent
+  # statefulset envFrom-references a Secret that doesn't exist and the pods
+  # fail with CreateContainerConfigError.
+  mapAgentSecret: false
 
   image:
     registry: docker.io
@@ -120,3 +129,19 @@ agent:
     limits:
       cpu: 1000m
       memory: 512Mi
+
+  # PSS baseline / restricted-friendly. Agent writes to PVC at /etc/woodpecker.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
