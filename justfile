@@ -184,7 +184,7 @@ cnpg-reset cluster namespace name:
     echo "Deleting PVCs for {{name}} ..."
     kubectl -n {{namespace}} delete pvc -l cnpg.io/cluster={{name}} --ignore-not-found
     kubectl -n {{namespace}} get pvc -o name | grep -E "{{name}}-[0-9]+$" | xargs -r kubectl -n {{namespace}} delete --ignore-not-found
-    echo "Done. Re-run `just deploy {{cluster}} <app>` to recreate."
+    echo 'Done. Re-run "just deploy {{cluster}} <app>" to recreate.'
 
 # Show installed CRDs filtered by group (e.g. cnpg, gateway)
 [group('k3s')]
