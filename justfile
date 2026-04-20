@@ -109,6 +109,13 @@ helm-upgrade cluster app:
     [ -f "$VALUES" ] || { echo "Error: $VALUES not found"; exit 1; }
     HELM_ARGS="-f $VALUES"
     CLEANUP=""
+    # Optional production overlay at apps/<app>/values.production.yaml —
+    # loaded between chart defaults and sops secret overlay so values flow:
+    # chart defaults  <  production overlay  <  encrypted secret overlay.
+    PROD_OVERLAY="apps/{{app}}/values.production.yaml"
+    if [ -f "$PROD_OVERLAY" ]; then
+      HELM_ARGS="$HELM_ARGS -f $PROD_OVERLAY"
+    fi
     SECRET_VALUES="{{secrets_dir}}/k3s/{{cluster}}/{{app}}.values.yaml.enc"
     if [ -f "$SECRET_VALUES" ]; then
       TMPVALS=$(mktemp)
