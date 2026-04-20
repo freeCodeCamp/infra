@@ -627,24 +627,44 @@ and `k3s/gxy-launchbase/cluster/*`.
 | Woodpecker | `apps/woodpecker` (chart + manifests + HTTPRoute) | `docs/runbooks/woodpecker-oauth-app.md` (T10) + |
 |            |                                                   | `docs/runbooks/woodpecker-cf-access.md` (T32)   |
 
-### DNS + Access (T32)
+### DNS + TLS (T32)
 
-For `woodpecker.freecodecamp.net`, follow
-`docs/runbooks/woodpecker-cf-access.md` end-to-end. That runbook gates:
+For `woodpecker.freecodecamp.net`:
 
-1. Cloudflare Access application (created first — email OTP, platform-team
-   group, 24 h session, self-hosted).
-2. Three A records to the launchbase node public IPs, all proxied, SSL mode
+1. Gateway + Cloudflare Origin Certificate at the origin. `manifests/base/
+gateway.yaml` creates a per-app Gateway with `:80` + `:443` listeners
+   pinned to the hostname; the `:443` listener terminates TLS using the
+   `woodpecker-tls-cloudflare` Secret (kustomize secretGenerator built from
+   `secrets/tls.{crt,key}`). Use the same `*.freecodecamp.net` CF Origin cert
+   that `gxy-management` uses. Without the Origin cert at the origin, Traefik
+   serves `CN=TRAEFIK DEFAULT CERT` and CF Full (Strict) rejects the origin
+   with error 526.
+2. DNS: three A records for `woodpecker.freecodecamp.net` to the
+   launchbase node public IPs, all proxied (orange cloud), zone SSL mode
    Full (Strict).
-3. Verification: `curl -sI https://woodpecker.freecodecamp.net` returns 302
-   to `*.cloudflareaccess.com` + admin browser login reaches the admin menu.
+3. Verification: `curl -sI https://woodpecker.freecodecamp.net` returns 200
+   (or 302 to `*.cloudflareaccess.com` if CF Access is back in front).
 
-The admin list (`WOODPECKER_ADMIN`) and allowed orgs (`WOODPECKER_ORGS`) are
-read from the sops overlay
-`infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc` into the
-chart's `server.env` block — not from `values.production.yaml` (which holds
-only public toggles). Mutate via the rotation flow documented in the CF
-Access runbook §Admin list.
+### Auth posture
+
+Cloudflare Access is intentionally **off** for this deployment — the
+GitHub-org gate is deemed sufficient. If you need a platform-team narrower
+gate (or email-domain enforcement) later, re-enable CF Access per
+`docs/runbooks/woodpecker-cf-access.md`. That runbook is preserved as the
+reference for the CF Access application; treat its ordering as advisory
+(Access app saved BEFORE DNS publication) only when you re-enable it.
+
+Login is restricted via `WOODPECKER_ORGS=freeCodeCamp-Universe` (users must
+be members of that GitHub org); `WOODPECKER_OPEN=true` so new staff can
+self-register through OAuth. Admins are enumerated in
+`WOODPECKER_ADMIN=freeCodeCamp-bot,raisedadead,camperbot`.
+
+`WOODPECKER_ADMIN`, `WOODPECKER_ORGS`, `WOODPECKER_OPEN`, and the GitHub
+OAuth client credentials all live in the sops overlay
+`infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc`, loaded into
+the chart's `server.env` block by `just helm-upgrade`. Mutate via
+`sops --input-type yaml --output-type yaml <file>`; `sops <file>`
+auto-detects the `.enc` extension as binary and errors out.
 
 ### Known Postgres constraint
 
