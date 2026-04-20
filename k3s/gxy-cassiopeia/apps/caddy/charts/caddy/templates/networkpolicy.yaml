@@ -20,6 +20,10 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+    # Cilium FQDN toFQDNs selector is populated only when DNS queries are
+    # visible to the Cilium DNS proxy, which requires an L7 `rules.dns`
+    # block on a DNS egress rule. Without this, toFQDNs above has an empty
+    # IP set and all R2 traffic is silently dropped.
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": kube-system
@@ -28,6 +32,9 @@ spec:
         - ports:
             - port: "53"
               protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.r2.cloudflarestorage.com"
   ingress:
     - fromEntities:
         - cluster
