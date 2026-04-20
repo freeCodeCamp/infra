@@ -6,8 +6,15 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp-universe/caddy-s3
-  # Pinned — bumped via PR with smoke-test re-run.
-  tag: "20260418-6c65f0f"
+  # Pinned by digest — OCI spec: when tag+digest both present, digest wins.
+  # Kubelet/containerd pull by digest (immutable). Resolve new digest with:
+  #   TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:freecodecamp-universe/caddy-s3:pull" | jq -r .token)
+  #   curl -sI -H "Authorization: Bearer $TOKEN" \
+  #     -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+  #     https://ghcr.io/v2/freecodecamp-universe/caddy-s3/manifests/latest \
+  #     | grep -i "^docker-content-digest:"
+  # Bumped via PR with smoke-test re-run.
+  tag: "latest@sha256:82e4e4a8a111bb325632edaa09229a39e66f647652d2a5988c0bfae12bc5713e"
   pullPolicy: IfNotPresent
 
 resources:
