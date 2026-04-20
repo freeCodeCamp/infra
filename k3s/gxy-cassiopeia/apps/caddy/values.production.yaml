@@ -7,14 +7,12 @@ replicaCount: 3
 image:
   repository: ghcr.io/freecodecamp-universe/caddy-s3
   # Pinned by digest — OCI spec: when tag+digest both present, digest wins.
-  # Kubelet/containerd pull by digest (immutable). Resolve new digest with:
-  #   TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:freecodecamp-universe/caddy-s3:pull" | jq -r .token)
-  #   curl -sI -H "Authorization: Bearer $TOKEN" \
-  #     -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-  #     https://ghcr.io/v2/freecodecamp-universe/caddy-s3/manifests/latest \
-  #     | grep -i "^docker-content-digest:"
-  # Bumped via PR with smoke-test re-run.
-  tag: "latest@sha256:82e4e4a8a111bb325632edaa09229a39e66f647652d2a5988c0bfae12bc5713e"
+  # Kubelet/containerd pull by digest (immutable). Resolve digest with:
+  #   docker buildx imagetools inspect ghcr.io/freecodecamp-universe/caddy-s3:<tag>
+  # Tag is the dev-<sha> produced by `just caddy-s3-build` until the Woodpecker
+  # pipeline activates (then switch to latest-main or commit-SHA tag). Bump via
+  # PR with `just caddy-s3-verify` + cluster smoke-test re-run.
+  tag: "dev-509c1d1@sha256:51777286b4e26206fde749604c02834f834b226381e142e8ddb6797a712e34bd"
   pullPolicy: IfNotPresent
 
 resources:
