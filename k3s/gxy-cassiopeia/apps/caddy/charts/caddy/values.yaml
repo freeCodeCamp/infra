@@ -46,8 +46,9 @@ r2:
   secretAccessKey: "" # injected at deploy time via sops overlay
 
 httpRoute:
-  parentName: traefik
-  parentNamespace: kube-system
+  parentName: caddy-gateway
+  parentNamespace: caddy
+  sectionName: web
   hostnames:
     - "*.freecode.camp"
 

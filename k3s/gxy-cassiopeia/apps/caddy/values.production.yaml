@@ -29,8 +29,12 @@ r2:
   # (endpoint embeds the CF account ID).
 
 httpRoute:
-  parentName: traefik
-  parentNamespace: kube-system
+  # The Gateway CR is chart-owned (charts/caddy/templates/gateway.yaml). It
+  # lives in the caddy namespace alongside the HTTPRoute so the Traefik
+  # Gateway API controller binds them with minimum cross-namespace wiring.
+  parentName: caddy-gateway
+  parentNamespace: caddy
+  sectionName: web
   hostnames:
     - "*.freecode.camp"
 

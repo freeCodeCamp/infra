@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: caddy-gateway
+  labels:
+    app.kubernetes.io/name: { { .Chart.Name } }
+    app.kubernetes.io/instance: { { .Release.Name } }
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: web
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
