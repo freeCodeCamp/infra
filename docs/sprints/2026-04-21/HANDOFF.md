@@ -100,6 +100,8 @@ All DO · FRA1 · k3s HA embedded etcd · `cilium 1.19.2` ·
 
 ## Completed this round (audit trail)
 
+Pre-handoff commits (cleanup + audit):
+
 - `fb333fc` MASTER.md A1 tick + dispatch path typo fix (sprints/)
 - Bead `gxy-static-k7d.33` closed with reason referencing `fb333fc`
 - Universe main pushed (8 commits: 2344385, 589b6a8, 7c26006, 8cf77e6,
@@ -107,8 +109,24 @@ All DO · FRA1 · k3s HA embedded etcd · `cilium 1.19.2` ·
   `freeCodeCamp-Universe/Universe-Architecture.git` (warning from old URL —
   update when convenient)
 - `965901d` FLIGHT-MANUAL Parts 3+4 (gxy-launchbase + gxy-cassiopeia) shipped
-- Old sprint 2026-04-20 dispatch files: no new commits; to be archived during
-  docs reorg (task #17)
+
+Sprint 2026-04-21 commits (this session, infra repo
+`feat/k3s-universe`):
+
+- `e95f260` `docs(guidelines)`: add canonical doc conventions + monthly trim
+- `6bfaf6d` `docs(sprint/2026-04-21)`: seed handoff + README
+- `f277aa9` `docs`: split FLIGHT-MANUAL.md per-cluster + reorg tree + archive
+  2026-04-20 sprint + rename `runbook/` → `runbooks/`
+- `87fcdff` `docs(park)`: seed deferment list with triggers + ADR refs
+- `8914d69` `docs(runbook)`: add `gxy-mgmt → gxy-management` rename runbook
+- _(latest)_ `docs(sprint/2026-04-21)`: QA-recommendations + handoff refresh
+
+Sprint 2026-04-21 commits (Universe repo `main`):
+
+- _(latest)_ `adr`: 2026-04-21 amendments (ADR-001/003/007/008/011/013 +
+  D22 resolution + D32 acceptance + galaxy role matrix)
+- Field-notes format header added to `infra.md`, `windmill.md`,
+  `universe-cli.md` (committed earlier this session)
 
 ## Task map
 
@@ -117,21 +135,25 @@ recreate from subjects below; dependencies at end of table.
 
 ### Main track (11 tasks)
 
-| ID  | Subject                                                                                      | Status      |
-| --- | -------------------------------------------------------------------------------------------- | ----------- |
-| #17 | Docs foundation: GUIDELINES + field-notes reformat + tree reorg + per-cluster flight-manuals | in_progress |
-| #18 | ADR amendments in-place (bypass ownership)                                                   | pending     |
-| #19 | Write docs/TODO-park.md deferment list                                                       | pending     |
-| #20 | Deep cluster audit: cost + HA + autoscaling inventory                                        | pending     |
-| #21 | Rename runbook: gxy-mgmt → gxy-management (full blast radius)                                | pending     |
-| #22 | Execute gxy-mgmt → gxy-management via reprovision                                            | pending     |
-| #23 | Write new MASTER sprint plan (`docs/sprints/2026-04-21/`)                                    | pending     |
-| #24 | MVP: static-apps E2E chain (Woodpecker pipeline + R2 flow + alias + cleanup + smoke)         | pending     |
-| #25 | Release universe-cli 0.4.0-beta.1                                                            | pending     |
-| #26 | Cutover: DNS gxy-static → gxy-cassiopeia + teardown gxy-static                               | pending     |
-| #27 | Recurring: monthly doc trim (standing)                                                       | pending     |
+| ID  | Subject                                                                                      | Status        |
+| --- | -------------------------------------------------------------------------------------------- | ------------- |
+| #17 | Docs foundation: GUIDELINES + field-notes reformat + tree reorg + per-cluster flight-manuals | **completed** |
+| #18 | ADR amendments in-place (bypass ownership)                                                   | **completed** |
+| #19 | Write docs/TODO-park.md deferment list                                                       | **completed** |
+| #20 | Deep cluster audit: cost + HA + autoscaling inventory                                        | pending       |
+| #21 | Rename runbook: gxy-mgmt → gxy-management (full blast radius)                                | **completed** |
+| #22 | Execute gxy-mgmt → gxy-management via reprovision                                            | pending       |
+| #23 | Write new MASTER sprint plan (`docs/sprints/2026-04-21/`)                                    | pending       |
+| #24 | MVP: static-apps E2E chain (Woodpecker pipeline + R2 flow + alias + cleanup + smoke)         | pending       |
+| #25 | Release universe-cli 0.4.0-beta.1                                                            | pending       |
+| #26 | Cutover: DNS gxy-static → gxy-cassiopeia + teardown gxy-static                               | pending       |
+| #27 | Recurring: monthly doc trim (standing)                                                       | pending       |
 
 ### Q/A brainstorm track (8 decisions, all gate #23)
+
+Recommended defaults drafted in
+[`QA-recommendations.md`](QA-recommendations.md). Operator ticks / redirects
+before #23 writes.
 
 | ID  | Question                                                              | Status  |
 | --- | --------------------------------------------------------------------- | ------- |
