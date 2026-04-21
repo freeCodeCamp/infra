@@ -599,81 +599,394 @@ rm -rf /tmp/test-static
 
 ---
 
-# gxy-launchbase (Universe CI)
+# Part 3: gxy-launchbase
 
-Full phase-by-phase runbook for gxy-launchbase is an outstanding backlog item
-(beads `gxy-static-k7d.TP-milestone`). Until that lands, rebuild instructions
-live in-tree alongside the apps and runbooks; the pointers below are the
-canonical entry points.
+CI galaxy. Hosts Woodpecker + CNPG-backed Postgres for Universe pipeline builds.
 
-### Cluster bootstrap
-
-Same mechanism as gxy-management / gxy-static. After droplets + VPC + Tailscale
-are in place (see Phase 1 + Phase 7 for the generic template — only the tag
-and VPC name change), run:
+## Pre-flight
 
 ```
+cd ~/DEV/fCC/infra
+just ansible-install
+just secret-verify-all
+```
+
+- [ ] All secrets decrypt OK
+- [ ] age key on local machine (`~/.config/sops/age/keys.txt`)
+- [ ] `infra-secrets/k3s/gxy-launchbase/` contains:
+  - `woodpecker.values.yaml.enc` (chart overlay — `server.env` with OAuth + org gate)
+  - `woodpecker.secrets.env.enc` (`WOODPECKER_SERVER_SECRET`, `WOODPECKER_AGENT_SECRET`, `WOODPECKER_GITHUB_CLIENT`, `WOODPECKER_GITHUB_SECRET`)
+  - `woodpecker-backup.secrets.env.enc` (`ACCESS_KEY_ID`, `SECRET_ACCESS_KEY` — DO Spaces for CNPG base backups)
+  - `woodpecker.tls.crt.enc` + `woodpecker.tls.key.enc` (Cloudflare Origin Certificate for `*.freecodecamp.net`, same cert as gxy-management)
+
+## Phase 13: Infrastructure (ClickOps — codify in OpenTofu)
+
+### 13.1 DO Droplets
+
+- [ ] Create 3× `s-4vcpu-8gb-amd` in FRA1
+- [ ] Names: `gxy-vm-launchbase-k3s-{1,2,3}`
+- [ ] Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-launchbase-k3s`
+- [ ] Cloud-init: `cloud-init/basic.yml`
+
+### 13.2 DO Cloud Firewall
+
+- [ ] Add tag `gxy-launchbase-k3s` to existing `gxy-fw-fra1`
+
+### 13.3 Tailscale
+
+```
+just play tailscale--0-install gxy_launchbase_k3s
+just play tailscale--1b-up-with-ssh gxy_launchbase_k3s
+```
+
+Verify: `tailscale status | grep gxy-vm-launchbase`
+
+## Phase 14: Cluster Bootstrap
+
+```
+cd k3s/gxy-launchbase
 just play k3s--bootstrap gxy_launchbase_k3s
 ```
 
-Per-galaxy config lives in `ansible/inventory/group_vars/gxy_launchbase_k3s.yml`
-and `k3s/gxy-launchbase/cluster/*`.
+Per-galaxy config lives in `ansible/inventory/group_vars/gxy_launchbase_k3s.yml` (cluster CIDR `10.6.0.0/16`, service CIDR `10.16.0.0/16`, `cilium_cluster_id: 3`). etcd snapshots land in `s3://net-freecodecamp-universe-backups/etcd/gxy-launchbase/` every 6h, 20 retained.
 
-### Apps
+### Post-bootstrap checks
 
-| App        | Chart / manifests                                 | Runbook                                         |
-| ---------- | ------------------------------------------------- | ----------------------------------------------- |
-| CNPG       | `apps/cnpg-operator` (cluster-scoped)             | See `apps/woodpecker/SECRETS.md` §Postgres      |
-| Woodpecker | `apps/woodpecker` (chart + manifests + HTTPRoute) | `docs/runbooks/woodpecker-oauth-app.md` (T10) + |
-|            |                                                   | `docs/runbooks/woodpecker-cf-access.md` (T32)   |
+```
+export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
-### DNS + TLS (T32)
+kubectl get nodes -o wide
+# All 3 Ready, InternalIP = VPC IPs (10.110.0.x)
 
-For `woodpecker.freecodecamp.net`:
+kubectl get pods -n kube-system
+# All Running, no CrashLoopBackOff
+```
 
-1. Gateway + Cloudflare Origin Certificate at the origin. `manifests/base/
-gateway.yaml` creates a per-app Gateway with `:80` + `:443` listeners
-   pinned to the hostname; the `:443` listener terminates TLS using the
-   `woodpecker-tls-cloudflare` Secret (kustomize secretGenerator built from
-   `secrets/tls.{crt,key}`). Use the same `*.freecodecamp.net` CF Origin cert
-   that `gxy-management` uses. Without the Origin cert at the origin, Traefik
-   serves `CN=TRAEFIK DEFAULT CERT` and CF Full (Strict) rejects the origin
-   with error 526.
-2. DNS: three A records for `woodpecker.freecodecamp.net` to the
-   launchbase node public IPs, all proxied (orange cloud), zone SSL mode
-   Full (Strict).
-3. Verification: `curl -sI https://woodpecker.freecodecamp.net` returns 200
-   (or 302 to `*.cloudflareaccess.com` if CF Access is back in front).
+## Phase 15: CNPG + Postgres Cluster
 
-### Auth posture
+### 15.1 Install CNPG operator
 
-Cloudflare Access is intentionally **off** for this deployment — the
-GitHub-org gate is deemed sufficient. If you need a platform-team narrower
-gate (or email-domain enforcement) later, re-enable CF Access per
-`docs/runbooks/woodpecker-cf-access.md`. That runbook is preserved as the
-reference for the CF Access application; treat its ordering as advisory
-(Access app saved BEFORE DNS publication) only when you re-enable it.
+```
+just helm-upgrade gxy-launchbase cnpg-system
+```
 
-Login is restricted via `WOODPECKER_ORGS=freeCodeCamp-Universe` (users must
-be members of that GitHub org); `WOODPECKER_OPEN=true` so new staff can
-self-register through OAuth. Admins are enumerated in
-`WOODPECKER_ADMIN=freeCodeCamp-bot,raisedadead,camperbot`.
+Chart at `k3s/gxy-launchbase/apps/cnpg-system/charts/`. The operator is cluster-scoped; installs CRDs (`Cluster`, `ScheduledBackup`, `Pooler`, etc.) and the controller in namespace `cnpg-system`.
 
-`WOODPECKER_ADMIN`, `WOODPECKER_ORGS`, `WOODPECKER_OPEN`, and the GitHub
-OAuth client credentials all live in the sops overlay
-`infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc`, loaded into
-the chart's `server.env` block by `just helm-upgrade`. Mutate via
-`sops --input-type yaml --output-type yaml <file>`; `sops <file>`
-auto-detects the `.enc` extension as binary and errors out.
+### 15.2 Verify
 
-### Known Postgres constraint
+```
+kubectl get pods -n cnpg-system
+# cnpg-controller-manager Running
 
-The `woodpecker-postgres` CNPG `Cluster` CR was bootstrapped without
-`spec.backup` because `barmanObjectStore` native mode is deprecated
-(CNPG >= 1.26) and deadlocked the fresh cluster on `restore_command`. The
-plugin-based replacement is tracked as `gxy-static-k7d.TP03b` in beads.
-Until it lands, a belt-and-braces weekly `pg_dump` export to R2 is the
-operator-side compensating control.
+just crds-grep gxy-launchbase cnpg
+# postgresql.cnpg.io CRDs present
+```
+
+The `Cluster` CR and `ScheduledBackup` for `woodpecker-postgres` are part of the Woodpecker kustomize base and land in Phase 16.2.
+
+## Phase 16: Woodpecker
+
+### 16.1 Helm install
+
+```
+just helm-upgrade gxy-launchbase woodpecker
+```
+
+Chart at `k3s/gxy-launchbase/apps/woodpecker/charts/woodpecker/`. The sops overlay `woodpecker.values.yaml.enc` injects `server.env` with the GitHub OAuth client, `WOODPECKER_ADMIN=freeCodeCamp-bot,raisedadead,camperbot`, `WOODPECKER_ORGS=freeCodeCamp-Universe`, `WOODPECKER_OPEN=true`.
+
+### 16.2 Deploy manifests (namespace, Postgres Cluster CR, ScheduledBackup, Gateway, HTTPRoute)
+
+```
+just deploy gxy-launchbase woodpecker
+```
+
+This decrypts `woodpecker.secrets.env.enc`, `woodpecker-backup.secrets.env.enc`, and the TLS cert pair, then applies `k3s/gxy-launchbase/apps/woodpecker/manifests/base/`:
+
+- `namespace.yaml` — `woodpecker` namespace
+- `postgres-cluster.yaml` — CNPG `Cluster` CR for `woodpecker-postgres`
+- `scheduled-backup.yaml` — 6-hour base backups via `barmanObjectStore` plugin
+- `gateway.yaml` — `:80` + `:443` listeners, TLS terminated with `woodpecker-tls-cloudflare`
+- `httproute.yaml` — routes `woodpecker.freecodecamp.net` to the Woodpecker server
+
+Wait for the CNPG cluster to settle before Woodpecker pods recover:
+
+```
+just cnpg-wait gxy-launchbase woodpecker woodpecker-postgres
+```
+
+### 16.3 Verify
+
+```
+kubectl get pods -n woodpecker
+# woodpecker-server, woodpecker-agent-*, woodpecker-postgres-{1,2,3} Running
+
+kubectl get cluster -n woodpecker
+# woodpecker-postgres  3/3 instances Ready
+
+kubectl get scheduledbackup -n woodpecker
+# woodpecker-postgres-base  schedule 0 0 0,6,12,18 * * *
+
+kubectl get gateway -n woodpecker
+# woodpecker-gateway Programmed=True
+
+kubectl get httproute -n woodpecker
+# woodpecker-route
+```
+
+## Phase 17: DNS + Cloudflare Access
+
+### 17.1 Get node public IPs
+
+```
+doctl compute droplet list --tag-name gxy-launchbase-k3s --format Name,PublicIPv4
+```
+
+### 17.2 Cloudflare DNS
+
+- [ ] 3× A records: `woodpecker.freecodecamp.net` → launchbase node public IPs
+- [ ] Proxy: ON (orange cloud)
+- [ ] SSL mode: Full (Strict)
+
+Without the Cloudflare Origin Certificate at the origin, Traefik serves `CN=TRAEFIK DEFAULT CERT` and CF Full (Strict) rejects the origin with error 526 — the cert in `woodpecker-tls-cloudflare` (Phase 16.2) is what prevents that.
+
+### 17.3 Cloudflare Access
+
+Cloudflare Access is intentionally **off** for this deployment — the GitHub-org gate (`WOODPECKER_ORGS=freeCodeCamp-Universe` + `WOODPECKER_OPEN=true`) is deemed sufficient for letting staff in without an extra OTP layer.
+
+To re-enable CF Access (narrower team/email gate), follow `docs/runbook/gxy-launchbase.md` — that runbook is the authoritative reference for the Access application. Treat its ordering as advisory (Access app saved BEFORE DNS publication) only when you re-enable it.
+
+A dedicated runbook split (OAuth app provisioning vs CF Access re-enable) is pending — tracked as `gxy-static-k7d.32`.
+
+### 17.4 Smoke test
+
+```
+curl -sI https://woodpecker.freecodecamp.net
+# 200 (or 302 to *.cloudflareaccess.com if CF Access is back in front)
+```
+
+- [ ] Browser: visit `https://woodpecker.freecodecamp.net`
+- [ ] Log in via GitHub — OAuth grant page shows `freeCodeCamp-Universe` scope
+
+## Phase 18: OAuth app provisioning
+
+A dedicated runbook (`docs/runbook/woodpecker-oauth-app.md`) is TBD when `gxy-static-k7d.10` closes. Until then, the inline procedure is:
+
+1. GitHub → `freeCodeCamp-Universe` org → Settings → Developer settings → OAuth Apps → New OAuth App
+2. Application name: `Woodpecker CI`
+3. Homepage URL: `https://woodpecker.freecodecamp.net`
+4. Authorization callback URL: `https://woodpecker.freecodecamp.net/authorize`
+5. Copy Client ID + Client Secret into `infra-secrets/k3s/gxy-launchbase/woodpecker.values.yaml.enc` under `server.env.WOODPECKER_GITHUB_CLIENT` + `server.env.WOODPECKER_GITHUB_SECRET`
+6. Mutate via `sops --input-type yaml --output-type yaml <file>` — `sops <file>` auto-detects `.enc` as binary and errors out
+7. Re-run `just helm-upgrade gxy-launchbase woodpecker` to roll the new credentials into the chart
+
+## Backups
+
+### What is backed up
+
+| Data                 | Method                                          | Schedule                | Storage                                                       | Restore time                   |
+| -------------------- | ----------------------------------------------- | ----------------------- | ------------------------------------------------------------- | ------------------------------ |
+| etcd (cluster state) | k3s built-in S3 snapshots                       | Every 6h, 20 retained   | `s3://net-freecodecamp-universe-backups/etcd/gxy-launchbase/` | Minutes (k3s native restore)   |
+| woodpecker-postgres  | CNPG base backup + continuous WAL (R2)          | 6h base, WAL continuous | R2 bucket via `barmanObjectStore` plugin                      | Minutes–hours (PITR)           |
+| Woodpecker app state | Not backed up — reproduced from Postgres        | N/A                     | N/A                                                           | Re-attach chart to restored DB |
+| Helm releases        | Not backed up — reproducible from values        | N/A                     | infra repo                                                    | `just helm-upgrade`            |
+| TLS certs, secrets   | Not backed up — reproducible from infra-secrets | N/A                     | infra-secrets repo                                            | `just deploy`                  |
+
+CNPG base backups are scheduled by the `woodpecker-postgres-base` `ScheduledBackup` CR (6-hour cadence, aligns with etcd snapshots for consistent recovery planning). WAL archiving runs continuously.
+
+The earlier `barmanObjectStore` native mode was deprecated in CNPG ≥ 1.26; the plugin-based replacement is now the default. If the cluster ever deadlocks on `restore_command`, drop `spec.backup` from the `Cluster` CR temporarily and re-apply the `ScheduledBackup` after the cluster is healthy. A belt-and-braces weekly `pg_dump` export remains an operator-side compensating control until plugin operation has a few months of track record.
+
+### Restore woodpecker-postgres from backup
+
+Recovery from the latest base backup + WAL replay:
+
+```
+kubectl delete cluster -n woodpecker woodpecker-postgres
+# Re-apply the Cluster CR with spec.bootstrap.recovery pointing at the same
+# barman-cloud backup source — see CNPG recovery docs.
+kubectl apply -k k3s/gxy-launchbase/apps/woodpecker/manifests/base/
+just cnpg-wait gxy-launchbase woodpecker woodpecker-postgres
+```
+
+For a full cluster-reset drill see [CNPG recovery](https://cloudnative-pg.io/documentation/current/recovery/).
+
+### Restore etcd from S3
+
+Same procedure as gxy-management Phase 1 — see `# Part 1: gxy-management` → `Restore etcd from S3`. Substitute `etcd/gxy-launchbase` for the folder.
+
+## Usage — first pipeline
+
+1. In the Woodpecker UI, hit **Add repository** and pick a repo under `freeCodeCamp-Universe` (OAuth grant must include that org).
+2. Drop a minimal `.woodpecker.yaml` in the repo:
+
+   ```yaml
+   steps:
+     smoke:
+       image: alpine:3.20
+       commands:
+         - echo "pipeline runs on gxy-launchbase"
+   ```
+
+3. Push to a branch → Woodpecker picks it up → pipeline runs on the agent.
+4. Confirm via `kubectl logs -n woodpecker deploy/woodpecker-agent` (or via the UI).
+
+Scale agents by editing `server.env.WOODPECKER_MAX_WORKFLOWS` in the sops overlay, then re-run `just helm-upgrade gxy-launchbase woodpecker`.
+
+---
+
+# Part 4: gxy-cassiopeia
+
+Production static galaxy. Serves Universe constellations (e.g. `freecode.camp` cutover target, first-party sites) via Caddy + R2. Replaces `gxy-static` once T25 cutover closes.
+
+## Pre-flight
+
+```
+cd ~/DEV/fCC/infra
+just ansible-install
+just secret-verify-all
+```
+
+- [ ] All secrets decrypt OK
+- [ ] age key on local machine (`~/.config/sops/age/keys.txt`)
+- [ ] `infra-secrets/k3s/gxy-cassiopeia/` contains:
+  - `caddy.values.yaml.enc` (R2 credentials: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_ENDPOINT`)
+  - `r2-rw.env.enc` + `r2-ro.env.enc` (bucket-scoped key pair for `just r2-bucket-verify`)
+
+## Phase 19: Infrastructure (ClickOps)
+
+### 19.1 DO Droplets
+
+- [ ] Create 3× `s-4vcpu-8gb-amd` in FRA1
+- [ ] Names: `gxy-vm-cassiopeia-k3s-{1,2,3}`
+- [ ] Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-cassiopeia-k3s`
+- [ ] Cloud-init: `cloud-init/basic.yml`
+
+No OpenTofu workspace exists for gxy-cassiopeia yet — provisioning is DO dashboard today, codify as a follow-up when the layout stabilises post-cutover.
+
+### 19.2 DO Cloud Firewall
+
+- [ ] Add tag `gxy-cassiopeia-k3s` to existing `gxy-fw-fra1`
+
+### 19.3 Tailscale
+
+```
+just play tailscale--0-install gxy_cassiopeia_k3s
+just play tailscale--1b-up-with-ssh gxy_cassiopeia_k3s
+```
+
+Verify: `tailscale status | grep gxy-vm-cassiopeia`
+
+## Phase 20: Cluster Bootstrap
+
+```
+cd k3s/gxy-cassiopeia
+just play k3s--bootstrap gxy_cassiopeia_k3s
+```
+
+Per-galaxy config in `ansible/inventory/group_vars/gxy_cassiopeia_k3s.yml` (cluster CIDR `10.7.0.0/16`, service CIDR `10.17.0.0/16`, `cilium_cluster_id: 4`). etcd snapshots land in `s3://net-freecodecamp-universe-backups/etcd/gxy-cassiopeia/`.
+
+### Post-bootstrap checks
+
+```
+export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+kubectl get nodes -o wide
+# All 3 Ready
+
+kubectl get pods -n kube-system
+# All Running, no CrashLoopBackOff
+```
+
+## Phase 21: Caddy Helm chart install
+
+```
+just helm-upgrade gxy-cassiopeia caddy
+```
+
+Local chart at `k3s/gxy-cassiopeia/apps/caddy/charts/caddy/`. The chart templates Gateway + HTTPRoute + NetworkPolicy + the Caddy Deployment with rclone-sync sidecar. Chart defaults are overlaid by `k3s/gxy-cassiopeia/apps/caddy/values.production.yaml` (image tag pin, per-site host list) and then by the sops overlay `caddy.values.yaml.enc` (R2 credentials).
+
+Caddy image is `ghcr.io/freecodecamp-universe/caddy-s3:{sha}`, built by the Woodpecker pipeline `.woodpecker/caddy-s3-build.yaml` (in-tree r2alias module via xcaddy; no third-party Caddy plugins per D32). Local dev builds via `just caddy-s3-build` + verify with `just caddy-s3-verify`.
+
+### Verify
+
+```
+kubectl get pods -n caddy
+# 3 pods Running, 2/2 containers (caddy + rclone-sync)
+
+kubectl get gateway -n caddy
+# caddy-gateway Programmed=True
+
+kubectl get httproute -n caddy
+# caddy-route
+```
+
+## Phase 22: R2 bucket provisioning
+
+Provision bucket `gxy-cassiopeia-1` (versioning enabled, per-site rw/ro keys) per `docs/runbook/r2-bucket-provision.md`. Store the key pair encrypted at `infra-secrets/k3s/gxy-cassiopeia/r2-{rw,ro}.env.enc`.
+
+Verify end-to-end:
+
+```
+just r2-bucket-verify gxy-cassiopeia-1
+# rw key writes, ro key cannot write, both can read
+```
+
+## Phase 23: CF DNS + origin allow-list
+
+### 23.1 Get node public IPs
+
+```
+doctl compute droplet list --tag-name gxy-cassiopeia-k3s --format Name,PublicIPv4
+```
+
+### 23.2 Cloudflare DNS
+
+- [ ] 3× A records per production domain → cassiopeia node public IPs (Proxy ON)
+- [ ] SSL mode: Full (Strict) for domains with origin cert, Flexible otherwise
+
+Use `just cf-dns-cutover <zone> <ips>` for declarative zone flips (see `docs/runbook/dns-cutover.md`). Run `just cutover-preflight` first — it exits non-zero on any failing site.
+
+### 23.3 Origin allow-list
+
+Cron + manifest to keep only Cloudflare edge IPs on the origin firewall is TBD when `gxy-static-k7d.14` closes. Until then, the cluster firewall (`gxy-fw-fra1`) accepts 80/443 from the public internet; CF WAF is the only layer gating origin hits.
+
+## Phase 24: First deploy via Woodpecker pipeline
+
+The production pipeline template (build artifact → push to R2 with deploy ID → promote via `universe` CLI) is TBD when `gxy-static-k7d.21` closes. Until then, immutable deploy + alias promotion flow is the same as `# Part 2: gxy-static` Phase 12 — point `S3_ENDPOINT` at the `gxy-cassiopeia-1` bucket and run the `universe static deploy` / `universe static promote` pair.
+
+Post-cutover from `gxy-static` (T25 — `gxy-static-k7d.25`), production DNS for `freecode.camp` and first-party constellation hosts resolves here.
+
+## Troubleshooting
+
+### Alias cache invalidation
+
+rclone sidecar syncs `production`/`preview` aliases every ~5 minutes. Force a sync by restarting the deployment:
+
+```
+kubectl rollout restart deployment -n caddy caddy
+```
+
+### R2 503s
+
+- Check R2 status page first. The `caddy-s3` in-tree module surfaces upstream 503s as 502 to the client.
+- If the bucket is healthy: `kubectl logs -n caddy deploy/caddy -c rclone-sync` to inspect the last sync cycle.
+- Fall back to serving from the previous deploy ID by running `universe static promote --to <previous-deploy-id>`.
+
+### CF cache purge
+
+After a promote, CF edge still serves the old alias for the cache TTL:
+
+- Zone-wide purge: CF dashboard → Caching → Configuration → Purge Everything (use sparingly).
+- Targeted purge: API `POST /zones/{id}/purge_cache` with `{ "files": [...] }` for the specific URLs.
+
+---
+
+# Post-M5 Hetzner migration
+
+`gxy-launchbase` and `gxy-cassiopeia` both run on DO FRA1 today (per ADR-003 for Woodpecker/CNPG and ADR-007 D32 for static v2). Both galaxies migrate to Hetzner post-M5 — tracked as `gxy-static-k7d.30` (**deferred**).
+
+**Constraint:** the Talos / k0s distro evaluation must close before any Hetzner provisioning begins. Do not open a Hetzner project, cut DNS, or rebuild state on Hetzner until `gxy-static-k7d.30` lands. A premature migration locks the distro choice and strands any etcd state on the source cluster.
+
+When the evaluation closes, a dedicated migration runbook lands in `docs/runbook/` and gets linked from this section.
 
 ---
 
@@ -729,9 +1042,30 @@ just play k3s--teardown gxy_launchbase_k3s
 doctl compute droplet delete gxy-vm-launchbase-k3s-1 gxy-vm-launchbase-k3s-2 gxy-vm-launchbase-k3s-3 --force
 ```
 
-Also pull the DNS records for `woodpecker.freecodecamp.net` and disable or
-delete the `Woodpecker CI` Access application — see the rollback section of
-`docs/runbooks/woodpecker-cf-access.md`.
+Also pull the DNS records for `woodpecker.freecodecamp.net`. CF Access is off
+for this deployment, so no Access application to delete — only re-enable if
+`docs/runbook/gxy-launchbase.md` was followed to turn it on.
+
+## gxy-cassiopeia Teardown
+
+Destructive: this kills the Caddy cluster. R2 bucket state persists (buckets
+are the source of truth — the cluster only serves them). Confirm CF DNS has
+been flipped off cassiopeia before teardown so live traffic does not 5xx.
+
+### Cluster only (preserves VMs)
+
+```
+just play k3s--teardown gxy_cassiopeia_k3s
+```
+
+### Full teardown (VMs too)
+
+```
+just play k3s--teardown gxy_cassiopeia_k3s
+doctl compute droplet delete gxy-vm-cassiopeia-k3s-1 gxy-vm-cassiopeia-k3s-2 gxy-vm-cassiopeia-k3s-3 --force
+```
+
+R2 buckets, VPC, firewall, Spaces persist (shared infrastructure).
 
 ---
 
