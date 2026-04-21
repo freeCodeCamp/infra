@@ -67,12 +67,15 @@ deploy cluster app:
     set -eu
     ENC_DIR="{{secrets_dir}}/k3s/{{cluster}}"
     APP_SECRETS="k3s/{{cluster}}/apps/{{app}}/manifests/base/secrets"
+    # Absolute form so `cd k3s/<cluster>` later in this recipe does not break
+    # the EXIT trap's rm targets (pre-2026-04-22 bug leaked decrypted files).
+    APP_SECRETS_ABS="$(pwd)/$APP_SECRETS"
     CLEANUP=""
+    trap 'rm -f $CLEANUP' EXIT
 
     if [ -f "$ENC_DIR/{{app}}.secrets.env.enc" ]; then
       sops -d --input-type dotenv --output-type dotenv "$ENC_DIR/{{app}}.secrets.env.enc" > "$APP_SECRETS/.secrets.env"
-      CLEANUP="$APP_SECRETS/.secrets.env"
-      trap "rm -f $CLEANUP" EXIT
+      CLEANUP="$CLEANUP $APP_SECRETS_ABS/.secrets.env"
     fi
     # TLS: per-app override first (`<app>.tls.{crt,key}.enc`), else fall back
     # to cluster-default wildcard via `k3s/<cluster>/cluster.tls.zone` marker →
@@ -80,8 +83,7 @@ deploy cluster app:
     if [ -f "$ENC_DIR/{{app}}.tls.crt.enc" ] && [ -f "$ENC_DIR/{{app}}.tls.key.enc" ]; then
       sops -d "$ENC_DIR/{{app}}.tls.crt.enc" > "$APP_SECRETS/tls.crt"
       sops -d "$ENC_DIR/{{app}}.tls.key.enc" > "$APP_SECRETS/tls.key"
-      CLEANUP="$CLEANUP $APP_SECRETS/tls.crt $APP_SECRETS/tls.key"
-      trap "rm -f $CLEANUP" EXIT
+      CLEANUP="$CLEANUP $APP_SECRETS_ABS/tls.crt $APP_SECRETS_ABS/tls.key"
     elif [ -f "k3s/{{cluster}}/cluster.tls.zone" ] && [ -d "$APP_SECRETS" ]; then
       ZONE=$(tr -d '[:space:]' < "k3s/{{cluster}}/cluster.tls.zone")
       ZONE_CRT="{{secrets_dir}}/global/tls/${ZONE}.crt.enc"
@@ -89,14 +91,12 @@ deploy cluster app:
       if [ -f "$ZONE_CRT" ] && [ -f "$ZONE_KEY" ]; then
         sops -d "$ZONE_CRT" > "$APP_SECRETS/tls.crt"
         sops -d "$ZONE_KEY" > "$APP_SECRETS/tls.key"
-        CLEANUP="$CLEANUP $APP_SECRETS/tls.crt $APP_SECRETS/tls.key"
-        trap "rm -f $CLEANUP" EXIT
+        CLEANUP="$CLEANUP $APP_SECRETS_ABS/tls.crt $APP_SECRETS_ABS/tls.key"
       fi
     fi
     if [ -f "$ENC_DIR/{{app}}-backup.secrets.env.enc" ]; then
       sops -d --input-type dotenv --output-type dotenv "$ENC_DIR/{{app}}-backup.secrets.env.enc" > "$APP_SECRETS/.backup-secrets.env"
-      CLEANUP="$CLEANUP $APP_SECRETS/.backup-secrets.env"
-      trap "rm -f $CLEANUP" EXIT
+      CLEANUP="$CLEANUP $APP_SECRETS_ABS/.backup-secrets.env"
     fi
 
     cd k3s/{{cluster}}
