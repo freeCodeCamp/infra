@@ -109,7 +109,9 @@ git commit -m "refactor(naming): gxy-mgmt → gxy-management (repo refs only; in
 
 **Verify:** `rtk grep -rn 'gxy[-_]mgmt' /Users/mrugesh/DEV/fCC/infra
 --include='*.md' --include='*.yml' --include='*.yaml' --include='justfile'`
-returns zero matches outside `docs/sprints/archive/`.
+returns zero matches outside `docs/sprints/` (active sprint + archive
+docs legitimately narrate the rename and are exempt; all operational
+files — ansible, flight-manuals, runbooks — must be clean).
 
 Do **not** push yet. Push after step 10 when the infra is back green.
 
@@ -281,11 +283,11 @@ the rebuild; no true rollback exists past droplet deletion.
 ## Exit criteria
 
 - [ ] Zero matches of `gxy[-_]mgmt` in live repo tree (outside
-      `docs/sprints/archive/`).
+      `docs/sprints/` — active sprint + archive docs exempt).
 - [ ] DO droplets: 3× `gxy-vm-management-k3s-{1,2,3}` with tag
       `gxy-management-k3s`.
 - [ ] `kubectl --kubeconfig=k3s/gxy-management/.kubeconfig.yaml get
-    nodes` → all 3 Ready.
+nodes` → all 3 Ready.
 - [ ] `curl -sI https://windmill.freecodecamp.net` → 200.
 - [ ] `curl -sI https://argocd.freecodecamp.net` → 200.
 - [ ] ArgoCD applications list matches pre-rebuild.

@@ -154,30 +154,37 @@ Rules:
   proxies; regional re-route on node failure relies on CF health
   checks (not configured — check CF load balancer / proxy settings).
 
-## Rename partial-state (informs #22)
+## Rename scope (informs #22)
 
-Repo already partially renamed. Current state across the three naming
-forms (per HANDOFF §Naming conventions):
+Naming forms per HANDOFF §Naming conventions. Git log shows no
+`k3s/gxy-mgmt/` path ever existed — repo-dir has always been
+`gxy-management`. Rename scope = ansible + DO layer only:
 
-| Form               | Current value             | Renamed? |
-| ------------------ | ------------------------- | -------- |
-| Repo dir           | `k3s/gxy-management/`     | **Yes**  |
-| Ansible group_vars | `gxy_mgmt_k3s.yml`        | **No**   |
-| DO droplet tag     | `gxy-mgmt-k3s`            | **No**   |
-| Droplet names      | `gxy-vm-mgmt-k3s-{1,2,3}` | **No**   |
+| Form               | Current value             | In rename scope?                      |
+| ------------------ | ------------------------- | ------------------------------------- |
+| Repo dir           | `k3s/gxy-management/`     | No — already full-word from inception |
+| Ansible group_vars | `gxy_mgmt_k3s.yml`        | **Yes**                               |
+| DO droplet tag     | `gxy-mgmt-k3s`            | **Yes**                               |
+| Droplet names      | `gxy-vm-mgmt-k3s-{1,2,3}` | **Yes**                               |
 
-Implication for #22: infra-facing rename is the larger half. Ansible
-inventory references group → destroys referential integrity with
-current group_vars file if touched piecemeal. Runbook #21 already
-covers the atomic sequence; confirm runbook handles the repo-dir step
-being pre-applied (idempotence).
+Implication for #22: ansible group rename destroys referential
+integrity with `ansible/inventory/digitalocean.yml` keyed_groups (group
+name derived from droplet tag) unless tag + group_vars filename flip
+together. Runbook #21 already sequences this atomically.
+
+Runbook gap surfaced during audit: §3 verify step (`rtk grep -rn
+'gxy[-_]mgmt' ...` returns zero outside `docs/sprints/archive/`) will
+fail against active sprint docs (HANDOFF.md, cluster-audit.md) that
+legitimately reference the rename-source. Verify exclusion widened to
+`docs/sprints/` in follow-up edit.
 
 ## Recommendations
 
 Numbered in sprint-execution order.
 
-1. **#22 rename exec** — confirm runbook idempotent w.r.t. repo-dir
-   already renamed. Execute when operator present.
+1. **#22 rename exec** — widen runbook §3 verify-grep exclusion to
+   `docs/sprints/` (not just archive) so active sprint docs don't fail
+   the zero-match check. Execute when operator present.
 2. **Zot deployment** — deploy `k3s/gxy-management/apps/zot/` as part
    of triangulum M5 gate, not MVP. Leave declared-but-undeployed;
    note in TODO-park.md if not already.
