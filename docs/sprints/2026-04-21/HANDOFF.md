@@ -207,9 +207,9 @@ Tradeoffs documented in each task description.
 ### Infra repo (`~/DEV/fCC/infra`, branch `feat/k3s-universe`)
 
 - `CLAUDE.md` — project instructions + galaxy table
-- `docs/FLIGHT-MANUAL.md` — current singular manual (to split into
-  `docs/flight-manuals/` per-cluster via #17)
-- `docs/runbook/` (to rename → `docs/runbooks/` via #17):
+- `docs/flight-manuals/` — per-cluster rebuild manuals + `00-index.md`
+  (split from the retired singular `docs/FLIGHT-MANUAL.md` during #17)
+- `docs/runbooks/` (renamed from `docs/runbook/` during #17):
   `dns-cutover.md`, `gxy-launchbase.md`, `r2-bucket-provision.md`
 - `docs/architecture/`:
   `rfc-gxy-cassiopeia.md` (large, canonical spec),

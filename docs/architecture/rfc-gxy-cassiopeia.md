@@ -231,7 +231,7 @@ The existing `ansible/inventory/digitalocean.yml` dynamic inventory already cove
 
 #### 4.1.4 Bootstrap Procedure
 
-Full bootstrap is identical to gxy-static (documented in `docs/FLIGHT-MANUAL.md`):
+Full bootstrap is identical to gxy-static (documented in `docs/flight-manuals/gxy-launchbase.md`):
 
 1. ClickOps: provision 3× s-4vcpu-8gb-amd in DO FRA1 with the cloud-init config at `cloud-init/k3s-node.yaml` and tag `_gxy-launchbase-k3s`.
 2. Direnv loads the cluster-specific DO token from `infra-secrets`.
