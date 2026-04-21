@@ -13,7 +13,7 @@ Tasks span four repositories. Each agent prompt specifies a `## Repo and CWD` se
 | Repo             | Absolute path                           | Tasks that work here                                                                                                                               |
 | ---------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **infra**        | `/Users/mrugesh/DEV/fCC/infra`          | T01–T05, T07–T10, T12, T13, T15, T21, T23, T24, T25, T26, plus the infra-side parts of T14 and T11's justfile recipe; T06 deferred → T30 (post-M5) |
-| **windmill**     | `/Users/mrugesh/DEV/fCC-U/windmill`       | T11, T14 (flow portion), T22                                                                                                                       |
+| **windmill**     | `/Users/mrugesh/DEV/fCC-U/windmill`     | T11, T14 (flow portion), T22                                                                                                                       |
 | **universe-cli** | `/Users/mrugesh/DEV/fCC-U/universe-cli` | T16, T17, T18, T19, T20                                                                                                                            |
 | **Universe**     | `/Users/mrugesh/DEV/fCC-U/Universe`     | T25 (post-cutover field notes only), T27, T28, T29 (field notes only)                                                                              |
 
@@ -4752,7 +4752,7 @@ Notes: <free-form ops observations>
 Make this template clearly marked "FILL AT CUTOVER TIME" so a future reader knows the entry is authoritative only after it is filled.
 
 ### Step 3: Cross-reference in FLIGHT-MANUAL
-Ensure `docs/FLIGHT-MANUAL.md` links to this runbook in the cutover section (this cross-linking is Task 26's job — flag if Task 26 is already done).
+Ensure `docs/flight-manuals/gxy-cassiopeia.md` links to this runbook in the cutover section (this cross-linking is Task 26's job — flag if Task 26 is already done).
 
 ### Step 4: Lint
 ```bash
@@ -4796,7 +4796,7 @@ If `markdownlint` is not available, manual review is acceptable. If the Universe
 **Traceability:** Documentation, §6.10 rollback plan
 **Files:**
 
-- Modify: `/Users/mrugesh/DEV/fCC/infra/docs/FLIGHT-MANUAL.md`
+- Modify: `/Users/mrugesh/DEV/fCC/infra/docs/flight-manuals/gxy-cassiopeia.md`
 
 #### Context
 
@@ -4811,7 +4811,7 @@ Add a new "gxy-cassiopeia" rebuild section to the FLIGHT-MANUAL so the doomsday 
 #### Verification
 
 ```bash
-markdownlint docs/FLIGHT-MANUAL.md 2>&1 | head -20
+markdownlint docs/flight-manuals/gxy-cassiopeia.md 2>&1 | head -20
 ```
 
 **Expected output:** no errors (or same as baseline pre-edit).
@@ -4832,10 +4832,10 @@ Work in the infra repo: `/Users/mrugesh/DEV/fCC/infra`.
 
 ## Your Task
 
-Extend `docs/FLIGHT-MANUAL.md` (the doomsday rebuild doc) with a gxy-cassiopeia + gxy-launchbase section. Every phase from Task 05 onward must be recoverable from this manual with no external context.
+Extend `docs/flight-manuals/gxy-cassiopeia.md` (the doomsday rebuild doc) with a gxy-cassiopeia + gxy-launchbase section. Every phase from Task 05 onward must be recoverable from this manual with no external context.
 
 ### Step 1: Read the current FLIGHT-MANUAL
-- `docs/FLIGHT-MANUAL.md` — understand the existing tone, depth, and structure.
+- `docs/flight-manuals/gxy-cassiopeia.md` — understand the existing tone, depth, and structure.
 - The existing gxy-static + gxy-management sections are the template for the new sections' style.
 
 ### Step 2: Add gxy-launchbase + gxy-cassiopeia sections
@@ -4892,12 +4892,12 @@ Ensure every runbook referenced above exists (they are created by Tasks 06, 09, 
 
 ### Step 4: Lint
 ```bash
-markdownlint docs/FLIGHT-MANUAL.md 2>&1 | head -20
+markdownlint docs/flight-manuals/gxy-cassiopeia.md 2>&1 | head -20
 ```
 
 ## Files
 
-- Modify: `docs/FLIGHT-MANUAL.md`
+- Modify: `docs/flight-manuals/gxy-cassiopeia.md`
 
 ## Acceptance Criteria
 
@@ -5209,7 +5209,7 @@ These are the post-deploy operational records. The cutover entry in particular w
 - Modify: `ansible/requirements.yml` (add `hetzner.hcloud` collection)
 - Create: `docs/runbooks/hetzner-cloud-init-dryrun.md`
 - Modify: `ansible/inventory/group_vars/gxy_launchbase_k3s.yml` (documentary update only — group_vars is provider-agnostic)
-- Modify: `docs/FLIGHT-MANUAL.md` (swap gxy-launchbase provider line back to Hetzner)
+- Modify: `docs/flight-manuals/gxy-cassiopeia.md` (swap gxy-launchbase provider line back to Hetzner)
 - Modify: `docs/rfc/gxy-cassiopeia.md` (§4.1.1 provider line + §12.2 risks table) OR spin a new ADR if provider changes warrant it
 
 #### Context
@@ -5314,7 +5314,7 @@ Execute the dry-run (operator action). Do NOT proceed until it passes green.
 
 1. After the soak, drain DO agents, scale them to 0, power off the droplets.
 2. Preserve a final CNPG backup + Helm values archive in `infra-secrets/gxy-launchbase/decommission-<date>/`.
-3. Update `docs/FLIGHT-MANUAL.md` — gxy-launchbase provider line back to Hetzner.
+3. Update `docs/flight-manuals/gxy-cassiopeia.md` — gxy-launchbase provider line back to Hetzner.
 4. Update RFC §4.1.1 and §12.2 (or file a follow-up ADR documenting the final topology).
 5. Append a field-notes entry: `/Users/mrugesh/DEV/fCC-U/Universe/spike/field-notes/infra.md`.
 
