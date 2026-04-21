@@ -43,7 +43,13 @@ just secret-verify-all
 
 - All secrets decrypt OK
 - age key on local machine (`~/.config/sops/age/keys.txt`)
-- Per-galaxy secrets in `infra-secrets/k3s/<galaxy>/` (see each manual)
+- Platform-wide secrets in `infra-secrets/global/` (direnv tokens +
+  per-zone CF Origin wildcards at `global/tls/<zone>.{crt,key}.enc`)
+- Per-cluster secrets in `infra-secrets/k3s/<galaxy>/` (see each manual)
+- Per-cluster TLS zone marker at `infra/k3s/<galaxy>/cluster.tls.zone`
+  selects which `global/tls/<zone>.*.enc` pair the deploy recipe uses
+  when no per-app TLS override is present. See
+  [`docs/architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md).
 
 ## Post-M5 Hetzner migration
 

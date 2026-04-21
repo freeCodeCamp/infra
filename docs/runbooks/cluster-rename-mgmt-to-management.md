@@ -29,13 +29,25 @@ group rename downstream.
 
 - Working tree clean on `feat/k3s-universe`.
 - `doctl` authenticated against the Universe DO account.
-- age key on operator's local machine.
+- age key on operator's local machine (`~/.config/sops/age/keys.txt`).
+- `just secret-verify-all` exits 0.
 - `infra-secrets` sibling repo at `../infra-secrets` contains:
-  `k3s/gxy-management/windmill.secrets.env.enc`,
-  `k3s/gxy-management/windmill-backup.secrets.env.enc`,
-  `k3s/gxy-management/cloudflare-origin.crt.enc` +
-  `cloudflare-origin.key.enc`, and the TLS pair for both routes.
-- Latest Windmill backup confirmed (either local `.backups/` or S3).
+  - `global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard
+    for the zone; `just deploy` picks it up via
+    `infra/k3s/gxy-management/cluster.tls.zone`.
+  - `k3s/gxy-management/windmill.values.yaml.enc` — Windmill chart overlay
+    (GitHub OAuth, postgres password, oauth config).
+  - `k3s/gxy-management/windmill-backup.secrets.env.enc` — Backup cronjob
+    secret (PG_PASSWORD + S3 creds for `net-freecodecamp-universe-backups`).
+  - Per-app overrides if any app ever diverges from the zone default
+    (currently none on gxy-management — argocd/windmill/zot all use the
+    shared zone wildcard).
+- Latest Windmill backup in S3
+  (`s3://net-freecodecamp-universe-backups/windmill/gxy-management/`)
+  within the last 24h — triggered via
+  `kubectl create job --from=cronjob/windmill-backup` or the 02:00 UTC
+  cron cycle. Local `.backups/` from `just windmill-backup gxy-management`
+  is acceptable as a second copy.
 - ArgoCD state is reproducible from git (Universe apps live in git
   manifests; no ad-hoc applications that live only in-cluster).
 
