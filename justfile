@@ -74,15 +74,24 @@ deploy cluster app:
       CLEANUP="$APP_SECRETS/.secrets.env"
       trap "rm -f $CLEANUP" EXIT
     fi
-    if [ -f "$ENC_DIR/{{app}}.tls.crt.enc" ]; then
+    # TLS: per-app override first (`<app>.tls.{crt,key}.enc`), else fall back
+    # to cluster-default wildcard via `k3s/<cluster>/cluster.tls.zone` marker →
+    # `infra-secrets/global/tls/<zone>.{crt,key}.enc`. Both files required.
+    if [ -f "$ENC_DIR/{{app}}.tls.crt.enc" ] && [ -f "$ENC_DIR/{{app}}.tls.key.enc" ]; then
       sops -d "$ENC_DIR/{{app}}.tls.crt.enc" > "$APP_SECRETS/tls.crt"
-      CLEANUP="$CLEANUP $APP_SECRETS/tls.crt"
-      trap "rm -f $CLEANUP" EXIT
-    fi
-    if [ -f "$ENC_DIR/{{app}}.tls.key.enc" ]; then
       sops -d "$ENC_DIR/{{app}}.tls.key.enc" > "$APP_SECRETS/tls.key"
-      CLEANUP="$CLEANUP $APP_SECRETS/tls.key"
+      CLEANUP="$CLEANUP $APP_SECRETS/tls.crt $APP_SECRETS/tls.key"
       trap "rm -f $CLEANUP" EXIT
+    elif [ -f "k3s/{{cluster}}/cluster.tls.zone" ] && [ -d "$APP_SECRETS" ]; then
+      ZONE=$(tr -d '[:space:]' < "k3s/{{cluster}}/cluster.tls.zone")
+      ZONE_CRT="{{secrets_dir}}/global/tls/${ZONE}.crt.enc"
+      ZONE_KEY="{{secrets_dir}}/global/tls/${ZONE}.key.enc"
+      if [ -f "$ZONE_CRT" ] && [ -f "$ZONE_KEY" ]; then
+        sops -d "$ZONE_CRT" > "$APP_SECRETS/tls.crt"
+        sops -d "$ZONE_KEY" > "$APP_SECRETS/tls.key"
+        CLEANUP="$CLEANUP $APP_SECRETS/tls.crt $APP_SECRETS/tls.key"
+        trap "rm -f $CLEANUP" EXIT
+      fi
     fi
     if [ -f "$ENC_DIR/{{app}}-backup.secrets.env.enc" ]; then
       sops -d --input-type dotenv --output-type dotenv "$ENC_DIR/{{app}}-backup.secrets.env.enc" > "$APP_SECRETS/.backup-secrets.env"
