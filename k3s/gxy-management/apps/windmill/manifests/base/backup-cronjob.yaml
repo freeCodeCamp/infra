@@ -17,7 +17,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: backup
-              image: bitnami/postgresql:16
+              image: postgres:18-bookworm
               command:
                 - /bin/bash
                 - -c

@@ -1,7 +1,7 @@
 # RFC: Secrets Layout — Two-Scope Convention + Shared Wildcard Cert
 
 **Date:** 2026-04-22
-**Status:** Draft
+**Status:** Accepted (implemented 2026-04-22)
 **Target Release:** Pre-#22 (rename exec gate)
 **Author:** Infra team
 **Related:** ADR-003 (Universe topology), ADR-011 (admin plane + secrets),

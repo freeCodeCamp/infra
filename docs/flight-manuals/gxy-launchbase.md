@@ -15,6 +15,9 @@ just secret-verify-all
 
 - All secrets decrypt OK
 - age key on local machine (`~/.config/sops/age/keys.txt`)
+- `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin
+  wildcard for the zone, picked up via
+  `infra/k3s/gxy-launchbase/cluster.tls.zone` = `freecodecamp-net`
 - `infra-secrets/k3s/gxy-launchbase/` contains:
   - `woodpecker.values.yaml.enc` (chart overlay — `server.env` with OAuth + org gate)
   - `woodpecker.secrets.env.enc` (`WOODPECKER_SERVER_SECRET`,
@@ -22,8 +25,6 @@ just secret-verify-all
     `WOODPECKER_GITHUB_SECRET`)
   - `woodpecker-backup.secrets.env.enc` (`ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`
     — DO Spaces for CNPG base backups)
-  - `woodpecker.tls.crt.enc` + `woodpecker.tls.key.enc` (Cloudflare Origin
-    Certificate for `*.freecodecamp.net`, same cert as gxy-management)
 
 ## Phase 13: Infrastructure (ClickOps — codify in OpenTofu)
 
