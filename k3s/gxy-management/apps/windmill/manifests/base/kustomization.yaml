@@ -6,7 +6,7 @@ resources:
   - namespace.yaml
   - gateway.yaml
   - httproutes.yaml
-  # - backup-cronjob.yaml  # TODO: re-enable after creating .backup-secrets.env
+  - backup-cronjob.yaml
 
 secretGenerator:
   - name: windmill-tls-cloudflare
@@ -16,9 +16,9 @@ secretGenerator:
       - tls.key=secrets/tls.key
     options:
       disableNameSuffixHash: true
-  # - name: windmill-backup-s3  # TODO: re-enable after creating .backup-secrets.env
-  #   type: Opaque
-  #   envs:
-  #     - secrets/.backup-secrets.env
-  #   options:
-  #     disableNameSuffixHash: true
+  - name: windmill-backup-s3
+    type: Opaque
+    envs:
+      - secrets/.backup-secrets.env
+    options:
+      disableNameSuffixHash: true
