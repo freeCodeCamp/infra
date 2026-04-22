@@ -148,14 +148,21 @@ done
 Dry run ansible first:
 
 ```sh
-just play k3s--teardown gxy_mgmt_k3s -- --check
+just play k3s--teardown gxy_mgmt_k3s --check
 ```
+
+Note: `just play` forwards `*args` directly — no `--` separator.
 
 If clean:
 
 ```sh
 just play k3s--teardown gxy_mgmt_k3s
 ```
+
+Alternative: skip the teardown play entirely when the rebuild target is
+"cluster from scratch" — jump straight to Step 6 droplet delete. The
+teardown play gracefully wipes k3s from still-living VMs; if the VMs will
+be obliterated anyway, the wipe is redundant.
 
 **Verify:** kubectl contexts fail (expected). `/var/lib/rancher/k3s/`
 gone on every node.

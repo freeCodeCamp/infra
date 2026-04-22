@@ -117,6 +117,107 @@ kubectl get svc -n kube-system traefik
 # EXTERNAL-IP shows all 3 node VPC IPs
 ```
 
+## Phase 3.5: Restore Windmill state (REBUILD ONLY)
+
+Skip on fresh install. Only applies when this flight-manual is replayed to
+rebuild an existing cluster — the bundled PostgreSQL comes up empty after
+Phase 3.1 Helm install, so the pre-teardown `pg_dumpall` must be loaded
+before end users hit the UI.
+
+For a rebuild, do this BEFORE Phase 4 DNS cutover. The ordering avoids
+serving an empty Windmill to CF-proxied clients. If DNS was already cut
+(hotfix during a live teardown), minimize the window by running 3.5
+immediately — expect minutes of empty state.
+
+### 3.5.1 Preconditions
+
+- Pre-teardown pg_dump exists at `k3s/gxy-management/.backups/windmill-<ts>.sql.gz`
+  (`just windmill-backup gxy-management` before teardown) OR S3 copy at
+  `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
+- `windmill-postgresql-0` pod Running (Phase 3.3 green).
+
+### 3.5.2 Quiesce Windmill app + worker pods
+
+The bundled PostgreSQL refuses `DROP DATABASE windmill` while the app /
+extra / workers hold connections (seen as ~35 sessions per deploy). Scale
+the Windmill deployments to zero first; leave the `windmill-postgresql`
+StatefulSet up.
+
+```
+export KUBECONFIG=$(pwd)/k3s/gxy-management/.kubeconfig.yaml
+
+# Record current replica counts for restore after (should be 1/1/2/1).
+kubectl get deploy -n windmill -o jsonpath='{range .items[*]}{.metadata.name}{"="}{.spec.replicas}{"\n"}{end}'
+
+kubectl scale deploy -n windmill \
+  windmill-app windmill-extra windmill-workers-default windmill-workers-native \
+  --replicas=0
+
+# Wait until only windmill-postgresql-0 is Running.
+kubectl get pods -n windmill -w
+```
+
+### 3.5.3 Restore
+
+```
+DUMP=k3s/gxy-management/.backups/windmill-<ts>.sql.gz   # adjust timestamp
+PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
+
+kubectl cp "$DUMP" "windmill/${PG_POD}:/tmp/"
+
+# Kill any stragglers + drop the fresh-install DB so the dump's CREATE
+# lands cleanly.
+kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -c "
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+  WHERE datname='windmill' AND pid <> pg_backend_pid();"
+kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -c "DROP DATABASE IF EXISTS windmill;"
+
+kubectl exec -n windmill "${PG_POD}" -- bash -c \
+  "gunzip -c /tmp/$(basename $DUMP) | psql -U postgres"
+```
+
+Expected noise: `NOTICE` / `ERROR: role "postgres" already exists` and
+similar on `DROP/CREATE` — harmless, because `pg_dumpall --clean --if-exists`
+emits idempotent DROP statements that race with the
+already-bootstrapped `postgres` super-role. Treat constraint violations on
+`INSERT` as real errors.
+
+### 3.5.4 Scale back + verify
+
+```
+# Restore original replica counts (chart 4.x defaults).
+kubectl scale deploy -n windmill windmill-app --replicas=1
+kubectl scale deploy -n windmill windmill-extra --replicas=1
+kubectl scale deploy -n windmill windmill-workers-default --replicas=2
+kubectl scale deploy -n windmill windmill-workers-native --replicas=1
+
+kubectl rollout status deploy -n windmill windmill-app --timeout=5m
+kubectl rollout status deploy -n windmill windmill-workers-default --timeout=5m
+
+# Row counts
+kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -d windmill -c "
+  SELECT
+    (SELECT count(*) FROM script) AS scripts,
+    (SELECT count(*) FROM flow) AS flows,
+    (SELECT count(*) FROM app) AS apps,
+    (SELECT count(*) FROM resource) AS resources,
+    (SELECT count(*) FROM usr) AS users,
+    (SELECT count(*) FROM schedule) AS schedules
+  ;"
+
+# wmill CLI sync check (from ~/DEV/fCC-U/windmill)
+wmill sync pull --workspace platform --yes
+# Expect: zero deletions, zero new additions.
+```
+
+### 3.5.5 S3 fallback (no local dump available)
+
+```
+s3cmd get s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz /tmp/
+kubectl cp /tmp/windmill-<ts>.sql.gz windmill/${PG_POD}:/tmp/
+# continue from 3.5.3 exec step
+```
+
 ## Phase 4: DNS + access (ClickOps — codify in OpenTofu)
 
 ### 4.1 Get node public IPs

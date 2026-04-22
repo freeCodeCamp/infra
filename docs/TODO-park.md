@@ -53,6 +53,18 @@ sprint planning when an activation trigger fires.
 - **Owner:** infra team. Lands on `gxy-management`.
 - **Ref:** ADR-001 §Component placement, ADR-002 §IaC Tooling.
 
+### ArgoCD deployment on gxy-management
+
+- **Activation trigger:** static-apps MVP shipped end-to-end (staff push →
+  cassiopeia live). ArgoCD is not crit-path for the MVP chain; Windmill +
+  Woodpecker cover the control plane until then.
+- **Owner:** infra team. Lands on `gxy-management`.
+- **Ref:** ADR-001 §Component placement (GitOps controller).
+- **Note:** Prior release `argocd (argo-cd-9.4.17 / v3.3.6)` removed during
+  the 2026-04-22 `gxy-mgmt → gxy-management` reprovision (#22). Apps were
+  reproducible from git; zero state loss. Redeploy per
+  `docs/flight-manuals/gxy-management.md` Phase 5.
+
 ## Auth + identity
 
 ### BetterAuth + Account Service
