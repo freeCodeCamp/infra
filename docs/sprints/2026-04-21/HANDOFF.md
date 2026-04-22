@@ -1,228 +1,210 @@
 # Sprint 2026-04-21 — Session Handoff
 
-Read this first when resuming in a fresh Claude Code session. All session-local
-context needed to continue the Universe static-apps MVP work lives here.
+Read this first when resuming in a fresh Claude Code session. Session-local
+context for continuing Universe static-apps MVP work.
 
 ## Start-here checklist (fresh session)
 
 1. Read this file end-to-end.
-2. Read `docs/GUIDELINES.md` (doc conventions).
-3. Run `TaskList` — verify tasks #17–#35 present; if not, recreate from the
-   [Task map](#task-map) below.
-4. Verify live cluster state still matches [Galaxy state](#galaxy-state) (helm
-   releases + droplets drift over time).
-5. Pick next unblocked task in `TaskList` and proceed.
+2. Read [`MASTER.md`](MASTER.md) — dispatch checklist + phase gates.
+3. Read [`QA-recommendations.md`](QA-recommendations.md) — locked operator
+   decisions (Q1–Q8, accepted 2026-04-22).
+4. Read `docs/GUIDELINES.md` — doc conventions.
+5. Run `TaskList`; tasks #17–#35 present. If not, recreate from
+   [Task map](#task-map).
+6. Verify live cluster state still matches [Galaxy state](#galaxy-state)
+   (helm releases + droplets drift over time).
+7. Epic `gxy-static-k7d` stage = `running` (promoted 2026-04-22). Ready
+   to dispatch MVP sub-tasks.
 
-## Session context (2026-04-21)
+## Session context (rolling)
 
-This handoff was produced after a deep audit that concluded the
-`docs/sprints/2026-04-20/` sprint had drifted from post-bootstrap reality and
-was scrapped. A fresh plan was built around shipping static-apps end-to-end to
-unblock the staff team.
+### 2026-04-22 — QA lock + rename dogfood + RFC amendments
 
-### Operator decisions this round
+- gxy-mgmt → gxy-management reprovision executed (#22 closed). Windmill
+  restored from S3 CronJob dump (local backup truncation bug fixed in
+  `justfile windmill-backup`).
+- Dogfood gaps captured in `docs/flight-manuals/gxy-management.md`
+  (new Phase 3.5 Windmill restore) + `Universe/spike/field-notes/infra.md`.
+- QA brainstorm Q1–Q8 accepted; `QA-recommendations.md` marked
+  ACCEPTED 2026-04-22. Tasks #28–#35 closed.
+- MASTER.md written (#23 closed). #24 dispatch block written
+  (`24-static-apps-k7d.md`).
+- RFC amendments D33–D39 appended to `rfc-gxy-cassiopeia.md`:
+  D5 superseded by D35 (`.preview` dot scheme); D29 superseded by
+  D36 (DO FW only, no CF-IP allow-list).
+- T14 bead `gxy-static-k7d.15` closed with Q4 descope reason.
+- T32 bead `gxy-static-k7d.33` **still open** but verified live
+  (see [T32 verification](#t32-verification-2026-04-22)).
+- Epic `gxy-static-k7d` transitioned `speccing` → `running`
+  (event `.36`).
+- ArgoCD deployment deferred to TODO-park (not MVP crit-path).
 
-- **Rename `gxy-mgmt` → `gxy-management` globally.** Acceptable to teardown +
-  reprovision as dogfood for the flight-manual.
-- **Windmill permanent home = `gxy-management`.** Overrides ADR-001's
-  backoffice placement. ADR-001 needs amendment.
-- **CF Access dropped globally.** OAuth org-gate is canonical for any tool
-  with native OAuth (Woodpecker, ArgoCD, Windmill, Grafana). CF Access
-  reserved only for auth-less surfaces (rare). Resolves open decision D22.
-- **Old sprint scrapped** — `docs/sprints/2026-04-20/` to be moved to
-  `docs/sprints/archive/2026-04-20/` during the docs reorg (task #17).
-- **ADR amendment ownership bypass granted** — this agent may amend ADRs
-  in-place despite Universe-team owning them per convention.
-- **Static-apps E2E = MVP.** Dynamic apps, bare-metal, o11y, BetterAuth are
-  deferred. Goal: staff push to repo → site live on cassiopeia.
+### 2026-04-21 — Audit + reset
 
-### Galaxy role reassignments (operator-supplied)
+- `docs/sprints/2026-04-20/` scrapped; drifted from post-bootstrap reality.
+- Fresh plan built around shipping static-apps E2E.
+- Rename `gxy-mgmt` → `gxy-management` decided; acceptable dogfood path.
+- Windmill permanent home = `gxy-management` (overrides ADR-001).
+- CF Access dropped globally; OAuth org-gate canonical for native-OAuth
+  tools. Resolves D22.
+- Static-apps E2E = MVP. Dynamic, BM, o11y, BetterAuth deferred.
+- ADR amendment ownership bypass granted (in-place this round).
+
+### Galaxy role reassignments (stable)
 
 | Galaxy         | Provider now | Provider future | Role                                  | Tools                                                       |
 | -------------- | ------------ | --------------- | ------------------------------------- | ----------------------------------------------------------- |
-| gxy-management | DO FRA1      | DO FRA1         | Control plane                         | Windmill + Zot + ArgoCD (platform-only) + Atlantis          |
+| gxy-management | DO FRA1      | DO FRA1         | Control plane                         | Windmill + Zot + ArgoCD (deferred) + Atlantis               |
 | gxy-launchbase | DO FRA1      | Hetzner         | Supply chain ("GitHub Actions layer") | Woodpecker (+ArgoCD TBD) + CI tooling                       |
 | gxy-backoffice | TBD          | Hetzner         | Backoffice + o11y                     | VictoriaMetrics + ClickHouse + Vector + HyperDX + GlitchTip |
 | gxy-cassiopeia | DO FRA1      | Hetzner         | Static hosting                        | Caddy + R2 (cassiopeia serves staff constellations)         |
 | gxy-triangulum | —            | Hetzner         | Dynamic hosting ("Heroku-like")       | containers, CNPG prod, Ceph RGW future                      |
 
-Deferred galaxies (not in MVP): gxy-backoffice, gxy-triangulum.
-Retiring: gxy-static at cassiopeia cutover.
-Out of scope: `ops-mgmt`, `ops-backoffice-tools` (legacy fCC, retire post-Universe).
+Deferred (not MVP): gxy-backoffice, gxy-triangulum.
+Retiring: gxy-static at cassiopeia cutover (#26).
+Out of scope: `ops-mgmt`, `ops-backoffice-tools` (legacy).
 
-## Galaxy state (verified 2026-04-21)
+## Galaxy state (verified 2026-04-22)
 
-### Naming conventions (critical — all three forms diverge)
+### Naming conventions (post-rename — all three forms converged on `management`)
 
 - **Repo dir:** `k3s/gxy-{management,static,launchbase,cassiopeia}/`
-  (full word `management`; others short)
-- **Ansible group (underscore):** `gxy_mgmt_k3s`, `gxy_static_k3s`,
+- **Ansible group:** `gxy_management_k3s`, `gxy_static_k3s`,
   `gxy_launchbase_k3s`, `gxy_cassiopeia_k3s`
-- **DO droplet tag (dash):** `gxy-mgmt-k3s`, `gxy-static-k3s`,
+- **DO droplet tag:** `gxy-management-k3s`, `gxy-static-k3s`,
   `gxy-launchbase-k3s`, `gxy-cassiopeia-k3s`
-- **Droplet names:** `gxy-vm-{mgmt,static,launchbase,cassiopeia}-k3s-{1,2,3}`
-
-The `mgmt` → `management` rename (task #21/#22) touches all three forms plus
-repo doc refs.
+- **Droplet names:** `gxy-vm-{management,static,launchbase,cassiopeia}-k3s-{1,2,3}`
 
 ### Live clusters
 
-All DO · FRA1 · k3s HA embedded etcd · `cilium 1.19.2` ·
-`traefik 39.0.201+up39.0.2 (v3.6.9)` + `traefik-crd` · PSS baseline ·
-3 nodes each.
+All DO · FRA1 · k3s v1.34.5+k3s1 HA embedded etcd · Cilium 1.19.2 ·
+Traefik 39.0.201+up39.0.2 (v3.6.9) + traefik-crd · PSS baseline · 3 nodes each.
 
-| Galaxy         | Nodes                                           | App helm releases (chart / app ver)                                                  |
-| -------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------ |
-| gxy-management | 164.92.245.161, 64.226.72.77, 164.90.160.64     | argocd (argo-cd-9.4.17 / v3.3.6), windmill (windmill-4.0.134 / 1.686.0)              |
-| gxy-static     | (legacy)                                        | caddy (caddy-static-0.1.0 / 2.9)                                                     |
-| gxy-launchbase | 68.183.221.232, 68.183.215.167, 165.245.220.145 | cnpg-system (cloudnative-pg-0.28.0 / 1.29.0), woodpecker (woodpecker-3.5.1 / 3.13.0) |
-| gxy-cassiopeia | 46.101.179.141, 188.166.165.62, 165.227.149.249 | caddy (caddy-0.1.0 / 0.1.0) with in-tree r2_alias + caddy.fs.r2                      |
+| Galaxy         | Kubeconfig server            | Helm releases (chart / app ver)                                                         |
+| -------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
+| gxy-management | `https://100.81.119.62:6443` | argocd (deferred — parked), windmill (windmill-4.0.134 / 1.686.0), restored post-rename |
+| gxy-static     | legacy                       | caddy (caddy-static-0.1.0 / 2.9) — retires at #26 cutover                               |
+| gxy-launchbase | (direnv-scoped)              | cnpg-system (cloudnative-pg-0.28.0 / 1.29.0), woodpecker (woodpecker-3.5.1 / 3.13.0)    |
+| gxy-cassiopeia | (direnv-scoped)              | caddy (caddy-0.1.0 / 0.1.0) with in-tree `r2_alias` + `caddy.fs.r2`                     |
 
 ### External infra
 
-- Cloudflare (zones `freecodecamp.net`, `freecode.camp`) — all origins proxied
-- Origin TLS: CF Origin Cert `*.freecodecamp.net` reused across galaxies
-- Object storage live: Cloudflare R2 bucket `universe-static-apps-01`
-- Secrets at rest: sops + age in sibling repo `infra-secrets`
-- Admin plane: Tailscale (SSH + kubectl only; per ADR-011)
+- Cloudflare zones `freecodecamp.net` + `freecode.camp` — all origins proxied
+- Origin certs: `*.freecodecamp.net`, `*.freecode.camp`,
+  `*.preview.freecode.camp` (all ACM-issued, CF-activated)
+- Object storage: CF R2 bucket `universe-static-apps-01`
+- Secrets at rest: sops+age in sibling repo `infra-secrets`
+- Admin plane: Tailscale (SSH + kubectl only; ADR-011)
 
 ### Live endpoints
 
-- `https://woodpecker.freecodecamp.net` → 302 via CF, org-gated OAuth
-- `https://argocd.freecodecamp.net` → HTTPRoute on gxy-management
-- `https://windmill.freecodecamp.net` → HTTPRoute on gxy-management
+- `https://woodpecker.freecodecamp.net` — 200, `x-woodpecker-version: 3.13.0`,
+  CF-proxied, GitHub org-gate (CF Access off per commit `3875c02`)
+- `https://argocd.freecodecamp.net` — HTTPRoute live; ArgoCD deploy deferred
+  (parked)
+- `https://windmill.freecodecamp.net` — HTTPRoute on gxy-management;
+  restored from S3 dump 2026-04-22
 
-### Apps-dir vs deployed drift
+### T32 verification (2026-04-22)
 
-- `k3s/gxy-management/apps/zot/` exists but Zot NOT in helm releases — deploy gap.
-- Supply-chain chain (cosign / Grype / Trivy / Kyverno / SBOM) absent —
-  acceptable for static-apps MVP, blocks triangulum.
+Probe results:
+
+```
+dig +short woodpecker.freecodecamp.net A @1.1.1.1
+→ 172.67.180.88, 104.21.35.228  (CF proxy IPs)
+
+curl -sI https://woodpecker.freecodecamp.net/
+→ HTTP/2 200
+  x-woodpecker-version: 3.13.0
+  cf-cache-status: DYNAMIC
+```
+
+Verdict: T32 functionally complete. Bead `gxy-static-k7d.33` still open;
+operator closes. Runbook `docs/runbooks/woodpecker-cf-access.md` kept for
+when CF Access reactivated (if needed).
 
 ## Completed this round (audit trail)
 
-Pre-handoff commits (cleanup + audit):
+Infra repo `feat/k3s-universe` — commits (operator pushed 2026-04-22):
 
-- `fb333fc` MASTER.md A1 tick + dispatch path typo fix (sprints/)
-- Bead `gxy-static-k7d.33` closed with reason referencing `fb333fc`
-- Universe main pushed (8 commits: 2344385, 589b6a8, 7c26006, 8cf77e6,
-  41c538e, 9a0beef, ab8d7c2, 161a93e). Remote moved to
-  `freeCodeCamp-Universe/Universe-Architecture.git` (warning from old URL —
-  update when convenient)
-- `965901d` FLIGHT-MANUAL Parts 3+4 (gxy-launchbase + gxy-cassiopeia) shipped
+- `e95f260` docs(guidelines): canonical doc conventions + monthly trim
+- `6bfaf6d` docs(sprint/2026-04-21): seed handoff + README
+- `f277aa9` docs: split FLIGHT-MANUAL.md per-cluster + reorg + archive 04-20
+- `87fcdff` docs(park): seed deferment list
+- `8914d69` docs(runbook): add gxy-mgmt → gxy-management rename runbook
+- `25d33df` docs(sprint/2026-04-21): cluster audit (#20)
+- `99bc332` docs(rename): correct rename scope + verify-grep exclusion
+- `30f2205` docs(architecture): RFC secrets layout — two-scope (#36 Phase 1)
+- `3465a9d` feat(secrets): RFC Phase 2b+3 — cluster.tls.zone markers
+- `779ab28` fix(deploy): anchor cleanup trap to absolute paths (Phase 5)
+- `cef8c8a` feat(windmill-backup): re-enable backup CronJob + fix image (Phase 5/7)
+- `827bc7e` docs(secrets): sync flight-manuals + rename runbook (Phase 6)
+- `9d49cda` refactor(naming): gxy-mgmt → gxy-management (repo refs only)
+- `97b9c14` feat(infra): gxy-mgmt → gxy-management dogfood gaps
+- `39d49b5` docs(sprint/2026-04-21): lock QA brainstorm decisions
+- `6f3c84c` docs(sprint/2026-04-21): MASTER dispatch plan (#23)
+- `3376e86` docs(sprint/2026-04-21): #24 MVP static-apps dispatch block
+- `4c5e38b` docs(rfc-cassiopeia): append Q1-Q8 amendments as D33-D39
 
-Sprint 2026-04-21 commits (this session, infra repo
-`feat/k3s-universe`):
-
-- `e95f260` `docs(guidelines)`: add canonical doc conventions + monthly trim
-- `6bfaf6d` `docs(sprint/2026-04-21)`: seed handoff + README
-- `f277aa9` `docs`: split FLIGHT-MANUAL.md per-cluster + reorg tree + archive
-  2026-04-20 sprint + rename `runbook/` → `runbooks/`
-- `87fcdff` `docs(park)`: seed deferment list with triggers + ADR refs
-- `8914d69` `docs(runbook)`: add `gxy-mgmt → gxy-management` rename runbook
-- _(latest)_ `docs(sprint/2026-04-21)`: QA-recommendations + handoff refresh
-
-Sprint 2026-04-21 commits (Universe repo `main`):
-
-- _(latest)_ `adr`: 2026-04-21 amendments (ADR-001/003/007/008/011/013 +
-  D22 resolution + D32 acceptance + galaxy role matrix)
-- Field-notes format header added to `infra.md`, `windmill.md`,
-  `universe-cli.md` (committed earlier this session)
+Universe repo `main` — 8 commits (pushed earlier sessions).
+Remote now `freeCodeCamp-Universe/Universe-Architecture.git`.
 
 ## Task map
 
-All tasks live in the Tasks API. If not present (session reset lost state),
-recreate from subjects below; dependencies at end of table.
+Ledger in Tasks API. If not present (session reset), recreate from below.
 
-### Main track (11 tasks)
+### Main track
 
-| ID  | Subject                                                                                      | Status        |
-| --- | -------------------------------------------------------------------------------------------- | ------------- |
-| #17 | Docs foundation: GUIDELINES + field-notes reformat + tree reorg + per-cluster flight-manuals | **completed** |
-| #18 | ADR amendments in-place (bypass ownership)                                                   | **completed** |
-| #19 | Write docs/TODO-park.md deferment list                                                       | **completed** |
-| #20 | Deep cluster audit: cost + HA + autoscaling inventory                                        | pending       |
-| #21 | Rename runbook: gxy-mgmt → gxy-management (full blast radius)                                | **completed** |
-| #22 | Execute gxy-mgmt → gxy-management via reprovision                                            | pending       |
-| #23 | Write new MASTER sprint plan (`docs/sprints/2026-04-21/`)                                    | pending       |
-| #24 | MVP: static-apps E2E chain (Woodpecker pipeline + R2 flow + alias + cleanup + smoke)         | pending       |
-| #25 | Release universe-cli 0.4.0-beta.1                                                            | pending       |
-| #26 | Cutover: DNS gxy-static → gxy-cassiopeia + teardown gxy-static                               | pending       |
-| #27 | Recurring: monthly doc trim (standing)                                                       | pending       |
+| ID  | Subject                                                          | Status        |
+| --- | ---------------------------------------------------------------- | ------------- |
+| #17 | Docs foundation (GUIDELINES + field-notes + per-cluster manuals) | **completed** |
+| #18 | ADR amendments in-place (bypass ownership)                       | **completed** |
+| #19 | Write docs/TODO-park.md deferment list                           | **completed** |
+| #20 | Deep cluster audit (cost + HA + autoscaling)                     | **completed** |
+| #21 | Rename runbook: gxy-mgmt → gxy-management                        | **completed** |
+| #22 | Execute rename via reprovision                                   | **completed** |
+| #23 | MASTER sprint plan                                               | **completed** |
+| #24 | MVP static-apps E2E chain                                        | pending       |
+| #25 | Release @freecodecamp/universe-cli 0.4.0-beta.1                  | pending       |
+| #26 | DNS cutover gxy-static → gxy-cassiopeia + teardown gxy-static    | pending       |
+| #27 | Recurring monthly doc trim (standing)                            | standing      |
 
-### Q/A brainstorm track (8 decisions, all gate #23)
+### Q/A brainstorm — LOCKED 2026-04-22
 
-Recommended defaults drafted in
-[`QA-recommendations.md`](QA-recommendations.md). Operator ticks / redirects
-before #23 writes.
+All 8 closed. Decisions in `QA-recommendations.md` summary table;
+amended into `docs/architecture/rfc-gxy-cassiopeia.md` as D33–D39.
 
-| ID  | Question                                                              | Status  |
-| --- | --------------------------------------------------------------------- | ------- |
-| #28 | Q1 alias-write mechanism (Windmill flow vs Woodpecker pipeline step)  | pending |
-| #29 | Q2 CF R2 admin cred path in infra-secrets                             | pending |
-| #30 | Q3 per-site secret sops path naming                                   | pending |
-| #31 | Q4 origin IP allow-list enforcement (Cilium CNP vs DO Cloud Firewall) | pending |
-| #32 | Q5 staff-site DNS pattern (platform-owned vs BYO)                     | pending |
-| #33 | Q6 rollback SLO target                                                | pending |
-| #34 | Q7 preview envs in MVP (prod-only vs prod+preview)                    | pending |
-| #35 | Q8 cleanup retention policy (hard 7d vs per-site override)            | pending |
+| ID    | Q   | Decision                                                   |
+| ----- | --- | ---------------------------------------------------------- |
+| #28 ✓ | Q1  | Woodpecker pipeline step                                   |
+| #29 ✓ | Q2  | `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc` |
+| #30 ✓ | Q3  | `infra-secrets/constellations/<site>.secrets.env.enc`      |
+| #31 ✓ | Q4  | DO Cloud Firewall only (no CF-IP allow-list)               |
+| #32 ✓ | Q5  | `<site>.freecode.camp` + `<site>.preview.freecode.camp`    |
+| #33 ✓ | Q6  | ≤ 2 minutes rollback SLO                                   |
+| #34 ✓ | Q7  | Prod + preview both in MVP                                 |
+| #35 ✓ | Q8  | Hard 7d cleanup; alias prefix-pin                          |
 
 ### Dependencies
 
-- #22 blocked by #17, #21
-- #23 blocked by #17, #18, #28, #29, #30, #31, #32, #33, #34, #35
-- #24 blocked by #23
-- #25 blocked by #24
-- #26 blocked by #25, #32
+Chain: **#24 → #25 → #26**. #27 standing.
 
-Ready-now: #17 (in progress), #18, #19, #20, #21, plus all Q/A (#28–#35).
+## Deferment list
 
-## Deferment list (will land in docs/TODO-park.md via #19)
+See [`docs/TODO-park.md`](../../TODO-park.md). MVP-out:
 
-**Parked (no MVP impact):**
-
-- Supply chain (Zot push, cosign, Grype+Trivy, Kyverno verifyImages, SBOM) —
-  activates with first image ship (gxy-triangulum)
-- Atlantis on gxy-management — after first IaC PR pain
-- BetterAuth + Account Service — post-10-app threshold per spike
-- gxy-triangulum provisioning — no dynamic apps in MVP
-- Hetzner migration (launchbase, backoffice, cassiopeia eventual) — post-M5
-- ArgoCD multi-cluster wiring — single-cluster MVP
-- CNPG barman-cloud plugin — when prod DB lands
-- DR runbook (ADR-012) — post-M1
-- Rook-Ceph — post-bare-metal
-- ops-\* legacy teardown — post-Universe launch
-- gxy-backoffice provisioning + O11y stack — sequence after static MVP
-
-**Not deferred, part of MVP:**
-
-- Rename `gxy-mgmt` → `gxy-management` (incl. reprovision)
-- Static-apps E2E chain
-- universe-cli 0.4.0-beta.1 release
-- DNS cutover + gxy-static teardown
-- Docs reorg
-
-## Q/A brainstorm — current options (operator decisions pending)
-
-All 8 questions gate task #23. Answers unblock #24, #25, #26 cascade.
-
-- **Q1 alias-write:** (a) Woodpecker pipeline step / (b) Windmill flow /
-  (c) hybrid
-- **Q2 CF R2 admin cred path:** (a) `infra-secrets/platform/…` /
-  (b) `infra-secrets/k3s/gxy-cassiopeia/…` / (c) dedicated provisioning token
-- **Q3 per-site sops path:** (a) `infra-secrets/constellations/<site>.secrets.env.enc` /
-  (b) `infra-secrets/k3s/gxy-cassiopeia/sites/<site>.secrets.env.enc` /
-  (c) `infra-secrets/cassiopeia/sites/<site>.secrets.env.enc` (current RFC)
-- **Q4 origin IP allow-list:** (a) Cilium CNP / (b) DO Cloud Firewall /
-  (c) both
-- **Q5 staff-site DNS:** (a) platform-owned `<site>.freecode.camp` /
-  (b) BYO via `universe` CLI / (c) both (default platform, opt-in BYO)
-- **Q6 rollback SLO:** (a) seconds / (b) minutes / (c) tiered
-- **Q7 preview envs:** (a) prod-only MVP / (b) prod+preview day 1 /
-  (c) prod on cassiopeia + preview on launchbase
-- **Q8 cleanup retention:** (a) hard 7d / (b) 7d default + platform.yaml
-  override / (c) tiered by site importance
-
-Tradeoffs documented in each task description.
+- Supply chain (Zot push, cosign, Grype+Trivy, Kyverno, SBOM)
+- Atlantis on gxy-management
+- BetterAuth + Account Service
+- gxy-triangulum provisioning
+- Hetzner migration (launchbase, backoffice, cassiopeia eventual)
+- ArgoCD deployment on gxy-management (added 2026-04-22 — not crit-path)
+- CNPG barman-cloud plugin
+- DR runbook (ADR-012)
+- Rook-Ceph
+- `ops-*` legacy teardown
+- gxy-backoffice provisioning + O11y stack
 
 ## Key file references
 
@@ -230,87 +212,111 @@ Tradeoffs documented in each task description.
 
 - `CLAUDE.md` — project instructions + galaxy table
 - `docs/flight-manuals/` — per-cluster rebuild manuals + `00-index.md`
-  (split from the retired singular `docs/FLIGHT-MANUAL.md` during #17)
-- `docs/runbooks/` (renamed from `docs/runbook/` during #17):
-  `dns-cutover.md`, `gxy-launchbase.md`, `r2-bucket-provision.md`
+- `docs/runbooks/` — `dns-cutover.md`, `gxy-launchbase.md`,
+  `r2-bucket-provision.md`, `woodpecker-cf-access.md`,
+  `cluster-rename-mgmt-to-management.md` (executed)
 - `docs/architecture/`:
-  `rfc-gxy-cassiopeia.md` (large, canonical spec),
-  `task-gxy-cassiopeia.md` (large, breakdown),
-  `rfc-gxy-cassiopeia-caddyfile-poc.md`
-- `docs/sprints/2026-04-20/` — scrapped, archive via #17
-- `docs/sprints/2026-04-21/` — this sprint (HANDOFF + README here)
+  - `rfc-secrets-layout.md` (accepted 2026-04-22)
+  - `rfc-gxy-cassiopeia.md` (with 2026-04-22 D33–D39 amendments)
+  - `task-gxy-cassiopeia.md` (source of truth for MVP sub-tasks)
+  - `rfc-gxy-cassiopeia-caddyfile-poc.md`
+- `docs/sprints/2026-04-21/` — this sprint
+  - `HANDOFF.md` (this file) · `MASTER.md` · `README.md`
+  - `QA-recommendations.md` · `cluster-audit.md` · `24-static-apps-k7d.md`
+- `docs/sprints/archive/2026-04-20/` — scrapped
+- `docs/TODO-park.md` — deferment ledger
 - `ansible/` — playbooks, roles, inventory
-- `k3s/<galaxy>/` — per-cluster app dirs (pattern: `apps/<app>/charts/<chart>/`
-  - `apps/<app>/manifests/base/` + `values.production.yaml`)
+- `k3s/<galaxy>/apps/<app>/charts/<chart>/` + `manifests/base/` +
+  `values.production.yaml`
 - `.claude/rules/` — code-quality + docs-ops rules
+- `justfile` — `windmill-backup` hardened with in-pod dump + sentinel +
+  `kubectl cp`
 
 ### Universe repo (`~/DEV/fCC-U/Universe`, branch `main`)
 
-- `CLAUDE.md`, `CONTEXT.md`, `REQUIREMENTS.md`, `ARCHI-DIAGRAM.md`
-- `decisions/001-015-*.md` — 15 ADRs (to amend via #18)
-- `spike/field-notes/{infra,windmill,universe-cli}.md` — reformat via #17
-- `spike/spike-plan.md`
-- `spike/tool-validation.md`
-- Remote renamed to `freeCodeCamp-Universe/Universe-Architecture.git` —
-  update `origin` URL when convenient.
+- `CLAUDE.md` (ownership model canonical)
+- `decisions/001-015-*.md` — 15 ADRs
+- `spike/field-notes/{infra,windmill,universe-cli}.md` — field notes
+- `spike/spike-plan.md` · `spike/tool-validation.md`
 
 ### universe-cli repo (`~/DEV/fCC-U/universe-cli`, branch `feat/woodpecker-pivot`)
 
-- Code shipped locally (commits `a7dd58e` + `f6971cf`) — Woodpecker client
-  replaces direct R2; `@aws-sdk/client-s3` removed; bundle 1.95 MB → 812 KB
-- Version still `0.3.3` on npm; `0.4.0-beta.1` release pending task #25
-- Branch diverged from main — merge to main before tagging release
+- Code shipped locally (commits `a7dd58e` + `f6971cf`) — Woodpecker
+  client replaces direct R2; `@aws-sdk/client-s3` removed; bundle
+  1.95 MB → 812 KB
+- Version `0.3.3` on npm; `0.4.0-beta.1` release pending #25
+- Branch diverged from `main` — merge before tagging
 
 ### Windmill repo (`~/DEV/fCC-U/windmill`, branch `main`)
 
-- `workspaces/platform/f/` — existing flows (`app`, `github`, `google_chat`,
-  `ops`, `repo_mgmt`)
-- `workspaces/platform/f/static/` — does not exist yet; task #24 creates
-  `provision_site_r2_credentials.{ts,yaml,test.ts}`
+- `workspaces/platform/f/` — existing flows (`app`, `github`,
+  `google_chat`, `ops`, `repo_mgmt`)
+- `workspaces/platform/f/static/` — does **not** exist yet. T11 creates:
+  - `provision_site_r2_credentials.ts` + `.yaml` + `.test.ts`
+- Dispatch doc: `docs/sprints/2026-04-21/windmill-t11-dispatch.md`
+  (infra-repo authored; mirrors to windmill session start context)
 
-### infra-secrets repo (private, sibling)
+### infra-secrets repo (private sibling — paths locked 2026-04-22)
 
-- `k3s/gxy-launchbase/*.enc` — woodpecker secrets live here
-- Per-site R2 secret path — NOT YET DEFINED (gated on Q3)
-- CF R2 admin cred path — NOT YET DEFINED (gated on Q2)
+- `platform/cf-r2-provisioner.secrets.env.enc` — **NEW** (D33, Q2).
+  Admin-scope CF R2 token for bucket `universe-static-apps-01`;
+  provisioner mints per-site tokens. Created during T11 implementation.
+- `constellations/<site>.secrets.env.enc` — **NEW** (D34, Q3).
+  Per-site data-plane token. Written by T11 Windmill flow.
+- `.sops.yaml` creation_rule (land alongside T11):
+  `path_regex: ^constellations/.*\.secrets\.env\.enc$` with platform
+  age key.
+- `k3s/gxy-launchbase/*.enc` — Woodpecker secrets (existing).
+- `k3s/gxy-cassiopeia/caddy.values.yaml.enc` — R2 ro key bootstrap.
 
 ## Non-obvious invariants
 
-- `rtk` tool is mandatory for all Bash tool calls per user CLAUDE.md
-- `caveman` output style active — drop articles/filler in user-facing text
-- `context-mode` MCP tools route large outputs through sandbox — use
-  `ctx_batch_execute` / `ctx_execute_file` / `ctx_search` for anything
-  producing >20 lines
-- Never push from session; operator pushes
-- Never edit target files under `~/.claude/*` — edit source in `~/.dotfiles/`
-- Stage enforcement active: epic `gxy-static-k7d` currently at stage
-  `speccing`; may need `running` promotion for MVP execution
+- `rtk` tool mandatory for verbose Bash (per user CLAUDE.md)
+- `caveman` output style active — drop articles/filler
+- `context-mode` MCP routes >20-line outputs through sandbox
+- **Never push from session; operator pushes.** (User pushed all infra
+  commits through `4c5e38b` on 2026-04-22.)
+- Never edit target files under `~/.claude/*` — edit source in
+  `~/.dotfiles/`
+- Epic `gxy-static-k7d` stage = `running` (promoted 2026-04-22).
 - Windmill `wmill sync push` is destructive; check drift before pushing
-- sops is stateful — `sops decrypt --in-place` then yq then
+- sops is stateful — `sops decrypt --in-place` → yq →
   `sops encrypt --in-place`
+- `just play <name> <group>` expands to `play-<name>.yml`; no `-- --check`
+  separator (runbook line 151 fixed).
+- `.envrc` hierarchy: root loads CF/Tailscale tokens; cluster dir loads
+  DO token from `do-universe/.env.enc`. Outside-cluster runs need
+  `direnv exec <cluster-dir> <cmd>`.
+- `just windmill-backup` now uses in-pod `pg_dumpall` + sentinel
+  verification + `kubectl cp` (streaming pipe truncation bug fixed
+  2026-04-22).
+- PSS admission exempt: `windmill` + `tailscale` namespaces.
+- Gateway API listener ports match Traefik entrypoint ports (80/443
+  with hostNetwork).
 
 ## Success criteria (MVP done)
 
-1. Staff member pushes to a Universe-org repo following the
-   `.woodpecker/deploy.yaml` template.
-2. Woodpecker on gxy-launchbase builds + uploads build output to R2 bucket
-   `universe-static-apps-01` under `<site>/deploys/<ts>-<sha>/`.
-3. Alias write repoints `<site>/production` (or equivalent) to the new
-   deploy prefix atomically.
-4. Request to `<site>.freecode.camp` (or BYO domain) routes via CF →
-   cassiopeia Caddy → R2 via `r2_alias` + `caddy.fs.r2`.
-5. `universe rollback --to <deploy-id>` repoints alias to prior deploy;
-   verified green within agreed SLO (Q6).
-6. `universe promote` repoints production alias from preview (if Q7=b/c).
-7. Cleanup cron deletes deploys older than retention (Q8) except aliased.
-8. gxy-static retired; DNS for `*.freecode.camp` on gxy-cassiopeia.
+1. Staff push to Universe-org repo following `.woodpecker/deploy.yaml`
+   template.
+2. Woodpecker on gxy-launchbase builds + uploads to R2
+   `universe-static-apps-01/<site>/deploys/<ts>-<sha>/`.
+3. Pipeline writes `<site>/production` + `<site>/preview` atomically.
+4. `<site>.freecode.camp` + `<site>.preview.freecode.camp` both route
+   via CF → gxy-cassiopeia Caddy → `r2_alias` → R2 object served.
+5. `universe rollback --to <deploy-id>` green ≤ 2 min (Q6).
+6. `universe promote` repoints production from current preview atomically.
+7. Cleanup cron deletes deploys > 7d except aliased prefixes.
+8. gxy-static retired; DNS fully on gxy-cassiopeia.
 9. `@freecodecamp/universe-cli@0.4.0-beta.1` published on npm.
 10. Staff-facing "how to deploy a static site" playbook published.
 
 ## History of this sprint
 
 - 2026-04-20 — Old sprint `docs/sprints/2026-04-20/` dispatched;
-  bootstrap of gxy-launchbase + gxy-cassiopeia landed same day;
-  T32 shipped as side-effect.
-- 2026-04-21 — Audit surfaced doc-vs-reality drift; sprint scrapped;
-  fresh plan built (this HANDOFF).
+  bootstrap of gxy-launchbase + gxy-cassiopeia landed same day.
+- 2026-04-21 — Audit; sprint scrapped; fresh plan built. HANDOFF
+  seeded.
+- 2026-04-22 — gxy-mgmt → gxy-management rename executed; Windmill
+  restore dogfooded; QA locked; MASTER + dispatch block written;
+  RFC amendments landed; T32 verified live; epic promoted to
+  `running`; 18 infra commits pushed by operator.
