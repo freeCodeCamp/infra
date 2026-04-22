@@ -226,7 +226,7 @@ The existing `ansible/inventory/digitalocean.yml` dynamic inventory already cove
 
 - **No new inventory file required.** DO tag `_gxy-launchbase-k3s` maps to Ansible group `gxy_launchbase_k3s` via the existing keyed_groups regex.
 - **Tag convention:** All gxy-launchbase nodes carry DO tag `_gxy-launchbase-k3s` (leading underscore, hyphens preserved).
-- **Existing `gxy_mgmt_k3s` and `gxy_static_k3s`** groups in `digitalocean.yml` are unchanged.
+- **Existing `gxy_management_k3s` and `gxy_static_k3s`** groups in `digitalocean.yml` are unchanged.
 - **Post-M5 Hetzner migration (deferred):** will introduce `ansible/inventory/hetzner.yml` using `hetzner.hcloud.hcloud` plugin and add the collection to `ansible/requirements.yml`. Not in scope for M0–M5.
 
 #### 4.1.4 Bootstrap Procedure

@@ -29,15 +29,15 @@ just secret-verify-all
 ### 1.2 DO Droplets
 
 - Create 3x `s-8vcpu-16gb-amd` in FRA1
-- Names: `gxy-vm-mgmt-k3s-{1,2,3}`
+- Names: `gxy-vm-management-k3s-{1,2,3}`
   _(rename to `gxy-vm-management-k3s-{1,2,3}` pending task #22 in sprint 2026-04-21)_
-- Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-mgmt-k3s`
+- Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-management-k3s`
   _(tag rename: `gxy-management-k3s` pending)_
 - Cloud-init: `cloud-init/basic.yml`
 
 ### 1.3 DO Cloud Firewall
 
-- Create firewall `gxy-fw-fra1`, attach to tag `gxy-mgmt-k3s`
+- Create firewall `gxy-fw-fra1`, attach to tag `gxy-management-k3s`
 - VPC rules (source 10.110.0.0/20): 2379-2380, 4240, 4244, 5001, 6443, 8472, 10250
 - Public rules: 22/TCP, 80/TCP, 443/TCP
 
@@ -48,14 +48,14 @@ just secret-verify-all
 ### 1.5 Tailscale
 
 ```
-just play tailscale--0-install gxy_mgmt_k3s
-just play tailscale--1b-up-with-ssh gxy_mgmt_k3s
+just play tailscale--0-install gxy_management_k3s
+just play tailscale--1b-up-with-ssh gxy_management_k3s
 ```
 
 Verify from local:
 
 ```
-tailscale status | grep gxy-vm-mgmt
+tailscale status | grep gxy-vm-management
 ```
 
 All 3 nodes should show as connected.
@@ -64,7 +64,7 @@ All 3 nodes should show as connected.
 
 ```
 cd k3s/gxy-management
-just play k3s--bootstrap gxy_mgmt_k3s
+just play k3s--bootstrap gxy_management_k3s
 ```
 
 This runs 5 plays: validate → prerequisites → k3s deploy → Cilium → verify + kubeconfig.
@@ -128,7 +128,7 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.a
 If no ExternalIP (DO doesn't always populate it):
 
 ```
-doctl compute droplet list --tag-name gxy-mgmt-k3s --format Name,PublicIPv4
+doctl compute droplet list --tag-name gxy-management-k3s --format Name,PublicIPv4
 ```
 
 ### 4.2 Cloudflare DNS
@@ -418,14 +418,14 @@ wmill generate-metadata
 ### Cluster only (preserves VMs)
 
 ```
-just play k3s--teardown gxy_mgmt_k3s
+just play k3s--teardown gxy_management_k3s
 ```
 
 ### Full teardown (VMs too)
 
 ```
-just play k3s--teardown gxy_mgmt_k3s
-doctl compute droplet delete gxy-vm-mgmt-k3s-1 gxy-vm-mgmt-k3s-2 gxy-vm-mgmt-k3s-3 --force
+just play k3s--teardown gxy_management_k3s
+doctl compute droplet delete gxy-vm-management-k3s-1 gxy-vm-management-k3s-2 gxy-vm-management-k3s-3 --force
 ```
 
 VPC, firewall, Spaces persist (shared infrastructure — see
