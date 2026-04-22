@@ -14,8 +14,9 @@ served by Caddy, end-to-end, production-polished, ready for real users.
 ## What's here
 
 - `HANDOFF.md` — session resumption doc (primary).
-- `MASTER.md` — dispatch checklist (written in task #23; not yet present).
+- `MASTER.md` — dispatch checklist (phases, tasks, gates).
+- `QA-recommendations.md` — locked operator decisions (accepted 2026-04-22).
+- `cluster-audit.md` — cost/HA/autoscaling inventory from task #20.
 - Per-task dispatch files — added as tasks dispatch.
 
-The prior sprint `../2026-04-20/` is scrapped and will be archived under
-`../archive/2026-04-20/` during the docs reorg (task #17).
+The prior sprint `../2026-04-20/` is archived at `../archive/2026-04-20/`.

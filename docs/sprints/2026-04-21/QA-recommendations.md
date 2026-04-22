@@ -52,33 +52,37 @@ staff push → site live. Complexity lands in Phase 2.
 
 ## Q4 — Origin IP allow-list enforcement (#31)
 
-**Recommended: (b) DO Cloud Firewall at node level.**
+**ACCEPTED 2026-04-22: (b) DO Cloud Firewall, simple mode — no CF-IP
+allow-list, no per-galaxy split.**
 
-- Rule on `gxy-fw-fra1`: allow 80/443 only from published Cloudflare IPv4
-  - IPv6 ranges (`https://www.cloudflare.com/ips-v4/` +
-    `/ips-v6/`).
-- Windmill cron refreshes the rule weekly via DO API (list diffs CF IPs,
-  calls firewall update).
-- **Why:** T32 stamp-2 field note flagged Cilium CNP with FQDN
-  allow-lists as a footgun under 1.19; node-level firewall avoids cluster
-  DNS dependencies. Fails open on rule misconfiguration (still gated by
-  CF WAF), which is safer for static public content than Cilium's
-  fail-closed default.
-- Applies to `gxy-cassiopeia` only for MVP; no effect on `gxy-management`
-  / `gxy-launchbase` which are org-gated and do not serve public traffic.
+- `gxy-fw-fra1` keeps 80/443 open to `0.0.0.0/0`. Traffic already gated
+  behind CF proxy (SSL Full Strict); CF WAF + CF DDoS absorb the
+  abuse surface.
+- No Windmill cron to diff CF IPs. No tag split per galaxy. KISS.
+- Post-MVP triggers to reconsider: one of (a) first scraper-driven DO
+  bandwidth spike, (b) CF-bypass attack signature observed in logs,
+  (c) compliance ask for explicit IP allow-list.
+- **Why simpler now:** T32 stamp-2 field note flagged Cilium CNP with
+  FQDN allow-lists as a footgun under 1.19. Adding CF-IP rules on the
+  DO side trades that footgun for a weekly-cron dependency; we don't
+  need the protection yet.
 
 ## Q5 — Staff-site DNS pattern (#32)
 
-**Recommended: (a) platform-owned `<site>.freecode.camp` subdomain per
-site, MVP-only.**
+**ACCEPTED 2026-04-22: platform-owned two-level pattern.**
 
-- `<site>.freecode.camp` A record → cassiopeia node public IPs, CF proxied,
-  SSL Full (Strict) via `*.freecode.camp` origin cert.
-- Onboarding = Windmill flow accepts `<site>`, creates CF DNS record,
-  writes caddy route to ConfigMap.
-- **Why:** fastest onboarding; zero registrar API work for MVP; one CF
-  zone to reason about; aligns with gxy-static's current pattern (easy
-  cutover).
+- Prod: `<site>.freecode.camp` A record → cassiopeia node public IPs,
+  CF proxied, SSL Full (Strict) via `*.freecode.camp` CF Origin cert
+  (already live).
+- Preview: `<site>.preview.freecode.camp` A record → same IPs, CF proxied,
+  SSL Full (Strict) via `*.preview.freecode.camp` CF Origin cert
+  (already issued via ACM, CF activated).
+- Onboarding = Woodpecker/Windmill flow accepts `<site>`, creates both
+  A records (or a single flat entry plus a preview entry as needed),
+  writes caddy route/alias mapping.
+- **Why:** fastest onboarding; zero registrar API work for MVP; two CF
+  zones' worth of certs already in place; aligns with gxy-static's
+  current pattern. Preview sibling unlocks Q7.
 - **Phase 2:** BYO domain via `universe` CLI per ADR-009 flat DNS model.
   Staff owns full domain; platform provisions CF Origin Cert per domain.
   Deferred until first staff asks.
@@ -99,14 +103,20 @@ site, MVP-only.**
 
 ## Q7 — Preview environments in MVP (#34)
 
-**Recommended: (a) prod-only MVP.**
+**ACCEPTED 2026-04-22: prod + preview in MVP (flipped from default).**
 
-- Ship prod path first. Preview path lands in Phase 2 once prod stable.
-- **Why:** preview doubles the moving parts (preview R2 prefix, preview
-  alias, preview DNS, preview cleanup cadence). Staff-unblock goal is
-  prod first; preview is DX polish.
-- **Compensating:** staff can test locally via `universe` CLI's
-  `--preview` flag dry-run against a scratch R2 prefix after Phase 2.
+- DNS cert infra is already in place: `*.preview.freecode.camp` CF
+  Origin cert live alongside `*.freecode.camp`. No additional registrar
+  or CF work needed to serve preview traffic.
+- Each deploy writes two alias files in R2: `<site>/production` and
+  `<site>/preview`. `universe promote` repoints `<site>/production` to
+  the current preview prefix atomically.
+- Cleanup cron (Q8) treats both aliases as "in use" — same 7d retention
+  for unreferenced prefixes.
+- **Why flipped:** default assumed preview DX cost > MVP value. With
+  certs pre-issued the incremental cost collapses to R2 prefix
+  bookkeeping. Preview path becomes the staff safety net for prod
+  cutover, which is load-bearing for any content edit-and-ship loop.
 
 ## Q8 — Cleanup retention (#35)
 
@@ -119,18 +129,18 @@ site, MVP-only.**
 - **Phase 2:** per-site override via `platform.yaml`
   `static.retention: <N>d` when first ask lands.
 
-## Summary table — recommended MVP defaults
+## Summary table — ACCEPTED 2026-04-22
 
-| Q   | Topic                | Recommended default                                        |
-| --- | -------------------- | ---------------------------------------------------------- |
-| Q1  | Alias-write          | Woodpecker pipeline step                                   |
-| Q2  | CF R2 admin cred     | `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc` |
-| Q3  | Per-site sops path   | `infra-secrets/constellations/<site>.secrets.env.enc`      |
-| Q4  | Origin IP allow-list | DO Cloud Firewall (node-level)                             |
-| Q5  | Staff-site DNS       | Platform-owned `<site>.freecode.camp` subdomain            |
-| Q6  | Rollback SLO         | ≤ 2 minutes                                                |
-| Q7  | Preview envs         | Prod-only MVP (preview Phase 2)                            |
-| Q8  | Cleanup retention    | Hard 7d (override Phase 2)                                 |
+| Q   | Topic                | Decision                                                                                      |
+| --- | -------------------- | --------------------------------------------------------------------------------------------- |
+| Q1  | Alias-write          | Woodpecker pipeline step                                                                      |
+| Q2  | CF R2 admin cred     | `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc`                                    |
+| Q3  | Per-site sops path   | `infra-secrets/constellations/<site>.secrets.env.enc`                                         |
+| Q4  | Origin IP allow-list | DO Cloud Firewall, no CF-IP allow-list, no per-galaxy split                                   |
+| Q5  | Staff-site DNS       | Prod `<site>.freecode.camp` + preview `<site>.preview.freecode.camp` (both certs CF-resident) |
+| Q6  | Rollback SLO         | ≤ 2 minutes                                                                                   |
+| Q7  | Preview envs         | Prod + preview both in MVP (flipped — certs already issued)                                   |
+| Q8  | Cleanup retention    | Hard 7d; preview alias pins its prefix same as prod                                           |
 
 ## How to adopt
 
