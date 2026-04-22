@@ -70,7 +70,7 @@ k3s/
 | Cluster        | Name Pattern              | Count | Specs               | Tags           |
 | -------------- | ------------------------- | ----- | ------------------- | -------------- |
 | tools          | ops-vm-tools-k3s-nyc3-0X  | 3     | 4 vCPU, 8GB, 160GB  | tools_k3s      |
-| gxy-management | gxy-vm-mgmt-k3s-{1,2,3}   | 3     | 8 vCPU, 16GB, 320GB | gxy-mgmt-k3s   |
+| gxy-management | gxy-vm-management-k3s-{1,2,3}   | 3     | 8 vCPU, 16GB, 320GB | gxy-management-k3s   |
 | gxy-static     | gxy-vm-static-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-static-k3s |
 
 ### Load Balancer
@@ -91,7 +91,7 @@ just play k3s--cluster tools_k3s
 just play k3s--longhorn tools_k3s
 
 # Deploy gxy-management galaxy
-just play k3s--bootstrap gxy_mgmt_k3s
+just play k3s--bootstrap gxy_management_k3s
 
 # Deploy gxy-static galaxy
 just play k3s--bootstrap gxy_static_k3s

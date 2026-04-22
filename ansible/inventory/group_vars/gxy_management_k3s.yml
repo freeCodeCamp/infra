@@ -1,6 +1,6 @@
 ---
 # gxy-management galaxy configuration
-# Applied automatically when targeting the gxy_mgmt_k3s inventory group
+# Applied automatically when targeting the gxy_management_k3s inventory group
 #
 # To add a new galaxy: create a new file matching the DO inventory tag.
 

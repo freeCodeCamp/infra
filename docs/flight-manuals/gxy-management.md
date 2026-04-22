@@ -29,15 +29,15 @@ just secret-verify-all
 ### 1.2 DO Droplets
 
 - Create 3x `s-8vcpu-16gb-amd` in FRA1
-- Names: `gxy-vm-mgmt-k3s-{1,2,3}`
+- Names: `gxy-vm-management-k3s-{1,2,3}`
   _(rename to `gxy-vm-management-k3s-{1,2,3}` pending task #22 in sprint 2026-04-21)_
-- Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-mgmt-k3s`
+- Image: Ubuntu 24.04, VPC: `universe-vpc-fra1`, Tag: `gxy-management-k3s`
   _(tag rename: `gxy-management-k3s` pending)_
 - Cloud-init: `cloud-init/basic.yml`
 
 ### 1.3 DO Cloud Firewall
 
-- Create firewall `gxy-fw-fra1`, attach to tag `gxy-mgmt-k3s`
+- Create firewall `gxy-fw-fra1`, attach to tag `gxy-management-k3s`
 - VPC rules (source 10.110.0.0/20): 2379-2380, 4240, 4244, 5001, 6443, 8472, 10250
 - Public rules: 22/TCP, 80/TCP, 443/TCP
 
@@ -48,14 +48,14 @@ just secret-verify-all
 ### 1.5 Tailscale
 
 ```
-just play tailscale--0-install gxy_mgmt_k3s
-just play tailscale--1b-up-with-ssh gxy_mgmt_k3s
+just play tailscale--0-install gxy_management_k3s
+just play tailscale--1b-up-with-ssh gxy_management_k3s
 ```
 
 Verify from local:
 
 ```
-tailscale status | grep gxy-vm-mgmt
+tailscale status | grep gxy-vm-management
 ```
 
 All 3 nodes should show as connected.
@@ -64,7 +64,7 @@ All 3 nodes should show as connected.
 
 ```
 cd k3s/gxy-management
-just play k3s--bootstrap gxy_mgmt_k3s
+just play k3s--bootstrap gxy_management_k3s
 ```
 
 This runs 5 plays: validate → prerequisites → k3s deploy → Cilium → verify + kubeconfig.
@@ -117,6 +117,107 @@ kubectl get svc -n kube-system traefik
 # EXTERNAL-IP shows all 3 node VPC IPs
 ```
 
+## Phase 3.5: Restore Windmill state (REBUILD ONLY)
+
+Skip on fresh install. Only applies when this flight-manual is replayed to
+rebuild an existing cluster — the bundled PostgreSQL comes up empty after
+Phase 3.1 Helm install, so the pre-teardown `pg_dumpall` must be loaded
+before end users hit the UI.
+
+For a rebuild, do this BEFORE Phase 4 DNS cutover. The ordering avoids
+serving an empty Windmill to CF-proxied clients. If DNS was already cut
+(hotfix during a live teardown), minimize the window by running 3.5
+immediately — expect minutes of empty state.
+
+### 3.5.1 Preconditions
+
+- Pre-teardown pg_dump exists at `k3s/gxy-management/.backups/windmill-<ts>.sql.gz`
+  (`just windmill-backup gxy-management` before teardown) OR S3 copy at
+  `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
+- `windmill-postgresql-0` pod Running (Phase 3.3 green).
+
+### 3.5.2 Quiesce Windmill app + worker pods
+
+The bundled PostgreSQL refuses `DROP DATABASE windmill` while the app /
+extra / workers hold connections (seen as ~35 sessions per deploy). Scale
+the Windmill deployments to zero first; leave the `windmill-postgresql`
+StatefulSet up.
+
+```
+export KUBECONFIG=$(pwd)/k3s/gxy-management/.kubeconfig.yaml
+
+# Record current replica counts for restore after (should be 1/1/2/1).
+kubectl get deploy -n windmill -o jsonpath='{range .items[*]}{.metadata.name}{"="}{.spec.replicas}{"\n"}{end}'
+
+kubectl scale deploy -n windmill \
+  windmill-app windmill-extra windmill-workers-default windmill-workers-native \
+  --replicas=0
+
+# Wait until only windmill-postgresql-0 is Running.
+kubectl get pods -n windmill -w
+```
+
+### 3.5.3 Restore
+
+```
+DUMP=k3s/gxy-management/.backups/windmill-<ts>.sql.gz   # adjust timestamp
+PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
+
+kubectl cp "$DUMP" "windmill/${PG_POD}:/tmp/"
+
+# Kill any stragglers + drop the fresh-install DB so the dump's CREATE
+# lands cleanly.
+kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -c "
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+  WHERE datname='windmill' AND pid <> pg_backend_pid();"
+kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -c "DROP DATABASE IF EXISTS windmill;"
+
+kubectl exec -n windmill "${PG_POD}" -- bash -c \
+  "gunzip -c /tmp/$(basename $DUMP) | psql -U postgres"
+```
+
+Expected noise: `NOTICE` / `ERROR: role "postgres" already exists` and
+similar on `DROP/CREATE` — harmless, because `pg_dumpall --clean --if-exists`
+emits idempotent DROP statements that race with the
+already-bootstrapped `postgres` super-role. Treat constraint violations on
+`INSERT` as real errors.
+
+### 3.5.4 Scale back + verify
+
+```
+# Restore original replica counts (chart 4.x defaults).
+kubectl scale deploy -n windmill windmill-app --replicas=1
+kubectl scale deploy -n windmill windmill-extra --replicas=1
+kubectl scale deploy -n windmill windmill-workers-default --replicas=2
+kubectl scale deploy -n windmill windmill-workers-native --replicas=1
+
+kubectl rollout status deploy -n windmill windmill-app --timeout=5m
+kubectl rollout status deploy -n windmill windmill-workers-default --timeout=5m
+
+# Row counts
+kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -d windmill -c "
+  SELECT
+    (SELECT count(*) FROM script) AS scripts,
+    (SELECT count(*) FROM flow) AS flows,
+    (SELECT count(*) FROM app) AS apps,
+    (SELECT count(*) FROM resource) AS resources,
+    (SELECT count(*) FROM usr) AS users,
+    (SELECT count(*) FROM schedule) AS schedules
+  ;"
+
+# wmill CLI sync check (from ~/DEV/fCC-U/windmill)
+wmill sync pull --workspace platform --yes
+# Expect: zero deletions, zero new additions.
+```
+
+### 3.5.5 S3 fallback (no local dump available)
+
+```
+s3cmd get s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz /tmp/
+kubectl cp /tmp/windmill-<ts>.sql.gz windmill/${PG_POD}:/tmp/
+# continue from 3.5.3 exec step
+```
+
 ## Phase 4: DNS + access (ClickOps — codify in OpenTofu)
 
 ### 4.1 Get node public IPs
@@ -128,7 +229,7 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.a
 If no ExternalIP (DO doesn't always populate it):
 
 ```
-doctl compute droplet list --tag-name gxy-mgmt-k3s --format Name,PublicIPv4
+doctl compute droplet list --tag-name gxy-management-k3s --format Name,PublicIPv4
 ```
 
 ### 4.2 Cloudflare DNS
@@ -418,14 +519,14 @@ wmill generate-metadata
 ### Cluster only (preserves VMs)
 
 ```
-just play k3s--teardown gxy_mgmt_k3s
+just play k3s--teardown gxy_management_k3s
 ```
 
 ### Full teardown (VMs too)
 
 ```
-just play k3s--teardown gxy_mgmt_k3s
-doctl compute droplet delete gxy-vm-mgmt-k3s-1 gxy-vm-mgmt-k3s-2 gxy-vm-mgmt-k3s-3 --force
+just play k3s--teardown gxy_management_k3s
+doctl compute droplet delete gxy-vm-management-k3s-1 gxy-vm-management-k3s-2 gxy-vm-management-k3s-3 --force
 ```
 
 VPC, firewall, Spaces persist (shared infrastructure — see

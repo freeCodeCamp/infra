@@ -860,7 +860,7 @@ yamllint -d "{extends: default, rules: {line-length: disable}}" ansible/inventor
 
 - CIDRs MUST NOT collide with existing galaxies (mgmt 10.0/10.10, static 10.5/10.15)
 - `cilium_cluster_id` MUST be unique across the fleet
-- Do NOT modify `gxy_static_k3s.yml` or `gxy_mgmt_k3s.yml`
+- Do NOT modify `gxy_static_k3s.yml` or `gxy_management_k3s.yml`
 
 #### Agent Prompt
 
