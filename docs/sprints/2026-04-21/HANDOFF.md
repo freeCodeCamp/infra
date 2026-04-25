@@ -14,6 +14,84 @@ Convention:
 
 ## Journal
 
+### 2026-04-25 — Wave A.2 follow-up: slop strip + D37 enforcement (universe-cli)
+
+Audit of A.2 closure surfaced T20 strip-completeness gap: 5 dead error
+classes + 6 orphan exit codes survived the rclone/S3 cut with circular
+tests proving dead code matches dead constants. Operator ran follow-up
+in parallel universe-cli session; verified clean.
+
+universe-cli commits (branch `feat/woodpecker-pivot`):
+
+- `4f54012` — refactor(errors): strip orphan classes (`StorageError`,
+  `OutputDirError`, `AliasError`, `DeployNotFoundError`, `ConfirmError`)
+  - 6 orphan exit codes (`EXIT_STORAGE`, `EXIT_OUTPUT_DIR`, `EXIT_ALIAS`,
+    `EXIT_DEPLOY_NOT_FOUND`, `EXIT_CONFIRM`, `EXIT_PARTIAL`) + circular
+    tests. Net: -91 lines across 4 files.
+- `0113c9c` — feat(config): D37 domain pattern + `production_branch`
+  covenant. Schema enforces production hostname matches `<site>` +
+  preview matches `<site>.preview.freecode.camp` (D35 dot-scheme).
+  Off-list bonus surfaced during the strip; tightens promote/rollback
+  branch resolution.
+
+Acceptance: `pnpm test` 166/166 green (was 167 — net -1 from removing
+62 dead tests + adding 61 D37 tests), `pnpm exec tsc --noEmit` clean,
+`pnpm exec oxlint src tests` 0/0.
+
+#25 publish path now clean — no orphan symbols carried forward.
+
+Commits (universe-cli, awaiting operator push): `4f54012`, `0113c9c`.
+
+### 2026-04-25 — Wave A.2 universe-cli T16-T20 closed + v0.4.0-beta.1 prepped
+
+`feat/woodpecker-pivot` audit + closure pass. All five universe-cli
+tasks shipped earlier same day were carrying open dispatch headers;
+this entry closes the loop.
+
+Universe-cli commits referenced (branch `feat/woodpecker-pivot`):
+
+- `a7dd58e` — T16 + T17. Woodpecker client (`src/woodpecker/{client,
+types,errors,stream,index}.ts`), credentials resolver
+  (`src/credentials/woodpecker.ts`), site-name validator
+  (`src/validation/site-name.ts`), `PipelineError` + `EXIT_PIPELINE=20`,
+  config schema strict-mode + `woodpecker {endpoint,repo_id}` section.
+- `f6971cf` — T18 + T19 + T20. Full rewrite of `deploy`, `promote`,
+  `rollback` to trigger Woodpecker pipelines via API; deletion of
+  `src/storage/*`, `src/deploy/{upload,metadata,preflight,id,walk}.ts`,
+  `src/credentials/resolver.ts`; `@aws-sdk/client-s3` removed from
+  `dependencies`.
+- `89ab897` — D35 dot-scheme test fixture correction. Audit caught
+  three `tests/commands/{deploy,promote,rollback}.test.ts` fixtures
+  still using legacy `<site>--preview.freecode.camp` hyphen-scheme.
+  Re-ran 167/167 green.
+- `03c5f19` — T20 release prep. `package.json.version` =
+  `0.4.0-beta.1`, CHANGELOG entry authored (Breaking / Added /
+  Removed / Migration); release CI auto-bump remains a no-op on
+  operator-triggered run.
+
+Dispatch closures (this commit): T16, T17, T18, T19, T20 status flipped
+to `done`, closure blocks filled with acceptance evidence + commit
+SHAs + surprises (D35 fixture drift, early `stream.ts` extraction,
+release-CI no-op behaviour). PLAN.md matrix rows flipped to `[x] done`.
+
+Field note appended at
+`~/DEV/fCC-U/Universe/spike/field-notes/universe-cli.md`.
+
+Acceptance: `pnpm test` 167/167 green, `pnpm exec tsc --noEmit` clean,
+`pnpm exec oxlint src tests` 0/0. No live Woodpecker call exercised
+yet — that surfaces during Wave B (T21 template + reference repo
+deploy against gxy-launchbase + gxy-cassiopeia).
+
+Next unblocked: **Wave A.3 windmill T11** (per-site R2 secret
+provisioning flow). Wave B follows once T11 observes green.
+
+#25 release dispatch unblocks: operator can run release workflow with
+`version=0.4.0-beta.1` after T11 + Wave B exercise the live Woodpecker
+flow end-to-end.
+
+Commits (universe-cli, awaiting operator push): `a7dd58e`, `f6971cf`,
+`89ab897`, `03c5f19`.
+
 ### 2026-04-25 — T15 Phase 4 smoke runbook + script (Wave A.1 closed)
 
 G1.0 operator bootstrap landed earlier same day (CF Account-owned API

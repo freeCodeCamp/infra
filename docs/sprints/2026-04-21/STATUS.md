@@ -1,8 +1,8 @@
 # Sprint 2026-04-21 — STATUS
 
-Updated: 2026-04-25 · Branch: `feat/k3s-universe` · Ahead of origin: 14
+Updated: 2026-04-25 (later) · Branch: `feat/k3s-universe` · Ahead of origin: 17
 
-**Wave A LIVE.** G1.0 cleared. T15 closed (script + runbook + recipe shipped, awaits operator live run on gxy-cassiopeia). A.2 T16 unblocked.
+**Wave A.1 + A.2 closed.** G1.0 cleared. T15 closed (awaits operator live run on gxy-cassiopeia). T16-T20 closed (universe-cli v0.4.0-beta.1 prepped + slop strip + D37 enforcement). **A.3 T11 (windmill flow) unblocked — next move.**
 
 Canonical session-roll output. Overwritten each `roll the session`. Read
 this **before** PLAN.md or DECISIONS.md — those are stable references,
@@ -37,6 +37,17 @@ Sprint scaffolding (since operator's last push):
 - S10 — Filesystem-driven dispatches (drop bead tracking) — `ae82d8e`
 - S11 — Sprint doc consolidation: STATUS+PLAN+DECISIONS structure + GUIDELINES Sprint protocol — `3befa74`
 - T15 — Phase 4 smoke runbook + script + `just phase4-smoke` / `phase4-smoke-test` recipes (Wave A.1 closed) — `1e3b439`
+- S12 — T15 closing commit ref backfill — `3f31a5c`
+- T16-T20 dispatch closures (universe-cli closure docs in infra repo) — `96b5b52`
+
+universe-cli `feat/woodpecker-pivot` (cross-repo, awaiting operator push):
+
+- T16 + T17 — Woodpecker client + config schema strict-mode — `a7dd58e`
+- T18 + T19 + T20 — deploy/promote/rollback Woodpecker rewrite + S3/rclone strip — `f6971cf`
+- D35 fixture realignment — `89ab897`
+- v0.4.0-beta.1 release prep + CHANGELOG — `03c5f19`
+- A.2 follow-up: orphan errors + exit-codes strip (audit cleanup) — `4f54012`
+- D37 domain pattern + `production_branch` covenant — `0113c9c`
 
 ## Open
 
@@ -50,10 +61,12 @@ Wave A staggered — in flight:
 - Wave A.1 (infra) → **T15** ✅ done. Static gates green; awaits operator
   live run (`just phase4-smoke` against gxy-cassiopeia w/ temp DNS) for
   RFC §6.6 Phase 4 exit to fire. Runbook: `docs/runbooks/phase4-test-site-smoke.md`.
-- Wave A.2 (universe-cli) → **T16** ← next, then T17.
-- Wave A.3 (windmill) → T11 per-site R2 secret provisioning flow.
+- Wave A.2 (universe-cli) → **T16-T20** ✅ done. Slop strip + D37 enforcement also landed (off-list). v0.4.0-beta.1 ready behind operator publish trigger.
+- Wave A.3 (windmill) → **T11 ← next unblocked.** Per-site R2 secret provisioning flow. Cross-repo dispatch (~/DEV/fCC-U/windmill @ main).
 
-T15 done. T11 + T16–T22 still `pending`.
+Wave B (post-T11 observe-✓): T21 (infra `.woodpecker/deploy.yaml`), T22 (windmill cleanup cron). Both pending.
+
+T15 done. T16-T20 done. T11 + T21-T22 still `pending`.
 
 ## Other state
 
@@ -70,21 +83,24 @@ T15 done. T11 + T16–T22 still `pending`.
 ## Resume prompt — paste in fresh session
 
 ▎ Resume Sprint 2026-04-21 Wave A per docs/sprints/2026-04-21/PLAN.md.
-Tree on feat/k3s-universe, ahead of origin by 14, last shipped T15
-(Phase 4 smoke runbook + script + just phase4-smoke recipe). G1.0
-operator bootstrap DONE — CF Account-owned API Token minted,
+Tree on feat/k3s-universe, ahead of origin by 17. Wave A.1 + A.2 closed.
+G1.0 operator bootstrap DONE — CF Account-owned API Token minted,
 infra-secrets/windmill/.env.enc seeded with CF_R2_ADMIN_API_TOKEN +
 CF_ACCOUNT_ID, Windmill Resource u/admin/cf_r2_provisioner registered.
-Wave A.1 infra T15 closed (static gates green; awaits operator live
-`just phase4-smoke` run on gxy-cassiopeia w/ temp DNS for RFC §6.6
-Phase 4 exit). Sprint goal: Universe static-apps MVP — staff push
-→ site live on <site>.freecode.camp via Woodpecker → R2 →
-Caddy(r2_alias) on gxy-cassiopeia + preview siblings on
-<site>.preview.freecode.camp. Next unblocked: Wave A.2 universe-cli
-T16 woodpecker client (repo ~/DEV/fCC-U/universe-cli, branch
-feat/woodpecker-pivot), then T17 config schema → observe → A.3
-windmill T11. Locked decisions in DECISIONS.md (Q1–Q8 + D33×2/D40
-amendments). Per-task covenant: TDD discipline, one commit per task,
-type(scope): subject title only, worker flips dispatch Status
-pending → in-progress → done in same closure commit, no push / no PR
-/ no publish — operator pushes at sprint close.
+T15 done (Phase 4 smoke script + runbook + just phase4-smoke recipe;
+awaits operator live run on gxy-cassiopeia w/ temp DNS for RFC §6.6
+Phase 4 exit). T16-T20 done (universe-cli @ feat/woodpecker-pivot:
+Woodpecker pivot, S3/rclone strip, v0.4.0-beta.1 prepped, slop strip
+
+- D37 follow-up landed; 166/166 tests green). Sprint goal: Universe
+  static-apps MVP — staff push → site live on <site>.freecode.camp via
+  Woodpecker → R2 → Caddy(r2_alias) on gxy-cassiopeia + preview siblings
+  on <site>.preview.freecode.camp. Next unblocked: Wave A.3 windmill
+  T11 per-site R2 secret provisioning flow (cross-repo dispatch:
+  ~/DEV/fCC-U/windmill @ main, dispatches/T11-windmill-flow.md). After
+  T11 observe-✓: Wave B parallel fanout (infra T21 .woodpecker template,
+  windmill T22 cleanup cron). Locked decisions in DECISIONS.md (Q1–Q8 +
+  D33×2/D37/D40 amendments). Per-task covenant: TDD discipline, one
+  commit per task, type(scope): subject title only, worker flips
+  dispatch Status pending → in-progress → done in same closure commit,
+  no push / no PR / no publish — operator pushes at sprint close.

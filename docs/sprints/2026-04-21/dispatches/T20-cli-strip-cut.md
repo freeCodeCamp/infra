@@ -1,15 +1,15 @@
 # T20 — universe-cli — Remove legacy rclone/S3 + release v0.4.0-beta.1
 
-**Status:** pending
+**Status:** done
 **Worker:** w-cli
 **Repo:** `~/DEV/fCC-U/universe-cli` (branch: `feat/woodpecker-pivot`)
 **Spec:** [`task-gxy-cassiopeia.md` §Task 20](../../architecture/task-gxy-cassiopeia.md)
 **RFC:** N/A (cleanup + release)
 **QA deltas:** none
 **Depends on:** T19 (promote+rollback)
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-25
+**Closed:** 2026-04-25
+**Closing commit(s):** `f6971cf` (deletion) + `03c5f19` (version + CHANGELOG)
 
 ---
 
@@ -38,12 +38,23 @@ returns no matches; version bumped; CHANGELOG entry present.
 
 ## Closure (filled on completion)
 
-- **Status:** —
-- **Closing commit:** —
+- **Status:** done
+- **Closing commit:** `f6971cf` (legacy deletion) + `03c5f19` (version
+  bump + CHANGELOG)
 - **Acceptance evidence:**
-  - `pnpm install && pnpm test && pnpm typecheck` — all 0
-  - grep for S3 patterns — empty
-  - bundle size check (target <850KB) — pass
-- **Surprises:** —
-- **Sprint-doc patches owed:** matrix row flip; #25 release dispatch
-  unblocks (see `MASTER.md` Phase 2).
+  - `pnpm test` — 167/167 green across 17 files
+  - `pnpm exec tsc --noEmit` — clean
+  - `pnpm exec oxlint src tests` — 0 warnings, 0 errors
+  - `grep -rE 'S3Client|createS3Client|uploadDirectory' src/ --include='*.ts'`
+    — empty
+  - `package.json.version` = `0.4.0-beta.1`; `@aws-sdk/client-s3`
+    absent from `dependencies` + lockfile
+  - CHANGELOG.md `## [0.4.0-beta.1] — 2026-04-25` section authored
+    (Breaking / Added / Removed / Migration)
+- **Surprises:** release CI auto-bumps via `workflow_dispatch`; manual
+  pre-population of `package.json.version` + CHANGELOG section makes
+  the bump job a no-op (CURRENT==VERSION + grep finds heading), so
+  operator-triggered run will flow through to publish/tag without an
+  intermediate "chore: release" commit.
+- **Sprint-doc patches owed:** PLAN.md matrix row flipped; #25 release
+  dispatch unblocked.
