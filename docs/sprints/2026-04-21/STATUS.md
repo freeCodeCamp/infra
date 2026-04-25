@@ -68,8 +68,8 @@ All 9 sub-tasks `pending` per dispatch-doc Status headers.
 ## Resume prompt — paste in fresh session
 
 ▎ Resume Sprint 2026-04-21 Wave A pre-launch per docs/sprints/2026-04-21/PLAN.md.
-Tree on feat/k3s-universe, ahead of origin by 11, last shipped S10
-(filesystem-driven dispatches landed, beads tracking dropped).
+Tree on feat/k3s-universe, ahead of origin by 12, last shipped S11
+(sprint doc consolidation: STATUS+PLAN+DECISIONS + GUIDELINES protocol).
 Sprint goal: Universe static-apps MVP — staff push → site live on
 <site>.freecode.camp via Woodpecker → R2 → Caddy(r2_alias) on
 gxy-cassiopeia + preview siblings on <site>.preview.freecode.camp.
