@@ -348,7 +348,15 @@ Operator pushes.
 bash -c 'source /Users/mrugesh/.claude/plugins/cache/dotplugins/dp-cto/8.5.0/lib/dp-beads.sh && dp_beads_close gxy-static-k7d.12 "Shipped in windmill commit <sha>. Flow at f/static/provision_site_r2_credentials. Verified green via runScriptPreviewAndWaitResult against live Windmill. D22 repo-scope + D33 admin path + D34 per-site sops path honored."'
 ```
 
-## Operator bootstrap (BEFORE T11 starts) — REVISED 2026-04-25 (×2)
+## Operator bootstrap (BEFORE T11 starts) — REVISED 2026-04-25 (×3)
+
+**×3 amendment (2026-04-25 evening):** §1 step 5 corrected. Earlier
+revisions described the **user-token** form (with `Account Resources`
+and `TTL` rows) but routed the operator to the **account-owned-token**
+page. Account-owned tokens use a simpler 3-field form: name,
+permissions, optional expiration date — nothing else. Disambiguation
+note added distinguishing this from the R2-page "Manage API Tokens"
+surface (which mints S3-style keys, not the Bearer this flow needs).
 
 The provisioner admin cred lands in `infra-secrets/windmill/.env.enc`
 (per D33 amended ×2 — activates the reserved Universe-platform-app
@@ -369,7 +377,22 @@ Verified against Cloudflare docs 2026-04-25:
 
 ### 1. Mint CF Account-owned API Token (REQUIRED)
 
-> Requires **Super Administrator** role on the account.
+Requires **Super Administrator** role on the account.
+
+**Disambiguation — two CF surfaces can mint R2-capable creds; we want
+the FIRST, not the second:**
+
+- **(this doc — correct)** `Manage Account → Account API Tokens` —
+  mints a Bearer `cfat_…` token for `api.cloudflare.com/client/v4/...`
+  management calls. The flow uses this Bearer to mint per-site keys
+  via `POST /accounts/{id}/r2/buckets/{bucket}/credentials`.
+- **(NOT this doc)** `R2 → Overview → Account Details → Manage API Tokens`
+  — mints S3-style `Access Key ID` + `Secret Access Key` (with
+  permission picker `Admin Read & Write` / `Object Read & Write`
+  etc.) for direct S3-SDK calls against
+  `<account>.r2.cloudflarestorage.com`. T11 does NOT use this surface.
+
+Steps:
 
 1. Sign in to https://dash.cloudflare.com .
 2. Top-right account picker → select the freeCodeCamp Universe account
@@ -377,15 +400,23 @@ Verified against Cloudflare docs 2026-04-25:
 3. **Manage Account** → **Account API Tokens**.
    (Direct nav after step 2: account dropdown → Manage Account → "Account API Tokens" tab.)
 4. Click **Create Token**.
-5. Fill the form:
+5. Fill the form. **Account-owned token form is 3 fields only** —
+   simpler than the user-token form. Expect:
    - **Token name:** `r2-provisioner-universe-static-apps-01`
    - **Permissions:** add row → **Account** · **R2 Storage** · **Edit**
      (this lets the token call the R2 management endpoints incl.
      `POST /accounts/{account_id}/r2/buckets/{bucket}/credentials` to
      mint per-site access keys).
-   - **Account Resources:** Include — Specific account — freeCodeCamp.
-   - **TTL:** custom expiry ~1 year out (or leave open + add rotation
-     reminder to TODO-park).
+   - **Expiration date** (optional): set ~1 year out. If left blank,
+     add a rotation reminder to `infra/docs/TODO-park.md`.
+
+   **Do NOT look for** an "Account Resources" picker (token is
+   inherently scoped to the account being managed) or a "Client IP
+   Address Filtering" / custom "TTL" section. Those rows belong to
+   the **user-token** form (`My Profile → API Tokens`) — wrong
+   surface for T11. If you see them, you navigated to the user-token
+   page; back out and re-enter via Manage Account.
+
 6. **Continue to summary** → review → **Create Token**.
 7. **Copy the token value immediately.** It is shown once. The new
    format is `cfat_<random>` (account-owned scannable prefix; CF
