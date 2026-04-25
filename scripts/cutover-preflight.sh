@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # DNS cutover preflight: enumerate sites in gxy-static-1, run 8 checks per
-# site against gxy-cassiopeia-1. Exits non-zero on ANY site failing ANY check
+# site against universe-static-apps-01. Exits non-zero on ANY site failing ANY check
 # — cutover must not proceed.
 #
 # Usage:
@@ -8,7 +8,7 @@
 #
 # Environment (from direnv in infra-secrets):
 #   STATIC_BUCKET           (default: gxy-static-1)
-#   CASSIOPEIA_BUCKET       (default: gxy-cassiopeia-1)
+#   CASSIOPEIA_BUCKET       (default: universe-static-apps-01)
 #   CASSIOPEIA_NODE_IP      any gxy-cassiopeia node public IP (for Host-header test)
 #   WOODPECKER_ADMIN_TOKEN  Woodpecker API token with repo-read scope
 #   WOODPECKER_ENDPOINT     e.g. https://woodpecker.freecodecamp.net
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 : "${STATIC_BUCKET:=gxy-static-1}"
-: "${CASSIOPEIA_BUCKET:=gxy-cassiopeia-1}"
+: "${CASSIOPEIA_BUCKET:=universe-static-apps-01}"
 : "${CASSIOPEIA_NODE_IP:?Set CASSIOPEIA_NODE_IP to any gxy-cassiopeia node public IP}"
 : "${WOODPECKER_ADMIN_TOKEN:?Set WOODPECKER_ADMIN_TOKEN}"
 : "${WOODPECKER_ENDPOINT:?Set WOODPECKER_ENDPOINT (e.g. https://woodpecker.freecodecamp.net)}"

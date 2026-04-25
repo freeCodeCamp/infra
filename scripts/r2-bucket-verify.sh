@@ -3,9 +3,9 @@
 # correctly and the rw/ro keys decrypt + work.
 #
 # Usage:
-#   just r2-bucket-verify gxy-cassiopeia-1
+#   just r2-bucket-verify universe-static-apps-01
 #   # OR
-#   scripts/r2-bucket-verify.sh gxy-cassiopeia-1
+#   scripts/r2-bucket-verify.sh universe-static-apps-01
 #
 # Requires: rclone, sops, jq, infra-secrets checked out as sibling dir.
 # Exit code: 0 on all checks pass, non-zero on any failure.

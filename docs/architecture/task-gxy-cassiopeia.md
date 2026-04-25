@@ -51,7 +51,7 @@ Every task must respect these boundaries (from RFC §7):
 **Migration constraints:**
 
 - `universe-cli ≥ 0.4.0` required for gxy-cassiopeia; older versions will fail
-- Constellations on gxy-static must re-deploy to gxy-cassiopeia-1 before DNS cutover (enforced by preflight script)
+- Constellations on gxy-static must re-deploy to universe-static-apps-01 before DNS cutover (enforced by preflight script)
 - gxy-static is NOT deleted by this work; decommission is the user's decision post-30-day-soak
 
 **Scope boundaries (files tasks must NOT modify):**
@@ -1474,13 +1474,13 @@ If the Woodpecker chart's env schema has changed, check https://github.com/woodp
 
 #### Context
 
-A Windmill flow that mints a new R2 Access Token with path condition `gxy-cassiopeia-1/{site}/*`, stores it in sops-encrypted form, and adds it as a Woodpecker **repo-scoped** (not org-scoped) secret per D22 / RFC §4.2.4.
+A Windmill flow that mints a new R2 Access Token with path condition `universe-static-apps-01/{site}/*`, stores it in sops-encrypted form, and adds it as a Woodpecker **repo-scoped** (not org-scoped) secret per D22 / RFC §4.2.4.
 
 This closes the CRITICAL #2 supply-chain finding. The flow is the canonical path for registering a new constellation — ensures every site has its own bounded-blast-radius credential.
 
 #### Acceptance Criteria
 
-- GIVEN the flow input `{site: "hello-world"}` WHEN the flow executes against a mock CF API THEN a new R2 token is created with path condition `gxy-cassiopeia-1/hello-world.freecode.camp/*`
+- GIVEN the flow input `{site: "hello-world"}` WHEN the flow executes against a mock CF API THEN a new R2 token is created with path condition `universe-static-apps-01/hello-world.freecode.camp/*`
 - GIVEN the flow THEN the credentials are passed to a sops encryption step (actual file write is out of scope for the flow itself; flow returns encrypted blob)
 - GIVEN the flow THEN Woodpecker repo secrets `r2_access_key_id` + `r2_secret_access_key` are added to `freeCodeCamp-Universe/<site>` via Woodpecker API
 - GIVEN tests run THEN all assertions pass (mock CF API and Woodpecker API)
@@ -1511,7 +1511,7 @@ Work in the Windmill repo: `/Users/mrugesh/DEV/fCC-U/windmill`. NOT the infra re
 
 ## Your Task
 
-Per RFC §4.2.4 (D22), implement a TypeScript Windmill flow that mints a new R2 Access Token with a path condition restricting writes to `gxy-cassiopeia-1/{site}/*`, then registers the credentials as a **repo-scoped** Woodpecker secret (NOT org-scoped — this is the entire point: bound blast radius of a compromised build dep).
+Per RFC §4.2.4 (D22), implement a TypeScript Windmill flow that mints a new R2 Access Token with a path condition restricting writes to `universe-static-apps-01/{site}/*`, then registers the credentials as a **repo-scoped** Woodpecker secret (NOT org-scoped — this is the entire point: bound blast radius of a compromised build dep).
 
 Read the RFC at `/Users/mrugesh/DEV/fCC/infra/docs/rfc/gxy-cassiopeia.md` §4.2.4 and §5.20 (D22 rejection rationale for org-scope) before starting.
 
@@ -1537,9 +1537,9 @@ Deno.test("mints R2 token with correct path condition", async () => {
     }
     return new Response(JSON.stringify({ok: true}), {status: 200});
   };
-  await provisionSiteR2Credentials({site: "hello-world", cf_account_id: "acct1", bucket: "gxy-cassiopeia-1", fetchFn: fetchMock});
+  await provisionSiteR2Credentials({site: "hello-world", cf_account_id: "acct1", bucket: "universe-static-apps-01", fetchFn: fetchMock});
   const cfCall = calls.find(c => c.url.includes("cloudflare.com"));
-  assertEquals((cfCall!.body as any).permissions[0].allowed_paths[0], "gxy-cassiopeia-1/hello-world.freecode.camp/*");
+  assertEquals((cfCall!.body as any).permissions[0].allowed_paths[0], "universe-static-apps-01/hello-world.freecode.camp/*");
 });
 
 Deno.test("adds secrets to Woodpecker as repo-scope, not org-scope", async () => {
@@ -1573,7 +1573,7 @@ import * as wmill from "https://deno.land/x/windmill@v1.xxx/mod.ts";
 export interface ProvisionInput {
   site: string;              // bare name, e.g. "hello-world"
   cf_account_id: string;     // Cloudflare account ID
-  bucket: string;            // R2 bucket name, e.g. "gxy-cassiopeia-1"
+  bucket: string;            // R2 bucket name, e.g. "universe-static-apps-01"
   woodpecker_repo: string;   // e.g. "freeCodeCamp-Universe/hello-world"
   fetchFn?: typeof fetch;    // for testing
 }
@@ -1700,7 +1700,7 @@ constellation-register site:
         -- \
         site={{site}} \
         cf_account_id=$CF_ACCOUNT_ID \
-        bucket=gxy-cassiopeia-1 \
+        bucket=universe-static-apps-01 \
         woodpecker_repo=freeCodeCamp-Universe/{{site}}
 ```
 
@@ -1723,7 +1723,7 @@ All tests pass.
 - Tests pass: `deno test f/static/provision_site_r2_credentials.test.ts`
 - Flow rejects invalid site names with `--`
 - Woodpecker API call path is `/api/repos/{id}/secrets` (repo-scope), NOT `/api/orgs/.../secrets`
-- CF R2 token body includes `allowed_paths: ["gxy-cassiopeia-1/<site>.freecode.camp/*"]`
+- CF R2 token body includes `allowed_paths: ["universe-static-apps-01/<site>.freecode.camp/*"]`
 - Idempotent: re-running for the same site replaces the credentials cleanly
 
 ## Context
@@ -1748,7 +1748,7 @@ If the CF Access Token API schema differs from the code above, check CF docs at 
 
 ---
 
-### Task 12 [M]: R2 bucket gxy-cassiopeia-1 — ClickOps runbook + preflight
+### Task 12 [M]: R2 bucket universe-static-apps-01 — ClickOps runbook + preflight
 
 **Traceability:** Implements R5 | Constrained by §4.4.1 (versioning enabled)
 **Files:**
@@ -1784,7 +1784,7 @@ shellcheck scripts/r2-bucket-verify.sh && just --unstable --fmt --check
 #### Agent Prompt
 
 ````
-You are implementing Task 12: R2 bucket gxy-cassiopeia-1 — runbook + verification script.
+You are implementing Task 12: R2 bucket universe-static-apps-01 — runbook + verification script.
 
 ## Repo and CWD
 
@@ -1797,7 +1797,7 @@ Document the ClickOps bucket provisioning steps + a verification script. Actual 
 ### Step 1: docs/runbooks/r2-bucket-provision.md
 
 ```markdown
-# R2 Bucket Provision: gxy-cassiopeia-1
+# R2 Bucket Provision: universe-static-apps-01
 
 Phase 4 prerequisite per RFC §4.4.1. ClickOps for v1; OpenTofu import later.
 
@@ -1809,7 +1809,7 @@ Phase 4 prerequisite per RFC §4.4.1. ClickOps for v1; OpenTofu import later.
 
 1. **Create the bucket**
    - Cloudflare Dashboard → R2 Object Storage → Create bucket
-   - Name: `gxy-cassiopeia-1`
+   - Name: `universe-static-apps-01`
    - Location: Europe (or Automatic)
    - Storage class: Standard
 
@@ -1823,7 +1823,7 @@ Phase 4 prerequisite per RFC §4.4.1. ClickOps for v1; OpenTofu import later.
    - Create Token
    - Name: `gxy-cassiopeia-caddy-ro`
    - Permissions: R2 Object Read
-   - Specify bucket: gxy-cassiopeia-1
+   - Specify bucket: universe-static-apps-01
    - TTL: none (no expiration; rotated every 90 days via runbook)
    - Copy the Access Key ID and Secret Access Key
 
@@ -1834,7 +1834,7 @@ Phase 4 prerequisite per RFC §4.4.1. ClickOps for v1; OpenTofu import later.
    AWS_ACCESS_KEY_ID=<access key from step 3>
    AWS_SECRET_ACCESS_KEY=<secret from step 3>
    R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
-   R2_BUCKET=gxy-cassiopeia-1
+   R2_BUCKET=universe-static-apps-01
    ```
 
    Encrypt with sops:
@@ -1867,14 +1867,14 @@ Phase 4 prerequisite per RFC §4.4.1. ClickOps for v1; OpenTofu import later.
 
 ```bash
 #!/usr/bin/env bash
-# Verify gxy-cassiopeia-1 bucket is provisioned and accessible.
+# Verify universe-static-apps-01 bucket is provisioned and accessible.
 # Reads credentials from env (populated by direnv from infra-secrets).
 set -euo pipefail
 
 : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID not set}"
 : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY not set}"
 : "${R2_ENDPOINT:?R2_ENDPOINT not set}"
-: "${R2_BUCKET:=gxy-cassiopeia-1}"
+: "${R2_BUCKET:=universe-static-apps-01}"
 
 # Configure rclone in memory
 TMP_DIR="$(mktemp -d)"
@@ -2059,7 +2059,7 @@ resources:
     memory: 512Mi
 
 r2:
-  bucket: gxy-cassiopeia-1
+  bucket: universe-static-apps-01
   endpoint: "https://<cf-account>.r2.cloudflarestorage.com"
   # accessKeyId and secretAccessKey injected from sops overlay
 ```
@@ -2380,7 +2380,7 @@ If the CiliumNetworkPolicy API group has changed (v2 → v2alpha1 or similar), c
 
 #### Context
 
-A scripted smoke test that (1) uploads a test deploy to `gxy-cassiopeia-1/test.freecode.camp/deploys/<id>/`, (2) writes the production alias, (3) adds temp DNS, (4) curls the test URL via `Host` header on a node IP, (5) verifies alias flip within TTL, (6) cleans up.
+A scripted smoke test that (1) uploads a test deploy to `universe-static-apps-01/test.freecode.camp/deploys/<id>/`, (2) writes the production alias, (3) adds temp DNS, (4) curls the test URL via `Host` header on a node IP, (5) verifies alias flip within TTL, (6) cleans up.
 
 This is the Phase 4 exit gate per §6.6.
 
@@ -2422,13 +2422,13 @@ Scripted smoke validation that proves the full R2 → Caddy → Cloudflare chain
 ```bash
 #!/usr/bin/env bash
 # Phase 4 exit validation per RFC gxy-cassiopeia §6.6.
-# Uploads a test deploy to gxy-cassiopeia-1, writes production+preview aliases,
+# Uploads a test deploy to universe-static-apps-01, writes production+preview aliases,
 # verifies end-to-end serving, cleans up.
 #
 # Required env (via direnv at k3s/gxy-cassiopeia/):
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY  (R2 rw)
 #   R2_ENDPOINT
-#   R2_BUCKET=gxy-cassiopeia-1
+#   R2_BUCKET=universe-static-apps-01
 #   GXY_CASSIOPEIA_NODE_IP  (any node public IP for Host-header smoke)
 #   CF_API_TOKEN, CF_ZONE_ID  (for temp DNS record)
 
@@ -2498,7 +2498,7 @@ Exit criterion for RFC §6.6 Phase 4.
 ## Prerequisites
 - gxy-cassiopeia cluster Ready (Phase 3 done)
 - Caddy Helm chart deployed (Task 13 applied)
-- R2 bucket gxy-cassiopeia-1 exists with rw access key (Task 12 done)
+- R2 bucket universe-static-apps-01 exists with rw access key (Task 12 done)
 - Temp DNS record for `test.freecode.camp` and `test--preview.freecode.camp` → one gxy-cassiopeia node IP (Cloudflare UI, proxy ON)
 
 ## Steps
@@ -2509,7 +2509,7 @@ Exit criterion for RFC §6.6 Phase 4.
 5. Remove the temp DNS records for `test.freecode.camp` and `test--preview.freecode.camp`
 
 ## If it fails
-- Step 2 fail → rclone config or R2 key issue; check `rclone ls r2:gxy-cassiopeia-1/`
+- Step 2 fail → rclone config or R2 key issue; check `rclone ls r2:universe-static-apps-01/`
 - Step 4 fail → Caddy not routing; `kubectl -n caddy logs -l app.kubernetes.io/name=caddy`
 - Step 6 fail → cache TTL too aggressive, or r2_alias module bug; extend sleep to 60s and retry
 ```
@@ -3780,7 +3780,7 @@ cd /Users/mrugesh/DEV/fCC-U/windmill && deno test f/static/cleanup_old_deploys.t
 #### Constraints
 
 - Follow pseudocode in RFC §4.9.1 exactly
-- Lock key: `gxy-cassiopeia-1/_ops/cleanup.lock` with expiresAt
+- Lock key: `universe-static-apps-01/_ops/cleanup.lock` with expiresAt
 - First production deploy MUST be `dry_run=true`
 
 #### Agent Prompt
@@ -3943,7 +3943,7 @@ Real R2Ops implementation wraps rclone CLI (or Deno S3 SDK). Use rclone subproce
 `f/static/cleanup_old_deploys.yaml`:
 
 ```yaml
-summary: Cleanup old deploys from gxy-cassiopeia-1
+summary: Cleanup old deploys from universe-static-apps-01
 description: |
   Daily cron. Deletes R2 deploy prefixes older than 7 days that are not
   referenced by any alias, not among the 3 most recent, and not modified
@@ -4019,7 +4019,7 @@ Machine-checked preflight for Phase 6. Per RFC §6.8.1: enumerates sites in gxy-
 #### Acceptance Criteria
 
 - GIVEN the preflight script WHEN run in an env with both R2 buckets accessible THEN produces a per-site matrix and exits 0 only if all checks pass
-- GIVEN any site missing from gxy-cassiopeia-1 THEN script exits non-zero with a clear error
+- GIVEN any site missing from universe-static-apps-01 THEN script exits non-zero with a clear error
 - GIVEN `just cf-dns-export freecode.camp` THEN writes JSON snapshot of records to stdout
 - GIVEN `just cf-dns-cutover freecode.camp gxy-cassiopeia` THEN updates `*`, `@`, `www` A records to cassiopeia node IPs
 - GIVEN `just cf-dns-restore <snapshot.json>` THEN restores records from the snapshot
@@ -4059,13 +4059,13 @@ Per RFC §6.8.1 (D25): a shell script that enumerates sites in gxy-static-1 and 
 ```bash
 #!/usr/bin/env bash
 # DNS cutover preflight per RFC gxy-cassiopeia §6.8.1 (D25).
-# Enumerates sites in gxy-static-1, runs 8 checks per site against gxy-cassiopeia-1.
+# Enumerates sites in gxy-static-1, runs 8 checks per site against universe-static-apps-01.
 # Exits non-zero on ANY site failing ANY check — cutover must not proceed.
 
 set -euo pipefail
 
 : "${STATIC_BUCKET:=gxy-static-1}"
-: "${CASSIOPEIA_BUCKET:=gxy-cassiopeia-1}"
+: "${CASSIOPEIA_BUCKET:=universe-static-apps-01}"
 : "${CASSIOPEIA_NODE_IP:?Set CASSIOPEIA_NODE_IP to any gxy-cassiopeia node public IP}"
 : "${WOODPECKER_ADMIN_TOKEN:?Set WOODPECKER_ADMIN_TOKEN}"
 : "${WOODPECKER_ENDPOINT:?Set WOODPECKER_ENDPOINT}"
@@ -4396,7 +4396,7 @@ monitors:
       - google-chat-webhook
 
   # Per-site monitors. Generated from a site list — scripts/uptime-robot-apply.sh
-  # reads this file + a sites list (derived from gxy-cassiopeia-1 bucket)
+  # reads this file + a sites list (derived from universe-static-apps-01 bucket)
   # and creates/updates a monitor per site.
   per_site_template:
     name_format: "static-{site}"
@@ -4458,7 +4458,7 @@ PY
 ```bash
 #!/usr/bin/env bash
 # Idempotent apply of Uptime Robot monitors from uptime-robot/monitors.yaml.
-# Adds a monitor per site from gxy-cassiopeia-1 bucket.
+# Adds a monitor per site from universe-static-apps-01 bucket.
 set -euo pipefail
 : "${UPTIME_ROBOT_API_KEY:?Set UPTIME_ROBOT_API_KEY}"
 
@@ -4499,7 +4499,7 @@ for m in spec["monitors"]:
         print(f"created: {m['name']}")
 
 # Per-site monitors: enumerate sites from R2 bucket (via rclone)
-sites_bytes = subprocess.check_output(["rclone", "lsf", "--dirs-only", "r2:gxy-cassiopeia-1"])
+sites_bytes = subprocess.check_output(["rclone", "lsf", "--dirs-only", "r2:universe-static-apps-01"])
 sites = [s.rstrip("/") for s in sites_bytes.decode().splitlines() if s.strip()]
 
 tmpl = spec["per_site_template"]
@@ -4637,7 +4637,7 @@ rollback substrate for ≥ 30 days post-cutover (D26).
 
 - [ ] Phase 4 complete: `just phase4-smoke` passed against gxy-cassiopeia
 - [ ] Phase 5 complete: `@freecodecamp/universe-cli@0.4.0-beta.1` released
-- [ ] All existing gxy-static sites re-deployed to gxy-cassiopeia-1
+- [ ] All existing gxy-static sites re-deployed to universe-static-apps-01
 - [ ] `just cutover-preflight` returns green (no site failures)
 - [ ] Cloudflare Notifications + Uptime Robot monitors applied (`just cf-notifications-apply && just uptime-robot-apply`)
 - [ ] Platform team + staff announce window (1 hour quiet — no promotes/deploys)
@@ -4870,7 +4870,7 @@ After the existing cluster sections (or in a logical position — use the TOC of
 
 1. **Provision 3× s-4vcpu-8gb-amd in DO FRA1** (ClickOps or `tofu apply` when imported).
 2. **Bootstrap k3s**: `just play k3s--bootstrap -e "target_hosts=gxy_cassiopeia_k3s"`.
-3. **R2 bucket**: see `docs/runbooks/r2-bucket-provision.md` (gxy-cassiopeia-1, versioning enabled).
+3. **R2 bucket**: see `docs/runbooks/r2-bucket-provision.md` (universe-static-apps-01, versioning enabled).
 4. **Caddy image**: latest pushed from Woodpecker pipeline `.woodpecker/caddy-s3-build.yaml`. Image tag in `k3s/gxy-cassiopeia/apps/caddy/values.production.yaml`.
 5. **Caddy chart**: `just helm-upgrade caddy` (k3s/gxy-cassiopeia/apps/caddy/).
 6. **Origin allow-list**: `kubectl apply -f k3s/gxy-cassiopeia/apps/caddy/manifests/origin-allowlist-netpol.yaml`.
