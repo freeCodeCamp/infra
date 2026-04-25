@@ -30,22 +30,22 @@ This dispatch was authored before `rfc-secrets-layout.md` two-scope
 convention was reconciled with sprint Q2/Q3 decisions. Apply these
 overrides **everywhere** in this doc:
 
-| Topic                  | Old (this doc)                                                                                               | New (authoritative)                                                                                                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin token path       | `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc`                                                   | `infra-secrets/global/.env.enc` (with sample-twin in `global/.env.sample`) — per **D33 amended**                                                                                                        |
-| Per-site secret path   | `infra-secrets/constellations/<site>.secrets.env.enc`                                                        | **NONE.** Per-site secrets stay in Woodpecker only — per **D40 (supersedes D34)**                                                                                                                       |
-| sops `.sops.yaml` rule | author `^constellations/.*\.secrets\.env\.enc$` creation_rule                                                | **DROP.** No new rule — `global/.env.enc` already covered by `path_regex: .*`                                                                                                                           |
-| Flow steps             | mint → sops-encrypt → Woodpecker-register → return                                                           | mint → Woodpecker-register → return (no sops write)                                                                                                                                                     |
-| Return shape           | includes `secretPath`                                                                                        | drop `secretPath` field                                                                                                                                                                                 |
-| Acceptance §D          | sops encryption checks                                                                                       | **OBSOLETE** — flow has no sops step                                                                                                                                                                    |
-| Acceptance §F2/F4–F6   | sops file rotation/preserve                                                                                  | **OBSOLETE** — Woodpecker is sole rotation surface (use `PUT` semantics from §F3)                                                                                                                       |
-| Acceptance §G1/G2      | sops failure rollback                                                                                        | **OBSOLETE** — only CF mint + Woodpecker register exist                                                                                                                                                 |
-| Acceptance §H1         | `secretPath: string`                                                                                         | **DROP field**                                                                                                                                                                                          |
-| Acceptance §I4         | "no plaintext dotenv persists"; "list `constellations/` dir"                                                 | **OBSOLETE** — no dir to list                                                                                                                                                                           |
-| Acceptance §I5         | "sops recipient = platform age only" via `constellations/` smoke                                             | **OBSOLETE** — admin token already lives in `global/`; covered by existing global sops invariants                                                                                                       |
-| Acceptance §J5/J6      | `.sops.yaml` creation_rule + commit                                                                          | **OBSOLETE** — no new rule                                                                                                                                                                              |
-| Operator bootstrap     | `mkdir platform/`, write `cf-r2-provisioner.secrets.env.enc` (4 vars incl. S3 keys)                          | edit `global/.env.sample` (sample-twin), then `sops global/.env.enc` to add **2 vars only** (`CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`); S3 admin keys dropped — flow uses Bearer only (see new §below) |
-| Commit message hints   | `feat(platform): seed cf-r2-provisioner cred (D33)` / `feat(sops): add constellations/* creation_rule (D34)` | `feat(global): seed CF R2 provisioner cred (D33 amended 2026-04-25)`                                                                                                                                    |
+| Topic                  | Old (this doc)                                                                                               | New (authoritative)                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin token path       | `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc`                                                   | `infra-secrets/windmill/.env.enc` (with sample-twin in `windmill/.env.sample`) — activates the reserved `windmill/` Universe-platform-app namespace per **D33 amended ×2 2026-04-25**. NOT `global/.env.enc` (that path was an interim 1st-pass amend; rejected because `global/` direnv-loads into operator shell on every `cd infra/`, leaking admin token). |
+| Per-site secret path   | `infra-secrets/constellations/<site>.secrets.env.enc`                                                        | **NONE.** Per-site secrets stay in Woodpecker only — per **D40 (supersedes D34)**                                                                                                                                                                                                                                                                              |
+| sops `.sops.yaml` rule | author `^constellations/.*\.secrets\.env\.enc$` creation_rule                                                | **DROP.** No new rule — `windmill/.env.enc` already covered by existing repo-wide `path_regex: .*` (single platform age recipient).                                                                                                                                                                                                                            |
+| Flow steps             | mint → sops-encrypt → Woodpecker-register → return                                                           | mint → Woodpecker-register → return (no sops write)                                                                                                                                                                                                                                                                                                            |
+| Return shape           | includes `secretPath`                                                                                        | drop `secretPath` field                                                                                                                                                                                                                                                                                                                                        |
+| Acceptance §D          | sops encryption checks                                                                                       | **OBSOLETE** — flow has no sops step                                                                                                                                                                                                                                                                                                                           |
+| Acceptance §F2/F4–F6   | sops file rotation/preserve                                                                                  | **OBSOLETE** — Woodpecker is sole rotation surface (use `PUT` semantics from §F3)                                                                                                                                                                                                                                                                              |
+| Acceptance §G1/G2      | sops failure rollback                                                                                        | **OBSOLETE** — only CF mint + Woodpecker register exist                                                                                                                                                                                                                                                                                                        |
+| Acceptance §H1         | `secretPath: string`                                                                                         | **DROP field**                                                                                                                                                                                                                                                                                                                                                 |
+| Acceptance §I4         | "no plaintext dotenv persists"; "list `constellations/` dir"                                                 | **OBSOLETE** — no dir to list                                                                                                                                                                                                                                                                                                                                  |
+| Acceptance §I5         | "sops recipient = platform age only" via `constellations/` smoke                                             | **OBSOLETE** — admin token lives in `windmill/.env.enc`; covered by existing repo-wide `path_regex: .*` rule + single platform age recipient                                                                                                                                                                                                                   |
+| Acceptance §J5/J6      | `.sops.yaml` creation_rule + commit                                                                          | **OBSOLETE** — no new rule                                                                                                                                                                                                                                                                                                                                     |
+| Operator bootstrap     | `mkdir platform/`, write `cf-r2-provisioner.secrets.env.enc` (4 vars incl. S3 keys)                          | populate the reserved `windmill/` namespace: edit `windmill/.env.sample` (sample-twin), then sops-encrypt to create `windmill/.env.enc` with **2 vars only** (`CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`); S3 admin keys dropped — flow uses Bearer only (see new §below)                                                                                       |
+| Commit message hints   | `feat(platform): seed cf-r2-provisioner cred (D33)` / `feat(sops): add constellations/* creation_rule (D34)` | `feat(windmill): seed CF R2 provisioner cred (D33 amended ×2 2026-04-25)`                                                                                                                                                                                                                                                                                      |
 
 Everything else (flow logic, CF API contract, Woodpecker repo-scoped
 secrets per D22, site-name regex D19, return shape minus `secretPath`,
@@ -81,13 +81,13 @@ Pulled from `infra/docs/sprints/2026-04-21/QA-recommendations.md`
 `infra/docs/architecture/rfc-gxy-cassiopeia.md` Decision Index
 (D33–D39 amendments 2026-04-22).
 
-| Decision                                            | Impact on T11                                                                                                                                                                                                                                                                                                                                                                                                  |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **D33 / Q2 (amended 2026-04-25)**                   | Admin cred for provisioner lives at `infra-secrets/global/.env.enc` (sample-twin in `global/.env.sample`). Flow reads via Windmill Resource `u/admin/cf_r2_provisioner` (operator seeds it after editing `global/.env.enc`). Vars: `CF_R2_ADMIN_API_TOKEN` (CF Account-owned API token, perm `Account → R2 Storage → Edit`) + `CF_ACCOUNT_ID`. **NO S3 admin Access Key / Secret** — flow uses CF Bearer only. |
-| **D40 (supersedes D34) / Q3 (resolved 2026-04-25)** | Per-site secret persistence = **Woodpecker repo-scoped secret only**. T11 flow does NOT write to infra-secrets. No `constellations/` dir, no `.sops.yaml` rule change. Recovery path = re-mint via CF API. Offline backup deferred to TODO-park.                                                                                                                                                               |
-| **D38 / Q7**                                        | Preview is MVP-in. R2 path condition must cover **both** `<site>/` (which implicitly includes `<site>/deploys/*` + `<site>/production` + `<site>/preview` objects). Token scope = `<site>/*` covers all.                                                                                                                                                                                                       |
-| **D22** (original)                                  | Woodpecker secret is **repo-scoped**, not org-scoped. Flow must call Woodpecker API with repo owner+name, not org.                                                                                                                                                                                                                                                                                             |
-| **D35 / Q5**                                        | DNS scheme `<site>.freecode.camp` + `<site>.preview.freecode.camp` — not this flow's concern but informs site-name validation (D19 regex unchanged).                                                                                                                                                                                                                                                           |
+| Decision                                            | Impact on T11                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **D33 / Q2 (amended ×2 2026-04-25)**                | Admin cred for provisioner lives at `infra-secrets/windmill/.env.enc` (sample-twin in `windmill/.env.sample`) — activates reserved Universe-platform-app namespace per `rfc-secrets-layout.md` D4. Flow reads via Windmill Resource `u/admin/cf_r2_provisioner` (operator seeds it after editing `windmill/.env.enc`). Vars: `CF_R2_ADMIN_API_TOKEN` (CF Account-owned API token, perm `Account → R2 Storage → Edit`) + `CF_ACCOUNT_ID`. **NO S3 admin Access Key / Secret** — flow uses CF Bearer only. **NOT** `global/.env.enc` (that file is direnv-loaded into operator shell — would expose admin token in every `cd infra/`). |
+| **D40 (supersedes D34) / Q3 (resolved 2026-04-25)** | Per-site secret persistence = **Woodpecker repo-scoped secret only**. T11 flow does NOT write to infra-secrets. No `constellations/` dir, no `.sops.yaml` rule change. Recovery path = re-mint via CF API. Offline backup deferred to TODO-park.                                                                                                                                                                                                                                                                                                                                                                                     |
+| **D38 / Q7**                                        | Preview is MVP-in. R2 path condition must cover **both** `<site>/` (which implicitly includes `<site>/deploys/*` + `<site>/production` + `<site>/preview` objects). Token scope = `<site>/*` covers all.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **D22** (original)                                  | Woodpecker secret is **repo-scoped**, not org-scoped. Flow must call Woodpecker API with repo owner+name, not org.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **D35 / Q5**                                        | DNS scheme `<site>.freecode.camp` + `<site>.preview.freecode.camp` — not this flow's concern but informs site-name validation (D19 regex unchanged).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Files to produce
 
@@ -348,12 +348,15 @@ Operator pushes.
 bash -c 'source /Users/mrugesh/.claude/plugins/cache/dotplugins/dp-cto/8.5.0/lib/dp-beads.sh && dp_beads_close gxy-static-k7d.12 "Shipped in windmill commit <sha>. Flow at f/static/provision_site_r2_credentials. Verified green via runScriptPreviewAndWaitResult against live Windmill. D22 repo-scope + D33 admin path + D34 per-site sops path honored."'
 ```
 
-## Operator bootstrap (BEFORE T11 starts) — REVISED 2026-04-25
+## Operator bootstrap (BEFORE T11 starts) — REVISED 2026-04-25 (×2)
 
-The provisioner admin cred lands in `infra-secrets/global/.env.enc`
-(per D33 amended). T11 flow needs **only** the CF Account API Token
-(Bearer) — it calls `api.cloudflare.com/client/v4/...` to mint
-per-site R2 access keys + registers them as Woodpecker repo secrets.
+The provisioner admin cred lands in `infra-secrets/windmill/.env.enc`
+(per D33 amended ×2 — activates the reserved Universe-platform-app
+namespace; NOT `global/.env.enc` which would direnv-load into
+operator shell on every `cd infra/`). T11 flow needs **only** the CF
+Account API Token (Bearer) — it calls
+`api.cloudflare.com/client/v4/...` to mint per-site R2 access keys +
+registers them as Woodpecker repo secrets.
 
 S3-style admin keys (R2 page → Manage API Tokens → Admin Read & Write)
 are NOT needed for T11 and are deliberately out of scope (avoid extra
@@ -394,16 +397,29 @@ Also grab your **Account ID** while you're there:
 - Or: Account Home → right sidebar → **Account ID** (copy icon).
 - Format: 32-char hex.
 
-### 2. Update `global/.env.sample` (sample-twin discipline)
+### 2. Author `windmill/.env.sample` (sample-twin discipline)
+
+The reserved `windmill/` namespace exists today as an empty `.env.sample`
+stub (per `rfc-secrets-layout.md` D4). T11 is the first activation.
 
 ```bash
 cd ~/DEV/fCC/infra-secrets
-# Append documented stanza to global/.env.sample
-cat >> global/.env.sample <<'SAMPLE'
+# Replace the empty stub with documented sample (overwrite is fine; it has no real content yet)
+cat > windmill/.env.sample <<'SAMPLE'
+# =============================================================================
+# Reserved namespace: cross-cluster Universe-platform Windmill app secrets
+# =============================================================================
+# Consumed by Windmill flows running on gxy-management Windmill instance
+# (https://windmill.freecodecamp.net). NOT loaded into operator shell env —
+# this file is read on-demand by `wmill resource push` / direct sops decrypt
+# during operator bootstrap or rotation.
+#
+# Convention: every `.env.enc` here has a matching `.env.sample` documenting
+# every variable, why it exists, where to mint, and the consuming flow path.
 
-# =============================================================================
-# REQUIRED — Cloudflare R2 Provisioner (D33 amended 2026-04-25)
-# =============================================================================
+# -----------------------------------------------------------------------------
+# REQUIRED — Cloudflare R2 Provisioner (D33 amended ×2 2026-04-25; T11)
+# -----------------------------------------------------------------------------
 # Bearer token consumed by Windmill flow
 # `f/static/provision_site_r2_credentials` to mint per-site R2 access keys
 # (which become Woodpecker repo secrets — Woodpecker is sole persistence
@@ -422,34 +438,48 @@ CF_ACCOUNT_ID=
 SAMPLE
 ```
 
-### 3. Update `global/.env.enc` with real values
+### 3. Create `windmill/.env.enc` with real values
 
 ```bash
 cd ~/DEV/fCC/infra-secrets
-sops global/.env.enc   # opens $EDITOR; add CF_R2_ADMIN_API_TOKEN + CF_ACCOUNT_ID
+# First-time create (file does not exist yet):
+cat > windmill/.env <<DOTENV
+CF_R2_ADMIN_API_TOKEN=cfat_<paste-real-token>
+CF_ACCOUNT_ID=<32-char-hex>
+DOTENV
+
+sops -e --input-type dotenv --output-type dotenv \
+  windmill/.env > windmill/.env.enc
+shred -u windmill/.env 2>/dev/null || rm -P windmill/.env  # macOS uses rm -P
+```
+
+For subsequent rotations / additions:
+
+```bash
+sops windmill/.env.enc   # opens $EDITOR; edit in place
 ```
 
 Verify decrypt round-trip without leaking the value:
 
 ```bash
-sops -d global/.env.enc | grep -c '^CF_R2_ADMIN_API_TOKEN='   # → 1
-sops -d global/.env.enc | grep -c '^CF_ACCOUNT_ID='           # → 1
+sops -d windmill/.env.enc | grep -c '^CF_R2_ADMIN_API_TOKEN='   # → 1
+sops -d windmill/.env.enc | grep -c '^CF_ACCOUNT_ID='           # → 1
 ```
 
 ### 4. Commit (no push) per cmd-git-rules
 
 ```bash
 cd ~/DEV/fCC/infra-secrets
-git add global/.env.sample global/.env.enc
-git commit -m "feat(global): seed CF R2 provisioner cred (D33 amended 2026-04-25)"
+git add windmill/.env.sample windmill/.env.enc
+git commit -m "feat(windmill): seed CF R2 provisioner cred (D33 amended x2 2026-04-25)"
 # Operator pushes when ready. NEVER auto-push from worker.
 ```
 
 ### 5. Smoke-test the token (≤ 30 seconds)
 
 ```bash
-TOKEN=$(sops -d ~/DEV/fCC/infra-secrets/global/.env.enc | sed -n 's/^CF_R2_ADMIN_API_TOKEN=//p')
-ACCT=$(sops  -d ~/DEV/fCC/infra-secrets/global/.env.enc | sed -n 's/^CF_ACCOUNT_ID=//p')
+TOKEN=$(sops -d ~/DEV/fCC/infra-secrets/windmill/.env.enc | sed -n 's/^CF_R2_ADMIN_API_TOKEN=//p')
+ACCT=$(sops  -d ~/DEV/fCC/infra-secrets/windmill/.env.enc | sed -n 's/^CF_ACCOUNT_ID=//p')
 
 # Should return 200 with bucket list (or empty list if no buckets yet)
 curl -fsSL \
@@ -479,13 +509,14 @@ Access Key ID / Secret Access Key in the Resource (out of scope).
 ### 7. Acknowledge sprint-doc patches owed
 
 Worker must, as part of T11 closure (commit-only), patch these files
-to drop the obsolete `platform/` + `constellations/` references and
-the now-removed S3-admin-keys notion:
+to drop the obsolete `platform/` + `constellations/` references, the
+now-removed S3-admin-keys notion, AND the interim `global/.env.enc`
+mention (replaced by `windmill/.env.enc`):
 
 - `docs/sprints/2026-04-21/24-static-apps-k7d.md` (Q2/Q3 rows + secrets-layout block)
 - `docs/sprints/2026-04-21/MASTER.md` (Q2/Q3 rows + Phase 1 sub-deliverable refs)
 - `docs/sprints/2026-04-21/QA-recommendations.md` (append dated amendment block; do NOT rewrite locked Q2/Q3 prose — append-only correction)
-- `docs/sprints/2026-04-21/HANDOFF.md` (rolling log entry 2026-04-25 noting D33 amend + D40 supersede)
+- `docs/sprints/2026-04-21/HANDOFF.md` (rolling log entry 2026-04-25 noting D33 amend ×2 + D40 supersede)
 
 ## Test data + fixtures
 
