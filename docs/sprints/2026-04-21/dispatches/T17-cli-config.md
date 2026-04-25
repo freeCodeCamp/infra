@@ -1,14 +1,14 @@
 # T17 — universe-cli — Config schema + site name validation
 
-**Status:** pending
+**Status:** done
 **Worker:** w-cli
 **Repo:** `~/DEV/fCC-U/universe-cli` (branch: `feat/woodpecker-pivot`)
 **Spec:** [`task-gxy-cassiopeia.md` §Task 17](../../architecture/task-gxy-cassiopeia.md)
 **RFC:** [`rfc-gxy-cassiopeia.md` §4.8.1 + §4.8.5 + D19](../../architecture/rfc-gxy-cassiopeia.md)
 **QA deltas:** Q5 (DNS scheme — informs site-name regex; D19 unchanged)
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-25
+**Closed:** 2026-04-25
+**Closing commit(s):** `a7dd58e`
 
 ---
 
@@ -41,10 +41,14 @@ chars, no `--`, RFC-1123 DNS label rules; soft-warn `*-preview` /
 
 ## Closure (filled on completion)
 
-- **Status:** —
-- **Closing commit:** —
+- **Status:** done
+- **Closing commit:** `a7dd58e` (universe-cli)
 - **Acceptance evidence:**
-  - `pnpm test src/validation src/config` — all green
-  - `pnpm typecheck` — clean
-- **Surprises:** —
-- **Sprint-doc patches owed:** matrix row flip.
+  - `pnpm test tests/validation tests/config` — site-name 14, schema 19,
+    loader 14 — all green
+  - `pnpm exec tsc --noEmit` — clean
+- **Surprises:** site-name soft-warn list (`preview-` prefix /
+  `-preview` suffix) preserved verbatim from §4.8.5; under D35
+  dot-scheme the collision risk diminishes but the warn remains a UX
+  guard. No semantic change.
+- **Sprint-doc patches owed:** PLAN.md matrix row flipped — done.

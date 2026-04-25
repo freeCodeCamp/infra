@@ -1,15 +1,16 @@
 # T19 — universe-cli — Rewrite `promote` + `rollback`
 
-**Status:** pending
+**Status:** done
 **Worker:** w-cli
 **Repo:** `~/DEV/fCC-U/universe-cli` (branch: `feat/woodpecker-pivot`)
 **Spec:** [`task-gxy-cassiopeia.md` §Task 19](../../architecture/task-gxy-cassiopeia.md)
 **RFC:** [`rfc-gxy-cassiopeia.md` §4.8.3 + §4.8.4](../../architecture/rfc-gxy-cassiopeia.md)
-**QA deltas:** Q6 (≤2 min SLO — pipeline trigger + smoke poll); Q7 (preview parity)
+**QA deltas:** Q6 (≤2 min SLO — pipeline trigger + smoke poll); Q7
+(preview parity); D35 (dot-scheme test fixture aligned)
 **Depends on:** T18 (deploy rewrite)
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-25
+**Closed:** 2026-04-25
+**Closing commit(s):** `f6971cf`, `89ab897` (D35 dot-scheme test fixture)
 
 ---
 
@@ -37,10 +38,16 @@ both stream logs and exit with pipeline result.
 
 ## Closure (filled on completion)
 
-- **Status:** —
-- **Closing commit:** —
+- **Status:** done
+- **Closing commit:** `f6971cf` (rewrite) + `89ab897` (D35 dot-scheme
+  test fixture)
 - **Acceptance evidence:**
-  - `pnpm test src/commands/promote src/commands/rollback` — all green
-  - `pnpm typecheck` — clean
-- **Surprises:** —
-- **Sprint-doc patches owed:** matrix row flip.
+  - `pnpm test tests/commands/promote tests/commands/rollback` — 6+9
+    green
+  - `pnpm exec tsc --noEmit` — clean
+  - `EXIT_ARGS` + `EXIT_PIPELINE=20` added to `src/output/exit-codes.ts`
+    without colliding with prior codes
+- **Surprises:** `streamFirstStepLogs` extracted to
+  `src/woodpecker/stream.ts` early (during T16) — DRY pulled forward;
+  promote/rollback consume it directly without further refactor.
+- **Sprint-doc patches owed:** PLAN.md matrix row flipped — done.

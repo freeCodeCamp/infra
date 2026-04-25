@@ -1,14 +1,14 @@
 # T16 — universe-cli — Woodpecker API client
 
-**Status:** pending
+**Status:** done
 **Worker:** w-cli
 **Repo:** `~/DEV/fCC-U/universe-cli` (branch: `feat/woodpecker-pivot`)
 **Spec:** [`task-gxy-cassiopeia.md` §Task 16](../../architecture/task-gxy-cassiopeia.md)
 **RFC:** [`rfc-gxy-cassiopeia.md` §4.8.6](../../architecture/rfc-gxy-cassiopeia.md) — R15 streaming
 **QA deltas:** none
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-25
+**Closed:** 2026-04-25
+**Closing commit(s):** `a7dd58e`
 
 ---
 
@@ -40,12 +40,14 @@ HTTP status + body in `.cause`.
 
 ## Closure (filled on completion)
 
-- **Status:** —
-- **Closing commit:** —
+- **Status:** done
+- **Closing commit:** `a7dd58e` (universe-cli)
 - **Acceptance evidence:**
-  - `pnpm test src/woodpecker` — all green
-  - `pnpm typecheck` — clean
-  - `pnpm oxlint` — clean
-- **Surprises:** —
-- **Sprint-doc patches owed:** matrix row flip in
-  `24-static-apps-k7d.md`.
+  - `pnpm test tests/woodpecker` — 4/4 files green (client 12, errors 2,
+    stream 2, plus credentials/woodpecker 5)
+  - `pnpm exec tsc --noEmit` — clean
+  - `pnpm exec oxlint src tests` — 0 warnings, 0 errors
+- **Surprises:** stream module split out (`src/woodpecker/stream.ts`)
+  to share polling logic across deploy/promote/rollback; not a deviation
+  from spec but earlier than the §Task 19 "optional DRY" suggestion.
+- **Sprint-doc patches owed:** PLAN.md matrix row flipped — done.

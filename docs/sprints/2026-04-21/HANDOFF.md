@@ -14,6 +14,56 @@ Convention:
 
 ## Journal
 
+### 2026-04-25 — Wave A.2 universe-cli T16-T20 closed + v0.4.0-beta.1 prepped
+
+`feat/woodpecker-pivot` audit + closure pass. All five universe-cli
+tasks shipped earlier same day were carrying open dispatch headers;
+this entry closes the loop.
+
+Universe-cli commits referenced (branch `feat/woodpecker-pivot`):
+
+- `a7dd58e` — T16 + T17. Woodpecker client (`src/woodpecker/{client,
+types,errors,stream,index}.ts`), credentials resolver
+  (`src/credentials/woodpecker.ts`), site-name validator
+  (`src/validation/site-name.ts`), `PipelineError` + `EXIT_PIPELINE=20`,
+  config schema strict-mode + `woodpecker {endpoint,repo_id}` section.
+- `f6971cf` — T18 + T19 + T20. Full rewrite of `deploy`, `promote`,
+  `rollback` to trigger Woodpecker pipelines via API; deletion of
+  `src/storage/*`, `src/deploy/{upload,metadata,preflight,id,walk}.ts`,
+  `src/credentials/resolver.ts`; `@aws-sdk/client-s3` removed from
+  `dependencies`.
+- `89ab897` — D35 dot-scheme test fixture correction. Audit caught
+  three `tests/commands/{deploy,promote,rollback}.test.ts` fixtures
+  still using legacy `<site>--preview.freecode.camp` hyphen-scheme.
+  Re-ran 167/167 green.
+- `03c5f19` — T20 release prep. `package.json.version` =
+  `0.4.0-beta.1`, CHANGELOG entry authored (Breaking / Added /
+  Removed / Migration); release CI auto-bump remains a no-op on
+  operator-triggered run.
+
+Dispatch closures (this commit): T16, T17, T18, T19, T20 status flipped
+to `done`, closure blocks filled with acceptance evidence + commit
+SHAs + surprises (D35 fixture drift, early `stream.ts` extraction,
+release-CI no-op behaviour). PLAN.md matrix rows flipped to `[x] done`.
+
+Field note appended at
+`~/DEV/fCC-U/Universe/spike/field-notes/universe-cli.md`.
+
+Acceptance: `pnpm test` 167/167 green, `pnpm exec tsc --noEmit` clean,
+`pnpm exec oxlint src tests` 0/0. No live Woodpecker call exercised
+yet — that surfaces during Wave B (T21 template + reference repo
+deploy against gxy-launchbase + gxy-cassiopeia).
+
+Next unblocked: **Wave A.3 windmill T11** (per-site R2 secret
+provisioning flow). Wave B follows once T11 observes green.
+
+#25 release dispatch unblocks: operator can run release workflow with
+`version=0.4.0-beta.1` after T11 + Wave B exercise the live Woodpecker
+flow end-to-end.
+
+Commits (universe-cli, awaiting operator push): `a7dd58e`, `f6971cf`,
+`89ab897`, `03c5f19`.
+
 ### 2026-04-25 — T15 Phase 4 smoke runbook + script (Wave A.1 closed)
 
 G1.0 operator bootstrap landed earlier same day (CF Account-owned API

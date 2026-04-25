@@ -122,11 +122,11 @@ during 24h observation; `doctl compute droplet list` shows no
 | ---- | ------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------- |
 | T11  | windmill     | Per-site R2 secret provisioning flow          | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)               | [ ] pending             |
 | T15  | infra        | Phase 4 smoke runbook + script                | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [x] done                |
-| T16  | universe-cli | Woodpecker API client                         | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [ ] pending             |
-| T17  | universe-cli | Config schema + site name validation          | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [ ] pending             |
-| T18  | universe-cli | Rewrite `deploy` command                      | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [ ] pending             |
-| T19  | universe-cli | Rewrite `promote` + `rollback`                | [`dispatches/T19-cli-promote-rollback.md`](dispatches/T19-cli-promote-rollback.md) | [ ] pending             |
-| T20  | universe-cli | Strip legacy rclone/S3 + release 0.4.0-beta.1 | [`dispatches/T20-cli-strip-cut.md`](dispatches/T20-cli-strip-cut.md)               | [ ] pending — gates #25 |
+| T16  | universe-cli | Woodpecker API client                         | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [x] done                |
+| T17  | universe-cli | Config schema + site name validation          | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [x] done                |
+| T18  | universe-cli | Rewrite `deploy` command                      | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [x] done                |
+| T19  | universe-cli | Rewrite `promote` + `rollback`                | [`dispatches/T19-cli-promote-rollback.md`](dispatches/T19-cli-promote-rollback.md) | [x] done                |
+| T20  | universe-cli | Strip legacy rclone/S3 + release 0.4.0-beta.1 | [`dispatches/T20-cli-strip-cut.md`](dispatches/T20-cli-strip-cut.md)               | [x] done — #25 unblocks |
 | T21  | infra        | `.woodpecker/deploy.yaml` template            | [`dispatches/T21-woodpecker-template.md`](dispatches/T21-woodpecker-template.md)   | [ ] pending             |
 | T22  | windmill     | Cleanup cron flow                             | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                 | [ ] pending             |
 
