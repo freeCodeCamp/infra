@@ -14,6 +14,34 @@ Convention:
 
 ## Journal
 
+### 2026-04-25 — Wave A.2 follow-up: slop strip + D37 enforcement (universe-cli)
+
+Audit of A.2 closure surfaced T20 strip-completeness gap: 5 dead error
+classes + 6 orphan exit codes survived the rclone/S3 cut with circular
+tests proving dead code matches dead constants. Operator ran follow-up
+in parallel universe-cli session; verified clean.
+
+universe-cli commits (branch `feat/woodpecker-pivot`):
+
+- `4f54012` — refactor(errors): strip orphan classes (`StorageError`,
+  `OutputDirError`, `AliasError`, `DeployNotFoundError`, `ConfirmError`)
+  - 6 orphan exit codes (`EXIT_STORAGE`, `EXIT_OUTPUT_DIR`, `EXIT_ALIAS`,
+    `EXIT_DEPLOY_NOT_FOUND`, `EXIT_CONFIRM`, `EXIT_PARTIAL`) + circular
+    tests. Net: -91 lines across 4 files.
+- `0113c9c` — feat(config): D37 domain pattern + `production_branch`
+  covenant. Schema enforces production hostname matches `<site>` +
+  preview matches `<site>.preview.freecode.camp` (D35 dot-scheme).
+  Off-list bonus surfaced during the strip; tightens promote/rollback
+  branch resolution.
+
+Acceptance: `pnpm test` 166/166 green (was 167 — net -1 from removing
+62 dead tests + adding 61 D37 tests), `pnpm exec tsc --noEmit` clean,
+`pnpm exec oxlint src tests` 0/0.
+
+#25 publish path now clean — no orphan symbols carried forward.
+
+Commits (universe-cli, awaiting operator push): `4f54012`, `0113c9c`.
+
 ### 2026-04-25 — Wave A.2 universe-cli T16-T20 closed + v0.4.0-beta.1 prepped
 
 `feat/woodpecker-pivot` audit + closure pass. All five universe-cli
