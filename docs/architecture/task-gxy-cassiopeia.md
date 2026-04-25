@@ -1952,6 +1952,44 @@ If CF R2's UI layout changes, the concept (bucket → token → permission + pat
 
 **Depends on:** None
 
+#### Amendment 2026-04-26 (D41 + D42 supersede `ops-rw.env.enc`)
+
+The original Step 5 ("Create rw admin key (operational use)" with
+storage at `~/DEV/fCC/infra-secrets/gxy-cassiopeia/ops-rw.env.enc`) is
+**superseded** by sprint DECISIONS D41 + D42 (2026-04-26).
+
+Replacement: admin S3 ops keys live in `infra-secrets/windmill/.env.enc`
+alongside the admin Bearer (D33 ×2). One ops surface, one rotation
+target. Per-cluster `gxy-cassiopeia/ops-rw.env.enc` is NOT created.
+
+Step 5 replaced by:
+
+5. **Create rw admin key (operational use)**
+   - Same as step 3 but: name `universe-static-apps-01-ops-rw`,
+     permissions R2 Object Read & Write, scope `Apply to specific
+buckets only` → `universe-static-apps-01`, no TTL
+   - Append to `~/DEV/fCC/infra-secrets/windmill/.env.enc` (sops-edit
+     in place via `sops <path>`):
+
+     ```
+     R2_OPS_ACCESS_KEY_ID=<access key from this step>
+     R2_OPS_SECRET_ACCESS_KEY=<secret from this step>
+     CF_ACCOUNT_ID=<32-char hex from CF dashboard URL>
+     ```
+
+   - These are consumed on demand by `scripts/phase4-test-site-smoke.sh`
+     and the future T22 cleanup cron (Windmill flow). Never persisted
+     in operator shell. Do NOT use for per-site deploys — those get
+     their own path-restricted tokens via the T11 windmill flow.
+
+The Step 4 ro key + `caddy-r2.env.enc` design remains correct — Caddy
+needs a read-only key co-located with cluster-side config.
+
+Single-bucket invariant (reinforce): per-site separation is **prefix
+scoping** (`<site>/...`), not per-bucket. Smoke writes only under
+`test.freecode.camp/`. Deploys write under `<site>/deploys/<id>/` plus
+`<site>/production` + `<site>/preview` alias blobs.
+
 ---
 
 ### Task 13 [L]: Caddy Helm chart — templates (deployment, configmap, secret, service, httproute, networkpolicy)

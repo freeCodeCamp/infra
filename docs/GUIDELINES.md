@@ -220,6 +220,24 @@ commit MUST update **all** derived docs the change affects:
 - `roll the sprint` → rewrite `STATUS.md` from current git log + dispatch-doc state. Single commit.
 - `give me the resume prompt` → print `STATUS.md` Resume-prompt block verbatim.
 - `start the sprint` (fresh session) → read `README.md` → `STATUS.md` → report current state, no action.
+- `verify <G-id|T-id>` → run the dispatch's read-only **Verify command** block; report green/red. Required green before any operator-run gate (G-dispatch) or "awaits operator live run" T-dispatch closes. Added 2026-04-26 after sprint-2026-04-21 mid-sprint audit found 3 false-completion claims that would have been caught by a verify gate.
+
+**Operator-bootstrap dispatch (G-dispatch) requirements:**
+
+Every G-dispatch (`G<phase>.<seq>-<slug>.md`) declares operator manual
+work that mutates live state outside the repo (sops files, Windmill
+Resources, CF dashboard, kubeconfig, etc.). Schema:
+
+- Status header: `pending` → `in-progress` → `done` like T-dispatches.
+- Section `Operator steps` — numbered, copy-paste-runnable.
+- Section `Acceptance criteria` — observable post-conditions.
+- Section `Verify command` — single read-only command block any party
+  can re-run to confirm green. Output is logged to dispatch closure block.
+- Section `Closure` — Status, closing commit(s), Verify output (last
+  green), sprint-doc patches owed.
+
+Skipping the Verify section is a sprint bug — closing without a
+re-runnable green command lets state lies through.
 
 When a sprint closes, move its directory under
 `infra/docs/sprints/archive/`. Archives are read-only.
