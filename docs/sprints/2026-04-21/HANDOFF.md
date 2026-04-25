@@ -14,6 +14,94 @@ Convention:
 
 ## Journal
 
+### 2026-04-25 (recovery) — sprint-state audit + smoke refactor + 4 G-dispatches
+
+Pre-flight on T15 phase4-smoke surfaced 5 unmet operator-env prereqs.
+Cross-checked windmill / CF / Woodpecker / secrets layers. Found:
+
+- **G1.0 mis-marked done.** STATUS L46 + HANDOFF entry below (dated
+  2026-04-25, "T15 Phase 4 smoke runbook + script") claimed
+  "G1.0 operator bootstrap landed earlier same day (CF Account-owned
+  API Token minted, `infra-secrets/windmill/.env.enc` seeded with
+  `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`, smoke-curl green,
+  Windmill Resource `u/admin/cf_r2_provisioner` registered)". Reality
+  per live probes:
+  - CF token present + functional (R2 admin perms, proven by live
+    bucket list).
+  - `CF_ACCOUNT_ID` MISSING from `windmill/.env.enc` (real value
+    `ad45585c4383c97ec7023d61b8aef8c8`, derived live from CF API).
+  - Windmill Resource `u/admin/cf_r2_provisioner` NOT registered
+    (`wmill resource list` on platform workspace returns ONLY
+    `f/github/apollo_11_app`).
+  - No `R2_OPS_*` admin S3 keys seeded anywhere.
+- **Spec ↔ runbook ↔ reality drift on 4 axes:** R2 cred path,
+  CF token name (`CF_API_TOKEN` runbook vs `CLOUDFLARE_API_TOKEN`
+  global), Woodpecker API base (`/api/v1` runbook vs `/api` real),
+  rclone `r2:` remote unscoped.
+- **T12 operator-half never tracked.** Spec L1751 explicitly
+  "Do NOT actually provision". ClickOps + cred seeding never gated.
+
+Recovery decisions (per operator):
+
+- Strategy: full Phase 1–5 recovery
+- CF naming: keep `CLOUDFLARE_API_TOKEN`, add `CF_ZONE_ID` to global
+- Smoke design: refactor to **admin Bearer + ephemeral / on-demand
+  S3 keys via sops decrypt of `windmill/.env.enc`** (option 2). Drops
+  rclone surface entirely. Drops per-cluster R2 ops cred (T12
+  ops-rw.env.enc design superseded). Single bucket
+  `universe-static-apps-01`; per-site isolation = prefix scoping
+  (NOT per-bucket — operator clarified the misunderstanding).
+- Worktree: stay on `feat/k3s-universe`.
+
+This sweep delivers (no commits per phase — one sweep, then commits):
+
+- **Reports** (saved to `reports/`):
+  - `T15-smoke-preflight-2026-04-25.md`
+  - `sprint-state-audit-2026-04-25.md`
+- **Smoke refactor:**
+  - `scripts/phase4-test-site-smoke.sh` — rewrite to aws-cli + sops
+    on-demand. Env input shrinks to `R2_BUCKET` +
+    `GXY_CASSIOPEIA_NODE_IP`; admin creds (`CF_ACCOUNT_ID`,
+    `R2_OPS_ACCESS_KEY_ID`, `R2_OPS_SECRET_ACCESS_KEY`) decrypted
+    from `infra-secrets/windmill/.env.enc` per run.
+  - `scripts/tests/phase4-test-site-smoke.sh` — contract test
+    rewritten: asserts new env-guard set, banishes legacy guards
+    (`CF_API_TOKEN`, `CF_ZONE_ID`, `AWS_*`, `R2_ENDPOINT`), banishes
+    rclone in executable code, asserts single-bucket prefix usage,
+    asserts sops-on-demand path. RED → GREEN.
+- **Sprint-doc truth-up:** STATUS rewrites G1.0 from done to partial
+  with audit refs; this HANDOFF entry corrects the original.
+- **Spec / decisions amendment:**
+  - DECISIONS.md amendment block: D-amend "smoke + cleanup cron use
+    admin S3 keys via on-demand sops decrypt; no per-cluster ops rw
+    key; T12 ops-rw.env.enc design superseded".
+  - `docs/architecture/task-gxy-cassiopeia.md` Task 12 amendment block.
+  - `docs/runbooks/phase4-test-site-smoke.md` env table + tooling
+    section + bucket-clarity language.
+- **New G-dispatches** (4 files under `dispatches/`):
+  - G1.0a — windmill `.env.enc` complete + Resource push
+  - G1.0b — Woodpecker admin token mint + Resource push
+  - G1.1 — gxy-cassiopeia env (`R2_BUCKET` export + kubeconfig pull)
+  - G1.1.smoke — operator runs `just phase4-smoke`
+- **Sprint protocol amendment:** `docs/GUIDELINES.md` + `infra/CLAUDE.md`
+  add `verify <gate>` verb. Every G-dispatch declares verify command;
+  operator-run gates require green verify before close.
+- **PLAN.md matrix:** add G-rows to #24 sub-task matrix; update Wave A
+  graph to reflect recovery dependency ladder.
+
+Live-system facts pinned (probed during audit, sourced from CF API +
+Windmill + sops + DNS):
+
+| Fact                       | Value                                                 |
+| -------------------------- | ----------------------------------------------------- |
+| CF Account ID              | `ad45585c4383c97ec7023d61b8aef8c8`                    |
+| Bucket                     | `universe-static-apps-01` (created 2026-04-20)        |
+| Cassiopeia node IPs        | `165.227.149.249`, `46.101.179.141`, `188.166.165.62` |
+| Woodpecker API base        | `/api` (not `/api/v1`)                                |
+| Existing windmill resource | `f/github/apollo_11_app` only                         |
+
+No live-system mutations during audit. No `git push` / no `wmill resource push` / no R2 writes.
+
 ### 2026-04-25 — Wave A.2 follow-up: slop strip + D37 enforcement (universe-cli)
 
 Audit of A.2 closure surfaced T20 strip-completeness gap: 5 dead error

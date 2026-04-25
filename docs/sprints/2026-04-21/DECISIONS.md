@@ -24,20 +24,22 @@ Source-of-truth split:
 
 ## D-row cross-refs (RFC `rfc-gxy-cassiopeia.md` §Decisions / §Amendments)
 
-| D   | Status                               | Summary                                                                                                                                                                                         |
-| --- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D5  | superseded by D35                    | Preview DNS scheme original                                                                                                                                                                     |
-| D22 | resolved                             | OAuth org-gate canonical for native-OAuth tools; CF Access dropped globally                                                                                                                     |
-| D29 | superseded by D36                    | Origin IP enforcement original                                                                                                                                                                  |
-| D32 | resolved                             | `caddy.fs.r2` + `r2_alias` modules canonical for serve plane                                                                                                                                    |
-| D33 | **amended ×2 2026-04-25**            | CF R2 admin cred → `infra-secrets/windmill/.env.enc` (was `platform/`, then `global/`). Vars: `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`. Bearer-only, S3 admin keys dropped. NOT direnv-loaded. |
-| D34 | **superseded by D40 2026-04-25**     | Original per-site sops path                                                                                                                                                                     |
-| D35 | accepted 2026-04-22                  | Preview DNS = `<site>.preview.freecode.camp` dot-scheme                                                                                                                                         |
-| D36 | accepted 2026-04-22                  | DO Cloud Firewall only; no CF-IP allow-list                                                                                                                                                     |
-| D37 | accepted 2026-04-22                  | Two-zone staff-site DNS pattern (prod + preview siblings)                                                                                                                                       |
-| D38 | accepted 2026-04-22                  | Rollback SLO ≤ 2 min                                                                                                                                                                            |
-| D39 | accepted 2026-04-22                  | 7d hard retention; alias prefix-pin                                                                                                                                                             |
-| D40 | accepted 2026-04-25 (supersedes D34) | Per-site R2 secrets persist **only** in Woodpecker repo-scoped secrets. No `constellations/` dir, no `.sops.yaml` rule. Recovery = re-mint via CF API. Offline backup → TODO-park.              |
+| D   | Status                                              | Summary                                                                                                                                                                                                                |
+| --- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D5  | superseded by D35                                   | Preview DNS scheme original                                                                                                                                                                                            |
+| D22 | resolved                                            | OAuth org-gate canonical for native-OAuth tools; CF Access dropped globally                                                                                                                                            |
+| D29 | superseded by D36                                   | Origin IP enforcement original                                                                                                                                                                                         |
+| D32 | resolved                                            | `caddy.fs.r2` + `r2_alias` modules canonical for serve plane                                                                                                                                                           |
+| D33 | **amended ×2 2026-04-25**                           | CF R2 admin cred → `infra-secrets/windmill/.env.enc` (was `platform/`, then `global/`). Vars: `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`. Bearer-only, S3 admin keys dropped. NOT direnv-loaded.                        |
+| D34 | **superseded by D40 2026-04-25**                    | Original per-site sops path                                                                                                                                                                                            |
+| D35 | accepted 2026-04-22                                 | Preview DNS = `<site>.preview.freecode.camp` dot-scheme                                                                                                                                                                |
+| D36 | accepted 2026-04-22                                 | DO Cloud Firewall only; no CF-IP allow-list                                                                                                                                                                            |
+| D37 | accepted 2026-04-22                                 | Two-zone staff-site DNS pattern (prod + preview siblings)                                                                                                                                                              |
+| D38 | accepted 2026-04-22                                 | Rollback SLO ≤ 2 min                                                                                                                                                                                                   |
+| D39 | accepted 2026-04-22                                 | 7d hard retention; alias prefix-pin                                                                                                                                                                                    |
+| D40 | accepted 2026-04-25 (supersedes D34)                | Per-site R2 secrets persist **only** in Woodpecker repo-scoped secrets. No `constellations/` dir, no `.sops.yaml` rule. Recovery = re-mint via CF API. Offline backup → TODO-park.                                     |
+| D41 | accepted 2026-04-26                                 | Smoke + cleanup ops use admin S3 keys + admin Bearer via on-demand sops decrypt of `windmill/.env.enc`. No per-cluster ops cred. No rclone. Vars: `CF_ACCOUNT_ID`, `R2_OPS_ACCESS_KEY_ID`, `R2_OPS_SECRET_ACCESS_KEY`. |
+| D42 | accepted 2026-04-26 (supersedes T12 ops-rw.env.enc) | Per-cluster `infra-secrets/gxy-cassiopeia/ops-rw.env.enc` design dropped. Admin S3 keys live in `windmill/.env.enc` (D41).                                                                                             |
 
 ## Amendments log (this doc)
 
@@ -45,6 +47,74 @@ Source-of-truth split:
 - **2026-04-25** — D33 amended (`platform/` → `global/` → `windmill/.env.enc`).
   Cause: structure deep-audit caught direnv leak risk on `global/.env.enc`.
 - **2026-04-25** — D40 supersedes D34. Per-site secrets stay in Woodpecker.
+- **2026-04-26** — D41 added (smoke + cleanup ops surface) and D42
+  added (T12 ops-rw cred superseded). Cause: T15 pre-flight + sprint
+  state audit (`reports/sprint-state-audit-2026-04-25.md`) found 5
+  unmet operator-env prereqs + 3 false-completion claims in G1.0.
+  Recovery picked option 2 (admin Bearer + sops-on-demand for ops
+  surface). See entries below.
+
+### D41 — Smoke + cleanup ops surface (accepted 2026-04-26)
+
+**Decision:** infra-side R2 ops (Phase 4 smoke + future cleanup cron)
+consume admin S3 keys + admin Bearer **on demand from
+`infra-secrets/windmill/.env.enc`**. No persistent per-cluster R2 ops
+cred. No rclone surface.
+
+**Vars added to `windmill/.env.enc` by G-dispatch G1.0a:**
+
+- `CF_ACCOUNT_ID` — `ad45585c4383c97ec7023d61b8aef8c8` (live-verified)
+- `R2_OPS_ACCESS_KEY_ID` — full-bucket-scope admin S3 key
+- `R2_OPS_SECRET_ACCESS_KEY` — paired secret
+
+**Consumers:**
+
+- `scripts/phase4-test-site-smoke.sh` — sops-decrypts on each run,
+  passes to `aws s3 ...` via env, never persists in operator shell.
+- T22 cleanup cron (Windmill flow) — same pattern via Resource
+  `u/admin/cf_r2_provisioner` + same `windmill/.env.enc` source.
+
+**Why not per-cluster ops-rw:**
+
+- One bucket → one ops key surface ≡ KISS.
+- Admin token already lives at `windmill/.env.enc` (D33 ×2). Adding
+  S3 ops keys to the same file consolidates rotation surface.
+- Eliminates per-cluster `.env.enc` files (only `caddy.values.yaml.enc`
+  belongs at `infra-secrets/k3s/<cluster>/`).
+- Eliminates rclone-config-management (operator host state).
+
+**Why not admin Bearer alone (CF REST API for objects):**
+
+- CF REST API does not support arbitrary object PUT/GET/DELETE for
+  R2 — that surface is S3-compatible only.
+- `POST /accounts/{id}/r2/temp-access-credentials` requires
+  `parentAccessKeyId` (an existing persistent S3 key), so Bearer-only
+  bootstrap is impossible.
+
+### D42 — T12 ops-rw.env.enc design superseded (accepted 2026-04-26)
+
+**Decision:** Task 12 spec body lines L1842 + L1847 referencing
+`infra-secrets/gxy-cassiopeia/caddy-r2.env.enc` and
+`infra-secrets/gxy-cassiopeia/ops-rw.env.enc` are **superseded by D41**.
+The single `windmill/.env.enc` source carries all admin R2 ops creds.
+Per-cluster `.env.enc` files for R2 access are not created.
+
+**Affected files (amendment block added in T12 spec body):**
+
+- `docs/architecture/task-gxy-cassiopeia.md` Task 12 — amendment block
+  appended pointing here.
+
+**Recovery path on key compromise:** rotate via CF dashboard (revoke +
+re-mint scoped to bucket), re-seed `windmill/.env.enc`, push Resource
+update via `wmill resource push`. Same surface as admin Bearer rotation.
+
+### Single-bucket invariant (reinforcement, not new)
+
+`universe-static-apps-01` is the **only** R2 bucket for Universe static
+apps. Per-site separation = prefix scoping (`<site>/...`), enforced by
+Woodpecker per-site secret path-conditions (D40 / D22). Any future
+dispatch / runbook / spec body must use bucket-prefix language, never
+"per-site bucket".
 
 ## Brainstorm rationale (archived from QA-recommendations 2026-04-22)
 

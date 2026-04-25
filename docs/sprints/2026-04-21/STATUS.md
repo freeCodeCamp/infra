@@ -1,8 +1,16 @@
 # Sprint 2026-04-21 — STATUS
 
-Updated: 2026-04-25 (later) · Branch: `feat/k3s-universe` · Ahead of origin: 17
+Updated: 2026-04-25 (recovery sweep) · Branch: `feat/k3s-universe` · Ahead of origin: 17 + recovery
 
-**Wave A.1 + A.2 closed.** G1.0 cleared. T15 closed (awaits operator live run on gxy-cassiopeia). T16-T20 closed (universe-cli v0.4.0-beta.1 prepped + slop strip + D37 enforcement). **A.3 T11 (windmill flow) unblocked — next move.**
+**⚠ RECOVERY ACTIVE.** Pre-flight on T15 smoke surfaced 5 unmet
+operator-env prereqs + 3 false-completion claims in G1.0. See:
+
+- `reports/T15-smoke-preflight-2026-04-25.md`
+- `reports/sprint-state-audit-2026-04-25.md`
+
+Recovery picked: full Phase 1–5 with **smoke refactored to admin
+Bearer + on-demand sops decrypt** (option 2; rclone + per-cluster R2
+ops cred dropped). Wave B blocked on G1.0a + G1.0b + G1.1 ladder.
 
 Canonical session-roll output. Overwritten each `roll the session`. Read
 this **before** PLAN.md or DECISIONS.md — those are stable references,
@@ -36,9 +44,10 @@ Sprint scaffolding (since operator's last push):
 - S9 — gitignore /.cocoindex_code/ — `d43d1e4`
 - S10 — Filesystem-driven dispatches (drop bead tracking) — `ae82d8e`
 - S11 — Sprint doc consolidation: STATUS+PLAN+DECISIONS structure + GUIDELINES Sprint protocol — `3befa74`
-- T15 — Phase 4 smoke runbook + script + `just phase4-smoke` / `phase4-smoke-test` recipes (Wave A.1 closed) — `1e3b439`
+- T15 — Phase 4 smoke runbook + script + `just phase4-smoke` / `phase4-smoke-test` recipes (Wave A.1 _artifact_ closed; live-run deferred) — `1e3b439`
 - S12 — T15 closing commit ref backfill — `3f31a5c`
 - T16-T20 dispatch closures (universe-cli closure docs in infra repo) — `96b5b52`
+- S13 — sprint-doc roll: A.2 follow-up + slop strip — `73d4d19`
 
 universe-cli `feat/woodpecker-pivot` (cross-repo, awaiting operator push):
 
@@ -51,56 +60,78 @@ universe-cli `feat/woodpecker-pivot` (cross-repo, awaiting operator push):
 
 ## Open
 
-- **G1.0 — Operator bootstrap.** ✅ DONE 2026-04-25. CF Account-owned
-  API Token minted, `infra-secrets/windmill/.env.enc` seeded with
-  `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`, smoke-curl green, Windmill
-  Resource `u/admin/cf_r2_provisioner` registered.
+- **G1.0 — Operator bootstrap.** ⚠ **PARTIAL — was mis-marked done.** Live
+  audit (2026-04-25) found:
+  - ✅ CF Account-owned API token minted; sops-encrypted into
+    `infra-secrets/windmill/.env.enc` as `CF_R2_ADMIN_API_TOKEN`.
+    Verified live: token has R2 admin perms (lists bucket
+    `universe-static-apps-01` created 2026-04-20).
+  - ❌ `CF_ACCOUNT_ID` NOT in `windmill/.env.enc` (real value:
+    `ad45585c4383c97ec7023d61b8aef8c8`).
+  - ❌ Windmill Resource `u/admin/cf_r2_provisioner` NOT registered
+    (`wmill resource list` shows only `f/github/apollo_11_app`).
+  - ❌ R2 ops S3 admin keys (`R2_OPS_ACCESS_KEY_ID` +
+    `R2_OPS_SECRET_ACCESS_KEY`) NOT seeded.
+    Recovery dispatches G1.0a + G1.0b carry the rest of the work.
 
-Wave A staggered — in flight:
+Wave A staggered — recovery state:
 
-- Wave A.1 (infra) → **T15** ✅ done. Static gates green; awaits operator
-  live run (`just phase4-smoke` against gxy-cassiopeia w/ temp DNS) for
-  RFC §6.6 Phase 4 exit to fire. Runbook: `docs/runbooks/phase4-test-site-smoke.md`.
-- Wave A.2 (universe-cli) → **T16-T20** ✅ done. Slop strip + D37 enforcement also landed (off-list). v0.4.0-beta.1 ready behind operator publish trigger.
-- Wave A.3 (windmill) → **T11 ← next unblocked.** Per-site R2 secret provisioning flow. Cross-repo dispatch (~/DEV/fCC-U/windmill @ main).
+- Wave A.1 (infra) → **T15 artifact** closed. **Live run blocked** on
+  G1.0a (admin S3 keys + CF_ACCOUNT_ID seed) + G1.1 (cassiopeia env
+  patch). Smoke script refactored to admin-Bearer + on-demand sops
+  (rclone + per-cluster cred dropped per D-amend 2026-04-25).
+- Wave A.2 (universe-cli) → T16-T20 ✅ done. v0.4.0-beta.1 ready behind
+  operator publish trigger.
+- Wave A.3 (windmill) → **T11 BLOCKED** on G1.0a + G1.0b. Resource
+  shape `u/admin/cf_r2_provisioner` `{cfApiToken, cfAccountId}` doesn't
+  exist yet. Woodpecker admin Resource `u/admin/woodpecker_admin` also
+  not registered.
+
+New recovery dispatches (Phase 3 of recovery):
+
+- **G1.0a** — `infra-secrets/windmill/.env.enc` complete + Resource push
+- **G1.0b** — Woodpecker admin token mint + Resource push
+- **G1.1** — gxy-cassiopeia `.envrc` `R2_BUCKET` export + kubeconfig pull
+- **G1.1.smoke** — operator runs `just phase4-smoke`
 
 Wave B (post-T11 observe-✓): T21 (infra `.woodpecker/deploy.yaml`), T22 (windmill cleanup cron). Both pending.
 
-T15 done. T16-T20 done. T11 + T21-T22 still `pending`.
+T15 artifact done. T16-T20 done. G1.0a/b/1/smoke + T11 + T21-T22 pending.
 
 ## Other state
 
 - Cluster gxy-management: GREEN post-rename. Windmill restored from S3
   dump 2026-04-22. UI smoke 200.
-- Cluster gxy-launchbase: Woodpecker live. `https://woodpecker.freecodecamp.net` 200, `x-woodpecker-version: 3.13.0`.
-- Cluster gxy-cassiopeia: Caddy live with `r2_alias` + `caddy.fs.r2`. Caddy modules T01–T05 shipped 2026-04-18.
+- Cluster gxy-launchbase: Woodpecker live. `https://woodpecker.freecodecamp.net` 200, `x-woodpecker-version: 3.13.0`. API base `/api` (verified live 2026-04-25 — NOT `/api/v1`).
+- Cluster gxy-cassiopeia: Caddy live (3 nodes, all `404 server=Caddy` for `Host: test.freecode.camp` pre-smoke). Modules T01–T05 shipped 2026-04-18. Node IPs: `165.227.149.249` `46.101.179.141` `188.166.165.62`.
 - Cluster gxy-static: Live, retiring at #26 cutover.
+- CF account: `ad45585c4383c97ec7023d61b8aef8c8` (`freeCodeCamp`). Verified via live API.
 - CF zones: `freecodecamp.net` + `freecode.camp` proxied. Origin certs `*.freecodecamp.net`, `*.freecode.camp`, `*.preview.freecode.camp` all ACM-issued + CF-activated.
-- R2 bucket: `universe-static-apps-01`.
-- Tools verified: sops, age, doctl, wmill (via `bunx` from windmill repo), direnv loaded in 3 repos.
+- DNS: `test.freecode.camp` + `test.preview.freecode.camp` resolve via CF anycast (records already in place).
+- R2 bucket: `universe-static-apps-01` (created 2026-04-20). **Single bucket — per-site = prefix scoping.** No per-site buckets.
+- Tools verified: sops, age, doctl, wmill (via `bunx` from windmill repo), direnv loaded in 3 repos. **`aws` (aws-cli v2)** required for new smoke design — operator must install if absent.
 - Worker driver scripts: `~/.claude/plugins/cache/superpowers-marketplace/claude-session-driver/1.0.1/scripts/`.
 
 ## Resume prompt — paste in fresh session
 
-▎ Resume Sprint 2026-04-21 Wave A per docs/sprints/2026-04-21/PLAN.md.
-Tree on feat/k3s-universe, ahead of origin by 17. Wave A.1 + A.2 closed.
-G1.0 operator bootstrap DONE — CF Account-owned API Token minted,
-infra-secrets/windmill/.env.enc seeded with CF_R2_ADMIN_API_TOKEN +
-CF_ACCOUNT_ID, Windmill Resource u/admin/cf_r2_provisioner registered.
-T15 done (Phase 4 smoke script + runbook + just phase4-smoke recipe;
-awaits operator live run on gxy-cassiopeia w/ temp DNS for RFC §6.6
-Phase 4 exit). T16-T20 done (universe-cli @ feat/woodpecker-pivot:
-Woodpecker pivot, S3/rclone strip, v0.4.0-beta.1 prepped, slop strip
-
-- D37 follow-up landed; 166/166 tests green). Sprint goal: Universe
-  static-apps MVP — staff push → site live on <site>.freecode.camp via
-  Woodpecker → R2 → Caddy(r2_alias) on gxy-cassiopeia + preview siblings
-  on <site>.preview.freecode.camp. Next unblocked: Wave A.3 windmill
-  T11 per-site R2 secret provisioning flow (cross-repo dispatch:
-  ~/DEV/fCC-U/windmill @ main, dispatches/T11-windmill-flow.md). After
-  T11 observe-✓: Wave B parallel fanout (infra T21 .woodpecker template,
-  windmill T22 cleanup cron). Locked decisions in DECISIONS.md (Q1–Q8 +
-  D33×2/D37/D40 amendments). Per-task covenant: TDD discipline, one
-  commit per task, type(scope): subject title only, worker flips
-  dispatch Status pending → in-progress → done in same closure commit,
-  no push / no PR / no publish — operator pushes at sprint close.
+▎ Resume Sprint 2026-04-21 RECOVERY per
+docs/sprints/2026-04-21/reports/sprint-state-audit-2026-04-25.md.
+Tree on feat/k3s-universe, ahead of origin by 17 + recovery sweep.
+**G1.0 was mis-marked done — actual state is partial.** Audit
+2026-04-25 found: admin Bearer + CF_R2_ADMIN_API_TOKEN seeded ✓ but
+CF_ACCOUNT_ID missing, Resource u/admin/cf_r2_provisioner not
+registered, no R2 ops S3 keys. Recovery picks: full Phase 1–5 with
+smoke refactored to admin Bearer + on-demand sops decrypt (rclone +
+per-cluster R2 ops key dropped). Wave A.1 T15 artifact closed but
+live run blocked on G1.0a + G1.1. Wave A.2 T16-T20 done (universe-cli
+v0.4.0-beta.1 ready). Wave A.3 T11 blocked on G1.0a + G1.0b. Wave B
+(T21 + T22) blocked on T11. Single R2 bucket
+`universe-static-apps-01`; per-site = prefix scoping NOT per-bucket.
+CF account ad45585c4383c97ec7023d61b8aef8c8. Woodpecker API base
+`/api` (NOT `/api/v1`). New recovery dispatches:
+dispatches/G1.0a-windmill-cf-resource.md, G1.0b-woodpecker-resource.md,
+G1.1-cassiopeia-env.md, G1.1-smoke-live-run.md. Per-task covenant:
+TDD discipline, one commit per task, type(scope): subject title only,
+worker flips dispatch Status pending → in-progress → done in same
+closure commit, no push / no PR / no publish — operator pushes at
+sprint close.
