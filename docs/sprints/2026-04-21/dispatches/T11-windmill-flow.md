@@ -1,16 +1,20 @@
-# T11 Windmill flow dispatch — Per-site R2 secret provisioning
+# T11 — Per-site R2 secret provisioning Windmill flow
 
-**Bead:** `gxy-static-k7d.12` (T11 [M])
-**Owner repo:** windmill (`~/DEV/fCC-U/windmill`, branch `main`) — **NOT** the infra repo.
-**Epic stage gate:** `gxy-static-k7d` @ `running` (required; verify with `dp_beads_show gxy-static-k7d`).
-**Sprint parent:** `infra/docs/sprints/2026-04-21/MASTER.md` → Phase 1 · P1.\*.
-**Predecessor gates passed:** #22 rename done · #23 MASTER shipped ·
-QA Q1–Q8 locked (#28–#35) · RFC amendments D33–D39 landed · T32
-verified live (org-gate auth, CF Access off).
+**Status:** pending
+**Worker:** w-windmill
+**Repo:** `~/DEV/fCC-U/windmill` (branch: `main`) — **NOT** the infra repo
+**Spec:** [`task-gxy-cassiopeia.md` §Task 11](../../architecture/task-gxy-cassiopeia.md)
+**RFC:** [`rfc-gxy-cassiopeia.md` §5.20 D22 + Decision Index D33/D40](../../architecture/rfc-gxy-cassiopeia.md)
+**Sprint parent:** [`MASTER.md` → Phase 1 · P1.\*](../MASTER.md)
+**QA deltas:** Q1 (alias-write last step), Q2/Q3 (rescoped to D33×2 + D40), Q7 (preview parity), Q8 (7d cleanup pin)
+**Predecessor gates passed:** rename done · MASTER shipped · QA Q1–Q8 locked · RFC amendments D33–D40 landed · T32 verified live (org-gate auth, CF Access off) · T17 operator bootstrap (admin Bearer in `infra-secrets/windmill/.env.enc` + Windmill Resource `u/admin/cf_r2_provisioner`)
+**Started:** —
+**Closed:** —
+**Closing commit(s):** —
 
-**This doc is the authoritative dispatch for T11.** The bead's `design`
-block and inline `Agent Prompt` contain stale info (Deno toolchain,
-wrong repo path, pre-QA sops path). Prefer this doc.
+**This doc is the authoritative dispatch for T11.** Body below is the
+deep brief; worker should also cross-read spec + RFC to satisfy ALL
+acceptance criteria.
 
 ---
 
@@ -920,6 +924,23 @@ closure note. Do NOT close on trust — close on evidence.
 
 Next in MVP chain per `24-static-apps-k7d.md`:
 
-- **T21** (bead `.22`): `.woodpecker/deploy.yaml` pipeline template —
+- **T21**: `.woodpecker/deploy.yaml` pipeline template —
   consumes per-site credential provisioned by T11.
 - universe-cli lane T16–T20 can start in parallel (no dep on T11).
+
+---
+
+## Closure (filled on completion)
+
+- **Status:** —
+- **Closing commit(s):** windmill@—, infra@— (justfile recipe), infra-secrets@— (none if D40 honored)
+- **Acceptance evidence:**
+  - `pnpm test workspaces/platform/f/static/` — all green (≥95% line coverage)
+  - `pnpm oxfmt --check` + `pnpm oxlint` + `tsc --noEmit` — clean
+  - `runScriptPreviewAndWaitResult` MCP against live Windmill — green
+  - `wmill sync push --dry-run` — zero unintended deletions
+  - Live K1–K7 smoke probe — all pass
+  - K8 cleanup — CF token revoked, Woodpecker secrets deleted, R2 probe object deleted
+- **Surprises:** —
+- **Sprint-doc patches owed:** matrix row flip in `24-static-apps-k7d.md`
+  - closure note in `HANDOFF.md` rolling log + `Universe/spike/field-notes/windmill.md` journal entry.

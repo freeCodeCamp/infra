@@ -15,8 +15,12 @@ Retire gxy-static.
 - windmill `main`
 - infra-secrets private sibling
 
-**Active epic:** `gxy-static-k7d` (stage `speccing` → needs `running`
-before #24 exec).
+**Tracking model (2026-04-25):** filesystem-driven. Per-task dispatch
+docs at `dispatches/T<N>-<slug>.md` carry status header
+(`pending → in-progress → done`). Sprint matrix in
+[`24-static-apps-k7d.md`](24-static-apps-k7d.md). Beads + bead IDs
+deprecated for this sprint (epic `gxy-static-k7d` left at `running`,
+unused).
 
 **Resumption:** Fresh session → read `HANDOFF.md` first, then this
 `MASTER.md`, then `QA-recommendations.md`. Cluster-audit backlog in
@@ -28,16 +32,16 @@ before #24 exec).
 
 Source: `QA-recommendations.md` — all 8 accepted. Closed tasks #28–#35.
 
-| Q   | Topic                | Decision                                                             |
-| --- | -------------------- | -------------------------------------------------------------------- |
-| Q1  | Alias-write          | Woodpecker pipeline step (atomic last step)                          |
-| Q2  | CF R2 admin cred     | `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc`           |
-| Q3  | Per-site sops path   | `infra-secrets/constellations/<site>.secrets.env.enc`                |
-| Q4  | Origin IP allow-list | DO Cloud Firewall only; no CF-IP allow-list; no per-galaxy split     |
-| Q5  | Staff-site DNS       | `<site>.freecode.camp` prod + `<site>.preview.freecode.camp` preview |
-| Q6  | Rollback SLO         | ≤ 2 minutes (CF LRU 60s + 30s smoke poll × 2 green hits)             |
-| Q7  | Preview envs         | Both prod + preview in MVP (certs pre-issued via ACM → CF activated) |
-| Q8  | Cleanup retention    | Hard 7d; both aliases pin their prefix                               |
+| Q   | Topic                | Decision                                                                                |
+| --- | -------------------- | --------------------------------------------------------------------------------------- |
+| Q1  | Alias-write          | Woodpecker pipeline step (atomic last step)                                             |
+| Q2  | CF R2 admin cred     | `infra-secrets/windmill/.env.enc` (D33 amended ×2 2026-04-25; Bearer + Account ID only) |
+| Q3  | Per-site secrets     | Woodpecker repo-scoped secrets only — D40 supersedes D34 (no infra-secrets path)        |
+| Q4  | Origin IP allow-list | DO Cloud Firewall only; no CF-IP allow-list; no per-galaxy split                        |
+| Q5  | Staff-site DNS       | `<site>.freecode.camp` prod + `<site>.preview.freecode.camp` preview                    |
+| Q6  | Rollback SLO         | ≤ 2 minutes (CF LRU 60s + 30s smoke poll × 2 green hits)                                |
+| Q7  | Preview envs         | Both prod + preview in MVP (certs pre-issued via ACM → CF activated)                    |
+| Q8  | Cleanup retention    | Hard 7d; both aliases pin their prefix                                                  |
 
 **Cert posture:** `*.freecode.camp` + `*.preview.freecode.camp` CF Origin
 certs already live on Cloudflare. No registrar/CF work for MVP path.
@@ -105,10 +109,10 @@ Sub-deliverables:
      `universe-static-apps-01/<site>/deploys/<ts>-<sha>/`.
    - Last step writes alias files `<site>/production` + `<site>/preview`
      atomically (per Q1 + Q7).
-   - Uses per-site data-plane token from
-     `infra-secrets/constellations/<site>.secrets.env.enc` (Q3).
-   - Admin provisioning token scoped to
-     `infra-secrets/platform/cf-r2-provisioner.secrets.env.enc` (Q2).
+   - Per-site data-plane token sourced from Woodpecker repo-scoped
+     secrets `r2_access_key_id` + `r2_secret_access_key` (Q3 / D40).
+   - Admin provisioning token at `infra-secrets/windmill/.env.enc` —
+     `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID` (Q2 / D33×2).
 2. **P1.2 — Caddy `r2_alias` on gxy-cassiopeia**
    - Verify `caddy.fs.r2` + `http.handlers.r2_alias` modules live in
      running image.
