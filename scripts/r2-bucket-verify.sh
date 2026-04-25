@@ -31,8 +31,8 @@ ok "dependencies present: rclone, sops, jq"
 RW_ENC="$SECRETS_DIR/gxy-cassiopeia/r2-rw.env.enc"
 RO_ENC="$SECRETS_DIR/gxy-cassiopeia/r2-ro.env.enc"
 
-[ -f "$RW_ENC" ] || { fail "rw key file missing: $RW_ENC"; exit 1; }
-[ -f "$RO_ENC" ] || { fail "ro key file missing: $RO_ENC"; exit 1; }
+[[ -f "$RW_ENC" ]] || { fail "rw key file missing: $RW_ENC"; exit 1; }
+[[ -f "$RO_ENC" ]] || { fail "ro key file missing: $RO_ENC"; exit 1; }
 ok "rw + ro .env.enc files present"
 
 set +e
@@ -40,8 +40,16 @@ RW_DECRYPTED=$(sops -d --input-type dotenv --output-type dotenv "$RW_ENC" 2>/dev
 RO_DECRYPTED=$(sops -d --input-type dotenv --output-type dotenv "$RO_ENC" 2>/dev/null); RO_RC=$?
 set -e
 
-[ "$RW_RC" -eq 0 ] && ok "rw key decrypts" || fail "rw key sops decrypt failed (rc=$RW_RC)"
-[ "$RO_RC" -eq 0 ] && ok "ro key decrypts" || fail "ro key sops decrypt failed (rc=$RO_RC)"
+if [[ "$RW_RC" -eq 0 ]]; then
+  ok "rw key decrypts"
+else
+  fail "rw key sops decrypt failed (rc=$RW_RC)"
+fi
+if [[ "$RO_RC" -eq 0 ]]; then
+  ok "ro key decrypts"
+else
+  fail "ro key sops decrypt failed (rc=$RO_RC)"
+fi
 
 eval "$RW_DECRYPTED"
 eval "$RO_DECRYPTED"
@@ -83,7 +91,7 @@ fi
 
 # 5. rw writes; ro cannot write
 TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
-echo "verify-$(date +%s)" > "$TMP"
+printf 'verify-%s\n' "$(date +%s)" > "$TMP"
 TESTKEY="_ops/r2-bucket-verify/$(date +%s)-$$.txt"
 
 if rclone "${RCLONE_RW[@]}" copyto "$TMP" ":s3:$BUCKET/$TESTKEY" >/dev/null 2>&1; then
@@ -104,8 +112,8 @@ rclone "${RCLONE_RW[@]}" deletefile ":s3:$BUCKET/$TESTKEY" >/dev/null 2>&1 || wa
 # 6. Versioning (manual — rclone cannot query R2 versioning state)
 warn "versioning state cannot be queried via rclone — confirm in CF dashboard (Settings → Object versioning: Enabled)"
 
-echo
-if [ "$FAIL" -eq 0 ]; then
+printf '\n'
+if [[ "$FAIL" -eq 0 ]]; then
   printf '%s✓ all automated checks passed%s (1 manual check: versioning UI)\n' "$GRN" "$RST"
   exit 0
 else

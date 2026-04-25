@@ -64,3 +64,5 @@ o11y/defaults/
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
+# CocoIndex Code (ccc)
+/.cocoindex_code/
