@@ -371,6 +371,27 @@ cf-dns-restore snapshot mode="--dry-run":
     bash scripts/cf-dns-restore.sh {{ snapshot }} {{ mode }}
 
 # ---------------------------------------------------------------------------
+# Smoke (end-to-end gate scripts — Phase 4 exit, etc.)
+# ---------------------------------------------------------------------------
+
+# Phase 4 exit gate per RFC gxy-cassiopeia §6.6. Uploads a test deploy to
+# R2, writes prod+preview aliases, verifies serve via Caddy r2_alias on a
+# gxy-cassiopeia node, then purges the test prefix (trap covers failure paths).
+# See docs/runbooks/phase4-test-site-smoke.md for prerequisites + DNS setup.
+# Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET,
+# CF_API_TOKEN, CF_ZONE_ID (direnv), GXY_CASSIOPEIA_NODE_IP (operator export).
+[group('smoke')]
+phase4-smoke:
+    bash scripts/phase4-test-site-smoke.sh
+
+# Static contract test for phase4-test-site-smoke.sh — does not invoke the
+# script. Asserts strict mode, env guards, D35 dot-scheme preview hostname,
+# trap with R2 cleanup, shell rules, shellcheck clean.
+[group('smoke')]
+phase4-smoke-test:
+    bash scripts/tests/phase4-test-site-smoke.sh
+
+# ---------------------------------------------------------------------------
 # Docker images (caddy-s3 — in-tree r2alias module via xcaddy)
 # ---------------------------------------------------------------------------
 

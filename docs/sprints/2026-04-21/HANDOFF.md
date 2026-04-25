@@ -14,6 +14,45 @@ Convention:
 
 ## Journal
 
+### 2026-04-25 — T15 Phase 4 smoke runbook + script (Wave A.1 closed)
+
+G1.0 operator bootstrap landed earlier same day (CF Account-owned API
+Token minted, `infra-secrets/windmill/.env.enc` seeded with
+`CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`, smoke-curl green, Windmill
+Resource `u/admin/cf_r2_provisioner` registered). Wave A.1 fired.
+
+T15 closed via TDD path:
+
+- **NEW** `scripts/tests/phase4-test-site-smoke.sh` — RED-first static
+  contract suite. Asserts strict mode, all 7 env guards, **D35
+  dot-scheme** preview hostname (`<site>.preview.freecode.camp`),
+  trap with `rclone purge` cleanup (acceptance §2544 — cleanup on
+  success AND failure), `printf` over `echo -n`, `[[ ]]` over `[ ]`,
+  shellcheck clean, `bash -n` clean.
+- **NEW** `scripts/phase4-test-site-smoke.sh` — Phase 4 exit gate per
+  RFC §6.6. Uploads test deploy → writes prod alias → polls Q6 SLO
+  (30s × 2 green) → verifies preview 404 → writes preview alias →
+  verifies serve → purges. Trap re-runs purge on every exit path.
+- **NEW** `docs/runbooks/phase4-test-site-smoke.md` — prerequisites,
+  required env, 8-step success flow, failure-path matrix, rollback,
+  exit-gate semantics.
+- **MODIFIED** `justfile` — new `[group('smoke')]` with two recipes:
+  `phase4-smoke` (live gate) + `phase4-smoke-test` (static contract).
+
+Deltas from spec body recorded in dispatch closure block: D35 dot-scheme
+override, trap upgraded to R2 cleanup, env guards expanded 4→7, shell
+rules applied.
+
+**Live R2 / DNS run not executed by this dispatch** — script + runbook
+shipped; operator runs `just phase4-smoke` against gxy-cassiopeia with
+operator-added temp DNS. RFC §6.6 Phase 4 exit fires only after that
+run is green.
+
+Next unblocked: **Wave A.2 universe-cli T16** (woodpecker client) →
+T17 (config schema) → observe → A.3 windmill T11.
+
+Commits: `(this commit)`.
+
 ### 2026-04-25 (later same day) — Sprint doc consolidation: STATUS/PLAN/DECISIONS
 
 Refactored sprint dir to filesystem-driven structure with explicit

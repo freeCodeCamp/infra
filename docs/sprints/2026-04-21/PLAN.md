@@ -121,7 +121,7 @@ during 24h observation; `doctl compute droplet list` shows no
 | T-id | Area         | Subject                                       | Dispatch                                                                           | Status                  |
 | ---- | ------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------- |
 | T11  | windmill     | Per-site R2 secret provisioning flow          | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)               | [ ] pending             |
-| T15  | infra        | Phase 4 smoke runbook + script                | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [ ] pending             |
+| T15  | infra        | Phase 4 smoke runbook + script                | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [x] done                |
 | T16  | universe-cli | Woodpecker API client                         | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [ ] pending             |
 | T17  | universe-cli | Config schema + site name validation          | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [ ] pending             |
 | T18  | universe-cli | Rewrite `deploy` command                      | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [ ] pending             |
