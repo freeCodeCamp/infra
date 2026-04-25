@@ -1,6 +1,6 @@
 # Sprint 2026-04-21 — STATUS
 
-Updated: 2026-04-25 · Branch: `feat/k3s-universe` · Ahead of origin: 11
+Updated: 2026-04-25 · Branch: `feat/k3s-universe` · Ahead of origin: 12
 
 Canonical session-roll output. Overwritten each `roll the session`. Read
 this **before** PLAN.md or DECISIONS.md — those are stable references,
@@ -33,6 +33,7 @@ Sprint scaffolding (since operator's last push):
 - S8 — r2-bucket-verify SC2015 fix — `a60fe10`
 - S9 — gitignore /.cocoindex_code/ — `d43d1e4`
 - S10 — Filesystem-driven dispatches (drop bead tracking) — `ae82d8e`
+- S11 — Sprint doc consolidation: STATUS+PLAN+DECISIONS structure + GUIDELINES Sprint protocol — `3befa74`
 
 ## Open
 
