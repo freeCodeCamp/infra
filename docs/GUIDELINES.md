@@ -174,14 +174,52 @@ States: `Proposed` → `Accepted` → (optional) `Superseded` or `Parked`.
 
 ## Sprint docs
 
-One directory per sprint: `infra/docs/sprints/<YYYY-MM-DD>/`.
+One directory per sprint: `infra/docs/sprints/<YYYY-MM-DD>/`. Filesystem-driven —
+beads/issue-tracker IDs optional, dispatch-doc Status headers + STATUS.md
+are source of truth.
 
-Contents:
+**Canonical layout:**
 
-- `README.md` — goal, resumption pointer to HANDOFF if mid-sprint
-- `HANDOFF.md` — session-context doc so a fresh agent session can resume
-- `MASTER.md` — dispatch checklist (phases, tasks, gates)
-- Per-task files `NN-<area>-<taskid>.md` — self-contained dispatch blocks
+```
+infra/docs/sprints/<YYYY-MM-DD>/
+├── README.md         — read-order pointer
+├── STATUS.md         — live cursor (Shipped / Open / Other state / Resume prompt)
+├── PLAN.md           — stable plan: goal, phases, gates, sub-task matrix, Wave graph
+├── DECISIONS.md      — locked Q-rows + D-row cross-refs to RFCs
+├── HANDOFF.md        — append-only dated history log
+├── <topic>-audit.md  — point-in-time snapshots (optional)
+└── dispatches/T<N>-<slug>.md — per-task briefs with Status header
+```
+
+**Doc roles (read-order matters):**
+
+| File         | Mutability                                 | Read-when                         |
+| ------------ | ------------------------------------------ | --------------------------------- |
+| README.md    | Stable                                     | First — orients the dir           |
+| STATUS.md    | Rewritten every "roll the session"         | First on resume — gives next move |
+| PLAN.md      | Stable; patched on scope/phase change      | Before dispatching next task      |
+| DECISIONS.md | Append-only amendments; never rewrite rows | When a Q/D needs lookup           |
+| HANDOFF.md   | Append-only journal; one entry per session | When archaeology needed           |
+| dispatches/  | Status header flips per-task by worker     | Before working a specific task    |
+
+**Per-task closure checklist** — when a sub-task closes, the closure
+commit MUST update **all** derived docs the change affects:
+
+- [ ] Dispatch-doc Status header → `done`.
+- [ ] Sprint matrix row in `PLAN.md` → `[x] done`.
+- [ ] HANDOFF.md → append entry under today's date with summary + commit SHA.
+- [ ] Cluster's flight-manual if rebuild steps changed (per cluster touched).
+- [ ] Field-note Journal entry in `Universe/spike/field-notes/<area>.md` if learning landed (separate commit OK if cross-repo).
+- [ ] Runbook if the change introduced or modified an operational procedure.
+- [ ] ADR amendment if architectural decision shifted.
+- [ ] TODO-park entry if work was deferred.
+- [ ] Last `STATUS.md` may stay — gets rewritten next "roll the session".
+
+**Session-roll commands:**
+
+- `roll the sprint` → rewrite `STATUS.md` from current git log + dispatch-doc state. Single commit.
+- `give me the resume prompt` → print `STATUS.md` Resume-prompt block verbatim.
+- `start the sprint` (fresh session) → read `README.md` → `STATUS.md` → report current state, no action.
 
 When a sprint closes, move its directory under
 `infra/docs/sprints/archive/`. Archives are read-only.
@@ -226,7 +264,10 @@ Log the trim pass itself as a journal entry in `infra.md` field-notes.
 - Changed an architectural decision? → **Amend the ADR in place** +
   add a dated resolution note.
 - Starting a new sprint? → **Create `sprints/<date>/` with README +
-  HANDOFF + MASTER.**
+  STATUS + PLAN + DECISIONS + HANDOFF + `dispatches/`.**
+- Closing a sub-task? → **Run the per-task closure checklist** in
+  §Sprint docs. Flight-manuals + field-notes update in the same
+  closure work, not "later".
 - Deferring an item? → **Append to `docs/TODO-park.md` with activation
   trigger.**
 - Multiple places need the same fact? → **One canonical source; others
