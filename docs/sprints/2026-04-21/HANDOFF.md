@@ -14,6 +14,45 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 — G1.0a closed: `windmill/.env.enc` complete + cf_r2_provisioner Resource live
+
+Operator executed dispatch G1.0a in fresh Claude Code session opened in
+`~/DEV/fCC-U/windmill`. Two-repo split per dispatch:
+
+- `~/DEV/fCC/infra-secrets` `windmill/.env.enc` now carries all 4 vars:
+  `CF_R2_ADMIN_API_TOKEN` (existing, untouched), `CF_ACCOUNT_ID`
+  (`ad45585c4383c97ec7023d61b8aef8c8`), `R2_OPS_ACCESS_KEY_ID` +
+  `R2_OPS_SECRET_ACCESS_KEY` (admin S3 ops keys, name
+  `universe-static-apps-01-ops-rw`, R2 Object Read & Write,
+  bucket-scoped `universe-static-apps-01`, no TTL). Sample-twin
+  mirrored. Sops decrypts clean.
+- Windmill platform workspace: resource type `c_cf_r2_provisioner`
+  created (schema `{cfApiToken, cfAccountId}`, both required, did not
+  exist pre-run — caveat in dispatch §4 fired for real); resource
+  `u/admin/cf_r2_provisioner` created with extracted values. Verify
+  block returns `value_keys: ["cfAccountId", "cfApiToken"]` ✓
+  (T11 §6 spec match).
+
+Both artifacts sit outside the `f/**` IaC perimeter that `wmill.yaml`
+syncs — zero file changes in `~/DEV/fCC-U/windmill`. `u/admin/*` is
+admin-only namespace, lives only on the platform server. Captured as
+expected closure shape (no commit in windmill repo).
+
+No git push. No PR. No publish. Per covenant.
+
+Commits:
+
+- `infra-secrets`: `7d8edcb` — `feat(windmill): add R2 ops S3 keys + CF_ACCOUNT_ID (D41)`
+- `~/DEV/fCC/infra` (this commit): sprint-doc patches — dispatch Status
+  flip, PLAN matrix `[x] done`, this entry, STATUS G1.0 → G1.0a verified.
+
+Next unblocked: **G1.0b** (Woodpecker admin token mint + Resource push)
+
+- **G1.1** (cassiopeia `R2_BUCKET` export + kubeconfig pull) — both
+  operator gates, both can run in parallel with each other (G1.1
+  independent of G1.0a/b per Wave A graph). T11 still blocked on G1.0b.
+  G1.1.smoke still blocked on G1.0a + G1.1 (G1.0a now ✓; needs G1.1).
+
 ### 2026-04-25 (recovery) — sprint-state audit + smoke refactor + 4 G-dispatches
 
 Pre-flight on T15 phase4-smoke surfaced 5 unmet operator-env prereqs.
