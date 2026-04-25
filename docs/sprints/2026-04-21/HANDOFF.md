@@ -10,14 +10,108 @@ context for continuing Universe static-apps MVP work.
 3. Read [`QA-recommendations.md`](QA-recommendations.md) — locked operator
    decisions (Q1–Q8, accepted 2026-04-22).
 4. Read `docs/GUIDELINES.md` — doc conventions.
-5. Run `TaskList`; tasks #17–#35 present. If not, recreate from
-   [Task map](#task-map).
+5. Run `TaskList`. If empty (fresh controller session), compile from
+   the [2026-04-25 Wave A dispatch TaskList](#2026-04-25--wave-a-dispatch-tasklist-compile-in-fresh-session)
+   section below — 17 tasks, dependency graph included. (Sprint-level
+   bead tasks #17–#35 separately tracked in beads epic
+   `gxy-static-k7d`.)
 6. Verify live cluster state still matches [Galaxy state](#galaxy-state)
    (helm releases + droplets drift over time).
 7. Epic `gxy-static-k7d` stage = `running` (promoted 2026-04-22). Ready
    to dispatch MVP sub-tasks.
 
 ## Session context (rolling)
+
+### 2026-04-25 — Wave A staggered dispatch plan + D33/D40 amendments
+
+Sprint dispatch shifted from "fire all 3 in parallel" to **staggered
+Wave A** (one worker at a time, observe + verify before next launch).
+Cause: T11 dispatch doc had drifted from `rfc-secrets-layout.md`
+two-scope convention; structure audit caught it before any worker
+fired. Decisions recorded:
+
+- **D33 amended in place** (RFC `rfc-gxy-cassiopeia.md`): admin token
+  path moved `platform/cf-r2-provisioner.secrets.env.enc` →
+  `global/.env.enc`. Vars reduced to **two** —
+  `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID`. S3-style admin Access
+  Key/Secret dropped (flow uses CF Bearer only).
+- **D34 superseded by new D40**: per-site R2 secrets persist
+  **only** in Woodpecker (D22 channel). No `constellations/` dir, no
+  `.sops.yaml` rule. Re-mint via CF API is the recovery path.
+  Offline backup deferred to TODO-park.
+- Windmill T11 dispatch (`windmill-t11-dispatch.md`) prefixed with
+  override matrix + revised operator bootstrap (5 numbered steps incl.
+  smoke curl); §D / §F2-F6 / §G1-G2 / §H1 / §I4-I5 / §J5-J6 acceptance
+  rows marked OBSOLETE.
+- T11 worker owes sprint-doc patch (commit-only) at closure:
+  `24-static-apps-k7d.md`, `MASTER.md`, `QA-recommendations.md` (append
+  amendment block, do NOT rewrite locked Q2/Q3 prose).
+- bun PATH NOT in shell — workers run `bunx wmill ...` from windmill
+  repo cwd (devDep `windmill-cli@1.684.1`).
+
+### 2026-04-25 — Wave A dispatch TaskList (compile in fresh session)
+
+Use this section to recreate the controller-side TaskList. All work
+runs through `claude-session-driver` (scripts at
+`~/.claude/plugins/cache/superpowers-marketplace/claude-session-driver/1.0.1/scripts/`).
+
+**Dependency graph:**
+
+```
+1  Preflight ✓
+   ↓
+17 OPERATOR BOOTSTRAP (CF Bearer + global/.env.enc)
+   ↓ (gates 2)
+8  Launch w-infra ──→ 9 Brief T15 ──→ 10 Observe ✓
+                                          ↓
+                                       (gates 5)
+   ↓
+5  Launch w-cli ──→ 6 Brief T16+T17 ──→ 7 Observe ✓
+                                          ↓               ↓
+                                       (gates 2)      12 T18 ──→ 13 T19 ──→ 14 T20
+   ↓
+2  Launch w-windmill ──→ 3 Brief T11 ──→ 4 Observe ✓
+                                            ↓               ↓
+                                         11 T22         15 T21 (gated on 4 + 10)
+                                            ↓
+                                        16 Cleanup (gated on 11 + 14 + 15)
+```
+
+**TaskList rows** (subject — description summary — blockedBy):
+
+| #   | Subject                                                            | Description summary                                                                                                                                                                                                                                                                             | blockedBy  |
+| --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 1   | Preflight: verify direnv + secrets loaded in 3 repos               | Check direnv loaded in windmill / cli / infra; tools sops/age/wmill/doctl present; infra-secrets dirs sane                                                                                                                                                                                      | —          |
+| 17  | OPERATOR BOOTSTRAP: seed CF R2 provisioner cred in global/.env.enc | Manual ClickOps. Steps in `docs/sprints/2026-04-21/windmill-t11-dispatch.md §"Operator bootstrap (BEFORE T11 starts) — REVISED 2026-04-25"`. Mint CF Account API Token + edit global/.env.sample + sops global/.env.enc + commit no push + register Windmill Resource u/admin/cf_r2_provisioner | 1          |
+| 8   | Wave A.3: Launch w-infra worker                                    | `launch-worker.sh w-infra ~/DEV/fCC/infra`                                                                                                                                                                                                                                                      | 1          |
+| 9   | Wave A.3: Brief w-infra with T15 smoke runbook dispatch            | T15 = Phase 4 test-site smoke runbook + script. Bead `gxy-static-k7d.16`. Build `docs/runbooks/smoke-static-site.md` + `scripts/smoke/static-site.sh`. Poll 30s × 2 green per Q6 SLO                                                                                                            | 8          |
+| 10  | Wave A.3: Observe T15 to completion + verify evidence              | Wait stop event; verify runbook + script committed, bash -n clean, dry-run executes, bead .16 closed with evidence                                                                                                                                                                              | 9          |
+| 5   | Wave A.2: Launch w-cli worker                                      | `launch-worker.sh w-cli ~/DEV/fCC-U/universe-cli`. Confirm branch `feat/woodpecker-pivot`                                                                                                                                                                                                       | 10         |
+| 6   | Wave A.2: Brief w-cli with T16 + T17 dispatch                      | T16 (bead .17) = Woodpecker API client. T17 (bead .18) = config schema + site-name validation per D19 regex. TDD red-green-refactor                                                                                                                                                             | 5          |
+| 7   | Wave A.2: Observe T16+T17 to completion + verify evidence          | vitest green, eslint/oxlint clean, beads .17+.18 closed with evidence, commits on feat/woodpecker-pivot                                                                                                                                                                                         | 6          |
+| 2   | Wave A.1: Launch w-windmill worker                                 | `PATH not needed inline — worker uses bunx wmill`. `launch-worker.sh w-windmill ~/DEV/fCC-U/windmill`                                                                                                                                                                                           | 7, 10, 17  |
+| 3   | Wave A.1: Brief w-windmill with T11 dispatch                       | Paste FULL `windmill-t11-dispatch.md` (post-amendment) as opening prompt. Bead .12. Honor amendment matrix + Operator bootstrap §7 (sprint-doc patches owed)                                                                                                                                    | 2          |
+| 4   | Wave A.1: Observe T11 to completion + verify evidence              | vitest green, oxfmt+oxlint clean, `wmill sync push --dry-run` zero deletions, MCP preview green, bead .12 closed, sprint docs patched (24/MASTER/QA-rec/HANDOFF), commit on main no push                                                                                                        | 3          |
+| 11  | Wave B.windmill: T22 cleanup cron flow                             | Same w-windmill worker. T22 = R2 cleanup cron, 7d retention, prefix-pin both aliases per Q8. Bead .23                                                                                                                                                                                           | 4          |
+| 12  | Wave B.cli: T18 deploy rewrite                                     | Same w-cli worker. Rewrite `deploy` consuming T16 client + T17 config. Bead .19                                                                                                                                                                                                                 | 7          |
+| 13  | Wave B.cli: T19 promote + rollback rewrite                         | Bead .20                                                                                                                                                                                                                                                                                        | 12         |
+| 14  | Wave B.cli: T20 strip legacy + cut 0.4.0-beta.1                    | Strip rclone/S3 + bump pkg version + CHANGELOG. Bead .21. NO `npm publish` — operator handles                                                                                                                                                                                                   | 13         |
+| 15  | Wave B.infra: T21 .woodpecker/deploy.yaml template                 | Same w-infra worker. 10-step atomic promote pipeline. Bead .22. Consumes T11 R2 secret format (Woodpecker repo secret names `r2_access_key_id` + `r2_secret_access_key`).                                                                                                                       | 4, 10      |
+| 16  | Cleanup: stop all 3 workers + sprint state audit                   | `stop-worker.sh × 3`, audit `dp_beads_show gxy-static-k7d`, update HANDOFF rolling log                                                                                                                                                                                                          | 11, 14, 15 |
+
+**Worker ↔ repo map:**
+
+- `w-windmill` → `~/DEV/fCC-U/windmill` branch `main`. Tasks: T11, T22.
+- `w-cli` → `~/DEV/fCC-U/universe-cli` branch `feat/woodpecker-pivot`. Tasks: T16→T17→T18→T19→T20.
+- `w-infra` → `~/DEV/fCC/infra` branch `feat/k3s-universe`. Tasks: T15, T21.
+
+**Stagger discipline:** never launch next worker until prior Observe-✓
+passes. If any acceptance fails → halt, diagnose, re-brief same worker
+or kill + restart. Never run 2 workers in same repo (git race).
+
+**Auto-approve tools:** Default ON (PreToolUse 30s window). Override
+to manual via `approve-tool.sh <session-id> allow|deny` watching
+`/tmp/claude-workers/<sid>.tool-pending`.
 
 ### 2026-04-22 — QA lock + rename dogfood + RFC amendments
 
