@@ -51,7 +51,7 @@ run is green.
 Next unblocked: **Wave A.2 universe-cli T16** (woodpecker client) →
 T17 (config schema) → observe → A.3 windmill T11.
 
-Commits: `(this commit)`.
+Commits: `1e3b439`.
 
 ### 2026-04-25 (later same day) — Sprint doc consolidation: STATUS/PLAN/DECISIONS
 

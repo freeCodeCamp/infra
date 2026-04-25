@@ -36,7 +36,7 @@ Sprint scaffolding (since operator's last push):
 - S9 — gitignore /.cocoindex_code/ — `d43d1e4`
 - S10 — Filesystem-driven dispatches (drop bead tracking) — `ae82d8e`
 - S11 — Sprint doc consolidation: STATUS+PLAN+DECISIONS structure + GUIDELINES Sprint protocol — `3befa74`
-- T15 — Phase 4 smoke runbook + script + `just phase4-smoke` / `phase4-smoke-test` recipes (Wave A.1 closed) — `(this commit)`
+- T15 — Phase 4 smoke runbook + script + `just phase4-smoke` / `phase4-smoke-test` recipes (Wave A.1 closed) — `1e3b439`
 
 ## Open
 

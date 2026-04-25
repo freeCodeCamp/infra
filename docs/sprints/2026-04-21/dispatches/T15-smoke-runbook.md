@@ -8,7 +8,7 @@
 **QA deltas:** Q6 (≤2 min rollback SLO — poll 30s × 2 green hits)
 **Started:** 2026-04-25
 **Closed:** 2026-04-25
-**Closing commit(s):** (filled at commit)
+**Closing commit(s):** `1e3b439`
 
 ---
 
@@ -43,7 +43,7 @@ script with environment pre-loaded.
 ## Closure
 
 - **Status:** done
-- **Closing commit:** (filled at commit)
+- **Closing commit:** `1e3b439`
 - **Acceptance evidence:**
   - `shellcheck scripts/phase4-test-site-smoke.sh` — clean
   - `shellcheck scripts/tests/phase4-test-site-smoke.sh` — clean (one
@@ -52,10 +52,9 @@ script with environment pre-loaded.
   - `bash -n scripts/phase4-test-site-smoke.sh` — clean
   - `just phase4-smoke-test` (static contract suite) — `OK:
 phase4-test-site-smoke.sh contract satisfied`. Asserts `set -euo
-pipefail`, all 7 env guards, D35 dot-scheme preview hostname, trap
-    - `rclone purge` cleanup (acceptance §2544 — cleanup on success
-      AND failure), no `echo -n`, no POSIX `[ ]`, shellcheck clean,
-      `bash -n` clean.
+pipefail`, all 7 env guards, D35 dot-scheme preview hostname, trap - `rclone purge` cleanup (acceptance §2544 — cleanup on success
+    AND failure), no `echo -n`, no POSIX `[ ]`, shellcheck clean,
+    `bash -n` clean.
   - `just --unstable --fmt --check` — exits 0
 - **Deltas from spec body:**
   - Preview hostname **dot-scheme** (`test.preview.freecode.camp`),
