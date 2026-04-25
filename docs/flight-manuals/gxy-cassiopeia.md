@@ -105,7 +105,7 @@ kubectl get httproute -n caddy
 
 ## Phase 22: R2 bucket provisioning
 
-Provision bucket `gxy-cassiopeia-1` (versioning enabled, per-site rw/ro keys)
+Provision bucket `universe-static-apps-01` (versioning enabled, per-site rw/ro keys)
 per [../runbooks/r2-bucket-provision.md](../runbooks/r2-bucket-provision.md).
 Store the key pair encrypted at
 `infra-secrets/k3s/gxy-cassiopeia/r2-{rw,ro}.env.enc`.
@@ -113,7 +113,7 @@ Store the key pair encrypted at
 Verify end-to-end:
 
 ```
-just r2-bucket-verify gxy-cassiopeia-1
+just r2-bucket-verify universe-static-apps-01
 # rw key writes, ro key cannot write, both can read
 ```
 
@@ -147,7 +147,7 @@ The production pipeline template (build artifact → push to R2 with deploy
 ID → promote via `universe` CLI) is TBD when `gxy-static-k7d.21` closes.
 Until then, immutable deploy + alias promotion flow is the same as
 [gxy-static.md](gxy-static.md) Phase 12 — point `S3_ENDPOINT` at the
-`gxy-cassiopeia-1` bucket and run the `universe static deploy` /
+`universe-static-apps-01` bucket and run the `universe static deploy` /
 `universe static promote` pair.
 
 Post-cutover from `gxy-static` (T25 — `gxy-static-k7d.25`), production DNS

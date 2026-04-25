@@ -16,7 +16,7 @@
 | R2  | Provision gxy-cassiopeia cluster                | P0       | §4.1 Cluster Provisioning  |
 | R3  | Deploy Woodpecker CI on gxy-launchbase          | P0       | §4.2 Woodpecker CI         |
 | R4  | Build custom Caddy `r2_alias` module            | P0       | §4.3 Caddy R2 Alias Module |
-| R5  | Provision R2 bucket `gxy-cassiopeia-1`          | P0       | §4.4 Storage Layout        |
+| R5  | Provision R2 bucket `universe-static-apps-01`   | P0       | §4.4 Storage Layout        |
 | R6  | Deploy Caddy Helm chart on gxy-cassiopeia       | P0       | §4.5 Caddy Deployment      |
 | R7  | Woodpecker pipeline template for static deploy  | P0       | §4.6 Pipeline Template     |
 | R8  | DNS: `*.freecode.camp` → gxy-cassiopeia         | P0       | §4.7 DNS & TLS             |
@@ -41,7 +41,7 @@
 | D5  | Preview subdomain scheme: `{site}--preview.freecode.camp`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Stays under `*.freecode.camp` free wildcard SSL                                                                                                                                                                                                                                                                                                                                       | §5.5                                    |
 | D6  | ArgoCD manages Caddy infrastructure only; exits per-deploy hot path                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Cleanly separates CD-of-platform from CD-of-sites                                                                                                                                                                                                                                                                                                                                     | §5.6                                    |
 | D7  | Woodpecker on gxy-launchbase (not temporary on gxy-management)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Spike plan Phase 1 expectation; isolates CI from mgmt                                                                                                                                                                                                                                                                                                                                 | §5.7                                    |
-| D8  | R2 bucket name: `gxy-cassiopeia-1` (sequential suffix convention)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Matches gxy-static-1 naming; allows future buckets 2, 3…                                                                                                                                                                                                                                                                                                                              | §5.8                                    |
+| D8  | R2 bucket name: `universe-static-apps-01` (sequential suffix convention)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Matches gxy-static-1 naming; allows future buckets 2, 3…                                                                                                                                                                                                                                                                                                                              | §5.8                                    |
 | D9  | Single Woodpecker pipeline with `OP` variable (deploy/promote/rollback)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Fewer pipeline files to maintain; same secrets/image cache                                                                                                                                                                                                                                                                                                                            | §5.9                                    |
 | D10 | Alias files are plain text (single-line deploy ID, UTF-8, no trailing \n)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Matches current universe-cli convention; simplest to parse                                                                                                                                                                                                                                                                                                                            | §5.10                                   |
 | D11 | Deploy ID format: `{YYYYMMDD-HHMMSS}-{git-sha7}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Sortable, informative, collision-resistant                                                                                                                                                                                                                                                                                                                                            | §5.10                                   |
@@ -105,6 +105,18 @@ Source: structure audit during sprint 2026-04-21 Wave A preflight
   `infra-secrets/README.md` rewritten same day to document the
   decision tree + activate `windmill/` namespace + sample-twin
   discipline (2026-04-25 commit).
+- **CORRECTED (bucket-name drift, evening):** All references to R2
+  bucket `gxy-cassiopeia-1` → `universe-static-apps-01` (canonical
+  per HANDOFF galaxy state + cluster-audit + sprint MASTER + Wave A
+  operator confirmation). Affects R5 dispatch row, §4.4 Storage
+  Layout, §4.6.3 path conditions, §6 cutover steps, §Task-11/22/25
+  acceptance, §A.2 inventory snippets. Runbooks (`r2-bucket-provision.md`,
+  `dns-cutover.md`) + flight-manual `gxy-cassiopeia.md` patched in
+  same commit. Bucket-name "sequential suffix per D8" convention
+  unchanged in spirit; the `-01` suffix matches D8 — naming scheme
+  shifted from `gxy-<name>-N` to `universe-<purpose>-NN` mid-spike to
+  decouple bucket lifetime from galaxy lifetime (R2 buckets persist
+  across cassiopeia rebuilds).
 
 ### Amendments (2026-04-22)
 
@@ -335,22 +347,22 @@ One server, three agents (one per node as a DaemonSet).
 
 #### 4.2.4 Secrets
 
-**R2 write credentials are repo-scoped, not org-scoped** (D22, §5.20). Each registered constellation receives its own R2 access-key pair at registration time, minted with an IAM-equivalent policy (R2 Access Token with a [path condition](https://developers.cloudflare.com/r2/api/tokens/) limiting writes to `gxy-cassiopeia-1/{site}/*`). This means a compromised build dependency in constellation A cannot overwrite constellation B's deploys.
+**R2 write credentials are repo-scoped, not org-scoped** (D22, §5.20). Each registered constellation receives its own R2 access-key pair at registration time, minted with an IAM-equivalent policy (R2 Access Token with a [path condition](https://developers.cloudflare.com/r2/api/tokens/) limiting writes to `universe-static-apps-01/{site}/*`). This means a compromised build dependency in constellation A cannot overwrite constellation B's deploys.
 
 | Scope        | Secret Name            | Value Source                                           | Used By                              |
 | ------------ | ---------------------- | ------------------------------------------------------ | ------------------------------------ |
 | **Repo**     | `r2_access_key_id`     | per-site, issued by onboarding flow, sops-encrypted    | Only that constellation's pipeline   |
 | **Repo**     | `r2_secret_access_key` | per-site, issued by onboarding flow, sops-encrypted    | Only that constellation's pipeline   |
 | Organization | `r2_endpoint`          | `https://<account>.r2.cloudflarestorage.com`           | All deploy pipelines (non-sensitive) |
-| Organization | `r2_bucket`            | `gxy-cassiopeia-1`                                     | All deploy pipelines (non-sensitive) |
+| Organization | `r2_bucket`            | `universe-static-apps-01`                              | All deploy pipelines (non-sensitive) |
 | Organization | `cf_api_token`         | CF Purge Cache API token, zone-scoped to freecode.camp | Cache purge step                     |
 | Organization | `cf_zone_id`           | Cloudflare zone ID for `freecode.camp`                 | Cache purge step (non-sensitive)     |
 
 R2 path conditions on the per-site token (documented at `https://developers.cloudflare.com/r2/api/tokens/#path-specific-access`):
 
 ```
-allow PutObject, GetObject, DeleteObject on gxy-cassiopeia-1/{site}/*
-deny  PutObject, GetObject, DeleteObject on gxy-cassiopeia-1/*
+allow PutObject, GetObject, DeleteObject on universe-static-apps-01/{site}/*
+deny  PutObject, GetObject, DeleteObject on universe-static-apps-01/*
 ```
 
 Caddy's read-only key is a separate org-scoped credential (not stored in Woodpecker; stored in Caddy's k8s Secret directly, sourced from infra-secrets, narrow to `GetObject` across the whole bucket).
@@ -627,7 +639,7 @@ Image tag convention: `ghcr.io/freecodecamp-universe/caddy-s3:{YYYYMMDD}-{git-sh
 
 #### 4.4.1 R2 Bucket
 
-- **Name:** `gxy-cassiopeia-1`
+- **Name:** `universe-static-apps-01`
 - **Account:** freeCodeCamp-Universe Cloudflare account
 - **Provisioning:** ClickOps (Cloudflare UI) for v1; import to OpenTofu later (ADR-002).
 - **Access keys:** Two keys — one for Woodpecker (read/write), one for Caddy (read-only). Both stored in `infra-secrets/gxy-cassiopeia/` as sops-encrypted files.
@@ -637,7 +649,7 @@ Image tag convention: `ghcr.io/freecodecamp-universe/caddy-s3:{YYYYMMDD}-{git-sh
 #### 4.4.2 Key Layout
 
 ```
-gxy-cassiopeia-1/
+universe-static-apps-01/
 ├── {site}/
 │   ├── deploys/
 │   │   ├── {deploy-id}/
@@ -954,7 +966,7 @@ resources:
     memory: 512Mi
 
 r2:
-  bucket: gxy-cassiopeia-1
+  bucket: universe-static-apps-01
   endpoint: "https://<cf-account>.r2.cloudflarestorage.com"
   # accessKeyId and secretAccessKey injected from sops overlay
 ```
@@ -1730,7 +1742,7 @@ try {
 
 **Lock semantics:**
 
-- Lock key: `gxy-cassiopeia-1/_ops/cleanup.lock`
+- Lock key: `universe-static-apps-01/_ops/cleanup.lock`
 - Content: JSON `{instanceId, acquiredAt, expiresAt}`.
 - Acquire: read current lock, if absent or `expiresAt < now` then PutObject with new values. S3 PutObject is atomic but not conditional (no If-None-Match in R2 S3 API); for v1 the Windmill cron is the only writer, so the lock is advisory, not mutex. If a second writer appears, add conditional-put via R2 API.
 - Release: DeleteObject at end of run.
@@ -1940,7 +1952,7 @@ T01 (`gxy-static-k7d.2`) is `blocks`-blocked by T31 in beads; dispatch will not 
 
 #### 5.24.1 Dual-target writes during soak (DEFERRED)
 
-**Approach (not adopted for M1):** During the 30-day soak, the Woodpecker pipeline writes every successful deploy to BOTH gxy-cassiopeia-1 AND gxy-static-1, keeping gxy-static in content parity so that rollback is fully transparent.
+**Approach (not adopted for M1):** During the 30-day soak, the Woodpecker pipeline writes every successful deploy to BOTH universe-static-apps-01 AND gxy-static-1, keeping gxy-static in content parity so that rollback is fully transparent.
 **Pros:** Rollback is a true rollback (no content regression).
 **Cons:** Doubles R2 write cost during soak (~30 days × N deploys × 2); doubles pipeline step complexity (T21); requires gxy-static pipelines to accept the new deploy format (possible regression in itself); and delays M1 by 1–2 weeks.
 **Deferred.** Cost of the content gap is tolerated for M1 in exchange for ship speed; revisit after first real post-cutover incident informs the trade-off. Filed as follow-up: "RFC gxy-cassiopeia §5.24.1 — dual-target writes" after M1 ships.
@@ -2070,13 +2082,13 @@ The rollout is 7 phases. Later phases depend on earlier ones. Any phase can be p
 
 ### 6.6 Phase 4: Deploy Caddy and Provision R2
 
-- Create R2 bucket `gxy-cassiopeia-1` in Cloudflare UI.
+- Create R2 bucket `universe-static-apps-01` in Cloudflare UI.
 - Create R2 access keys (1 rw for Woodpecker, 1 ro for Caddy).
 - Store keys in `infra-secrets/gxy-cassiopeia/` as sops-encrypted yaml.
 - Add `k3s/gxy-cassiopeia/apps/caddy/` chart (§4.5.2).
 - `just helm-upgrade caddy` on gxy-cassiopeia.
 - Verify Caddy pods Ready; `/healthz` responds 200.
-- Manually upload a test site (via a throwaway Woodpecker job) to `gxy-cassiopeia-1/test.freecode.camp/deploys/<id>/` + write `test.freecode.camp/production` alias.
+- Manually upload a test site (via a throwaway Woodpecker job) to `universe-static-apps-01/test.freecode.camp/deploys/<id>/` + write `test.freecode.camp/production` alias.
 - Add temporary DNS: `test.freecode.camp` → one gxy-cassiopeia node IP.
 - `curl -H "Host: test.freecode.camp" http://<nodeIP>` returns the test page.
 - `curl -H "Host: test--preview.freecode.camp" http://<nodeIP>` returns 404 (preview alias absent — expected).
@@ -2102,9 +2114,9 @@ The script performs, for every site present in `gxy-static-1`:
 
 | Check                                                                  | How                                                                                      | Pass criterion                                         |
 | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Site exists in `gxy-cassiopeia-1`                                      | `rclone lsd r2:gxy-cassiopeia-1/<site>/deploys/`                                         | At least one `deploys/<id>/` prefix exists             |
-| `production` alias exists in `gxy-cassiopeia-1`                        | `rclone cat r2:gxy-cassiopeia-1/<site>/production`                                       | Returns a deploy ID matching `^[A-Za-z0-9._-]{1,64}$`  |
-| Alias target exists                                                    | `rclone lsf r2:gxy-cassiopeia-1/<site>/deploys/<id>/index.html`                          | File exists                                            |
+| Site exists in `universe-static-apps-01`                               | `rclone lsd r2:universe-static-apps-01/<site>/deploys/`                                  | At least one `deploys/<id>/` prefix exists             |
+| `production` alias exists in `universe-static-apps-01`                 | `rclone cat r2:universe-static-apps-01/<site>/production`                                | Returns a deploy ID matching `^[A-Za-z0-9._-]{1,64}$`  |
+| Alias target exists                                                    | `rclone lsf r2:universe-static-apps-01/<site>/deploys/<id>/index.html`                   | File exists                                            |
 | HTTP 200 via cassiopeia origin (host header + direct IP)               | `curl -sSI -H "Host: <site>" http://<gxy-cassiopeia-node>/`                              | Status 200                                             |
 | HTTP 200 via cassiopeia origin for preview (if a preview alias exists) | `curl -sSI -H "Host: <site-short>--preview.freecode.camp" http://<gxy-cassiopeia-node>/` | Status 200                                             |
 | Constellation is registered with Woodpecker                            | `woodpecker-cli repo info freeCodeCamp-Universe/<site>`                                  | Exit 0                                                 |
@@ -2151,7 +2163,7 @@ If step 5–7 surface a problem within 15 minutes of cutover:
 
 #### 6.9.1 Rollback content-parity caveat (CRITICAL)
 
-The "rollback substrate" guarantees **DNS-level availability**, not **content parity**. During the 30-day window, all new deploys flow exclusively to `gxy-cassiopeia-1`; `gxy-static` is frozen at cutover-day state. A day-N rollback (N > 1) therefore serves the cutover-day snapshot, not the latest deploys — every constellation that shipped between cutover and day N silently regresses to older content.
+The "rollback substrate" guarantees **DNS-level availability**, not **content parity**. During the 30-day window, all new deploys flow exclusively to `universe-static-apps-01`; `gxy-static` is frozen at cutover-day state. A day-N rollback (N > 1) therefore serves the cutover-day snapshot, not the latest deploys — every constellation that shipped between cutover and day N silently regresses to older content.
 
 **Operators invoking rollback MUST:**
 
@@ -2203,7 +2215,7 @@ These must hold before and after any change to this system:
 ### 7.3 Migration Constraints
 
 - **`universe-cli ≥ 0.4.0` is required** for gxy-cassiopeia. Older versions attempt direct R2 upload and will fail with credential-not-found errors.
-- **Constellations existing on gxy-static** must re-deploy to gxy-cassiopeia-1 before DNS cutover, or they 404 post-cutover.
+- **Constellations existing on gxy-static** must re-deploy to universe-static-apps-01 before DNS cutover, or they 404 post-cutover.
 - **`gxy-static` is not deleted by this RFC.** Decommission is the user's decision.
 
 ### 7.4 Data Integrity Guards
@@ -2395,7 +2407,7 @@ Tests exercise both the `r2_alias` middleware (path rewrite) AND the `caddy.fs.r
 
 ### 11.3 End-to-End Tests (Bash + Woodpecker sandbox)
 
-- Spin up the Phase 4 test bucket (`gxy-cassiopeia-1` with temp DNS on `test.freecode.camp`).
+- Spin up the Phase 4 test bucket (`universe-static-apps-01` with temp DNS on `test.freecode.camp`).
 - Run `universe deploy --json` from a fixture repo; parse output for pipeline number.
 - Poll pipeline status via Woodpecker API; assert completes within 90s.
 - `curl https://test--preview.freecode.camp` returns expected content.
@@ -2422,7 +2434,7 @@ Documented in §9.3. Run during Phase 4 exit criterion.
 5. Visit `https://hello-world--preview.freecode.camp` — new title visible within 30s.
 6. `universe promote`
 7. Visit `https://hello-world.freecode.camp` — new title visible within 30s.
-8. Old deploys remain in `gxy-cassiopeia-1/hello-world.freecode.camp/deploys/`; alias files point to latest.
+8. Old deploys remain in `universe-static-apps-01/hello-world.freecode.camp/deploys/`; alias files point to latest.
 9. `universe rollback --to <old-id>`
 10. Visit `https://hello-world.freecode.camp` — old title visible within 30s.
 

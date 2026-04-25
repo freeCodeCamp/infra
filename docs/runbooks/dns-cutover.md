@@ -30,7 +30,7 @@ cd ~/DEV/fCC/infra
 just cutover-preflight
 ```
 
-The script (T23) enumerates sites in `gxy-static-1`, runs 8 checks per site against `gxy-cassiopeia-1`, and exits:
+The script (T23) enumerates sites in `gxy-static-1`, runs 8 checks per site against `universe-static-apps-01`, and exits:
 
 | Exit code | Meaning                                              | Action                                           |
 | --------- | ---------------------------------------------------- | ------------------------------------------------ |
@@ -140,7 +140,7 @@ Monitor `status.<internal>` and the platform-team email inbox for:
 
 ### 6.1 Rollback content-parity caveat (READ FIRST — per RFC §6.9.1)
 
-**DNS revert restores availability, NOT content parity.** During the soak window, all new deploys flow exclusively to `gxy-cassiopeia-1`; `gxy-static` is frozen at cutover-day state.
+**DNS revert restores availability, NOT content parity.** During the soak window, all new deploys flow exclusively to `universe-static-apps-01`; `gxy-static` is frozen at cutover-day state.
 
 A day-N rollback (N > 1) serves the cutover-day snapshot. Every constellation that shipped between cutover and rollback silently regresses to older content.
 
