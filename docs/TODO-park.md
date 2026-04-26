@@ -186,6 +186,32 @@ Phase 2 only opens if cross-repo audit surfaces additional pillars.
 - **Owner:** infra team.
 - **Ref:** ADR-001 §Component placement (ArgoCD multi-cluster on mgmt).
 
+### R2 lifecycle GC for orphan deploy prefixes (artemis)
+
+- **Activation trigger:** first prod-load on `uploads.freecode.camp` —
+  when `<site>/deploys/<ts>-<sha>/` orphan prefixes accumulate from
+  failed / aborted deploys (CLI re-init after mid-upload crash leaves
+  old prefix behind). Estimate: when bucket size grows >10% above
+  current-alias keep-set, or after 30 days of real deploy traffic.
+- **Owner:** infra team. R2 lifecycle rule, NOT artemis svc concern —
+  keeps artemis stateless + idempotent.
+- **Ref:** ADR-016 §Failure semantics (deploy retry idempotency model);
+  T31 dispatch §Retry-and-failure (no queue, no state, idempotent by
+  `deployId`).
+- **Scope:** R2 bucket `universe-static-apps-01` lifecycle rule
+  matching prefix `*/deploys/*` with age > N days (initial guess: 14d;
+  tune from observed deploy cadence). MUST NOT match alias keys
+  `<site>/preview` / `<site>/production` (no `/deploys/` segment) or
+  `caddy.fs.r2` cache keys.
+- **Why parked.** v1 artemis is single-tenant, deploys/day not /sec.
+  Orphan accumulation is cosmetic until storage cost or list-objects
+  latency surfaces. Premature GC rule risks deleting last-good preview
+  during long-running deploy retry windows. Defer until trigger fires
+  with real traffic shape.
+- **Open question.** Whether to keep last-N successful deploys per
+  site (rollback depth) or rely on alias key history alone. ADR-016
+  amend candidate at activation.
+
 ## Reliability
 
 ### DR runbook with tested RTO / RPO targets
