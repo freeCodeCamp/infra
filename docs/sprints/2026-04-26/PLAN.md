@@ -41,7 +41,7 @@ Filesystem-driven. Per-task dispatch docs at `dispatches/T<N>-<slug>.md` carry s
 | T32 | universe-cli v0.4 rewrite                       | pending | Fresh `feat/proxy-pivot` off `main` |
 | T33 | `platform.yaml` v2 schema + validator + doc     | done    | `universe-cli@5d7b6ef`              |
 | T34 | Caddy reverse proxy + DNS prep + smoke retarget | pending | After T31                           |
-| T22 | Cleanup cron Windmill flow                      | pending | After T31 live                      |
+| T22 | Cleanup cron Windmill flow                      | done    | `windmill@016a868`                  |
 
 ## Phases + gates
 
@@ -89,7 +89,7 @@ Sub-deliverables:
 | T32  | universe-cli       | v0.4 rewrite — proxy client (`feat/proxy-pivot`) | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)             | [ ] pending |
 | T33  | universe-cli       | `platform.yaml` v2 schema + validator + doc      | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)           | [x] done    |
 | T34  | infra              | Caddy reverse proxy + DNS prep + smoke retarget  | [`dispatches/T34-caddy-dns-smoke.md`](dispatches/T34-caddy-dns-smoke.md)             | [ ] pending |
-| T22  | windmill           | Cleanup cron flow                                | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                   | [ ] pending |
+| T22  | windmill           | Cleanup cron flow                                | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                   | [x] done    |
 
 ## Wave dispatch graph
 

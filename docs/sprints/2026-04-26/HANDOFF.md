@@ -11,6 +11,86 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T22 closed: cleanup cron Windmill flow
+
+T22 worker session in `~/DEV/fCC-U/windmill` shipped 7d-retention
+sweep flow per dispatch §Behavioral gates + ADR-007 retention + D39
+hard-7d + D41 admin S3 keys. Worker discipline clean: own repo +
+own dispatch Status flip (already committed at `infra@a967cf24`).
+
+**Closing commits:**
+
+- windmill `main` (not pushed): `016a868` — `feat(static): add cleanup cron for R2 deploys (T22)`
+- infra `feat/k3s-universe`: `a967cf24` — `docs(sprints): close T22 cleanup cron (windmill)` (worker-flipped Status header)
+
+**Files landed (windmill `f/static/`):**
+
+- `cleanup_old_deploys.{ts,test.ts,script.yaml,script.lock,schedule.yaml}`
+- `package.json` + `pnpm-lock.yaml` (`@aws-sdk/client-s3@3.1037.0`)
+
+**Gates evidenced:**
+
+- Tests: 12 vitest cases new (RED → GREEN); full suite 412/412 green across 30 files
+- Lint/format: `oxfmt --check` + `oxlint` clean; `tsc` clean for T22 files (38 pre-existing errors unchanged — out-of-scope drift)
+- `just plan` dry-run: 4 adds, 0 deletes (script + lock + script.yaml + schedule.yaml)
+- `windmill-reviewer` agent verdict CLEAR; 3 advisories applied: atomic CAS via `IfNoneMatch: "*"`; schedule skill marker; Resource handoff documented
+
+**Operator-owned post-deploy gates (per closure block):**
+
+1. Provision Resource `u/admin/r2_admin_s3` (native `s3` type) — admin R2 S3 keys
+2. `runScriptPreviewAndWaitResult` MCP with `dry_run=true` against live Windmill
+3. Flip `schedule.enabled: true` (still `dry_run=true`) → review pending list
+4. Switch `args.dry_run: false` for live retention sweep
+
+**Sprint state delta this commit (infra):**
+
+- PLAN top-level task chain row T22 → `done`.
+- PLAN dispatch matrix row T22 → `[x] done`.
+- STATUS Open table T22 → `done` + operator-gates note; Shipped section
+  gained windmill block (`016a868`) + worker close (`a967cf24`) + CLI
+  ns pivot commit (`22140aed`); concurrency plan rewritten (CLI ns
+  pivot landed pre-T32; T32 + T34 are remaining lanes).
+- HANDOFF — this entry.
+
+### 2026-04-27 — CLI surface namespace pivot (pre-T32 fire)
+
+Operator caught design risk before T32 worker fired: top-level
+`universe deploy` / `promote` / `rollback` / `ls` would lock CLI into
+static-app semantics, forcing breaking change for future surfaces
+(workers, dbs, queues). Pivot decision: namespace deploy verbs under
+`static` subcommand; reserve top-level `universe` for cross-cutting
+auth + identity + version commands.
+
+**Closing commits:**
+
+- Universe `main` (not pushed): `df255b9` — `docs(decisions): D016 amend CLI namespace static`
+  (3rd dated amendment block in ADR-016)
+- infra `feat/k3s-universe`: `22140aed` — `docs(sprints): pivot CLI surface to static ns`
+  (T32 dispatch §CLI surface rewritten; PLAN sprint goal +
+  G2 gate + success criteria 2/7/8 namespaced; README goal namespaced;
+  STATUS governor-resume namespaced; DECISIONS amendment-log entry)
+
+**Pre/post surface delta:**
+
+| Pre                 | Post                          |
+| ------------------- | ----------------------------- |
+| `universe deploy`   | `universe static deploy`      |
+| `universe promote`  | `universe static promote`     |
+| `universe rollback` | `universe static rollback`    |
+| `universe ls`       | `universe static ls`          |
+| `universe login`    | `universe login` (top-level)  |
+| `universe logout`   | `universe logout` (top-level) |
+| `universe whoami`   | `universe whoami` (top-level) |
+
+**T32 worker scope add:** single text fix in T33-shipped
+`docs/platform-yaml.md` (`universe deploy` → `universe static deploy`)
+folded into T32 commit (universe-cli repo, worker-owned). Governor did
+not cross repo lines.
+
+**Out-of-band drift noted:** infra `docs/TODO-park.md` carries an
+unstaged "T-build-residency" parking entry from a separate session
+(not pivot scope, not T22 scope). Left unstaged for operator triage.
+
 ### 2026-04-27 — T31 closed: artemis Go svc greenfield scaffold
 
 T31 worker session in `~/DEV/fCC-U/artemis` (greenfield repo) shipped
