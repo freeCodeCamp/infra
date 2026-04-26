@@ -1,8 +1,9 @@
+# SECONDARY BUILDER. Canonical = .github/workflows/docker--caddy-s3.yml
+# (build-residency principle: Universe platform pillars must build outside
+# Universe to avoid bootstrap chicken-egg). This pipeline is retained as
+# a fallback and will be retired via T-build-residency dispatch (pending).
+# Triggered manually only — no auto-fire on push.
 when:
-  - event: push
-    branch: main
-    path:
-      - "docker/images/caddy-s3/**"
   - event: manual
 
 steps:
