@@ -1,14 +1,14 @@
 # T30 — D016 ADR draft (deploy proxy architecture)
 
-**Status:** pending
+**Status:** done
 **Worker:** w-infra (governing session — broken ownership 2026-04-26)
 **Repo:** `~/DEV/fCC-U/Universe` (branch: `main`) — **CROSS-REPO under broken-ownership authorization**
 **Output:** `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`
 **Sprint cross-ref:** D43 row in `DECISIONS.md`
 **Authority:** operator command 2026-04-26 — "BREAK OWNERSHIP MODEL, Use this session as the governing session. We have to ship this tonight."
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-26 (late evening)
+**Closed:** 2026-04-26 (late evening)
+**Closing commit(s):** `Universe@e2a9356` — `feat(decisions): D016 deploy proxy plane`
 
 ---
 
@@ -79,8 +79,8 @@ D016 codifies the proxy plane that replaces per-site R2 tokens.
 
 ## Closure checklist
 
-- [ ] `016-deploy-proxy.md` lands
-- [ ] Sprint `DECISIONS.md` D43 row points to `016-deploy-proxy.md`
-- [ ] `T30` dispatch Status flipped `done`
-- [ ] PLAN matrix row checked
-- [ ] HANDOFF entry appended
+- [x] `016-deploy-proxy.md` lands (`Universe@e2a9356`)
+- [x] Sprint `DECISIONS.md` D43 row points to `016-deploy-proxy.md` (already in place at sprint open)
+- [x] `T30` dispatch Status flipped `done`
+- [x] PLAN matrix row checked
+- [x] HANDOFF entry appended

@@ -11,6 +11,37 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 (late evening) — T30 closed: ADR-016 landed in Universe
+
+Governing session under broken-ownership authorization wrote
+`~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md` per T30 dispatch
+brief. ADR mirrors ADR-015 conventions; nine sections present (Context,
+Decision, Architecture, Authn/Authz, R2 layout, Operational surface,
+Migration, Consequences, Cross-references) plus empty Amendments block.
+Q9–Q15 verbatim leans recorded; cross-refs ADR-003 / ADR-004 / ADR-008 /
+ADR-009 / ADR-010 / ADR-011, RFC cassiopeia (D33–D42), and supersedes
+prior-sprint dispatch T11. Universe `decisions/README.md` Accepted list
+gained ADR-016 row.
+
+**Closing commit:** `Universe@e2a9356` —
+`feat(decisions): D016 deploy proxy plane`. Universe now ahead of
+`origin/main` by 4 commits (3 prior field-notes + this ADR). Operator
+pushes at sprint close.
+
+**Sprint state delta this commit (infra):**
+
+- T30 dispatch Status flipped `pending → done`; closing-commit SHA
+  recorded; closure checklist boxes ticked.
+- PLAN top-level task chain row T30 → `done`.
+- PLAN dispatch matrix row T30 → `[x] done`.
+- HANDOFF — this entry.
+- DECISIONS D43 row already cross-refs `016-deploy-proxy.md` from sprint
+  open; no edit required.
+
+**Next move:** open T31 — Go scaffold + endpoints + tests in NEW
+greenfield repo `~/DEV/fCC-U/uploads/`. Module path
+`github.com/freeCodeCamp/uploads`. Go 1.26.2 verified on host.
+
 ### 2026-04-26 (late evening) — Sprint opens at branch point
 
 Governing session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`).

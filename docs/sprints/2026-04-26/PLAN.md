@@ -36,7 +36,7 @@ Filesystem-driven. Per-task dispatch docs at `dispatches/T<N>-<slug>.md` carry s
 
 | ID  | Subject                                         | Status  | Notes                               |
 | --- | ----------------------------------------------- | ------- | ----------------------------------- |
-| T30 | D016 ADR draft + lock                           | pending | Cross-repo Universe; broken-owner   |
+| T30 | D016 ADR draft + lock                           | done    | Cross-repo Universe; broken-owner   |
 | T31 | Uploads svc (Go) — scaffold + endpoints + tests | pending | NEW repo `~/DEV/fCC-U/uploads`      |
 | T32 | universe-cli v0.4 rewrite                       | pending | Fresh `feat/proxy-pivot` off `main` |
 | T33 | `platform.yaml` v2 schema + validator + doc     | pending | Parallel with T32                   |
@@ -84,7 +84,7 @@ Sub-deliverables:
 
 | T-id | Area               | Subject                                          | Dispatch                                                                             | Status      |
 | ---- | ------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------ | ----------- |
-| T30  | Universe (xrepo)   | D016 ADR — deploy proxy plane (broken ownership) | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md) | [ ] pending |
+| T30  | Universe (xrepo)   | D016 ADR — deploy proxy plane (broken ownership) | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md) | [x] done    |
 | T31  | uploads (new repo) | Uploads svc Go — scaffold + endpoints + tests    | [`dispatches/T31-uploads-service.md`](dispatches/T31-uploads-service.md)             | [ ] pending |
 | T32  | universe-cli       | v0.4 rewrite — proxy client (`feat/proxy-pivot`) | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)             | [ ] pending |
 | T33  | universe-cli       | `platform.yaml` v2 schema + validator + doc      | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)           | [ ] pending |
