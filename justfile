@@ -326,6 +326,41 @@ r2-bucket-verify bucket:
     scripts/r2-bucket-verify.sh {{ bucket }}
 
 # ---------------------------------------------------------------------------
+# Constellations (per-site static-app provisioning)
+# ---------------------------------------------------------------------------
+
+# Mint per-site Cloudflare R2 credentials and register them as Woodpecker
+# repo-scoped secrets via the Windmill flow at
+# `f/static/provision_site_r2_credentials`. Idempotent — re-running rotates
+# the token. T11 (sprint 2026-04-21) + D22 (Woodpecker repo-scope) +
+# D33 amended ×2 + D40 (Woodpecker is sole persistence surface).
+# Requires WINDMILL_REPO (defaults to ../fCC-U/windmill).
+[group('constellations')]
+constellation-register SITE="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ SITE }}" ]; then
+      echo "Usage: just constellation-register <site>" >&2
+      echo "  <site>: lowercase alphanumeric + hyphens, 1-32 chars" >&2
+      exit 2
+    fi
+    WINDMILL_REPO="${WINDMILL_REPO:-../fCC-U/windmill}"
+    if [ ! -d "${WINDMILL_REPO}/workspaces/platform" ]; then
+      echo "Error: Windmill repo not found at ${WINDMILL_REPO}." >&2
+      echo "Override with WINDMILL_REPO=/abs/path/to/windmill" >&2
+      exit 1
+    fi
+    cd "${WINDMILL_REPO}/workspaces/platform"
+    echo "Registering constellation {{ SITE }} via Windmill flow..."
+    bunx wmill script run f/static/provision_site_r2_credentials \
+      -d '{"site":"{{ SITE }}"}'
+
+# Static contract test for `constellation-register` recipe.
+[group('constellations')]
+constellation-register-test:
+    bash scripts/tests/constellation-register.sh
+
+# ---------------------------------------------------------------------------
 # Monitoring (Cloudflare Notifications + Uptime Robot)
 # ---------------------------------------------------------------------------
 

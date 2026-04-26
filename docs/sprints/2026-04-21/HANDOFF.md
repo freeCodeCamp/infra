@@ -14,6 +14,97 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 — T11 shipped: Windmill flow `f/static/provision_site_r2_credentials`
+
+Worker session in `~/DEV/fCC-U/windmill` per dispatch
+`docs/sprints/2026-04-21/dispatches/T11-windmill-flow.md` (covenant:
+one commit per repo, no push, no PR, no publish).
+
+Files committed (windmill@`010d577`):
+
+- `workspaces/platform/f/static/folder.meta.yaml`
+- `workspaces/platform/f/static/provision_site_r2_credentials.ts`
+  (~400 lines — typed `T11Error` hierarchy: `ValidationError`,
+  `ConfigMissingError`, `CFApiError`, `CFTimeoutError`,
+  `WoodpeckerApiError`, `WoodpeckerRepoMissingError`,
+  `RollbackIncompleteError`. `loadAdminResource<T>()` gates
+  `wmill.getResource` with `ResourceService.existsResource` per
+  windmill-sgj Bug B / session.md zero-tolerance.)
+- `workspaces/platform/f/static/provision_site_r2_credentials.test.ts`
+  (55 tests — site validation table, CF mint contract, Woodpecker
+  registration, rotation, rollback, return-shape, security,
+  error hierarchy)
+- `workspaces/platform/f/static/provision_site_r2_credentials.script.yaml`
+- `workspaces/platform/f/static/provision_site_r2_credentials.script.lock`
+  (regenerated via `bunx wmill generate-metadata` — pinned
+  `windmill-client@1.691.0`)
+
+Files committed (infra repo, separate commit):
+
+- `justfile` — added `[group('constellations')] constellation-register
+SITE` recipe + `constellation-register-test`. Dispatches via
+  `bunx wmill script run f/static/provision_site_r2_credentials -d
+'{"site":"<SITE>"}'` from `${WINDMILL_REPO}/workspaces/platform`
+  (default `../fCC-U/windmill`).
+- `scripts/tests/constellation-register.sh` — static contract test
+  (recipe declared, group, usage hint, env override default,
+  dispatch path, JSON envelope, fail-fast).
+- `docs/sprints/2026-04-21/STATUS.md` — flipped Wave A.3 line +
+  resume prompt to T11 shipped.
+- `docs/sprints/2026-04-21/HANDOFF.md` — this entry.
+
+Decisions honored:
+
+- **D22** — Woodpecker secret is repo-scoped; calls
+  `POST /api/repos/<owner>/<repo>/secrets`, NEVER
+  `POST /api/orgs/<org>/secrets`.
+- **D33 amended ×2 2026-04-25** — admin cred via Resource
+  `u/admin/cf_r2_provisioner` (no env var, no hardcode); seeded by
+  G1.0a 2026-04-26.
+- **D40 supersedes D34** — flow has NO sops write; Woodpecker is
+  sole persistence surface. Acceptance §D, F2/F4–F6, G1/G2, H1
+  (`secretPath`), I4/I5, J5/J6 OBSOLETE per dispatch amendment.
+
+Acceptance evidence (covenant-feasible subset):
+
+- A1 vitest 55/55 ✅
+- A2 oxfmt --check ✅
+- A3 oxlint 0 warnings ✅
+- A4 tsc --noEmit 0 errors in `f/static/` (pre-existing baseline
+  drift in other folders, untouched)
+- B1/B2/B3 site-name table-driven (valid + invalid + ordering)
+- C1/C2/C3/C4/C5/C6/C9 CF mint body, path-condition exact
+  `<bucket>.path.<site>/*`, token name, expiry, isolation,
+  4xx, malformed JSON
+- E1/E2/E3/E4/E5/E6/E9/E10 Woodpecker repo-scope, owner/repo
+  defaults, two split secrets, events `[push, manual]` (no
+  pull_request → I7), images `[]`, Bearer auth, repo-existence
+  probe before mint
+- F1/F3/F5/F6 rotation paths
+- G3/G5 rollback semantics + RollbackIncompleteError
+- H1 return shape exact (no `secretAccessKey`, no `secretPath`),
+  H2 secretAccessKey never logged, H4 typed errors
+- I1/I2/I3/I6 admin tokens via Resource only, exact path-prefix
+  fuzz
+
+Skipped per covenant ("no git push, no PR, no publish") —
+operator territory:
+
+- K1–K8 live MCP `runScriptPreviewAndWaitResult` against
+  `windmill.freecodecamp.net` + smoke probe + cleanup
+- `wmill sync push` to live workspace
+- `just plan --show-diffs` post-push diff review
+- M1 dp-engine bead close (not part of this filesystem-driven
+  dispatch model)
+
+Reviewer gate: BLOCK on first pass (C1.6 skill header, C1.7+C2.1
+typed wrap of getResource throw, C2.2+C6.2 generate-metadata
+receipt, C4.1 just plan). Fixed C1.6/C1.7/C2.1/C2.2/C6.2;
+C4.1 documented as covenant-skipped. Re-review CLEAR.
+
+Next: operator runs preview + `wmill sync push` to flip Wave A.3
+T11 from artifact-✓ to observe-✓. Then Wave B (T21/T22) unblocks.
+
 ### 2026-04-26 — G1.0b closed: Woodpecker admin PAT + woodpecker_admin Resource live
 
 Operator executed dispatch G1.0b in same `~/DEV/fCC-U/windmill` session
