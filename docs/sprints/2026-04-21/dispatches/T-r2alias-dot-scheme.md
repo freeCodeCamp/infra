@@ -1,6 +1,6 @@
 # T-r2alias-dot-scheme — Caddy r2_alias module dot-scheme migration
 
-**Status:** in-progress
+**Status:** done
 **Type:** code dispatch (Go module rewrite + chart bump + GH Actions workflow)
 **Worker:** session
 **Repo:** `~/DEV/fCC/infra` (branch: `feat/k3s-universe`)
@@ -10,7 +10,7 @@
 **Blocks:** G1.1.smoke
 **Wave:** A.1
 **Started:** 2026-04-26
-**Closed:** —
+**Closed:** 2026-04-26 — module rewrite + chart configmap + GH Actions canonical builder + namespace flip to `freecodecamp/caddy-s3` + RFC scrub. Image `sha-712c6e3@sha256:e024af67…` deployed to cassiopeia. Smoke green: `phase4-20260426-080726`.
 
 ---
 
