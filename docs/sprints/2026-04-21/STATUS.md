@@ -1,6 +1,6 @@
 # Sprint 2026-04-21 — STATUS
 
-Updated: 2026-04-25 (recovery sweep) · Branch: `feat/k3s-universe` · Ahead of origin: 17 + recovery
+Updated: 2026-04-26 (G1.0a + G1.0b closed) · Branch: `feat/k3s-universe` · Ahead of origin: 17 + recovery + G1.0a + G1.0b
 
 **⚠ RECOVERY ACTIVE.** Pre-flight on T15 smoke surfaced 5 unmet
 operator-env prereqs + 3 false-completion claims in G1.0. See:
@@ -10,7 +10,9 @@ operator-env prereqs + 3 false-completion claims in G1.0. See:
 
 Recovery picked: full Phase 1–5 with **smoke refactored to admin
 Bearer + on-demand sops decrypt** (option 2; rclone + per-cluster R2
-ops cred dropped). Wave B blocked on G1.0a + G1.0b + G1.1 ladder.
+ops cred dropped). G1.0a + G1.0b closed 2026-04-26. Wave A.3 admin
+deps now both green; T11 implementation pending. Wave B still blocked
+on G1.1 ladder + T11.
 
 Canonical session-roll output. Overwritten each `roll the session`. Read
 this **before** PLAN.md or DECISIONS.md — those are stable references,
@@ -48,6 +50,8 @@ Sprint scaffolding (since operator's last push):
 - S12 — T15 closing commit ref backfill — `3f31a5c`
 - T16-T20 dispatch closures (universe-cli closure docs in infra repo) — `96b5b52`
 - S13 — sprint-doc roll: A.2 follow-up + slop strip — `73d4d19`
+- G1.0a — `windmill/.env.enc` complete (4 vars) + Resource `u/admin/cf_r2_provisioner` + resource type `c_cf_r2_provisioner` live on platform workspace; infra-secrets commit `7d8edcb`; sprint-doc closure this commit
+- G1.0b — Woodpecker admin PAT (`WOODPECKER_ADMIN_TOKEN`) added to `windmill/.env.enc` + `.env.sample` doc block; Resource `u/admin/woodpecker_admin` + resource type `c_woodpecker_admin` live on platform workspace; live probe HTTP 200 (login `freeCodeCamp-bot`, admin: true); infra-secrets commit `749ee09`; sprint-doc closure this commit
 
 universe-cli `feat/woodpecker-pivot` (cross-repo, awaiting operator push):
 
@@ -60,43 +64,49 @@ universe-cli `feat/woodpecker-pivot` (cross-repo, awaiting operator push):
 
 ## Open
 
-- **G1.0 — Operator bootstrap.** ⚠ **PARTIAL — was mis-marked done.** Live
-  audit (2026-04-25) found:
-  - ✅ CF Account-owned API token minted; sops-encrypted into
-    `infra-secrets/windmill/.env.enc` as `CF_R2_ADMIN_API_TOKEN`.
-    Verified live: token has R2 admin perms (lists bucket
-    `universe-static-apps-01` created 2026-04-20).
-  - ❌ `CF_ACCOUNT_ID` NOT in `windmill/.env.enc` (real value:
-    `ad45585c4383c97ec7023d61b8aef8c8`).
-  - ❌ Windmill Resource `u/admin/cf_r2_provisioner` NOT registered
-    (`wmill resource list` shows only `f/github/apollo_11_app`).
-  - ❌ R2 ops S3 admin keys (`R2_OPS_ACCESS_KEY_ID` +
-    `R2_OPS_SECRET_ACCESS_KEY`) NOT seeded.
-    Recovery dispatches G1.0a + G1.0b carry the rest of the work.
+- **G1.0 — Operator bootstrap.** ✅ **Both halves closed (2026-04-26):
+  G1.0a CF + G1.0b Woodpecker.** Live state:
+  - ✅ CF Account-owned API token: `CF_R2_ADMIN_API_TOKEN` in
+    `infra-secrets/windmill/.env.enc`. Verified live (R2 admin perms,
+    lists bucket `universe-static-apps-01`).
+  - ✅ `CF_ACCOUNT_ID=ad45585c4383c97ec7023d61b8aef8c8` in same file.
+  - ✅ Windmill Resource `u/admin/cf_r2_provisioner` live on platform
+    workspace, shape `{cfApiToken, cfAccountId}`. Resource type
+    `c_cf_r2_provisioner` created same run.
+  - ✅ R2 ops S3 admin keys `R2_OPS_ACCESS_KEY_ID` +
+    `R2_OPS_SECRET_ACCESS_KEY` (name `universe-static-apps-01-ops-rw`,
+    R2 Object Read & Write, bucket-scoped, no TTL) in same file.
+    Consumed on-demand by smoke + cleanup cron via sops decrypt.
+  - ✅ Woodpecker admin PAT `WOODPECKER_ADMIN_TOKEN` in same file
+    (admin scope, `freeCodeCamp-bot`, no TTL).
+  - ✅ Windmill Resource `u/admin/woodpecker_admin` live on platform
+    workspace, shape `{baseUrl, token}`. Resource type
+    `c_woodpecker_admin` created same run. `baseUrl` =
+    `https://woodpecker.freecodecamp.net/api`.
 
 Wave A staggered — recovery state:
 
 - Wave A.1 (infra) → **T15 artifact** closed. **Live run blocked** on
-  G1.0a (admin S3 keys + CF_ACCOUNT_ID seed) + G1.1 (cassiopeia env
-  patch). Smoke script refactored to admin-Bearer + on-demand sops
-  (rclone + per-cluster cred dropped per D-amend 2026-04-25).
+  G1.1 (cassiopeia env patch) — G1.0a now ✓. Smoke script refactored
+  to admin-Bearer + on-demand sops (rclone + per-cluster cred dropped
+  per D-amend 2026-04-25).
 - Wave A.2 (universe-cli) → T16-T20 ✅ done. v0.4.0-beta.1 ready behind
   operator publish trigger.
-- Wave A.3 (windmill) → **T11 BLOCKED** on G1.0a + G1.0b. Resource
-  shape `u/admin/cf_r2_provisioner` `{cfApiToken, cfAccountId}` doesn't
-  exist yet. Woodpecker admin Resource `u/admin/woodpecker_admin` also
-  not registered.
+- Wave A.3 (windmill) → **T11 admin deps unblocked** (G1.0a + G1.0b
+  both ✓ — CF Resource `{cfApiToken, cfAccountId}` + Woodpecker
+  Resource `{baseUrl, token}` live on platform workspace). T11 flow
+  implementation still pending.
 
 New recovery dispatches (Phase 3 of recovery):
 
-- **G1.0a** — `infra-secrets/windmill/.env.enc` complete + Resource push
-- **G1.0b** — Woodpecker admin token mint + Resource push
-- **G1.1** — gxy-cassiopeia `.envrc` `R2_BUCKET` export + kubeconfig pull
-- **G1.1.smoke** — operator runs `just phase4-smoke`
+- **G1.0a** — ✅ done 2026-04-26 (`windmill/.env.enc` 4-var complete + `u/admin/cf_r2_provisioner` + type `c_cf_r2_provisioner` live)
+- **G1.0b** — ✅ done 2026-04-26 (`WOODPECKER_ADMIN_TOKEN` in `windmill/.env.enc` + Resource `u/admin/woodpecker_admin` + type `c_woodpecker_admin` live; admin scope verified)
+- **G1.1** — pending — gxy-cassiopeia `.envrc` `R2_BUCKET` export + kubeconfig pull
+- **G1.1.smoke** — pending — operator runs `just phase4-smoke` (depends G1.0a ✓ + G1.1)
 
 Wave B (post-T11 observe-✓): T21 (infra `.woodpecker/deploy.yaml`), T22 (windmill cleanup cron). Both pending.
 
-T15 artifact done. T16-T20 done. G1.0a/b/1/smoke + T11 + T21-T22 pending.
+T15 artifact done. T16-T20 done. G1.0a + G1.0b ✅. G1.1/smoke + T11 + T21-T22 pending.
 
 ## Other state
 
@@ -116,20 +126,20 @@ T15 artifact done. T16-T20 done. G1.0a/b/1/smoke + T11 + T21-T22 pending.
 
 ▎ Resume Sprint 2026-04-21 RECOVERY per
 docs/sprints/2026-04-21/reports/sprint-state-audit-2026-04-25.md.
-Tree on feat/k3s-universe, ahead of origin by 17 + recovery sweep.
-**G1.0 was mis-marked done — actual state is partial.** Audit
-2026-04-25 found: admin Bearer + CF_R2_ADMIN_API_TOKEN seeded ✓ but
-CF_ACCOUNT_ID missing, Resource u/admin/cf_r2_provisioner not
-registered, no R2 ops S3 keys. Recovery picks: full Phase 1–5 with
-smoke refactored to admin Bearer + on-demand sops decrypt (rclone +
-per-cluster R2 ops key dropped). Wave A.1 T15 artifact closed but
-live run blocked on G1.0a + G1.1. Wave A.2 T16-T20 done (universe-cli
-v0.4.0-beta.1 ready). Wave A.3 T11 blocked on G1.0a + G1.0b. Wave B
-(T21 + T22) blocked on T11. Single R2 bucket
-`universe-static-apps-01`; per-site = prefix scoping NOT per-bucket.
-CF account ad45585c4383c97ec7023d61b8aef8c8. Woodpecker API base
-`/api` (NOT `/api/v1`). New recovery dispatches:
-dispatches/G1.0a-windmill-cf-resource.md, G1.0b-woodpecker-resource.md,
+Tree on feat/k3s-universe, ahead of origin by 17 + recovery + G1.0a +
+G1.0b. **G1.0a + G1.0b both closed 2026-04-26.**
+`windmill/.env.enc` carries 5 vars (CF_R2_ADMIN_API_TOKEN,
+CF_ACCOUNT_ID, R2_OPS_ACCESS_KEY_ID, R2_OPS_SECRET_ACCESS_KEY,
+WOODPECKER_ADMIN_TOKEN). Platform workspace has resource types
+c_cf_r2_provisioner + c_woodpecker_admin and resources
+u/admin/cf_r2_provisioner ({cfApiToken, cfAccountId}) +
+u/admin/woodpecker_admin ({baseUrl, token}) live. Wave A.1 T15
+artifact closed; live run still blocked on G1.1. Wave A.2 T16-T20
+done (universe-cli v0.4.0-beta.1 ready). Wave A.3 T11 admin deps both
+✓; T11 implementation pending. Wave B (T21 + T22) blocked on T11.
+Single R2 bucket `universe-static-apps-01`; per-site = prefix scoping
+NOT per-bucket. CF account ad45585c4383c97ec7023d61b8aef8c8.
+Woodpecker API base `/api` (NOT `/api/v1`). Pending dispatches:
 G1.1-cassiopeia-env.md, G1.1-smoke-live-run.md. Per-task covenant:
 TDD discipline, one commit per task, type(scope): subject title only,
 worker flips dispatch Status pending → in-progress → done in same
