@@ -1,14 +1,14 @@
 # T11 — Per-site R2 secret provisioning Windmill flow
 
-**Status:** pending
+**Status:** in-progress
 **Worker:** w-windmill
 **Repo:** `~/DEV/fCC-U/windmill` (branch: `main`) — **NOT** the infra repo
 **Spec:** [`task-gxy-cassiopeia.md` §Task 11](../../architecture/task-gxy-cassiopeia.md)
 **RFC:** [`rfc-gxy-cassiopeia.md` §5.20 D22 + Decision Index D33/D40](../../architecture/rfc-gxy-cassiopeia.md)
 **Sprint parent:** [`MASTER.md` → Phase 1 · P1.\*](../MASTER.md)
 **QA deltas:** Q1 (alias-write last step), Q2/Q3 (rescoped to D33×2 + D40), Q7 (preview parity), Q8 (7d cleanup pin)
-**Predecessor gates passed:** rename done · MASTER shipped · QA Q1–Q8 locked · RFC amendments D33–D40 landed · T32 verified live (org-gate auth, CF Access off) · T17 operator bootstrap (admin Bearer in `infra-secrets/windmill/.env.enc` + Windmill Resource `u/admin/cf_r2_provisioner`)
-**Started:** —
+**Predecessor gates passed:** rename done · MASTER shipped · QA Q1–Q8 locked · RFC amendments D33–D40 landed · T32 verified live (org-gate auth, CF Access off) · G1.0a + G1.0b closed 2026-04-26 (Resources `u/admin/cf_r2_provisioner` + `u/admin/woodpecker_admin` live on platform workspace)
+**Started:** 2026-04-26
 **Closed:** —
 **Closing commit(s):** —
 
