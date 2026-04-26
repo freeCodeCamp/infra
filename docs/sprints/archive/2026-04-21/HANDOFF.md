@@ -14,6 +14,46 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 (late evening) — Sprint closed at branch point
+
+This sprint reached a natural branch point. Wave A.1 (serve plane —
+Caddy `r2_alias` + R2 bucket layout + smoke harness) shipped green.
+Wave A.2 (universe-cli `feat/woodpecker-pivot` work) is archaeology
+(branch never merged post-pivot). Wave A.3 (T11 per-site R2 token mint)
+SUPERSEDED earlier this evening by D016 deploy-proxy plane (see entry
+below).
+
+The proxy pillar is genuinely a new chapter, not a refactor of prior
+work. Per operator command, sprint moves to
+`docs/sprints/archive/2026-04-21/` and a fresh sprint
+`docs/sprints/2026-04-26/` opens with proxy pillar focus.
+
+**Closure summary:**
+
+- Wave A.1 ✅ (Caddy + R2 layout + smoke). Lives forward to new sprint.
+- Wave A.2 ✅ (universe-cli `feat/woodpecker-pivot`) — archaeology. Branch orphaned.
+- Wave A.3 SUPERSEDED — see prior entry. Boneyard pending in windmill repo (T31 follow-up).
+- Phase 1 Sub-deliverables P1.2–P1.6 hold; P1.1 + P1.7 + P1.8 (proxy + CLI v0.4 + schema v2) move to new sprint.
+- Sprint G1 gate not closed; carries forward.
+
+**Cross-references:**
+
+- New sprint: `../2026-04-26/`
+- Universe ADR D016 (cross-repo, broken-ownership): `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`
+- Sprint D43 (this sprint, archived): cross-ref to D016
+- Active dispatches moved to new sprint: T22, T30, T31, T32, T33, T34
+- Archived dispatches stay here: G-series, T-series 11–21, T-r2alias
+
+Operator pushes 4 repos at sprint close (still pending):
+
+- infra (this repo) — feat/k3s-universe → main (or PR if shaped that way)
+- universe-cli — `feat/woodpecker-pivot` orphaned; `feat/proxy-pivot` new branch off `main` (incoming T32)
+- windmill — main (T11 boneyard incoming)
+- Universe — main (D016 ADR incoming + field-note entries)
+- uploads (NEW) — main (greenfield, incoming T31)
+
+---
+
 ### 2026-04-26 (evening) — PIVOT: D016 deploy-proxy plane supersedes T11
 
 Worker session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`).
