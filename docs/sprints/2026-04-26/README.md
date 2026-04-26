@@ -22,8 +22,8 @@ docs/sprints/2026-04-26/
 ├── reports/          — audits + reports (created lazily)
 └── dispatches/
     ├── T22-cleanup-cron.md           — windmill (post-T31 live)
-    ├── T30-d016-deploy-proxy-adr.md  — Universe (cross-repo)
-    ├── T31-uploads-service.md        — new repo `~/DEV/fCC-U/uploads`
+    ├── T30-d016-deploy-proxy-adr.md  — Universe (cross-repo) — DONE
+    ├── T31-artemis-service.md        — new repo `~/DEV/fCC-U/artemis` (renamed 2026-04-26)
     ├── T32-cli-v04-rewrite.md        — universe-cli `feat/proxy-pivot`
     ├── T33-platform-yaml-v2.md       — universe-cli `feat/proxy-pivot`
     └── T34-caddy-dns-smoke.md        — infra
@@ -35,7 +35,13 @@ This sprint opens at the branch point of [`../archive/2026-04-21/`](../archive/2
 
 ## Authority model
 
-**Broken ownership** for tonight's session per operator command 2026-04-26 evening. Session governs cross-repo (Universe ADRs + universe-cli + windmill + new uploads repo) without per-team round-trip. Decisions are append-only via amendment blocks; teams can object post-hoc and amendments land same way.
+**Broken ownership** for tonight's session per operator command 2026-04-26 evening. Session governs cross-repo (Universe ADRs + universe-cli + windmill + new artemis repo) without per-team round-trip. Decisions are append-only via amendment blocks; teams can object post-hoc and amendments land same way.
+
+**Multi-session true-parallel pivot 2026-04-26 (post-T30):** governing
+session in this repo is now governor-only. Per-T workers fire from
+separate Claude Code sessions / terminals using the resume prompts in
+`STATUS.md` §"Multi-session resume prompts". Workers edit their dispatch
+file + their repo only. Governor consolidates sprint-doc updates.
 
 ## Session protocol
 

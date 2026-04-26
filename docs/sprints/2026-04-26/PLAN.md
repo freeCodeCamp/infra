@@ -119,15 +119,31 @@ Notes:
 
 ## Worker ↔ repo map
 
-Single governing session (broken ownership 2026-04-26) drives all T30–T34 across 5 repos:
+**Pivot 2026-04-26 (post-T30):** governing session shifted from
+single-session-interleaved to **multi-session true-parallel**. This
+session (in `~/DEV/fCC/infra`) is now governor-only — owns sprint-doc
+consolidation + closure reconciliation. Per-T workers fire from
+separate Claude Code sessions / terminals.
 
-- `~/DEV/fCC-U/Universe` (`main`) — T30 (D016 ADR). Cross-repo authorized.
-- `~/DEV/fCC-U/uploads` (`main`, NEW) — T31. Greenfield.
-- `~/DEV/fCC-U/universe-cli` (`feat/proxy-pivot`, NEW off `main`) — T32 + T33.
-- `~/DEV/fCC/infra` (`feat/k3s-universe`) — T34 (Caddy + DNS + smoke + sprint docs).
-- `~/DEV/fCC-U/windmill` (`main`) — T22 + boneyard headers on T11 source.
+- `~/DEV/fCC/infra` (`feat/k3s-universe`) — **governor (this session)** + T34 worker (post-T31). Holds sprint-doc edits (STATUS / PLAN / HANDOFF / DECISIONS) + dispatch Status reconciliation.
+- `~/DEV/fCC-U/Universe` (`main`) — T30 (D016 ADR + amendments). **Done** at `Universe@310c7e1`.
+- `~/DEV/fCC-U/artemis` (`main`, NEW) — T31 worker. Greenfield Go scaffold.
+- `~/DEV/fCC-U/universe-cli` (`feat/proxy-pivot`, NEW off `main`) — T32 + T33 workers. Two parallel sessions OK (same branch; coordinate file-by-file or two sub-branches merged at close).
+- `~/DEV/fCC-U/windmill` (`main`) — T22 worker + boneyard headers on T11 source.
 
-**Stagger discipline:** broken ownership = single session. T30 → T31 serial. T32 + T33 parallel. T34 blocks on T31. T22 last. One commit per task close.
+**Stagger discipline (multi-session):**
+
+- T30 → T31 serial — **complete** (T30 closed; T31 unblocked).
+- T31 + T33 + (optional) T22 fire **concurrent** in three terminals.
+- T32 sequences after T31 API contract solid (or fires partial-parallel for scaffold + identity chain).
+- T34 blocks on T31 image tag (artemis CI publishes first GHCR image).
+- One commit per task close. Worker flips dispatch-doc Status header in own commit; governor reconciles PLAN matrix + HANDOFF in separate infra commit at task close.
+
+**File-write discipline (multi-session):**
+
+- Workers ONLY edit: own dispatch file (`dispatches/T<N>-*.md`) Status header + own repo files. Never touch `STATUS.md`, `PLAN.md`, `HANDOFF.md`, `DECISIONS.md`.
+- Governor (this session) ONLY edits sprint-doc cluster — never touches T-worker repo files.
+- Conflict on dispatch file: worker wins; governor consolidates next.
 
 ## Dispatch instructions
 
