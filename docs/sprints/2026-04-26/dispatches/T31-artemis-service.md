@@ -1,14 +1,14 @@
 # T31 — Artemis service implementation (Go microservice)
 
-**Status:** pending
-**Worker:** _claim by setting Worker on first commit (e.g., `w-artemis`)_ — multi-session true-parallel mode active
+**Status:** done
+**Worker:** w-artemis (governor session, role-overridden 2026-04-26 evening)
 **Repo:** `~/DEV/fCC-U/artemis` (branch: `main`) — empty git repo (only `.git/`); files land in this dispatch
 **Spec:** D016 (`~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`) §Architecture + §Authn/authz + §R2 layout + §Amendments (read in full — covers `uploads → artemis` rename + JWT scope clarification)
 **Cross-ref:** D43 + 2 dated amendments in sprint `DECISIONS.md`
 **Toolchain:** Go 1.26.2 (`/opt/homebrew/bin/go`); chi router; AWS SDK Go v2 for R2; testify
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-26 (late evening)
+**Closed:** 2026-04-27
+**Closing commit(s):** `artemis@861e4c4` (greenfield init — single commit per dispatch)
 
 ---
 

@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-26 (late evening; T30 closed; multi-session pivot) · Branch: `feat/k3s-universe` · Ahead of origin: 6+
+Updated: 2026-04-27 (T31 + T33 closed) · Branch: `feat/k3s-universe` · Ahead of origin: 8+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -16,7 +16,19 @@ infra (`feat/k3s-universe`):
 - `8da379e5` — `docs(sprint/2026-04-21): D016 proxy plane pivot`
 - `cdf30bbb` — `docs(sprints): close 2026-04-21, open 2026-04-26`
 - `3f525004` — `docs(sprints): close T30 (D016 ADR)`
-- `<incoming>` — `docs(sprints): rename T31 svc to artemis` (this consolidation commit)
+- `a80c1f64` — `docs(sprints): rename T31 svc to artemis`
+- `7465ce41` — `docs(sprint): close T31 — artemis@861e4c4`
+- `a6e8abcc` — `docs(sprints): close T33 (platform.yaml v2)`
+- `<incoming>` — `docs(sprints): reconcile T31 PLAN+STATUS+HANDOFF`
+
+universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
+
+- `8788648` — `feat(lib): add platform.yaml v2 schema + parser`
+- `5d7b6ef` — `docs(platform-yaml): add v2 schema reference + migration`
+
+artemis (`main` — greenfield, NEW remote, not pushed):
+
+- `861e4c4` — `feat: initial artemis service scaffold`
 
 Universe (`main`):
 
@@ -35,17 +47,17 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 | Dispatch                                                                      | Repo                                                                  | State                                                   |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------- |
 | **T30** — D016 ADR draft + amend                                              | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                           |
-| **T31** — artemis svc (Go, scaffold + endpoints + tests)                      | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | pending — **fire-ready**                                |
+| **T31** — artemis svc (Go, scaffold + endpoints + tests)                      | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                            |
 | **T32** — universe-cli v0.4 rewrite (login/deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | pending — partial-parallel with T31                     |
-| **T33** — `platform.yaml` v2 schema + validator + doc                         | universe-cli `feat/proxy-pivot`                                       | pending — **fire-ready** (full parallel with T31)       |
+| **T33** — `platform.yaml` v2 schema + validator + doc                         | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                       |
 | **T34** — Caddy reverse proxy + DNS prep + smoke retarget                     | infra `feat/k3s-universe`                                             | pending (blocks on T31 image tag)                       |
 | **T22** — Cleanup cron flow (windmill, 7d retention)                          | `~/DEV/fCC-U/windmill` branch `main`                                  | pending — code-parallel with T31 (live verify post-T31) |
 
 **Concurrency plan:**
 
-- 3 lanes hot now: T31 (artemis), T33 (universe-cli schema), T22 (windmill cleanup). All three can fire simultaneously.
-- T32 starts when operator wants — can scaffold cmd + identity chain in parallel; HTTP client coupling waits on T31 contract.
-- T34 last — needs artemis image published.
+- T31 ✅ + T33 ✅ closed. **T34 unblocked** — artemis image can be built next (operator: `gh workflow run` on artemis CI). T32 fully unblocked (artemis API contract live + T33 schema landed).
+- 3 lanes fire-ready: T32 (universe-cli v0.4 commands), T22 (windmill cleanup), T34 (Caddy + DNS + smoke retarget).
+- T34 needs first GHCR image tag from artemis CI before Helm install.
 
 ## Operator-owned actions (post session ship)
 

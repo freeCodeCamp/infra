@@ -11,6 +11,86 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T31 closed: artemis Go svc greenfield scaffold
+
+T31 worker session in `~/DEV/fCC-U/artemis` (greenfield repo) shipped
+full Go microservice scaffold per dispatch §Files + §API surface +
+§Acceptance. Single commit allowed for greenfield init.
+
+**Closing commit (artemis `main`, NEW remote, not pushed):**
+
+- `861e4c4` — `feat: initial artemis service scaffold`
+
+**Worker dispatch close commit (infra `feat/k3s-universe`):**
+
+- `7465ce41` — `docs(sprint): close T31 — artemis@861e4c4` (worker
+  flipped dispatch Status header per multi-session discipline; governor
+  reconciles PLAN matrix + STATUS + this HANDOFF in separate commit
+  below).
+
+**Sprint state delta this commit (infra):**
+
+- PLAN top-level task chain row T31 → `done`.
+- PLAN dispatch matrix row T31 → `[x] done` (also corrected area label
+  `uploads (new repo)` → `artemis (new repo)` + dispatch path).
+- STATUS Open table T31 → `done`; Shipped section gained artemis block
+  - `7465ce41` worker close + this reconciliation commit; concurrency
+    plan rewritten (T34 + T32 unblocked).
+- HANDOFF — this entry.
+
+**Unblocks:** T34 (Caddy reverse proxy + DNS + smoke retarget) — needs
+first GHCR image tag from artemis CI before Helm install (operator:
+`gh workflow run` on artemis repo). T32 (universe-cli v0.4 commands)
+fully unblocked — both artemis API contract live + T33 schema landed.
+
+### 2026-04-27 — T33 closed: `platform.yaml` v2 schema + validator + doc
+
+T33 worker session in `~/DEV/fCC-U/universe-cli` shipped v2 schema
+strip-and-replace per D016 §`platform.yaml` schema + dispatch
+acceptance gates. Branch `feat/proxy-pivot` cut fresh off `main`
+(per Q14); `feat/woodpecker-pivot` archaeology untouched.
+
+**Closing commits (universe-cli `feat/proxy-pivot`, not pushed):**
+
+- `8788648` — `feat(lib): add platform.yaml v2 schema + parser`
+- `5d7b6ef` — `docs(platform-yaml): add v2 schema reference + migration`
+
+**Files landed:**
+
+- `src/lib/platform-yaml.schema.ts` — zod v2 schema (strict, prefault for nested defaults)
+- `src/lib/platform-yaml.ts` — `parsePlatformYaml(text) → {ok,value} | {ok,error}` + v1 marker detector
+- `tests/lib/platform-yaml.test.ts` — 32 tests (RED → GREEN)
+- `docs/platform-yaml.md` — schema reference + v0.3→v0.4 migration delta
+- `CHANGELOG.md` — `[Unreleased]` BREAKING entry
+- `README.md` — Configuration section + doc link
+
+**Gates:**
+
+- Tests: 252/252 (24 files; new file 32/32)
+- Lint: 0 warn / 0 err (oxlint, 50 files)
+- `tsc --noEmit`: clean
+
+**Behavioral verified:**
+
+- v1 markers detected: `r2`, `stack`, `domain`, `static`, `name` — error template per dispatch §Behavioral gates
+- Defaults applied: `build.output: "dist"`, `deploy.preview: true`, `deploy.ignore: ["*.map","node_modules/**",".git/**",".env*"]`
+- Site name validator carries D19 + D37 (lowercase, digits, single hyphens, 1–63 chars, no leading/trailing/consecutive hyphens)
+
+**Sprint state delta this commit (infra):**
+
+- T33 dispatch Status `pending → done`; closing-commit SHAs recorded;
+  closure checklist boxes ticked.
+- PLAN top-level task chain row T33 → `done`.
+- PLAN dispatch matrix row T33 → `[x] done`.
+- STATUS Open table T33 → `done`; Shipped section gained universe-cli
+  block; concurrency plan rewritten (T33 ✅, T32 unblocked for schema
+  consumption).
+- HANDOFF — this entry.
+
+**Unblocks:** T32 (universe-cli v0.4) can now consume the validator
+surface for `deploy` / `promote` / `rollback` command wiring. T31 still
+in-flight (independent lane). T34 still blocks on T31 image.
+
 ### 2026-04-26 (late evening) — T30 closed: ADR-016 landed in Universe
 
 Governing session under broken-ownership authorization wrote
