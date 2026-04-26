@@ -1,6 +1,6 @@
 # Sprint 2026-04-21 — STATUS
 
-Updated: 2026-04-26 (G1.0a + G1.0b closed) · Branch: `feat/k3s-universe` · Ahead of origin: 17 + recovery + G1.0a + G1.0b
+Updated: 2026-04-26 (G1.0a + G1.0b closed; T11 shipped) · Branch: `feat/k3s-universe` · Ahead of origin: 17 + recovery + G1.0a + G1.0b + T11
 
 **⚠ RECOVERY ACTIVE.** Pre-flight on T15 smoke surfaced 5 unmet
 operator-env prereqs + 3 false-completion claims in G1.0. See:
@@ -10,9 +10,11 @@ operator-env prereqs + 3 false-completion claims in G1.0. See:
 
 Recovery picked: full Phase 1–5 with **smoke refactored to admin
 Bearer + on-demand sops decrypt** (option 2; rclone + per-cluster R2
-ops cred dropped). G1.0a + G1.0b closed 2026-04-26. Wave A.3 admin
-deps now both green; T11 implementation pending. Wave B still blocked
-on G1.1 ladder + T11.
+ops cred dropped). G1.0a + G1.0b closed 2026-04-26. **T11 shipped
+2026-04-26** (windmill commit `010d577` — flow at
+`f/static/provision_site_r2_credentials`, 55/55 vitest green, reviewer
+CLEAR). Wave B (T21 + T22) now unblocked; awaits live preview +
+`wmill sync push` by operator before flipping to observe-✓.
 
 Canonical session-roll output. Overwritten each `roll the session`. Read
 this **before** PLAN.md or DECISIONS.md — those are stable references,
@@ -92,10 +94,13 @@ Wave A staggered — recovery state:
   per D-amend 2026-04-25).
 - Wave A.2 (universe-cli) → T16-T20 ✅ done. v0.4.0-beta.1 ready behind
   operator publish trigger.
-- Wave A.3 (windmill) → **T11 admin deps unblocked** (G1.0a + G1.0b
-  both ✓ — CF Resource `{cfApiToken, cfAccountId}` + Woodpecker
-  Resource `{baseUrl, token}` live on platform workspace). T11 flow
-  implementation still pending.
+- Wave A.3 (windmill) → **T11 ✅ shipped 2026-04-26** (windmill commit
+  `010d577` — flow at `f/static/provision_site_r2_credentials`).
+  Mints CF R2 token scoped to `<bucket>/<site>/*`, registers split
+  Woodpecker repo-scoped secrets (`r2_access_key_id`,
+  `r2_secret_access_key`), revokes prior token (rotation tail).
+  55/55 vitest green, oxfmt + oxlint clean, tsc clean, reviewer CLEAR.
+  Operator owns live preview + `wmill sync push` before observe-✓.
 
 New recovery dispatches (Phase 3 of recovery):
 
@@ -104,9 +109,9 @@ New recovery dispatches (Phase 3 of recovery):
 - **G1.1** — pending — gxy-cassiopeia `.envrc` `R2_BUCKET` export + kubeconfig pull
 - **G1.1.smoke** — pending — operator runs `just phase4-smoke` (depends G1.0a ✓ + G1.1)
 
-Wave B (post-T11 observe-✓): T21 (infra `.woodpecker/deploy.yaml`), T22 (windmill cleanup cron). Both pending.
+Wave B (post-T11 observe-✓): T21 (infra `.woodpecker/deploy.yaml`), T22 (windmill cleanup cron). Both pending; T11 artifact ✅, awaits operator live-preview to flip to observe-✓.
 
-T15 artifact done. T16-T20 done. G1.0a + G1.0b ✅. G1.1/smoke + T11 + T21-T22 pending.
+T15 artifact done. T16-T20 done. G1.0a + G1.0b ✅. T11 artifact ✅. G1.1/smoke + T21-T22 pending.
 
 ## Other state
 
