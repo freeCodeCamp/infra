@@ -72,20 +72,25 @@ Dependency: **#23 → #24 → #25 → #26**. #27 standing.
 **Gate G0:** cluster gxy-management GREEN post-rename, Windmill restored
 from S3 dump, UI smoke 200. **PASSED.**
 
-### Phase 1 — MVP static-apps chain (#24)
+### Phase 1 — MVP static-apps chain (#24) — **PIVOTED 2026-04-26 per D016 (proxy plane)**
 
-Sub-deliverables:
+Sub-deliverables (post-pivot):
 
-1. **P1.1 — Woodpecker `.woodpecker/deploy.yaml` template** (T21)
-   - Builds static output, uploads to `universe-static-apps-01/<site>/deploys/<ts>-<sha>/`.
-   - Last step writes alias files `<site>/production` + `<site>/preview` atomically (Q1 + Q7).
-   - Per-site data-plane token from Woodpecker repo-scoped secrets `r2_access_key_id` + `r2_secret_access_key` (Q3 / D40).
-   - Admin provisioning token at `infra-secrets/windmill/.env.enc` — `CF_R2_ADMIN_API_TOKEN` + `CF_ACCOUNT_ID` (Q2 / D33×2).
-2. **P1.2 — Caddy `r2_alias` on gxy-cassiopeia** — verified live 2026-04-18 bootstrap. No re-dispatch.
-3. **P1.3 — DNS wiring** — onboarding flow provisions `<site>.freecode.camp` + preview A records → cassiopeia public IPs. CF proxied. SSL Full Strict.
-4. **P1.4 — Cleanup cron (Windmill flow on gxy-management)** (T22) — 7d retention; both aliases pin prefix (Q8).
-5. **P1.5 — Firewall posture (Q4)** — `gxy-fw-fra1` 80/443 open to `0.0.0.0/0`. No CF-IP diff cron.
-6. **P1.6 — Smoke harness** (T15) — `universe promote` + `universe rollback` poll 30s × 2 green per Q6 SLO.
+1. **P1.1 — Deploy proxy service** (T30 ADR + T31 uploads svc) — Go microservice
+   at `uploads.freecode.camp`. Holds sole R2 admin credential. Authenticates
+   staff via GitHub identity (token / OIDC / device-flow). Authorizes via
+   server-side `sites.yaml` map → GitHub team membership probe. Streams
+   uploads to `universe-static-apps-01/<site>/deploys/<ts>-<sha>/`. Atomic
+   alias write on finalize.
+2. **P1.2 — Caddy `r2_alias` on gxy-cassiopeia** — verified live 2026-04-18 + D35 dot-scheme rolled 2026-04-26. No re-dispatch.
+3. **P1.3 — DNS wiring** — `uploads.freecode.camp` A → uploads svc galaxy public IP (T34); `<site>.freecode.camp` + preview A → cassiopeia public IPs. CF proxied. SSL Full Strict.
+4. **P1.4 — Cleanup cron (Windmill flow on gxy-management)** (T22) — 7d retention; both aliases pin prefix (Q8). Independent of upload path; unchanged.
+5. **P1.5 — Firewall posture (Q4)** — `gxy-fw-fra1` 80/443 open to `0.0.0.0/0`. No CF-IP diff cron. Uploads svc galaxy follows same posture.
+6. **P1.6 — Smoke harness** (T34 retarget) — exercises proxy E2E (init → upload → finalize → curl preview → promote → curl prod). Replaces direct-S3 phase4 smoke.
+7. **P1.7 — universe-cli v0.4 rewrite** (T32) — fresh branch off `main`; identity priority chain; commands target proxy `/api/*`. v0.3 R2-token CLI keeps current published until 0.4 ships.
+8. **P1.8 — `platform.yaml` v2** (T33) — strip credential paths; build + deploy config only.
+
+**Pivot rationale:** D016 supersedes T11 design. Per-site R2 token sharing (whether to staff or to CI via Woodpecker secrets) violates platform tenet. Proxy holds sole admin token; staff devs ship sites with only `platform.yaml` + GitHub identity.
 
 **Gate G1:** End-to-end staff push → site live → rollback → promote →
 cleanup exercised against one reference repo. Smoke harness green.
@@ -129,18 +134,23 @@ during 24h observation; `doctl compute droplet list` shows no
 
 ### T-dispatches
 
-| T-id      | Area           | Subject                                                      | Dispatch                                                                                           | Status                                                                                                           |
-| --------- | -------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| T11       | windmill       | Per-site R2 secret provisioning flow                         | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)                               | [x] artifact done 2026-04-26 (windmill@`010d577`); live preview owed by operator                                 |
-| T15       | infra          | Phase 4 smoke runbook + script                               | [`dispatches/archive/T15-smoke-runbook.md`](dispatches/archive/T15-smoke-runbook.md)               | [x] artifact done; live run = G1.1.smoke                                                                         |
-| T-r2alias | infra/caddy-s3 | r2_alias dot-scheme migration + GH Actions canonical builder | [`dispatches/archive/T-r2alias-dot-scheme.md`](dispatches/archive/T-r2alias-dot-scheme.md)         | [x] done 2026-04-26 — D35 module fix; image `sha-712c6e3` deployed; namespace flipped to `freecodecamp/caddy-s3` |
-| T16       | universe-cli   | Woodpecker API client                                        | [`dispatches/archive/T16-woodpecker-client.md`](dispatches/archive/T16-woodpecker-client.md)       | [x] done                                                                                                         |
-| T17       | universe-cli   | Config schema + site name validation                         | [`dispatches/archive/T17-cli-config.md`](dispatches/archive/T17-cli-config.md)                     | [x] done                                                                                                         |
-| T18       | universe-cli   | Rewrite `deploy` command                                     | [`dispatches/archive/T18-cli-deploy.md`](dispatches/archive/T18-cli-deploy.md)                     | [x] done                                                                                                         |
-| T19       | universe-cli   | Rewrite `promote` + `rollback`                               | [`dispatches/archive/T19-cli-promote-rollback.md`](dispatches/archive/T19-cli-promote-rollback.md) | [x] done                                                                                                         |
-| T20       | universe-cli   | Strip legacy rclone/S3 + release 0.4.0-beta.1                | [`dispatches/archive/T20-cli-strip-cut.md`](dispatches/archive/T20-cli-strip-cut.md)               | [x] done — #25 unblocks                                                                                          |
-| T21       | infra          | `.woodpecker/deploy.yaml` template                           | [`dispatches/T21-woodpecker-template.md`](dispatches/T21-woodpecker-template.md)                   | [ ] pending                                                                                                      |
-| T22       | windmill       | Cleanup cron flow                                            | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                                 | [ ] pending                                                                                                      |
+| T-id      | Area             | Subject                                                      | Dispatch                                                                                           | Status                                                                                                                   |
+| --------- | ---------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| T11       | windmill         | Per-site R2 secret provisioning flow                         | [`dispatches/archive/T11-windmill-flow.md`](dispatches/archive/T11-windmill-flow.md)               | **SUPERSEDED 2026-04-26 by D016.** Per-site token mint replaced by proxy plane. Artifact `windmill@010d577` archaeology. |
+| T30       | infra (xrepo)    | D016 ADR — deploy proxy plane (broken-ownership session)     | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md)               | [ ] pending                                                                                                              |
+| T31       | infra (new repo) | Uploads service (Go) — `~/DEV/fCC-U/uploads`                 | [`dispatches/T31-uploads-service.md`](dispatches/T31-uploads-service.md)                           | [ ] pending                                                                                                              |
+| T32       | universe-cli     | v0.4 rewrite — proxy client (`feat/proxy-pivot`)             | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)                           | [ ] pending                                                                                                              |
+| T33       | universe-cli     | `platform.yaml` v2 schema + validator                        | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)                         | [ ] pending                                                                                                              |
+| T34       | infra            | Caddy reverse proxy + DNS prep + smoke retarget              | [`dispatches/T34-caddy-dns-smoke.md`](dispatches/T34-caddy-dns-smoke.md)                           | [ ] pending                                                                                                              |
+| T15       | infra            | Phase 4 smoke runbook + script                               | [`dispatches/archive/T15-smoke-runbook.md`](dispatches/archive/T15-smoke-runbook.md)               | [x] artifact done; live run = G1.1.smoke                                                                                 |
+| T-r2alias | infra/caddy-s3   | r2_alias dot-scheme migration + GH Actions canonical builder | [`dispatches/archive/T-r2alias-dot-scheme.md`](dispatches/archive/T-r2alias-dot-scheme.md)         | [x] done 2026-04-26 — D35 module fix; image `sha-712c6e3` deployed; namespace flipped to `freecodecamp/caddy-s3`         |
+| T16       | universe-cli     | Woodpecker API client                                        | [`dispatches/archive/T16-woodpecker-client.md`](dispatches/archive/T16-woodpecker-client.md)       | [x] done                                                                                                                 |
+| T17       | universe-cli     | Config schema + site name validation                         | [`dispatches/archive/T17-cli-config.md`](dispatches/archive/T17-cli-config.md)                     | [x] done                                                                                                                 |
+| T18       | universe-cli     | Rewrite `deploy` command                                     | [`dispatches/archive/T18-cli-deploy.md`](dispatches/archive/T18-cli-deploy.md)                     | [x] done                                                                                                                 |
+| T19       | universe-cli     | Rewrite `promote` + `rollback`                               | [`dispatches/archive/T19-cli-promote-rollback.md`](dispatches/archive/T19-cli-promote-rollback.md) | [x] done                                                                                                                 |
+| T20       | universe-cli     | Strip legacy rclone/S3 + release 0.4.0-beta.1                | [`dispatches/archive/T20-cli-strip-cut.md`](dispatches/archive/T20-cli-strip-cut.md)               | [x] done — #25 unblocks                                                                                                  |
+| T21       | infra            | `.woodpecker/deploy.yaml` template                           | [`dispatches/archive/T21-woodpecker-template.md`](dispatches/archive/T21-woodpecker-template.md)   | **SUPERSEDED 2026-04-26 by D016.** Demoted to optional reference example; not critical path post-pivot.                  |
+| T22       | windmill         | Cleanup cron flow                                            | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                                 | [ ] pending                                                                                                              |
 
 **Out-of-scope / closed:**
 
@@ -148,49 +158,55 @@ during 24h observation; `doctl compute droplet list` shows no
 - **T32** (Woodpecker DNS + CF Access + admin users) — verified live 2026-04-22. No dispatch.
 - Caddy module tasks T01/T01b/T02/T03/T04/T05 — shipped 2026-04-18 bootstrap. Verified live on gxy-cassiopeia caddy-s3 image.
 
-## Wave A staggered dispatch graph (post-recovery 2026-04-26)
+## Wave A staggered dispatch graph (post-pivot 2026-04-26)
 
 ```
-G1.0 OPERATOR BOOTSTRAP (original)
-   ⚠ partial — superseded by G1.0a / G1.0b / G1.1 ladder
+PRIOR WAVE A (closed) ─ Wave A.1 (serve plane) ✅  | Wave A.2 (CLI v0.4-beta.1) ✅ archaeology
 
-G1.0a (operator) ─┐
-                  ├──→ T11 (w-windmill) ──→ observe ✓
-G1.0b (operator) ─┘                            ↓
-                                            Wave B fanout
-G1.1 (operator) ──→ T-r2alias (session) ──→ G1.1.smoke (operator) ──→ Wave A.1 fully closed
-                    [D35 module fix +                                  (RFC §6.6 Phase 4 exit ✓)
-                     GH Actions canonical
-                     builder + chart bump]
-
-A.2 (w-cli) T16 → T17 → T18 → T19 → T20  ──→  ✅ done (slop strip + D37 follow-up landed)
+D016 PIVOT — 2026-04-26 (broken ownership; session governs)
+        │
+        ▼
+T30 (D016 ADR draft) ──→ T31 (uploads svc Go scaffold + endpoints + tests)
+                                           │
+                                           ▼
+                          T32 (CLI v0.4 fresh proxy-client) ─┐
+                          T33 (platform.yaml v2 schema)  ───┤
+                                                            ▼
+                                            T34 (Caddy + DNS + smoke retarget — operator deploys)
+                                                            │
+                                                            ▼
+                                                Wave B fanout: T22 (cleanup cron, unchanged)
+                                                            │
+                                                            ▼
+                                                       Sprint G1 close
 ```
 
 Notes:
 
-- G1.0a + G1.0b are independent — operator can run in parallel.
-- G1.1 + G1.1.smoke serial (.envrc patch must precede live run). G1.1
-  parallel with G1.0a/b.
-- T11 unblocks once **both** G1.0a + G1.0b green.
-- Wave A.1 fully closes only when G1.1.smoke green (RFC §6.6 Phase 4 exit).
-- Wave B (T21 + T22) blocks on T11 observe-✓.
-- A.2 already closed (universe-cli v0.4.0-beta.1 prepped).
+- T30 → T31 serial (ADR locks shape before Go code).
+- T32 + T33 parallel within universe-cli repo on `feat/proxy-pivot` branch.
+- T34 blocks on T31 (chart values reference uploads svc image tag).
+- T22 (cleanup cron) independent of upload path; can land anytime, blocks on T31 only for live verification (admin token shared via Resource).
+- v0.3 R2-token CLI keeps serving until v0.4 publishes.
+- Old `feat/woodpecker-pivot` branch in universe-cli = orphaned. Never merged. Archaeology only.
 
-## Wave B parallel fanout (post-Wave-A green)
+## Wave B parallel fanout (post-pivot 2026-04-26)
 
-- **infra:** T21 — `.woodpecker/deploy.yaml` template. Consumes T11 secret format.
-- **universe-cli:** T18 → T19 → T20. Sequential within track, parallel with infra/windmill.
-- **windmill:** T22 — cleanup cron.
+Replaced by post-pivot graph above. Wave B is now just T22 (cleanup
+cron) which is upload-path agnostic. T21 demoted to optional reference;
+T18/T19/T20 superseded by T32 fresh-branch rewrite.
 
-## Worker ↔ repo map
+## Worker ↔ repo map (post-pivot 2026-04-26)
 
-- `w-windmill` → `~/DEV/fCC-U/windmill` branch `main`. Tasks: T11, T22.
-- `w-cli` → `~/DEV/fCC-U/universe-cli` branch `feat/woodpecker-pivot`. Tasks: T16 → T17 → T18 → T19 → T20.
-- `w-infra` → `~/DEV/fCC/infra` branch `feat/k3s-universe`. Tasks: T15, T21.
+- **Governing session** (broken ownership 2026-04-26) drives all T30–T34 across 4 repos.
+  - `~/DEV/fCC-U/Universe` branch `main` — T30 (D016 ADR). Cross-repo authorized.
+  - `~/DEV/fCC-U/uploads` (NEW; branch `main`) — T31 (uploads svc). Greenfield.
+  - `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) — T32 + T33.
+  - `~/DEV/fCC/infra` branch `feat/k3s-universe` — T34 (Caddy + DNS + smoke + sprint docs).
+  - `~/DEV/fCC-U/windmill` branch `main` — T22 (cleanup cron, post-T31 for live verify) + boneyard headers on T11 source.
+- **Archaeology branches** (do not merge): `universe-cli@feat/woodpecker-pivot`.
 
-**Stagger discipline:** never launch next worker until prior Observe-✓
-passes. Halt + diagnose on acceptance fail. Never run 2 workers in
-same repo (git race).
+**Stagger discipline:** broken ownership = single session. T30 → T31 serial. T32 + T33 parallel within same branch (different file tracks). T34 blocks on T31 image tag. T22 last (post live proxy).
 
 ## Dispatch instructions
 

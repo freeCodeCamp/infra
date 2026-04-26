@@ -14,6 +14,78 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 (evening) — PIVOT: D016 deploy-proxy plane supersedes T11
+
+Worker session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`).
+**Authority: operator command 2026-04-26 evening — "BREAK OWNERSHIP
+MODEL, Use this session as the governing session. We have to ship
+this tonight."** Session governs cross-repo (Universe ADRs + windmill
+boneyard + new `uploads` repo + universe-cli rewrite + infra docs)
+without per-team round-trip. Logged here for transparency.
+
+**Trigger.** Operator surfaced the deeper architectural footgun:
+Wave A.3 (T11 windmill flow) was minting per-site R2 tokens and
+pushing them to Woodpecker repo-scoped secrets. That moves
+token-sharing risk from staff hands to CI hands but does **not**
+eliminate it. Platform tenet: staff devs ship sites with **only
+`platform.yaml`** + GitHub identity. R2 tokens never leave cluster.
+
+**Decision (D016 / sprint D43).** New deploy-proxy plane. Q9–Q15
+locked in single session:
+
+- Q9: Standalone Go microservice at `uploads.freecode.camp`. Caddy
+  reverse proxies to k3s service. Direct upload to existing
+  `universe-static-apps-01/<site>/deploys/<ts>-<sha>/`. Atomic alias
+  flip on finalize. Re-uses bucket; no folder move.
+- Q10: CLI identity priority chain — env → GHA OIDC → Woodpecker
+  OIDC → `gh auth token` → device-flow stored.
+- Q11: Static `site → [team-slugs]` map server-side (`sites.yaml`
+  hot-reload). GH team membership probe per request, 5min cache.
+- Q12: Streaming proxy. Bandwidth thru proxy. No presigned URLs.
+- Q13: Server-side atomic alias write. Proxy is sole writer.
+- Q14: Yank `feat/woodpecker-pivot` work; fresh `feat/proxy-pivot`
+  off `main`. v0.3 keeps current published until v0.4 ships.
+- Q15: New repo `freeCodeCamp/uploads` at `~/DEV/fCC-U/uploads/`.
+
+**Sprint state delta (this commit).**
+
+- Created dispatches: `T30-d016-deploy-proxy-adr.md`,
+  `T31-uploads-service.md`, `T32-cli-v04-rewrite.md`,
+  `T33-platform-yaml-v2.md`, `T34-caddy-dns-smoke.md`.
+- Archived: `T11-windmill-flow.md` + `T21-woodpecker-template.md`
+  → `dispatches/archive/` with SUPERSEDED status header.
+- `PLAN.md` Phase 1 sub-deliverables rewritten (P1.1 = proxy svc;
+  P1.7 + P1.8 added for CLI + schema). Wave A graph rewritten.
+  T-matrix updated. Worker map collapsed to single governing session.
+- `STATUS.md` rewritten with pivot at top + new Open section + new
+  resume prompt.
+- `DECISIONS.md` D43 row + amendment block appended (cross-ref D016).
+- `HANDOFF.md` (this entry).
+
+**Tooling verified for incoming work.** Go 1.26.2 darwin/arm64 at
+`/opt/homebrew/bin/go`. Existing universe-cli toolchain (Bun +
+vitest + oxfmt + oxlint + tsup + husky) unchanged. ctx-mode
+v1.0.98 healthy after early-session bindings issue (ctx_doctor
+PASS).
+
+**What survives.** Caddy `r2_alias` D35 dot-scheme on cassiopeia
+unchanged. R2 single-bucket prefix layout unchanged. Atomic alias
+write _semantics_ unchanged (different writer). Admin token home
+in `windmill/.env.enc` unchanged (proxy reads via Resource).
+T22 (cleanup cron) unchanged — upload-path agnostic.
+
+**What dies.** T11 windmill flow (boneyard incoming next commit
+in windmill repo). T16-T20 universe-cli `feat/woodpecker-pivot`
+work (orphaned branch, never merged). T21 Woodpecker template
+(demoted to reference). G1.0b Woodpecker admin Resource
+(retired — proxy does not push secrets to Woodpecker).
+
+**Closing this commit.** infra-side pivot docs single commit.
+Subsequent commits per dispatch (T30 → T31 → T32+T33 → T34) in
+respective repos.
+
+---
+
 ### 2026-04-26 — Wave A.1 fully closed: G1.1 + T-r2alias-dot-scheme + G1.1.smoke green
 
 Worker session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`).

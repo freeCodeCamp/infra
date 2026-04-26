@@ -1,6 +1,6 @@
 # T11 — Per-site R2 secret provisioning Windmill flow
 
-**Status:** in-progress (artifact shipped windmill@010d577 + Bugs 1+2+C+D fixed; observe-✓ tail open — see Closure section for operator action checklist)
+**Status:** SUPERSEDED 2026-04-26 by D016 (deploy proxy plane). Per-site R2 token mint replaced by proxy holding sole R2 admin credential. Artifact `windmill@010d577` retained as archaeology with boneyard header in source. Live preview never run; operator action checklist in original Closure section is **void**. New work tracked at T30 (D016 ADR) + T31 (uploads svc) + T32 (CLI v0.4 rewrite).
 **Worker:** w-windmill
 **Repo:** `~/DEV/fCC-U/windmill` (branch: `main`) — **NOT** the infra repo
 **Spec:** [`task-gxy-cassiopeia.md` §Task 11](../../architecture/task-gxy-cassiopeia.md)
