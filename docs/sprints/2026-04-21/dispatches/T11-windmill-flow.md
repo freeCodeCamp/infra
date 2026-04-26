@@ -1,6 +1,6 @@
 # T11 — Per-site R2 secret provisioning Windmill flow
 
-**Status:** in-progress
+**Status:** in-progress (artifact shipped windmill@010d577 + Bugs 1+2+C+D fixed; observe-✓ tail open — see Closure section for operator action checklist)
 **Worker:** w-windmill
 **Repo:** `~/DEV/fCC-U/windmill` (branch: `main`) — **NOT** the infra repo
 **Spec:** [`task-gxy-cassiopeia.md` §Task 11](../../architecture/task-gxy-cassiopeia.md)
@@ -930,17 +930,171 @@ Next in MVP chain per `24-static-apps-k7d.md`:
 
 ---
 
+## Observe-✓ tail (live state cursor — UPDATE on each session-resume)
+
+Pass A live-preview discovery cycle expanded the bug list. Source +
+tests + live deploy of fixes are DONE; remaining work is
+operator-owned (CF dashboard, live Resource update, Woodpecker UI).
+
+### Done (committed, NOT pushed)
+
+| Stage                                                 | Commits                                |
+| ----------------------------------------------------- | -------------------------------------- |
+| T11 artifact                                          | `windmill@010d577` (already on origin) |
+| Resource-types pulled                                 | `windmill@aaeab60` `786b257`           |
+| Bug 1+2 (wpAdmin field name + URL drift)              | `windmill@d44783a` + format `e1db0be`  |
+| Bug C+D (perm UUIDs in Resource + SPA-HTML rejection) | `windmill@c5d9f92` + format `63488b7`  |
+| Field notes Bug 1+2                                   | `Universe@<sha1>`                      |
+| Field notes Bug C+D                                   | `Universe@<sha2>`                      |
+
+State on disk:
+
+- `windmill main` — ahead of origin by 5
+- `Universe main` — ahead of origin by 2
+- Live `platform` workspace — T11 script + `c_cf_r2_provisioner` (4-field schema) + `c_woodpecker_admin` resource-types up-to-date
+- Live Resource `u/admin/cf_r2_provisioner` — **NOT YET populated** with `r2ReadPermissionId` + `r2WritePermissionId`. Pass A blocks on this.
+- 400/400 tests green; lint clean
+
+### Operator action checklist (ACTIVE)
+
+#### Op-1 — Capture R2 Bucket Item Write permission UUID
+
+Read UUID is published by CF docs: `6a018a9f2fc74eb6b293b0c548f38b39`.
+Write UUID — capture from CF dashboard:
+
+1. <https://dash.cloudflare.com/profile/api-tokens> → Create Token → Custom token → Get started.
+2. Add Permission row → Account → Workers R2 Storage → Workers R2 Storage Bucket Item Write.
+3. Open DevTools Network tab; click Continue to summary.
+4. Inspect the `permission_groups` array in the form's submission payload. Copy the `id` whose `name` is `Workers R2 Storage Bucket Item Write`.
+5. **Cancel the token creation** — only reading the catalog, not minting.
+
+Fallback: Edit an existing R2 admin token in CF dashboard; the policy summary lists permission group names + IDs.
+
+#### Op-2 — Populate Resource `u/admin/cf_r2_provisioner`
+
+Live workspace has the upgraded resource-type schema; existing
+Resource value still carries only `cfApiToken` + `cfAccountId`. Add
+the two new fields via Windmill UI:
+
+1. <https://windmill.freecodecamp.net/resources?workspace=platform>
+2. Edit `u/admin/cf_r2_provisioner`.
+3. Add fields:
+   - `r2ReadPermissionId` = `6a018a9f2fc74eb6b293b0c548f38b39`
+   - `r2WritePermissionId` = (UUID captured Op-1)
+4. Save.
+
+#### Op-3 — Pass A retry (Bug-D rejection path)
+
+```bash
+cd ~/DEV/fCC-U/windmill/workspaces/platform
+bunx wmill script run f/static/provision_site_r2_credentials \
+  --workspace platform \
+  --data '{"site":"t11-observe-test","bucket":"universe-static-apps-01","woodpecker_owner":"freeCodeCamp","woodpecker_repo":"t11-observe-test"}'
+```
+
+Expected error result:
+
+```json
+{
+  "error": {
+    "name": "WoodpeckerRepoMissingError",
+    "message": "Woodpecker repo freeCodeCamp/t11-observe-test probe returned non-JSON content-type \"text/html; charset=utf-8\" — likely SPA fallback for missing repo. Enable the repo on Woodpecker UI before T11.",
+    "extra": { "retriable": false, "rollbackPerformed": false }
+  }
+}
+```
+
+Verify zero CF token leak (clean Pass A = above shape + empty leak check):
+
+```bash
+eval "$(sops -d --input-type dotenv --output-type dotenv ~/DEV/fCC/infra-secrets/windmill/.env.enc | grep -E '^(CF_R2_ADMIN_API_TOKEN|CF_ACCOUNT_ID)=' | sed 's/^/export /')"
+curl -sf -H "Authorization: Bearer $CF_R2_ADMIN_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/tokens" \
+  | jq '.result[]? | select(.name | test("t11-observe-test"))'
+# expect: empty
+```
+
+The error fires structurally pre-mint, so no real Pass-A token leak ever happens. The post-mint rollback path is exercised by unit tests E8/G3 instead.
+
+If leak check non-empty: STOP. Manually revoke via `DELETE /accounts/<id>/tokens/<id>`.
+
+#### Op-4 — Pass B repo decision
+
+Pass B requires a real, enabled Woodpecker repo:
+
+| Option          | Description                                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Disposable      | Enable `freeCodeCamp/<some-disposable-name>` on Woodpecker UI; cleanup after.                                            |
+| First real site | Run T11 against the first constellation we plan to launch on `gxy-cassiopeia`; keep the resulting CF token + WP secrets. |
+
+Operator picks. Substitute SITE+REPO in Op-5.
+
+#### Op-5 — Pass B execution
+
+```bash
+cd ~/DEV/fCC-U/windmill/workspaces/platform
+bunx wmill script run f/static/provision_site_r2_credentials \
+  --workspace platform \
+  --data '{"site":"<SITE>","bucket":"universe-static-apps-01","woodpecker_owner":"freeCodeCamp","woodpecker_repo":"<REPO>"}'
+```
+
+Expected success shape:
+
+```json
+{
+  "tokenId": "<cf-token-id>",
+  "accessKeyId": "<masked>",
+  "woodpeckerSecretNames": ["r2_access_key_id", "r2_secret_access_key"],
+  "expiresAt": "<+90d ISO8601>",
+  "rotated": false
+}
+```
+
+If disposable, cleanup:
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $CF_R2_ADMIN_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/tokens/<cf-token-id>"
+
+eval "$(sops -d --input-type dotenv --output-type dotenv ~/DEV/fCC/infra-secrets/windmill/.env.enc | grep -E '^WOODPECKER_ADMIN_TOKEN=' | sed 's/^/export /')"
+for name in r2_access_key_id r2_secret_access_key; do
+  curl -X DELETE -H "Authorization: Bearer $WOODPECKER_ADMIN_TOKEN" \
+    "https://woodpecker.freecodecamp.net/api/repos/<owner>/<repo>/secrets/$name"
+done
+# Disable repo on Woodpecker UI if disposable.
+```
+
+If first real site: skip cleanup; CF token + WP secrets stay live.
+
+#### Op-6 — Cross-repo closure (single infra commit)
+
+From a fresh session in `~/DEV/fCC/infra`:
+
+1. **This dispatch** — flip top header to `Status: done`, `Closed: <date>`, `Closing commit(s)`. Replace the `Observe-✓ tail` section with a single-line "closed" marker.
+2. **`STATUS.md`** — drop `T11 observe-✓` from Open; move to Shipped with summary line; mark Wave B (T21+T22) ready.
+3. **`PLAN.md`** — matrix row T11 → `[x] done`.
+4. **`HANDOFF.md`** — append entry with all SHAs and "Wave B unblocked".
+5. Commit:
+   ```
+   docs(sprint/2026-04-21): close T11 — Bugs 1+2+C+D fixed, Pass A+B green
+   ```
+
+#### Op-7 — Operator pushes all three repos
+
+```bash
+git -C ~/DEV/fCC-U/windmill push origin main
+git -C ~/DEV/fCC-U/Universe push origin main
+git -C ~/DEV/fCC/infra push origin feat/k3s-universe
+```
+
 ## Closure (filled on completion)
 
 - **Status:** —
-- **Closing commit(s):** windmill@—, infra@— (justfile recipe), infra-secrets@— (none if D40 honored)
+- **Closing commit(s):** windmill@—, Universe@—, infra@—
 - **Acceptance evidence:**
-  - `pnpm test workspaces/platform/f/static/` — all green (≥95% line coverage)
-  - `pnpm oxfmt --check` + `pnpm oxlint` + `tsc --noEmit` — clean
-  - `runScriptPreviewAndWaitResult` MCP against live Windmill — green
-  - `wmill sync push --dry-run` — zero unintended deletions
-  - Live K1–K7 smoke probe — all pass
-  - K8 cleanup — CF token revoked, Woodpecker secrets deleted, R2 probe object deleted
-- **Surprises:** —
-- **Sprint-doc patches owed:** matrix row flip in `24-static-apps-k7d.md`
-  - closure note in `HANDOFF.md` rolling log + `Universe/spike/field-notes/windmill.md` journal entry.
+  - `just lint && just test` green this session (400/400 across 29 files at observe-✓ entry)
+  - `runScriptPreviewAndWaitResult` (or `wmill script run` CLI fallback) — Pass A returned typed `WoodpeckerRepoMissingError`; Pass B returned success shape
+  - `wmill sync push --dry-run` — zero unintended deletions across two apply cycles
+  - K8 cleanup — CF token revoked + Woodpecker secrets deleted (Pass B disposable mode only)
+- **Surprises:** Pass A iteration found 4 distinct bugs across 2 retries — fixture/contract drift (1+2) and CF token-scope + Woodpecker SPA-fallback (C+D). Each round documented in `Universe/spike/field-notes/windmill.md` with rules.
+- **Sprint-doc patches owed:** matrix row flip in `24-static-apps-k7d.md`; closure entry in `HANDOFF.md`; field-notes already landed.
