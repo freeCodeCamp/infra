@@ -43,6 +43,31 @@ sprint planning when an activation trigger fires.
 - **Owner:** infra team.
 - **Ref:** ADR-003 §Hardened CI pipeline.
 
+## Toolchain
+
+### oxfmt wiring on universe-cli (T32 follow-up)
+
+- **Activation trigger:** next universe-cli sprint touch — pre-commit
+  format consistency desired before next contributor wave.
+- **Owner:** universe-cli maintainer (single dispatch, ~half-day).
+- **Ref:** Windmill toolchain mandate 2026-04-08 (oxfmt + oxlint +
+  vitest + Bun + pnpm + husky); T32 closure HANDOFF note 2026-04-27.
+- **Why parked.** T32 worker shipped CLI v0.4 with `oxlint` + `tsc`
+  gates green but `oxfmt --check` not run — package never installed
+  in repo despite T32 dispatch + T33 HANDOFF reference. Out-of-scope
+  for T32 closure (proxy-pillar critical path); blocks G1 only if
+  formatting drift surfaces during T34 smoke.
+- **Scope (single dispatch).**
+  - `pnpm add -D oxfmt` (devDep, pinned)
+  - `package.json` scripts: `format`, `format:check`
+  - husky `pre-commit`: add `oxfmt --check` before existing `tsc` gate
+  - One-shot `oxfmt --write` over `src/` + `test/` (separate commit
+    from wiring commit so review diffs split cleanly)
+  - Verify CI workflow picks up `format:check` step
+- **Open question.** Whether to gate CI on `format:check` (hard fail)
+  or report-only (advisory) for first sprint after wire-in. Default
+  hard fail — matches windmill repo posture.
+
 ## Automation
 
 ### Atlantis for OpenTofu PR automation
