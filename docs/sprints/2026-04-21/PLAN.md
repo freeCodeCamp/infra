@@ -124,7 +124,7 @@ during 24h observation; `doctl compute droplet list` shows no
 | ---------- | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
 | G1.0a      | windmill / sops    | Complete `windmill/.env.enc` + push `u/admin/cf_r2_provisioner` | [`dispatches/G1.0a-windmill-cf-resource.md`](dispatches/G1.0a-windmill-cf-resource.md)                 | [x] done — supersedes partial G1.0    |
 | G1.0b      | windmill / WP      | Mint Woodpecker admin token + push `u/admin/woodpecker_admin`   | [`dispatches/G1.0b-windmill-woodpecker-resource.md`](dispatches/G1.0b-windmill-woodpecker-resource.md) | [x] done                              |
-| G1.1       | infra / cassiopeia | `R2_BUCKET` export in `.envrc` + cassiopeia kubeconfig pull     | [`dispatches/G1.1-cassiopeia-env.md`](dispatches/G1.1-cassiopeia-env.md)                               | [ ] pending                           |
+| G1.1       | infra / cassiopeia | `R2_BUCKET` export in `.envrc` + cassiopeia kubeconfig pull     | [`dispatches/G1.1-cassiopeia-env.md`](dispatches/G1.1-cassiopeia-env.md)                               | [ ] in-progress (started 2026-04-26)  |
 | G1.1.smoke | infra              | Operator runs `just phase4-smoke` (RFC §6.6 Phase 4 exit)       | [`dispatches/G1.1-smoke-live-run.md`](dispatches/G1.1-smoke-live-run.md)                               | [ ] pending — depends on G1.0a + G1.1 |
 
 ### T-dispatches
