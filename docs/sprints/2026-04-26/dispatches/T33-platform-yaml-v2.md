@@ -1,13 +1,13 @@
 # T33 — platform.yaml v2 schema + README + validator
 
-**Status:** pending
-**Worker:** w-cli (governing session — broken ownership 2026-04-26)
+**Status:** done
+**Worker:** w-cli (multi-session true-parallel — T33 worker session)
 **Repo:** `~/DEV/fCC-U/universe-cli` (branch: `feat/proxy-pivot`)
 **Spec:** D016 §`platform.yaml` schema
 **Cross-ref:** D43 amendment in sprint `DECISIONS.md`
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-27
+**Closed:** 2026-04-27
+**Closing commit(s):** `universe-cli@8788648` (feat) + `universe-cli@5d7b6ef` (docs)
 
 ---
 
@@ -85,9 +85,9 @@ universe-cli/
 
 ## Closure checklist
 
-- [ ] Schema validator landed
-- [ ] Tests green
-- [ ] Doc landed
-- [ ] T33 Status `done`
-- [ ] PLAN matrix row checked
-- [ ] HANDOFF entry appended
+- [x] Schema validator landed (`src/lib/platform-yaml.{ts,schema.ts}`)
+- [x] Tests green (252/252; new file 32/32 RED→GREEN)
+- [x] Doc landed (`docs/platform-yaml.md` + README link + CHANGELOG)
+- [x] T33 Status `done`
+- [x] PLAN matrix row checked
+- [x] HANDOFF entry appended
