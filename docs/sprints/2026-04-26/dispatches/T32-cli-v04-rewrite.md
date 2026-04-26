@@ -26,16 +26,34 @@ git pull --rebase origin main          # operator-deferred
 git checkout -b feat/proxy-pivot
 ```
 
-## CLI surface (locked per D016)
+## CLI surface (locked per D016 + 2026-04-27 amendment §CLI namespace)
+
+Top-level reserved for cross-cutting auth + identity + version. Deploy
+verbs namespaced under `static` so future surfaces (workers, dbs,
+queues) extend without breaking change.
 
 ```
-universe login                              # GitHub OAuth device flow → ~/.config/universe-cli/token
-universe logout                             # delete stored token
-universe whoami                             # echo current login + authorized sites
-universe deploy [--promote] [--dir <path>]  # build → upload → preview (or promote)
-universe promote [--from <deployId>]        # swap production alias to preview (or named deploy)
-universe rollback --to <deployId>           # write production alias to past deploy
-universe ls [--site <site>]                 # list recent deploys with timestamps + git sha
+# top-level (cross-cutting)
+universe login                                       # GitHub OAuth device flow → ~/.config/universe-cli/token
+universe logout                                      # delete stored token
+universe whoami                                      # echo current login + authorized sites
+universe version                                     # CLI version + build metadata
+
+# static surface (namespaced)
+universe static deploy [--promote] [--dir <path>]    # build → upload → preview (or promote)
+universe static promote [--from <deployId>]          # swap production alias to preview (or named deploy)
+universe static rollback --to <deployId>             # write production alias to past deploy
+universe static ls [--site <site>]                   # list recent deploys with timestamps + git sha
+```
+
+Future surface skeleton (out of scope this dispatch — register `static`
+as a command group cleanly so `worker` / `db` / `queue` etc. layer in
+later without restructuring):
+
+```
+universe worker deploy ...    # future
+universe db migrate ...       # future
+universe queue purge ...      # future
 ```
 
 ## Identity resolution priority (Q10)
@@ -107,10 +125,11 @@ universe-cli/
 
 - `universe login` opens device-flow URL, polls until authorized, persists token
 - `universe whoami` resolves identity via priority chain, returns `{login, sites}`
-- `universe deploy` reads `platform.yaml`, runs `build.command` (or skips if pre-built), POSTs `/api/deploy/init`, multipart-uploads `output/`, POSTs `/finalize`
-- `universe promote` POSTs `/api/site/{site}/promote`
-- `universe rollback --to <id>` POSTs `/api/site/{site}/rollback`
-- `universe ls` returns deploy list, formats as table
+- `universe static deploy` reads `platform.yaml`, runs `build.command` (or skips if pre-built), POSTs `/api/deploy/init`, multipart-uploads `output/`, POSTs `/finalize`
+- `universe static promote` POSTs `/api/site/{site}/promote`
+- `universe static rollback --to <id>` POSTs `/api/site/{site}/rollback`
+- `universe static ls` returns deploy list, formats as table
+- T33-shipped `docs/platform-yaml.md` mention of `universe deploy` updated to `universe static deploy` (single text edit; same commit as T32 work)
 
 ### Operational gates
 
