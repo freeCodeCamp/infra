@@ -52,7 +52,7 @@ Module struct: `PreviewSuffix` → `PreviewSubdomain`. Caddyfile: `preview_suffi
 
 ### 5. New GH Actions workflow
 
-`.github/workflows/caddy-s3-build.yml`: trigger on push to any branch matching `docker/images/caddy-s3/**` + `workflow_dispatch`. Steps: `go test -race ./...` on module → `docker/build-push-action` to `ghcr.io/freecodecamp/caddy-s3:${SHA}` + branch tag. Use `GITHUB_TOKEN` for ghcr.
+`.github/workflows/docker--caddy-s3.yml`: `workflow_dispatch` only (manual via `gh workflow run docker--caddy-s3.yml --ref <branch>`). Steps: `go test -race ./...` on module → `docker/build-push-action` to `ghcr.io/freecodecamp/caddy-s3` (full SHA tag + branch tag + `latest` on main). Same-org auth via `GITHUB_TOKEN` (no PAT).
 
 ### 6. Mark Woodpecker secondary
 
