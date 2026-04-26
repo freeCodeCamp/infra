@@ -47,7 +47,7 @@ data:
         secret_access_key {$AWS_SECRET_ACCESS_KEY}
         cache_ttl         15s
         cache_max_entries 10000
-        preview_suffix    "--preview"
+        preview_subdomain "preview"
         root_domain       "freecode.camp"
       }
 
