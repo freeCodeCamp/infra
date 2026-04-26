@@ -124,7 +124,7 @@ during 24h observation; `doctl compute droplet list` shows no
 | ---------- | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
 | G1.0a      | windmill / sops    | Complete `windmill/.env.enc` + push `u/admin/cf_r2_provisioner` | [`dispatches/G1.0a-windmill-cf-resource.md`](dispatches/G1.0a-windmill-cf-resource.md)                 | [x] done — supersedes partial G1.0    |
 | G1.0b      | windmill / WP      | Mint Woodpecker admin token + push `u/admin/woodpecker_admin`   | [`dispatches/G1.0b-windmill-woodpecker-resource.md`](dispatches/G1.0b-windmill-woodpecker-resource.md) | [x] done                              |
-| G1.1       | infra / cassiopeia | `R2_BUCKET` export in `.envrc` + cassiopeia kubeconfig pull     | [`dispatches/G1.1-cassiopeia-env.md`](dispatches/G1.1-cassiopeia-env.md)                               | [ ] pending                           |
+| G1.1       | infra / cassiopeia | `R2_BUCKET` export in `.envrc` + cassiopeia kubeconfig pull     | [`dispatches/G1.1-cassiopeia-env.md`](dispatches/G1.1-cassiopeia-env.md)                               | [ ] in-progress (started 2026-04-26)  |
 | G1.1.smoke | infra              | Operator runs `just phase4-smoke` (RFC §6.6 Phase 4 exit)       | [`dispatches/G1.1-smoke-live-run.md`](dispatches/G1.1-smoke-live-run.md)                               | [ ] pending — depends on G1.0a + G1.1 |
 
 ### T-dispatches
@@ -239,6 +239,7 @@ same repo (git race).
 
 ## Non-obvious invariants (carry forward)
 
+- **k3s clusters are hand-rolled, not DOKS.** `doctl kubernetes cluster kubeconfig save` does NOT apply. Per-cluster kubeconfig at `k3s/<cluster>/.kubeconfig.yaml` (loaded by direnv via `expand_path`). Operator pattern: `cd k3s/<cluster>` or `direnv exec k3s/<cluster> kubectl ...`. No `kubectl --context <cluster>`. Cluster reach via Tailscale (server URL `https://100.64.x.x:6443`). Restoration: `just kubeconfig-sync <cluster>` decrypts from `infra-secrets/k3s/<cluster>/kubeconfig.yaml.enc` (where present); cassiopeia kubeconfig.enc not yet seeded — reseed via `scp <node>:/etc/rancher/k3s/k3s.yaml`.
 - Three-form galaxy naming: repo-dir (`gxy-management`), ansible group underscore (`gxy_management_k3s`), DO droplet tag dash (`gxy-management-k3s`). Inventory plugin regex_replace bridges.
 - `.envrc` hierarchy: root loads global tokens (CF, Tailscale); cluster dir `.envrc` loads team-specific DO token from `do-universe/.env.enc`. Run cluster-scoped `ansible`/`kubectl` with `direnv exec <cluster-dir>` when not cd'd in.
 - `just play <name> <group>` expands to `play-<name>.yml` against `<group>`; `*args` forwarded verbatim (no `-- --check` separator).
