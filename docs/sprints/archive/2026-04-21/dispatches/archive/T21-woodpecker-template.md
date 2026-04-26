@@ -1,6 +1,6 @@
 # T21 — `.woodpecker/deploy.yaml` pipeline template
 
-**Status:** pending
+**Status:** SUPERSEDED 2026-04-26 by D016. Build environment is staff choice post-pivot; CLI uploads to proxy from any environment. Woodpecker template demoted to optional reference example (not critical path). Tracked under post-MVP follow-up if staff demand surfaces.
 **Worker:** w-infra
 **Repo:** `~/DEV/fCC/infra` (branch: `feat/k3s-universe`)
 **Spec:** [`task-gxy-cassiopeia.md` §Task 21](../../architecture/task-gxy-cassiopeia.md)
