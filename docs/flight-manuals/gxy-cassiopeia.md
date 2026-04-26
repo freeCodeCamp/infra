@@ -85,10 +85,15 @@ rclone-sync sidecar. Chart defaults are overlaid by
 per-site host list) and then by the sops overlay `caddy.values.yaml.enc`
 (R2 credentials).
 
-Caddy image is `ghcr.io/freecodecamp-universe/caddy-s3:{sha}`, built by the
-Woodpecker pipeline `.woodpecker/caddy-s3-build.yaml` (in-tree r2alias
-module via xcaddy; no third-party Caddy plugins per D32). Local dev builds
-via `just caddy-s3-build` + verify with `just caddy-s3-verify`.
+Caddy image is `ghcr.io/freecodecamp/caddy-s3:{sha}`, built by the
+GitHub Actions workflow `.github/workflows/docker--caddy-s3.yml` on
+github-hosted runners (build-residency principle — platform pillars
+build outside Universe so the recovery path is never circular). The
+in-tree r2alias module is compiled via xcaddy; no third-party Caddy
+plugins per D32. Local dev builds via `just caddy-s3-build` + verify
+with `just caddy-s3-verify`. The Woodpecker pipeline at
+`.woodpecker/caddy-s3-build.yaml` is retained as a manual-trigger
+secondary; will retire via T-build-residency dispatch.
 
 ### Verify
 

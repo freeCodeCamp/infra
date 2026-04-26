@@ -4,10 +4,10 @@ description: Caddy serving *.freecode.camp static constellations from Cloudflare
 type: application
 version: 0.1.0
 # appVersion tracks the xcaddy-built image tag, not Caddy upstream. Bump
-# when rebuilding ghcr.io/freecodecamp-universe/caddy-s3.
+# when rebuilding ghcr.io/freecodecamp/caddy-s3.
 appVersion: "0.1.0"
 keywords:
   - caddy
   - r2
   - static
-home: https://github.com/freeCodeCamp-Universe/infra
+home: https://github.com/freeCodeCamp/infra

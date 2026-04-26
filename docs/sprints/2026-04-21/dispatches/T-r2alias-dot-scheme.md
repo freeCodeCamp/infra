@@ -52,7 +52,7 @@ Module struct: `PreviewSuffix` → `PreviewSubdomain`. Caddyfile: `preview_suffi
 
 ### 5. New GH Actions workflow
 
-`.github/workflows/caddy-s3-build.yml`: trigger on push to any branch matching `docker/images/caddy-s3/**` + `workflow_dispatch`. Steps: `go test -race ./...` on module → `docker/build-push-action` to `ghcr.io/freecodecamp-universe/caddy-s3:${SHA}` + branch tag. Use `GITHUB_TOKEN` for ghcr.
+`.github/workflows/caddy-s3-build.yml`: trigger on push to any branch matching `docker/images/caddy-s3/**` + `workflow_dispatch`. Steps: `go test -race ./...` on module → `docker/build-push-action` to `ghcr.io/freecodecamp/caddy-s3:${SHA}` + branch tag. Use `GITHUB_TOKEN` for ghcr.
 
 ### 6. Mark Woodpecker secondary
 
@@ -86,7 +86,7 @@ Operator runs `just helm-upgrade caddy gxy-cassiopeia` (or eq.). Verify caddy po
 
 - `go test -race ./docker/images/caddy-s3/modules/r2alias/...` green (incl new dot-scheme cases).
 - `caddy-caddyfile` ConfigMap on cassiopeia uses `preview_subdomain "preview"`.
-- `ghcr.io/freecodecamp-universe/caddy-s3:<SHA>` exists, built by GH Actions.
+- `ghcr.io/freecodecamp/caddy-s3:<SHA>` exists, built by GH Actions.
 - caddy pods on cassiopeia run new image.
 - `just phase4-smoke` exits 0 with `OK: phase 4 smoke passed — phase4-<ts>`.
 - `cf-cache-status: DYNAMIC` confirmed for both prod + preview hostnames during smoke.

@@ -433,8 +433,9 @@ phase4-smoke-test:
 # Build the caddy-s3 image locally and tag with dev-<sha>. Platform pinned to
 # linux/amd64 — DO droplets run on AMD64, and buildx defaults to the host
 # architecture (arm64 on Apple Silicon → exec format error in cluster).
-# Woodpecker builds the canonical `ghcr.io/freecodecamp-universe/caddy-s3:{sha}`
-# tag on push.
+# GitHub Actions (`.github/workflows/docker--caddy-s3.yml`) builds the
+# canonical `ghcr.io/freecodecamp/caddy-s3:{sha}` tag on push (build-
+# residency principle: platform pillars build outside Universe).
 [group('docker')]
 caddy-s3-build:
     #!/usr/bin/env bash
@@ -443,9 +444,9 @@ caddy-s3-build:
     docker buildx build \
         --platform linux/amd64 \
         --load \
-        -t "ghcr.io/freecodecamp-universe/caddy-s3:${TAG}" \
+        -t "ghcr.io/freecodecamp/caddy-s3:${TAG}" \
         docker/images/caddy-s3/
-    echo "Built: ghcr.io/freecodecamp-universe/caddy-s3:${TAG} (linux/amd64)"
+    echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
 
 # Verify the built image lists both in-tree modules AND does NOT list the
 # third-party caddy.fs.s3 (D32 — no third-party Caddy plugins). Runs the image
@@ -455,7 +456,7 @@ caddy-s3-verify:
     #!/usr/bin/env bash
     set -euo pipefail
     TAG="dev-$(git rev-parse --short HEAD)"
-    IMG="ghcr.io/freecodecamp-universe/caddy-s3:${TAG}"
+    IMG="ghcr.io/freecodecamp/caddy-s3:${TAG}"
     MODULES=$(docker run --rm --platform linux/amd64 "${IMG}" caddy list-modules)
     echo "${MODULES}" | grep -q '^http.handlers.r2_alias$' || { echo "FAIL: http.handlers.r2_alias not listed"; exit 1; }
     echo "${MODULES}" | grep -q '^caddy.fs.r2$' || { echo "FAIL: caddy.fs.r2 not listed"; exit 1; }
