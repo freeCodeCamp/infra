@@ -11,6 +11,38 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T31 closed: artemis Go svc greenfield scaffold
+
+T31 worker session in `~/DEV/fCC-U/artemis` (greenfield repo) shipped
+full Go microservice scaffold per dispatch §Files + §API surface +
+§Acceptance. Single commit allowed for greenfield init.
+
+**Closing commit (artemis `main`, NEW remote, not pushed):**
+
+- `861e4c4` — `feat: initial artemis service scaffold`
+
+**Worker dispatch close commit (infra `feat/k3s-universe`):**
+
+- `7465ce41` — `docs(sprint): close T31 — artemis@861e4c4` (worker
+  flipped dispatch Status header per multi-session discipline; governor
+  reconciles PLAN matrix + STATUS + this HANDOFF in separate commit
+  below).
+
+**Sprint state delta this commit (infra):**
+
+- PLAN top-level task chain row T31 → `done`.
+- PLAN dispatch matrix row T31 → `[x] done` (also corrected area label
+  `uploads (new repo)` → `artemis (new repo)` + dispatch path).
+- STATUS Open table T31 → `done`; Shipped section gained artemis block
+  - `7465ce41` worker close + this reconciliation commit; concurrency
+    plan rewritten (T34 + T32 unblocked).
+- HANDOFF — this entry.
+
+**Unblocks:** T34 (Caddy reverse proxy + DNS + smoke retarget) — needs
+first GHCR image tag from artemis CI before Helm install (operator:
+`gh workflow run` on artemis repo). T32 (universe-cli v0.4 commands)
+fully unblocked — both artemis API contract live + T33 schema landed.
+
 ### 2026-04-27 — T33 closed: `platform.yaml` v2 schema + validator + doc
 
 T33 worker session in `~/DEV/fCC-U/universe-cli` shipped v2 schema
