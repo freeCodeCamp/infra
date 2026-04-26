@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — Universe Static-Apps Proxy Pillar
 
-**Goal:** staff dev runs `universe deploy` from any environment (laptop, GHA, Woodpecker) → site live on `<site>.freecode.camp`. Zero R2 tokens in staff hands or CI secrets. Identity = GitHub team membership. Upload plane = Go microservice at `uploads.freecode.camp`.
+**Goal:** staff dev runs `universe static deploy` from any environment (laptop, GHA, Woodpecker) → site live on `<site>.freecode.camp`. Zero R2 tokens in staff hands or CI secrets. Identity = GitHub team membership. Upload plane = Go microservice (`artemis`) at `uploads.freecode.camp`.
 
 ## Read order (every fresh session)
 

@@ -167,7 +167,7 @@ governor before firing.
 
 ▎ Resume Sprint 2026-04-26 governor (Universe static-apps proxy pillar).
 Branch point from `../archive/2026-04-21/` (Wave A.1 ✅). Goal: staff
-`universe deploy` → live site, zero R2 tokens in staff/CI hands. Upload
+`universe static deploy` → live site, zero R2 tokens in staff/CI hands. Upload
 plane = Go svc `artemis` at host `uploads.freecode.camp` (repo renamed
 2026-04-26 evening; hostname unchanged). T30 closed (`Universe@310c7e1`).
 T31 + T33 + T22 fire-ready (multi-session true-parallel). T32 partial-

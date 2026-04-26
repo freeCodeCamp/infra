@@ -4,7 +4,7 @@ Stable plan. Patched only when scope/phases/dispatch-graph change. Live cursor l
 
 ## Sprint goal
 
-Staff dev runs `universe deploy` from **any environment** (laptop, GHA, Woodpecker, etc.) with **only `platform.yaml`** + GitHub identity in their hands. Zero R2 credentials persist outside cluster. Site live at `<site>.freecode.camp` (production) and `<site>.preview.freecode.camp` (preview siblings). Vendor-neutral throughout (R2 = S3-compat; portable to MinIO/Backblaze/Wasabi).
+Staff dev runs `universe static deploy` from **any environment** (laptop, GHA, Woodpecker, etc.) with **only `platform.yaml`** + GitHub identity in their hands. Zero R2 credentials persist outside cluster. Site live at `<site>.freecode.camp` (production) and `<site>.preview.freecode.camp` (preview siblings). Vendor-neutral throughout (R2 = S3-compat; portable to MinIO/Backblaze/Wasabi).
 
 ## Branches
 
@@ -66,7 +66,7 @@ Sub-deliverables:
 - CHANGELOG + README ported to proxy contract.
 - uploads svc tagged `v1.0.0`, image published to GHCR.
 
-**Gate G2:** `npm i -g @freecodecamp/universe-cli@0.4.0` works; `universe deploy` + `rollback` + `promote` drive proxy against G1 reference site.
+**Gate G2:** `npm i -g @freecodecamp/universe-cli@0.4.0` works; `universe static deploy` + `rollback` + `promote` drive proxy against G1 reference site.
 
 ### Phase 3 — Cutover (post-G2)
 
@@ -154,13 +154,13 @@ separate Claude Code sessions / terminals.
 ## Success criteria (proxy pillar done)
 
 1. `universe login` opens GitHub device flow OR auto-detects identity from env/OIDC/`gh`.
-2. `universe deploy` reads `platform.yaml`, builds (or uploads pre-built), POSTs proxy `/api/deploy/*`, returns preview URL.
+2. `universe static deploy` reads `platform.yaml`, builds (or uploads pre-built), POSTs proxy `/api/deploy/*`, returns preview URL.
 3. Proxy validates GitHub team membership against `sites.yaml` map.
 4. Proxy streams upload to R2 single bucket prefix-scoped.
 5. Proxy verifies upload (ListObjectsV2) then atomic alias write on finalize.
 6. `<site>.preview.freecode.camp` request: CF → cassiopeia Caddy → `r2_alias` → R2 → served.
-7. `universe promote` swaps production alias to current preview atomically.
-8. `universe rollback --to <id>` writes production alias to past deploy.
+7. `universe static promote` swaps production alias to current preview atomically.
+8. `universe static rollback --to <id>` writes production alias to past deploy.
 9. R2 admin credential never leaves cluster — staff devs hold only `platform.yaml` + GitHub identity.
 10. Cleanup cron deletes unreferenced prefixes; aliased prefixes pinned (7d retention; D39 holds).
 
