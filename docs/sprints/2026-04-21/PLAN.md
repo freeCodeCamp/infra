@@ -123,23 +123,23 @@ during 24h observation; `doctl compute droplet list` shows no
 | G-id       | Area               | Subject                                                         | Dispatch                                                                                               | Status                                |
 | ---------- | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
 | G1.0a      | windmill / sops    | Complete `windmill/.env.enc` + push `u/admin/cf_r2_provisioner` | [`dispatches/G1.0a-windmill-cf-resource.md`](dispatches/G1.0a-windmill-cf-resource.md)                 | [x] done — supersedes partial G1.0    |
-| G1.0b      | windmill / WP      | Mint Woodpecker admin token + push `u/admin/woodpecker_admin`   | [`dispatches/G1.0b-windmill-woodpecker-resource.md`](dispatches/G1.0b-windmill-woodpecker-resource.md) | [ ] pending                           |
+| G1.0b      | windmill / WP      | Mint Woodpecker admin token + push `u/admin/woodpecker_admin`   | [`dispatches/G1.0b-windmill-woodpecker-resource.md`](dispatches/G1.0b-windmill-woodpecker-resource.md) | [x] done                              |
 | G1.1       | infra / cassiopeia | `R2_BUCKET` export in `.envrc` + cassiopeia kubeconfig pull     | [`dispatches/G1.1-cassiopeia-env.md`](dispatches/G1.1-cassiopeia-env.md)                               | [ ] pending                           |
 | G1.1.smoke | infra              | Operator runs `just phase4-smoke` (RFC §6.6 Phase 4 exit)       | [`dispatches/G1.1-smoke-live-run.md`](dispatches/G1.1-smoke-live-run.md)                               | [ ] pending — depends on G1.0a + G1.1 |
 
 ### T-dispatches
 
-| T-id | Area         | Subject                                       | Dispatch                                                                           | Status                                   |
-| ---- | ------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------- |
-| T11  | windmill     | Per-site R2 secret provisioning flow          | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)               | [ ] pending — blocked on G1.0a + G1.0b   |
-| T15  | infra        | Phase 4 smoke runbook + script                | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [x] artifact done; live run = G1.1.smoke |
-| T16  | universe-cli | Woodpecker API client                         | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [x] done                                 |
-| T17  | universe-cli | Config schema + site name validation          | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [x] done                                 |
-| T18  | universe-cli | Rewrite `deploy` command                      | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [x] done                                 |
-| T19  | universe-cli | Rewrite `promote` + `rollback`                | [`dispatches/T19-cli-promote-rollback.md`](dispatches/T19-cli-promote-rollback.md) | [x] done                                 |
-| T20  | universe-cli | Strip legacy rclone/S3 + release 0.4.0-beta.1 | [`dispatches/T20-cli-strip-cut.md`](dispatches/T20-cli-strip-cut.md)               | [x] done — #25 unblocks                  |
-| T21  | infra        | `.woodpecker/deploy.yaml` template            | [`dispatches/T21-woodpecker-template.md`](dispatches/T21-woodpecker-template.md)   | [ ] pending                              |
-| T22  | windmill     | Cleanup cron flow                             | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                 | [ ] pending                              |
+| T-id | Area         | Subject                                       | Dispatch                                                                           | Status                                             |
+| ---- | ------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------- |
+| T11  | windmill     | Per-site R2 secret provisioning flow          | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)               | [ ] pending — admin deps unblocked (G1.0a + G1.0b) |
+| T15  | infra        | Phase 4 smoke runbook + script                | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [x] artifact done; live run = G1.1.smoke           |
+| T16  | universe-cli | Woodpecker API client                         | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [x] done                                           |
+| T17  | universe-cli | Config schema + site name validation          | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [x] done                                           |
+| T18  | universe-cli | Rewrite `deploy` command                      | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [x] done                                           |
+| T19  | universe-cli | Rewrite `promote` + `rollback`                | [`dispatches/T19-cli-promote-rollback.md`](dispatches/T19-cli-promote-rollback.md) | [x] done                                           |
+| T20  | universe-cli | Strip legacy rclone/S3 + release 0.4.0-beta.1 | [`dispatches/T20-cli-strip-cut.md`](dispatches/T20-cli-strip-cut.md)               | [x] done — #25 unblocks                            |
+| T21  | infra        | `.woodpecker/deploy.yaml` template            | [`dispatches/T21-woodpecker-template.md`](dispatches/T21-woodpecker-template.md)   | [ ] pending                                        |
+| T22  | windmill     | Cleanup cron flow                             | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                 | [ ] pending                                        |
 
 **Out-of-scope / closed:**
 

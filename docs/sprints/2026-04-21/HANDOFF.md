@@ -14,6 +14,63 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 — G1.0b closed: Woodpecker admin PAT + woodpecker_admin Resource live
+
+Operator executed dispatch G1.0b in same `~/DEV/fCC-U/windmill` session
+that closed G1.0a earlier the same day. Same two-repo split per
+dispatch precedent.
+
+Pattern detection step (per operator instruction "figure out HOW we
+have handled other sensitive tokens, keys in this repo in the past"):
+G1.0a precedent surfaced — `infra-secrets/<app>/.env.enc` (sops+age
+encrypted dotenv) is the canonical home for cross-cluster Windmill
+platform-app secrets. Token never paste-into-chat; operator
+sops-edits the encrypted file, worker extracts via `sops -d --input-type
+dotenv --output-type dotenv` into a process-local shell var, pushes the
+Resource via wmill, scrubs. Captured as `feat_secrets_migration_sops`
+memory amendment with verified sops command form (bare `sops` fails on
+encrypted-in-place dotenv files in this repo — both `--input-type` and
+`--output-type` `dotenv` flags required).
+
+Two-repo split:
+
+- `~/DEV/fCC/infra-secrets` `windmill/.env.enc` gained
+  `WOODPECKER_ADMIN_TOKEN`. Sample-twin `windmill/.env.sample` gained
+  matching slot + doc block (mint surface, scope, format, rotation,
+  live-verified facts: host `https://woodpecker.freecodecamp.net` 200,
+  Woodpecker version 3.13.0, API base `/api` NOT `/api/v1`). Sops
+  decrypts clean.
+- Windmill platform workspace: resource type `c_woodpecker_admin`
+  created (schema `{baseUrl, token}`, both required, did not exist
+  pre-run); resource `u/admin/woodpecker_admin` created with
+  `baseUrl=https://woodpecker.freecodecamp.net/api` + extracted token.
+  Live probe: HTTP 200, login `freeCodeCamp-bot`, `admin: true`,
+  `/api/users` (admin-only) HTTP 200 — admin scope confirmed.
+  `/api/repos` returns `[]` (no repos activated yet — activation is
+  T11 prerequisite, not G1.0b token-scope issue).
+
+Both artifacts sit outside the `f/**` IaC perimeter that `wmill.yaml`
+syncs — zero file changes in `~/DEV/fCC-U/windmill`. Matches G1.0a
+precedent.
+
+No git push. No PR. No publish. Per covenant.
+
+Commits:
+
+- `infra-secrets`: `749ee09` — `feat(windmill): add WOODPECKER_ADMIN_TOKEN (G1.0b)`
+- `~/DEV/fCC/infra` (this commit): sprint-doc patches — dispatch
+  Status flip + Closure block fill, PLAN matrix `[x] done`, this
+  entry, STATUS G1.0 → both halves closed.
+
+Next unblocked:
+
+- **T11** (windmill per-site R2 secret provisioning flow) — admin
+  deps both green now (G1.0a CF + G1.0b Woodpecker). Implementation
+  pending; flow consumes `u/admin/cf_r2_provisioner` and
+  `u/admin/woodpecker_admin` Resources.
+- **G1.1** (cassiopeia `R2_BUCKET` export + kubeconfig pull) — still
+  pending, independent of G1.0 ladder. G1.1.smoke blocked on G1.1.
+
 ### 2026-04-26 — G1.0a closed: `windmill/.env.enc` complete + cf_r2_provisioner Resource live
 
 Operator executed dispatch G1.0a in fresh Claude Code session opened in
