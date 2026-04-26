@@ -1,23 +1,11 @@
-name: Docker -- caddy-s3 (canonical builder)
+name: Docker -- caddy-s3
 
-# Build-residency principle (T-build-residency / pending ADR):
-# Universe platform pillars must build OUTSIDE Universe to avoid
-# bootstrap chicken-egg. caddy-s3 powers the static-apps serve plane on
-# gxy-cassiopeia; building it on Woodpecker (gxy-launchbase, inside
-# Universe) creates a circular dependency at recovery time. This
-# workflow runs on github-hosted runners (external) and pushes to GHCR
-# (external). The Woodpecker pipeline `.woodpecker/caddy-s3-build.yaml`
-# is retained as a secondary builder pending T-build-residency cleanup.
+# Manual trigger only — caddy-s3 ships with the cassiopeia chart roll,
+# not on every commit. Push from any branch via:
+#   gh workflow run docker--caddy-s3.yml --ref <branch>
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - feat/k3s-universe
-    paths:
-      - "docker/images/caddy-s3/**"
-      - ".github/workflows/docker--caddy-s3.yml"
 
 jobs:
   test:
@@ -51,9 +39,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
-      # Same-org push: freecodecamp/infra repo → ghcr.io/freecodecamp
-      # namespace. GITHUB_TOKEN suffices (`packages: write` permission set
-      # on the job above). No PAT or repo secrets needed.
       - name: Log in to the GHCR
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
@@ -69,7 +54,7 @@ jobs:
           tags: |
             type=sha,format=long
             type=ref,event=branch
-            type=raw,value=latest-main,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Cache Docker layers
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

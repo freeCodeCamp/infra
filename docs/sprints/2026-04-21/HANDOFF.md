@@ -14,6 +14,73 @@ Convention:
 
 ## Journal
 
+### 2026-04-26 — Wave A.1 fully closed: G1.1 + T-r2alias-dot-scheme + G1.1.smoke green
+
+Worker session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`).
+
+**G1.1 (operator-bootstrap).** `R2_BUCKET=universe-static-apps-01`
+exported in `k3s/gxy-cassiopeia/.envrc`. Cassiopeia kubeconfig
+already in place (no reseed needed); `kubectl get nodes` returned 3
+Ready. Closing dispatch flipped to done.
+
+**G1.1.smoke first run RED at step 6.** Preview alias write succeeded
+to R2 but Caddy 404'd `test.preview.freecode.camp`. Root cause: D35
+(2026-04-22 — preview host scheme `<site>.preview.<root>` dot-scheme
+supersedes D5 `<site>--preview.<root>` suffix scheme) was a partial
+migration. Caddy `r2alias` Go module + chart configmap stayed on the
+pre-D35 suffix scheme. Module parsed `test.preview.freecode.camp` as
+a multi-label production site → looked up
+`test.preview.freecode.camp/production` (404).
+
+**T-r2alias-dot-scheme.** New dispatch filed for the fix.
+
+- `host.go` `parseSiteAndAlias` rewritten for dot-scheme: detect
+  rightmost label of prefix == configured `preview_subdomain` →
+  strip to get site labels. New tests: 7-case table + inner-label +
+  site-label-named-preview. Module field renamed `PreviewSuffix` →
+  `PreviewSubdomain`. Caddyfile option `preview_suffix` →
+  `preview_subdomain`. Default `"preview"`. 56/56 module tests green
+  (`go test -race`). `go vet` clean. (`d6360c7`)
+- Caddy chart configmap aligned: `preview_subdomain "preview"`.
+  (`9c96a9c`)
+- New canonical builder: `.github/workflows/docker--caddy-s3.yml`
+  (`workflow_dispatch` only — manual). Same-org push to
+  `ghcr.io/freecodecamp/caddy-s3` via job `GITHUB_TOKEN`. Test gate +
+  metadata-action tags + `linux/amd64` platform pin. Woodpecker
+  pipeline `.woodpecker/caddy-s3-build.yaml` flagged secondary. Built
+  - pushed image: `sha-712c6e341f9b91320a1043683e166d487b7c2725`,
+    digest `sha256:e024af67…`. (`842a7fd`, `712c6e3`, `51de48c`)
+- Cassiopeia chart rolled to new image:
+  `values.production.yaml` tag pinned to
+  `sha-712c6e3@sha256:e024af67…`. `just helm-upgrade gxy-cassiopeia
+caddy` rolled the deployment; 3/3 caddy pods Running on new image.
+  (`3a8d993`)
+- RFC `rfc-gxy-cassiopeia.md` scrubbed: 19 stale operational
+  `--preview` refs flipped to dot-scheme; D5 row + D35 supersession
+  trail + §5.5 alt-considered preserved as historical context.
+  (`eb5ddca`)
+- Field-note (cross-repo, Universe `main`): build-residency rule for
+  Universe platform pillars — pillars must build outside Universe to
+  avoid bootstrap chicken-egg. Action item flagged for Universe team:
+  ratify ADR. (`799022b` + `e48c3d7`)
+
+**Build-residency boundary set.** Caddy-s3 originally targeted
+`ghcr.io/freecodecamp-universe/caddy-s3` namespace; first push
+403'd on org-side package permission policy. Operator decided
+namespace was not worth per-pillar PAT plumbing; image retired to
+`ghcr.io/freecodecamp/caddy-s3`. (Build-residency is about
+RUN-residency — not org-residency.) Operator cleanup deferred:
+delete `GHCR_PUSH_USER`/`GHCR_PUSH_TOKEN` repo secrets, revoke PAT,
+delete stale package on `freecodecamp-universe`.
+
+**G1.1.smoke RE-RUN GREEN.** All 8 steps pass.
+`OK: phase 4 smoke passed — phase4-20260426-080726`. Trap purged R2
+test prefix; post-verify confirms empty. RFC §6.6 Phase 4 exit gate
+✅. Wave A.1 fully closed.
+
+**Open after this:** T11 live preview + `wmill sync push` (operator).
+Wave B (T21 + T22) unblocks once T11 observe-✓.
+
 ### 2026-04-26 — T11 shipped: Windmill flow `f/static/provision_site_r2_credentials`
 
 Worker session in `~/DEV/fCC-U/windmill` per dispatch

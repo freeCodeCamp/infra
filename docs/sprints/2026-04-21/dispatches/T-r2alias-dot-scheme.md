@@ -1,6 +1,6 @@
 # T-r2alias-dot-scheme — Caddy r2_alias module dot-scheme migration
 
-**Status:** in-progress
+**Status:** done
 **Type:** code dispatch (Go module rewrite + chart bump + GH Actions workflow)
 **Worker:** session
 **Repo:** `~/DEV/fCC/infra` (branch: `feat/k3s-universe`)
@@ -10,7 +10,7 @@
 **Blocks:** G1.1.smoke
 **Wave:** A.1
 **Started:** 2026-04-26
-**Closed:** —
+**Closed:** 2026-04-26 — module rewrite + chart configmap + GH Actions canonical builder + namespace flip to `freecodecamp/caddy-s3` + RFC scrub. Image `sha-712c6e3@sha256:e024af67…` deployed to cassiopeia. Smoke green: `phase4-20260426-080726`.
 
 ---
 
@@ -52,7 +52,7 @@ Module struct: `PreviewSuffix` → `PreviewSubdomain`. Caddyfile: `preview_suffi
 
 ### 5. New GH Actions workflow
 
-`.github/workflows/caddy-s3-build.yml`: trigger on push to any branch matching `docker/images/caddy-s3/**` + `workflow_dispatch`. Steps: `go test -race ./...` on module → `docker/build-push-action` to `ghcr.io/freecodecamp/caddy-s3:${SHA}` + branch tag. Use `GITHUB_TOKEN` for ghcr.
+`.github/workflows/docker--caddy-s3.yml`: `workflow_dispatch` only (manual via `gh workflow run docker--caddy-s3.yml --ref <branch>`). Steps: `go test -race ./...` on module → `docker/build-push-action` to `ghcr.io/freecodecamp/caddy-s3` (full SHA tag + branch tag + `latest` on main). Same-org auth via `GITHUB_TOKEN` (no PAT).
 
 ### 6. Mark Woodpecker secondary
 

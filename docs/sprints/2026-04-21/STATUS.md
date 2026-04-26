@@ -1,20 +1,10 @@
 # Sprint 2026-04-21 — STATUS
 
-Updated: 2026-04-26 (G1.0a + G1.0b closed; T11 shipped) · Branch: `feat/k3s-universe` · Ahead of origin: 17 + recovery + G1.0a + G1.0b + T11
+Updated: 2026-04-26 (Wave A.1 fully closed; G1.1 + T-r2alias-dot-scheme + G1.1.smoke green) · Branch: `feat/k3s-universe` · Ahead of origin: 25 (recovery + Wave A.1 + T-r2alias)
 
-**⚠ RECOVERY ACTIVE.** Pre-flight on T15 smoke surfaced 5 unmet
-operator-env prereqs + 3 false-completion claims in G1.0. See:
-
-- `reports/T15-smoke-preflight-2026-04-25.md`
-- `reports/sprint-state-audit-2026-04-25.md`
-
-Recovery picked: full Phase 1–5 with **smoke refactored to admin
-Bearer + on-demand sops decrypt** (option 2; rclone + per-cluster R2
-ops cred dropped). G1.0a + G1.0b closed 2026-04-26. **T11 shipped
-2026-04-26** (windmill commit `010d577` — flow at
-`f/static/provision_site_r2_credentials`, 55/55 vitest green, reviewer
-CLEAR). Wave B (T21 + T22) now unblocked; awaits live preview +
-`wmill sync push` by operator before flipping to observe-✓.
+**✅ Wave A.1 GREEN.** RFC §6.6 Phase 4 exit gate cleared.
+`phase4-20260426-080726` smoke run passed all 8 steps. Caddy on
+cassiopeia rolled to `ghcr.io/freecodecamp/caddy-s3:sha-712c6e3@sha256:e024af67…`.
 
 Canonical session-roll output. Overwritten each `roll the session`. Read
 this **before** PLAN.md or DECISIONS.md — those are stable references,
@@ -52,101 +42,71 @@ Sprint scaffolding (since operator's last push):
 - S12 — T15 closing commit ref backfill — `3f31a5c`
 - T16-T20 dispatch closures (universe-cli closure docs in infra repo) — `96b5b52`
 - S13 — sprint-doc roll: A.2 follow-up + slop strip — `73d4d19`
-- G1.0a — `windmill/.env.enc` complete (4 vars) + Resource `u/admin/cf_r2_provisioner` + resource type `c_cf_r2_provisioner` live on platform workspace; infra-secrets commit `7d8edcb`; sprint-doc closure this commit
-- G1.0b — Woodpecker admin PAT (`WOODPECKER_ADMIN_TOKEN`) added to `windmill/.env.enc` + `.env.sample` doc block; Resource `u/admin/woodpecker_admin` + resource type `c_woodpecker_admin` live on platform workspace; live probe HTTP 200 (login `freeCodeCamp-bot`, admin: true); infra-secrets commit `749ee09`; sprint-doc closure this commit
-
-universe-cli `feat/woodpecker-pivot` (cross-repo, awaiting operator push):
-
-- T16 + T17 — Woodpecker client + config schema strict-mode — `a7dd58e`
-- T18 + T19 + T20 — deploy/promote/rollback Woodpecker rewrite + S3/rclone strip — `f6971cf`
-- D35 fixture realignment — `89ab897`
-- v0.4.0-beta.1 release prep + CHANGELOG — `03c5f19`
-- A.2 follow-up: orphan errors + exit-codes strip (audit cleanup) — `4f54012`
-- D37 domain pattern + `production_branch` covenant — `0113c9c`
+- G1.0a — `windmill/.env.enc` complete (4 vars) + Resource `u/admin/cf_r2_provisioner` + resource type `c_cf_r2_provisioner` live on platform workspace; infra-secrets commit `7d8edcb`; sprint-doc closure `22dd9e21`
+- G1.0b — Woodpecker admin PAT (`WOODPECKER_ADMIN_TOKEN`) added to `windmill/.env.enc` + `.env.sample` doc block; Resource `u/admin/woodpecker_admin` + resource type `c_woodpecker_admin` live on platform workspace; live probe HTTP 200; infra-secrets commit `749ee09`; sprint-doc closure `61cc885a`
+- T11 — windmill flow `f/static/provision_site_r2_credentials` shipped (windmill@`010d577`) — sprint-doc closure `518c46e`
+- G1.1 — `R2_BUCKET=universe-static-apps-01` exported in `k3s/gxy-cassiopeia/.envrc`; cassiopeia kubeconfig sanity-checked (3 nodes Ready); dispatch flipped to done; PLAN matrix `[x] done` — `6ee679bf`
+- **T-r2alias-dot-scheme — D35 module fix + GH Actions canonical builder + namespace flip + RFC scrub:**
+  - `feat(caddy-s3): r2_alias dot-scheme preview routing per D35` — `d6360c7f` (host.go + tests; option rename `preview_suffix` → `preview_subdomain`; 56/56 module tests green)
+  - `chore(caddy): preview_subdomain in chart configmap` — `9c96a9c8`
+  - `ci(caddy-s3): GH Actions canonical builder; Woodpecker secondary` — `842a7fd9`
+  - `docs(rfc): strip --preview suffix refs per D35` — `eb5ddca1`
+  - `chore(caddy-s3): retire freecodecamp-universe namespace; use freecodecamp` — `712c6e34` (cross-org push 403'd on package policy; flipped to same-org)
+  - `ci(caddy-s3): workflow_dispatch only; trim verbose comments` — `51de48c1`
+  - `chore(caddy): roll cassiopeia to caddy-s3 sha-712c6e3 (D35 dot-scheme)` — `3a8d9933`
+- G1.1.smoke — `phase4-20260426-080726` smoke run green; trap purged R2; post-verify empty; RFC §6.6 Phase 4 exit ✅
+- Universe `main` (cross-repo): field-note infra entry "build-residency for platform pillars" — `799022b` + `e48c3d7` (caddy-s3 namespace retirement note)
 
 ## Open
 
-- **G1.0 — Operator bootstrap.** ✅ **Both halves closed (2026-04-26):
-  G1.0a CF + G1.0b Woodpecker.** Live state:
-  - ✅ CF Account-owned API token: `CF_R2_ADMIN_API_TOKEN` in
-    `infra-secrets/windmill/.env.enc`. Verified live (R2 admin perms,
-    lists bucket `universe-static-apps-01`).
-  - ✅ `CF_ACCOUNT_ID=ad45585c4383c97ec7023d61b8aef8c8` in same file.
-  - ✅ Windmill Resource `u/admin/cf_r2_provisioner` live on platform
-    workspace, shape `{cfApiToken, cfAccountId}`. Resource type
-    `c_cf_r2_provisioner` created same run.
-  - ✅ R2 ops S3 admin keys `R2_OPS_ACCESS_KEY_ID` +
-    `R2_OPS_SECRET_ACCESS_KEY` (name `universe-static-apps-01-ops-rw`,
-    R2 Object Read & Write, bucket-scoped, no TTL) in same file.
-    Consumed on-demand by smoke + cleanup cron via sops decrypt.
-  - ✅ Woodpecker admin PAT `WOODPECKER_ADMIN_TOKEN` in same file
-    (admin scope, `freeCodeCamp-bot`, no TTL).
-  - ✅ Windmill Resource `u/admin/woodpecker_admin` live on platform
-    workspace, shape `{baseUrl, token}`. Resource type
-    `c_woodpecker_admin` created same run. `baseUrl` =
-    `https://woodpecker.freecodecamp.net/api`.
+- **T11 observe-✓.** Operator owes live preview + `wmill sync push` of
+  `f/static/provision_site_r2_credentials` against the platform
+  workspace. Until then, T11 is "artifact done" not "live verified."
+- **Wave B fanout** (post-T11 observe-✓):
+  - T21 — `.woodpecker/deploy.yaml` template (infra; consumes T11 secret format)
+  - T22 — Cleanup cron flow (windmill; 7d retention; pin aliases)
+- **T-build-residency** (new follow-up dispatch, not yet filed) —
+  audit all `.woodpecker/*.yaml` pipelines, classify each as platform
+  pillar vs tenant, migrate pillar pipelines to GitHub Actions,
+  retire secondary Woodpecker pipelines, propose ADR via Universe
+  team.
+- **Operator deferred cleanup** (post Wave A.1):
+  - `gh secret delete GHCR_PUSH_USER -R freeCodeCamp/infra`
+  - `gh secret delete GHCR_PUSH_TOKEN -R freeCodeCamp/infra`
+  - Revoke PAT `infra-ghcr-push-caddy-s3` at <https://github.com/settings/tokens>
+  - Delete stale package `freecodecamp-universe/caddy-s3` after a few days of stable cassiopeia operation
 
-Wave A staggered — recovery state:
-
-- Wave A.1 (infra) → **T15 artifact** closed. **Live run blocked** on
-  G1.1 (cassiopeia env patch) — G1.0a now ✓. Smoke script refactored
-  to admin-Bearer + on-demand sops (rclone + per-cluster cred dropped
-  per D-amend 2026-04-25).
-- Wave A.2 (universe-cli) → T16-T20 ✅ done. v0.4.0-beta.1 ready behind
-  operator publish trigger.
-- Wave A.3 (windmill) → **T11 ✅ shipped 2026-04-26** (windmill commit
-  `010d577` — flow at `f/static/provision_site_r2_credentials`).
-  Mints CF R2 token scoped to `<bucket>/<site>/*`, registers split
-  Woodpecker repo-scoped secrets (`r2_access_key_id`,
-  `r2_secret_access_key`), revokes prior token (rotation tail).
-  55/55 vitest green, oxfmt + oxlint clean, tsc clean, reviewer CLEAR.
-  Operator owns live preview + `wmill sync push` before observe-✓.
-
-New recovery dispatches (Phase 3 of recovery):
-
-- **G1.0a** — ✅ done 2026-04-26 (`windmill/.env.enc` 4-var complete + `u/admin/cf_r2_provisioner` + type `c_cf_r2_provisioner` live)
-- **G1.0b** — ✅ done 2026-04-26 (`WOODPECKER_ADMIN_TOKEN` in `windmill/.env.enc` + Resource `u/admin/woodpecker_admin` + type `c_woodpecker_admin` live; admin scope verified)
-- **G1.1** — pending — gxy-cassiopeia `.envrc` `R2_BUCKET` export + kubeconfig pull
-- **G1.1.smoke** — pending — operator runs `just phase4-smoke` (depends G1.0a ✓ + G1.1)
-
-Wave B (post-T11 observe-✓): T21 (infra `.woodpecker/deploy.yaml`), T22 (windmill cleanup cron). Both pending; T11 artifact ✅, awaits operator live-preview to flip to observe-✓.
-
-T15 artifact done. T16-T20 done. G1.0a + G1.0b ✅. T11 artifact ✅. G1.1/smoke + T21-T22 pending.
+Wave A.2 (universe-cli T16–T20) ✅ done — v0.4.0-beta.1 ready behind operator publish.
+Wave A.3 (windmill T11) ✅ artifact done — awaiting operator live preview.
 
 ## Other state
 
-- Cluster gxy-management: GREEN post-rename. Windmill restored from S3
-  dump 2026-04-22. UI smoke 200.
-- Cluster gxy-launchbase: Woodpecker live. `https://woodpecker.freecodecamp.net` 200, `x-woodpecker-version: 3.13.0`. API base `/api` (verified live 2026-04-25 — NOT `/api/v1`).
-- Cluster gxy-cassiopeia: Caddy live (3 nodes, all `404 server=Caddy` for `Host: test.freecode.camp` pre-smoke). Modules T01–T05 shipped 2026-04-18. Node IPs: `165.227.149.249` `46.101.179.141` `188.166.165.62`.
+- Cluster gxy-management: GREEN. Windmill restored from S3 dump 2026-04-22; UI smoke 200.
+- Cluster gxy-launchbase: Woodpecker live. `https://woodpecker.freecodecamp.net` HTTP 200, `x-woodpecker-version: 3.13.0`. API base `/api`.
+- Cluster gxy-cassiopeia: GREEN. Caddy 3/3 pods Running on `ghcr.io/freecodecamp/caddy-s3:sha-712c6e3@sha256:e024af67…` (D35 dot-scheme). ConfigMap carries `preview_subdomain "preview"`. Smoke `phase4-20260426-080726` green. Node IPs: `165.227.149.249` `46.101.179.141` `188.166.165.62`.
 - Cluster gxy-static: Live, retiring at #26 cutover.
-- CF account: `ad45585c4383c97ec7023d61b8aef8c8` (`freeCodeCamp`). Verified via live API.
-- CF zones: `freecodecamp.net` + `freecode.camp` proxied. Origin certs `*.freecodecamp.net`, `*.freecode.camp`, `*.preview.freecode.camp` all ACM-issued + CF-activated.
-- DNS: `test.freecode.camp` + `test.preview.freecode.camp` resolve via CF anycast (records already in place).
-- R2 bucket: `universe-static-apps-01` (created 2026-04-20). **Single bucket — per-site = prefix scoping.** No per-site buckets.
-- Tools verified: sops, age, doctl, wmill (via `bunx` from windmill repo), direnv loaded in 3 repos. **`aws` (aws-cli v2)** required for new smoke design — operator must install if absent.
-- Worker driver scripts: `~/.claude/plugins/cache/superpowers-marketplace/claude-session-driver/1.0.1/scripts/`.
+- CF account: `ad45585c4383c97ec7023d61b8aef8c8` (`freeCodeCamp`).
+- CF zones: `freecodecamp.net` + `freecode.camp` proxied. Origin certs `*.freecodecamp.net`, `*.freecode.camp`, `*.preview.freecode.camp` ACM-issued + CF-activated.
+- DNS: `test.freecode.camp` + `test.preview.freecode.camp` resolve via CF anycast.
+- R2 bucket: `universe-static-apps-01` (single bucket — per-site = prefix scoping).
+- GHCR canonical builder: GitHub Actions workflow `.github/workflows/docker--caddy-s3.yml` (manual `workflow_dispatch`). Woodpecker pipeline secondary, manual-only.
+- Tools verified: sops, age, doctl, wmill, direnv, aws-cli v2.
 
 ## Resume prompt — paste in fresh session
 
-▎ Resume Sprint 2026-04-21 RECOVERY per
-docs/sprints/2026-04-21/reports/sprint-state-audit-2026-04-25.md.
-Tree on feat/k3s-universe, ahead of origin by 17 + recovery + G1.0a +
-G1.0b. **G1.0a + G1.0b both closed 2026-04-26.**
-`windmill/.env.enc` carries 5 vars (CF_R2_ADMIN_API_TOKEN,
-CF_ACCOUNT_ID, R2_OPS_ACCESS_KEY_ID, R2_OPS_SECRET_ACCESS_KEY,
-WOODPECKER_ADMIN_TOKEN). Platform workspace has resource types
-c_cf_r2_provisioner + c_woodpecker_admin and resources
-u/admin/cf_r2_provisioner ({cfApiToken, cfAccountId}) +
-u/admin/woodpecker_admin ({baseUrl, token}) live. Wave A.1 T15
-artifact closed; live run still blocked on G1.1. Wave A.2 T16-T20
-done (universe-cli v0.4.0-beta.1 ready). Wave A.3 T11 admin deps both
-✓; T11 implementation pending. Wave B (T21 + T22) blocked on T11.
-Single R2 bucket `universe-static-apps-01`; per-site = prefix scoping
-NOT per-bucket. CF account ad45585c4383c97ec7023d61b8aef8c8.
-Woodpecker API base `/api` (NOT `/api/v1`). Pending dispatches:
-G1.1-cassiopeia-env.md, G1.1-smoke-live-run.md. Per-task covenant:
-TDD discipline, one commit per task, type(scope): subject title only,
-worker flips dispatch Status pending → in-progress → done in same
-closure commit, no push / no PR / no publish — operator pushes at
-sprint close.
+▎ Resume Sprint 2026-04-21. Wave A.1 fully closed 2026-04-26 (G1.1 +
+T-r2alias-dot-scheme + G1.1.smoke all green;
+`phase4-20260426-080726`). Tree on `feat/k3s-universe`, ahead of
+origin by 25. Caddy-s3 image
+`ghcr.io/freecodecamp/caddy-s3:sha-712c6e3@sha256:e024af67…`
+deployed to cassiopeia via D35 dot-scheme module rewrite. Canonical
+builder = GitHub Actions (`workflow_dispatch` only; same-org push to
+`freecodecamp` org). Open: T11 observe-✓ owed by operator (live
+preview + `wmill sync push`); Wave B (T21 + T22) blocks on T11; new
+follow-up T-build-residency to be filed (audit Woodpecker pillar
+pipelines, ADR proposal). Operator cleanup pending: delete
+`GHCR_PUSH_USER` + `GHCR_PUSH_TOKEN` secrets, revoke
+`infra-ghcr-push-caddy-s3` PAT, delete stale
+`freecodecamp-universe/caddy-s3` package. Per-task covenant: TDD,
+title-only `type(scope): subject`, no push by session, operator
+pushes at sprint close.
