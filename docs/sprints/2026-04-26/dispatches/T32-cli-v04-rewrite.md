@@ -1,14 +1,14 @@
 # T32 — universe-cli v0.4 rewrite (proxy client)
 
-**Status:** pending
+**Status:** done
 **Worker:** w-cli (governing session — broken ownership 2026-04-26)
 **Repo:** `~/DEV/fCC-U/universe-cli` (new branch: `feat/proxy-pivot` off `main`)
 **Spec:** D016 §CLI surface + §Authn/authz
 **Cross-ref:** D43 amendment in sprint `DECISIONS.md`
 **Toolchain:** existing — Bun, pnpm, vitest, oxfmt, oxlint, husky, tsup
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Started:** 2026-04-27
+**Closed:** 2026-04-27
+**Closing commit(s):** universe-cli `feat/proxy-pivot` `ccc71ab` → `24d6fa1` (17 commits; head `24d6fa1`).
 
 ---
 
@@ -145,10 +145,43 @@ universe-cli/
 
 ## Closure checklist
 
-- [ ] All files listed present
-- [ ] Tests green (vitest)
-- [ ] Lint + format clean
-- [ ] Single commit per task close
-- [ ] T32 Status `done`
-- [ ] PLAN matrix row checked
-- [ ] HANDOFF entry appended
+- [x] All files listed present (some additional libs: `build.ts`, `ignore.ts`,
+      `token-store.ts` per scope; tests for each)
+- [x] Tests green (vitest) — 265/265 across 23 files
+- [x] Lint + format clean — `pnpm lint` (oxlint) clean. `oxfmt` not
+      installed in repo (T33 closure HANDOFF mentioned it; package never
+      added) — left for follow-up sprint dispatch.
+- [x] Single commit per task close — multiple, one per sub-task / wave
+      bookkeeping (17 commits on `feat/proxy-pivot`)
+- [x] T32 Status `done`
+- [ ] PLAN matrix row checked — governor reconciles
+- [ ] HANDOFF entry appended — governor reconciles
+
+## Closure notes (worker)
+
+- CLI surface follows the 2026-04-27 namespace amendment: top-level
+  `login` / `logout` / `whoami` / `version`, `static deploy` /
+  `promote` / `rollback` / `ls`. Dropped pre-amendment flags
+  (`--force`, `--output-dir`, `--confirm`, positional `<deploy-id>`)
+  in favor of the dispatch-spec flag set (`--promote`, `--dir`,
+  `--from`, `--to`, `--site`).
+- Per-file PUT semantics implemented to match artemis
+  `internal/handler/deploy.go` `DeployUpload` (raw body + `?path=` query
+  param) — dispatch wording said "multipart" but artemis does not.
+- Identity slot 2 (GHA OIDC) implemented as priority placeholder. The
+  artemis `RequireGitHubBearer` middleware validates via GitHub
+  `GET /user`, which OIDC ID tokens cannot satisfy today; documented
+  in CLI README + CHANGELOG. Practical CI users supply
+  `$GITHUB_TOKEN` (slot 1).
+- Husky pre-commit gate gained `pnpm typecheck` (`tsc --noEmit`) after
+  3 type errors slipped through into committed code (whoami envelope
+  type, identity null-vs-undefined, upload Buffer→BodyInit). Fix-up
+  commit `ae9c477` + gate commit `f7f3b2b` are part of the 17-commit
+  set.
+- T33-shipped `docs/platform-yaml.md` `universe deploy` →
+  `universe static deploy` text fix folded into `1b087ab` /
+  `4f29379`.
+- AWS SDK deps (`@aws-sdk/client-s3`, `@smithy/util-stream`,
+  `aws-sdk-client-mock`, `aws-sdk-client-mock-vitest`) removed.
+  `tests/setup.ts` (mock extension only) removed; vitest setup file
+  reference dropped from `vitest.config.ts`.
