@@ -5,13 +5,16 @@
 replicaCount: 3
 
 image:
-  repository: ghcr.io/freecodecamp-universe/caddy-s3
+  repository: ghcr.io/freecodecamp/caddy-s3
   # Pinned by digest — OCI spec: when tag+digest both present, digest wins.
   # Kubelet/containerd pull by digest (immutable). Resolve digest with:
-  #   docker buildx imagetools inspect ghcr.io/freecodecamp-universe/caddy-s3:<tag>
-  # Tag is the dev-<sha> produced by `just caddy-s3-build` until the Woodpecker
-  # pipeline activates (then switch to latest-main or commit-SHA tag). Bump via
-  # PR with `just caddy-s3-verify` + cluster smoke-test re-run.
+  #   docker buildx imagetools inspect ghcr.io/freecodecamp/caddy-s3:<tag>
+  # Canonical builder is GitHub Actions (.github/workflows/docker--caddy-s3.yml)
+  # which tags every push with the full commit SHA + branch name and
+  # `latest-main` on default-branch builds (build-residency principle —
+  # platform pillars build outside Universe). Local fallback: `just
+  # caddy-s3-build` produces `dev-<sha>` for ad-hoc testing. Bump via PR
+  # with `just caddy-s3-verify` + cluster smoke-test re-run.
   tag: "dev-7f5144f@sha256:39bbecf91847f5d0625c95a8634e569ca120ee2f4e20b03e70c0e2e0de18c26b"
   pullPolicy: IfNotPresent
 

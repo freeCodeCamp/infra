@@ -633,7 +633,7 @@ LABEL org.opencontainers.image.licenses=Apache-2.0
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 ```
 
-Image tag convention: `ghcr.io/freecodecamp-universe/caddy-s3:{YYYYMMDD}-{git-sha7}`. Built and pushed by a Woodpecker pipeline in the infra repo on every change to `docker/images/caddy-s3/**`.
+Image tag convention: `ghcr.io/freecodecamp/caddy-s3:{YYYYMMDD}-{git-sha7}`. Built and pushed by a Woodpecker pipeline in the infra repo on every change to `docker/images/caddy-s3/**`.
 
 ### 4.4 Storage Layout
 
@@ -953,7 +953,7 @@ spec:
 replicaCount: 3
 
 image:
-  repository: ghcr.io/freecodecamp-universe/caddy-s3
+  repository: ghcr.io/freecodecamp/caddy-s3
   tag: "20260516-a1b2c3d" # pinned; updated by image-tag bump PR
   pullPolicy: IfNotPresent
 
@@ -2048,7 +2048,7 @@ The rollout is 7 phases. Later phases depend on earlier ones. Any phase can be p
 
 - Write `r2_alias` module (§4.3.4 interface contract).
 - Update `Dockerfile` (§4.3.8).
-- Build image locally and tag `ghcr.io/freecodecamp-universe/caddy-s3:dev-<sha>`.
+- Build image locally and tag `ghcr.io/freecodecamp/caddy-s3:dev-<sha>`.
 - Unit tests pass (§11.1).
 - Image pushed to GHCR.
 - **Exit criterion:** `kubectl run -it --rm --image=<tag> caddy:dev -- caddy list-modules | grep r2_alias` succeeds.
@@ -2453,7 +2453,7 @@ Documented in §9.3. Run during Phase 4 exit criterion.
 - **Adobe S3Mock** (`adobe/s3mock`) — test harness only, replaces MinIO per 2026-04-18 audit.
 - **`rclone/rclone:1.70.0`** Docker image for pipeline steps.
 - **`@aws-sdk/client-s3` v3.x** — REMOVED from universe-cli runtime deps (still used by test fixtures).
-- **GHCR push access** for `ghcr.io/freecodecamp-universe/caddy-s3` image.
+- **GHCR push access** for `ghcr.io/freecodecamp/caddy-s3` image.
 
 ### 12.2 Risks
 

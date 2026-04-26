@@ -51,24 +51,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
-      # Cross-org push: freecodecamp/infra repo → ghcr.io/freecodecamp-universe
-      # namespace. GITHUB_TOKEN scope is repo-org only, so a PAT with
-      # `write:packages` on the freecodecamp-universe org is required.
-      # Repo secrets:
-      #   GHCR_PUSH_USER  — bot username (e.g. freeCodeCamp-bot)
-      #   GHCR_PUSH_TOKEN — PAT with write:packages on freecodecamp-universe
+      # Same-org push: freecodecamp/infra repo → ghcr.io/freecodecamp
+      # namespace. GITHUB_TOKEN suffices (`packages: write` permission set
+      # on the job above). No PAT or repo secrets needed.
       - name: Log in to the GHCR
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_PUSH_USER }}
-          password: ${{ secrets.GHCR_PUSH_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
-          images: ghcr.io/freecodecamp-universe/caddy-s3
+          images: ghcr.io/freecodecamp/caddy-s3
           tags: |
             type=sha,format=long
             type=ref,event=branch
