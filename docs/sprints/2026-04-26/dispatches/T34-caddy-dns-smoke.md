@@ -98,22 +98,40 @@ Tag: `ghcr.io/freecodecamp/artemis:<sha>` — pin in
 
 ### 4. sops envelope — `infra-secrets/management/artemis.env.enc`
 
-Seal with operator's age key:
+Sample template lives at `infra-secrets/management/artemis.env.sample`
+(15 vars, full mint-where + format + rotation docs per var). Operator
+flow:
 
 ```
-R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com
-R2_ACCESS_KEY_ID=<admin S3 key>
-R2_SECRET_ACCESS_KEY=<paired>
-R2_BUCKET=universe-static-apps-01
-GH_CLIENT_ID=<from step 2>
-GH_ORG=freeCodeCamp
-JWT_SIGNING_KEY=<32-byte random — `openssl rand -hex 32`>
-JWT_TTL_SECONDS=900
-GH_MEMBERSHIP_CACHE_TTL=300
-LOG_LEVEL=info
+cp infra-secrets/management/artemis.env.sample \
+   infra-secrets/management/artemis.env
+# fill 5 REQUIRED secret values:
+#   R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+#   GH_CLIENT_ID, JWT_SIGNING_KEY (`openssl rand -hex 32`)
+# defaults already set: R2_BUCKET, GH_ORG, GH_API_BASE,
+#   SITES_YAML_PATH, JWT_TTL_SECONDS, GH_MEMBERSHIP_CACHE_TTL,
+#   ALIAS_*, DEPLOY_PREFIX_FORMAT, LOG_LEVEL
+sops encrypt --in-place infra-secrets/management/artemis.env
+mv infra-secrets/management/artemis.env \
+   infra-secrets/management/artemis.env.enc
+git -C infra-secrets add management/artemis.env.enc
+git -C infra-secrets commit -m "feat(management): seal artemis env"
 ```
 
-Helm chart consumes via sealed Secret template.
+**Decrypt incantation** (Helm chart + any ops script):
+
+```
+sops decrypt --input-type dotenv --output-type dotenv \
+  infra-secrets/management/artemis.env.enc
+```
+
+Both flags required — sops auto-detect from `.enc` extension falls
+back to JSON parser; dotenv envelopes silently fail without explicit
+type flags (`Error unmarshalling input json: invalid character '#'`).
+See `infra/CLAUDE.md` §Secrets for canonical pattern.
+
+Helm chart consumes via sealed Secret template (rendered at deploy
+time by chart `templates/secret.yaml` calling sops with flags above).
 
 ### 5. sites.yaml seed — initial team→site map
 
