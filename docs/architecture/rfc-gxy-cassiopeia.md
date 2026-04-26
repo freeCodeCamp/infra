@@ -10,25 +10,25 @@
 
 ## Requirement Index
 
-| ID  | Title                                           | Priority | Section                    |
-| --- | ----------------------------------------------- | -------- | -------------------------- |
-| R1  | Provision gxy-launchbase cluster                | P0       | §4.1 Cluster Provisioning  |
-| R2  | Provision gxy-cassiopeia cluster                | P0       | §4.1 Cluster Provisioning  |
-| R3  | Deploy Woodpecker CI on gxy-launchbase          | P0       | §4.2 Woodpecker CI         |
-| R4  | Build custom Caddy `r2_alias` module            | P0       | §4.3 Caddy R2 Alias Module |
-| R5  | Provision R2 bucket `universe-static-apps-01`   | P0       | §4.4 Storage Layout        |
-| R6  | Deploy Caddy Helm chart on gxy-cassiopeia       | P0       | §4.5 Caddy Deployment      |
-| R7  | Woodpecker pipeline template for static deploy  | P0       | §4.6 Pipeline Template     |
-| R8  | DNS: `*.freecode.camp` → gxy-cassiopeia         | P0       | §4.7 DNS & TLS             |
-| R9  | Preview routing `{site}--preview.freecode.camp` | P0       | §4.3 / §4.5 / §4.6         |
-| R10 | Rewrite `universe deploy` (no R2 keys on dev)   | P0       | §4.8 universe-cli          |
-| R11 | Rewrite `universe promote`                      | P0       | §4.8 universe-cli          |
-| R12 | Rewrite `universe rollback`                     | P0       | §4.8 universe-cli          |
-| R13 | Site name validation (`--` forbidden)           | P0       | §4.8 universe-cli          |
-| R14 | Cloudflare cache purge on alias change          | P1       | §4.6 Pipeline Template     |
-| R15 | Real-time log streaming in CLI                  | P1       | §4.8 universe-cli          |
-| R16 | Old deploy cleanup cron (7-day retention)       | P1       | §4.9 Operational Flows     |
-| R17 | Post-deploy smoke test                          | P1       | §4.6 Pipeline Template     |
+| ID  | Title                                          | Priority | Section                    |
+| --- | ---------------------------------------------- | -------- | -------------------------- |
+| R1  | Provision gxy-launchbase cluster               | P0       | §4.1 Cluster Provisioning  |
+| R2  | Provision gxy-cassiopeia cluster               | P0       | §4.1 Cluster Provisioning  |
+| R3  | Deploy Woodpecker CI on gxy-launchbase         | P0       | §4.2 Woodpecker CI         |
+| R4  | Build custom Caddy `r2_alias` module           | P0       | §4.3 Caddy R2 Alias Module |
+| R5  | Provision R2 bucket `universe-static-apps-01`  | P0       | §4.4 Storage Layout        |
+| R6  | Deploy Caddy Helm chart on gxy-cassiopeia      | P0       | §4.5 Caddy Deployment      |
+| R7  | Woodpecker pipeline template for static deploy | P0       | §4.6 Pipeline Template     |
+| R8  | DNS: `*.freecode.camp` → gxy-cassiopeia        | P0       | §4.7 DNS & TLS             |
+| R9  | Preview routing `{site}.preview.freecode.camp` | P0       | §4.3 / §4.5 / §4.6         |
+| R10 | Rewrite `universe deploy` (no R2 keys on dev)  | P0       | §4.8 universe-cli          |
+| R11 | Rewrite `universe promote`                     | P0       | §4.8 universe-cli          |
+| R12 | Rewrite `universe rollback`                    | P0       | §4.8 universe-cli          |
+| R13 | Site name validation (`--` forbidden)          | P0       | §4.8 universe-cli          |
+| R14 | Cloudflare cache purge on alias change         | P1       | §4.6 Pipeline Template     |
+| R15 | Real-time log streaming in CLI                 | P1       | §4.8 universe-cli          |
+| R16 | Old deploy cleanup cron (7-day retention)      | P1       | §4.9 Operational Flows     |
+| R17 | Post-deploy smoke test                         | P1       | §4.6 Pipeline Template     |
 
 ## Decision Index
 
@@ -38,7 +38,7 @@
 | D2  | Build in CI, not on developer machine                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Matches Netlify/Vercel model; single source of truth                                                                                                                                                                                                                                                                                                                                  | §5.2                                    |
 | D3  | R2-direct serving via custom Caddy module (no local disk, no rclone)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Simplest model; removes sync gap that plagued gxy-static                                                                                                                                                                                                                                                                                                                              | §5.3                                    |
 | D4  | Custom Caddy Go module for alias resolution (~300 LOC)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | No existing plugin handles alias file → path rewrite                                                                                                                                                                                                                                                                                                                                  | §5.4                                    |
-| D5  | Preview subdomain scheme: `{site}--preview.freecode.camp`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Stays under `*.freecode.camp` free wildcard SSL                                                                                                                                                                                                                                                                                                                                       | §5.5                                    |
+| D5  | Preview subdomain scheme: `{site}--preview.freecode.camp` (superseded by D35 — kept here for historical accuracy)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Stays under `*.freecode.camp` free wildcard SSL                                                                                                                                                                                                                                                                                                                                       | §5.5                                    |
 | D6  | ArgoCD manages Caddy infrastructure only; exits per-deploy hot path                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Cleanly separates CD-of-platform from CD-of-sites                                                                                                                                                                                                                                                                                                                                     | §5.6                                    |
 | D7  | Woodpecker on gxy-launchbase (not temporary on gxy-management)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Spike plan Phase 1 expectation; isolates CI from mgmt                                                                                                                                                                                                                                                                                                                                 | §5.7                                    |
 | D8  | R2 bucket name: `universe-static-apps-01` (sequential suffix convention)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Matches gxy-static-1 naming; allows future buckets 2, 3…                                                                                                                                                                                                                                                                                                                              | §5.8                                    |
@@ -167,7 +167,7 @@ Universe's public-facing static sites — documentation, marketing, course landi
 4. Rewrite `universe deploy|promote|rollback` to trigger Woodpecker pipelines via REST API with Bearer token auth and stream pipeline logs over SSE.
 5. Move `*.freecode.camp` (+ apex + www) DNS from gxy-static to gxy-cassiopeia node IPs.
 6. Deliver a reference pipeline template (`.woodpecker/deploy.yaml`) for static constellations that handles deploy, promote, and rollback operations via a single `OP` variable.
-7. Preview URL convention `{site}--preview.freecode.camp` works with a valid Cloudflare free-tier wildcard certificate.
+7. Preview URL convention `{site}.preview.freecode.camp` works with a valid Cloudflare free-tier wildcard certificate.
 8. Ship with a cutover plan that leaves gxy-static untouched; users decommission it on their schedule after cutover confirms gxy-cassiopeia is stable.
 
 ### 3.2 Non-Goals
@@ -408,7 +408,7 @@ Personal access tokens are created per user via the Woodpecker UI (`/user/token`
 #### 4.3.2 Responsibilities
 
 1. Parse the `Host` header; split into `{site}` and `{alias_name}`.
-   - If Host matches `<site>--preview.freecode.camp` → `site=<site>.freecode.camp`, `alias_name=preview`.
+   - If Host matches `<site>.preview.freecode.camp` → `site=<site>.freecode.camp`, `alias_name=preview`.
    - Otherwise → `site=<Host verbatim>`, `alias_name=production`.
 2. Read alias file `{site}/{alias_name}` from the configured R2 bucket via AWS SDK v2 `s3.GetObject`.
 3. Cache the alias file contents in a **bounded LRU TTL cache** (default 15s TTL, default 10,000 entries max) with `singleflight.Group` de-duplication so concurrent requests for the same missing key issue only one R2 GetObject (D27, §5.25). Cache key: `{bucket}/{site}/{alias_name}`. Library: `github.com/hashicorp/golang-lru/v2/expirable` for the LRU+TTL, `golang.org/x/sync/singleflight` for stampede protection.
@@ -432,7 +432,7 @@ Personal access tokens are created per user via the Woodpecker UI (`/user/token`
     secret_access_key {$AWS_SECRET_ACCESS_KEY}
     cache_ttl        15s
     cache_max_entries 10000
-    preview_suffix   "--preview"
+    preview_subdomain "preview"
     root_domain      "freecode.camp"
     deploy_id_regex  "^[A-Za-z0-9._-]{1,64}$"
   }
@@ -474,7 +474,7 @@ type R2Alias struct {
     SecretAccessKey  string        `json:"secret_access_key,omitempty"`
     CacheTTL         time.Duration `json:"cache_ttl,omitempty"`
     CacheMaxEntries  int           `json:"cache_max_entries,omitempty"`   // default 10_000
-    PreviewSuffix    string        `json:"preview_suffix,omitempty"`
+    PreviewSubdomain string        `json:"preview_subdomain,omitempty"`
     RootDomain       string        `json:"root_domain,omitempty"`
     DeployIDRegex    string        `json:"deploy_id_regex,omitempty"`
 
@@ -592,9 +592,9 @@ For `GET /` (no explicit path), the standard `file_server` index resolution (`in
 
 #### 4.3.7 Preview Routing
 
-Host header `hello-world--preview.freecode.camp`:
+Host header `hello-world.preview.freecode.camp`:
 
-- Strip suffix `--preview` from first label → `hello-world`
+- Detect rightmost label of prefix == `preview` (configured `preview_subdomain`) → site label = `hello-world`
 - Site key for alias lookup: `hello-world.freecode.camp`
 - Alias name: `preview`
 - Alias file path in R2: `hello-world.freecode.camp/preview`
@@ -875,7 +875,7 @@ data:
         access_key_id    {$AWS_ACCESS_KEY_ID}
         secret_access_key {$AWS_SECRET_ACCESS_KEY}
         cache_ttl        15s
-        preview_suffix   "--preview"
+        preview_subdomain "preview"
         root_domain      "freecode.camp"
       }
 
@@ -1214,7 +1214,7 @@ steps:
       - source .env
       - |
         if [ "${TARGET}" = "preview" ]; then
-          HOST="${SITE%%.*}--preview.freecode.camp"
+          HOST="${SITE%%.*}.preview.freecode.camp"
         else
           HOST="${SITE}"
         fi
@@ -1257,7 +1257,7 @@ steps:
       - source .env
       - |
         if [ "${TARGET}" = "preview" ]; then
-          URL="https://${SITE%%.*}--preview.freecode.camp/"
+          URL="https://${SITE%%.*}.preview.freecode.camp/"
         else
           URL="https://${SITE}/"
         fi
@@ -1315,7 +1315,7 @@ steps:
           "r2:${R2_BUCKET}/${SITE}/${TARGET}"
         echo "Reverted ${TARGET} alias: ${DEPLOY_ID} → ${PREVIOUS_DEPLOY_ID}"
         if [ "${TARGET}" = "preview" ]; then
-          HOST="${SITE%%.*}--preview.freecode.camp"
+          HOST="${SITE%%.*}.preview.freecode.camp"
         else
           HOST="${SITE}"
         fi
@@ -1391,7 +1391,7 @@ The existing gxy-static `A` records (same names, pointing at gxy-static node IPs
 
 #### 4.7.3 Preview Host Matching
 
-`{site}--preview.freecode.camp` matches the single-level wildcard. No additional certificate or DNS record required per preview — the wildcard covers all.
+`{site}.preview.freecode.camp` matches the single-level wildcard. No additional certificate or DNS record required per preview — the wildcard covers all.
 
 ### 4.8 universe-cli Changes
 
@@ -1421,7 +1421,7 @@ interface UniverseConfig {
 name: hello-world
 domain:
   production: hello-world.freecode.camp
-  preview: hello-world--preview.freecode.camp
+  preview: hello-world.preview.freecode.camp
 static:
   output_dir: dist
 woodpecker:
@@ -1459,7 +1459,7 @@ export async function deploy(options: DeployOptions): Promise<void> {
   outputSuccess(ctx, `Deploy pipeline #${pipeline.number} started`, {
     pipelineNumber: pipeline.number,
     site: config.name,
-    previewUrl: `https://${config.name}--preview.freecode.camp`,
+    previewUrl: `https://${config.name}.preview.freecode.camp`,
   });
 
   if (options.follow) {
@@ -1813,7 +1813,7 @@ T01 (`gxy-static-k7d.2`) is `blocks`-blocked by T31 in beads; dispatch will not 
 **Approach:** Preview URLs are `{site}.preview.freecode.camp`, e.g. `hello-world.preview.freecode.camp`.
 **Pros:** Clean separation; no delimiter collisions.
 **Cons:** Requires a second-level wildcard cert. Cloudflare free Universal SSL only covers `*.freecode.camp`. Cloudflare Advanced Certificate Manager at $10/mo or self-managed cert rotation.
-**Rejected.** `{site}--preview.freecode.camp` costs nothing and fits the existing wildcard. The "cannot contain `--`" rule is a trivial validation.
+**Originally rejected (D5).** `{site}--preview.freecode.camp` costs nothing and fits the existing wildcard. The "cannot contain `--`" rule is a trivial validation. **D35 supersedes:** the `*.preview.freecode.camp` wildcard cert was provisioned on CF already, and the dot-scheme `{site}.preview.freecode.camp` removes the double-dash special case from the site-name regex (D19) for cleaner ergonomics.
 
 ### 5.6 (D6) ArgoCD manages alias ConfigMap
 
@@ -2091,7 +2091,7 @@ The rollout is 7 phases. Later phases depend on earlier ones. Any phase can be p
 - Manually upload a test site (via a throwaway Woodpecker job) to `universe-static-apps-01/test.freecode.camp/deploys/<id>/` + write `test.freecode.camp/production` alias.
 - Add temporary DNS: `test.freecode.camp` → one gxy-cassiopeia node IP.
 - `curl -H "Host: test.freecode.camp" http://<nodeIP>` returns the test page.
-- `curl -H "Host: test--preview.freecode.camp" http://<nodeIP>` returns 404 (preview alias absent — expected).
+- `curl -H "Host: test.preview.freecode.camp" http://<nodeIP>` returns 404 (preview alias absent — expected).
 - Upload preview content + write `test.freecode.camp/preview` alias; preview URL now returns 200.
 - Delete test site; remove temporary DNS.
 - **Exit criterion:** Smoke test against a real R2-backed site works through the full chain.
@@ -2112,16 +2112,16 @@ A machine-checked checklist (D25). DNS MUST NOT be changed until every item retu
 
 The script performs, for every site present in `gxy-static-1`:
 
-| Check                                                                  | How                                                                                      | Pass criterion                                         |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Site exists in `universe-static-apps-01`                               | `rclone lsd r2:universe-static-apps-01/<site>/deploys/`                                  | At least one `deploys/<id>/` prefix exists             |
-| `production` alias exists in `universe-static-apps-01`                 | `rclone cat r2:universe-static-apps-01/<site>/production`                                | Returns a deploy ID matching `^[A-Za-z0-9._-]{1,64}$`  |
-| Alias target exists                                                    | `rclone lsf r2:universe-static-apps-01/<site>/deploys/<id>/index.html`                   | File exists                                            |
-| HTTP 200 via cassiopeia origin (host header + direct IP)               | `curl -sSI -H "Host: <site>" http://<gxy-cassiopeia-node>/`                              | Status 200                                             |
-| HTTP 200 via cassiopeia origin for preview (if a preview alias exists) | `curl -sSI -H "Host: <site-short>--preview.freecode.camp" http://<gxy-cassiopeia-node>/` | Status 200                                             |
-| Constellation is registered with Woodpecker                            | `woodpecker-cli repo info freeCodeCamp-Universe/<site>`                                  | Exit 0                                                 |
-| Constellation has R2 secrets set in Woodpecker                         | `woodpecker-cli repo secret ls freeCodeCamp-Universe/<site>`                             | Contains `r2_access_key_id` and `r2_secret_access_key` |
-| Site name passes validation                                            | Run validation regex from §4.8.5                                                         | Match                                                  |
+| Check                                                                  | How                                                                                     | Pass criterion                                         |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Site exists in `universe-static-apps-01`                               | `rclone lsd r2:universe-static-apps-01/<site>/deploys/`                                 | At least one `deploys/<id>/` prefix exists             |
+| `production` alias exists in `universe-static-apps-01`                 | `rclone cat r2:universe-static-apps-01/<site>/production`                               | Returns a deploy ID matching `^[A-Za-z0-9._-]{1,64}$`  |
+| Alias target exists                                                    | `rclone lsf r2:universe-static-apps-01/<site>/deploys/<id>/index.html`                  | File exists                                            |
+| HTTP 200 via cassiopeia origin (host header + direct IP)               | `curl -sSI -H "Host: <site>" http://<gxy-cassiopeia-node>/`                             | Status 200                                             |
+| HTTP 200 via cassiopeia origin for preview (if a preview alias exists) | `curl -sSI -H "Host: <site-short>.preview.freecode.camp" http://<gxy-cassiopeia-node>/` | Status 200                                             |
+| Constellation is registered with Woodpecker                            | `woodpecker-cli repo info freeCodeCamp-Universe/<site>`                                 | Exit 0                                                 |
+| Constellation has R2 secrets set in Woodpecker                         | `woodpecker-cli repo secret ls freeCodeCamp-Universe/<site>`                            | Contains `r2_access_key_id` and `r2_secret_access_key` |
+| Site name passes validation                                            | Run validation regex from §4.8.5                                                        | Match                                                  |
 
 The script exits non-zero on any failure and prints a per-site matrix. Cutover is gated: if `just cutover-preflight` fails, the operator fixes the failing sites and re-runs. No cutover without green.
 
@@ -2378,22 +2378,22 @@ Grafana dashboard `gxy-cassiopeia` with panels for: request rate by site, alias 
 
 Language: Go. Framework: standard `testing` + `stretchr/testify`.
 
-| Test case                                              | Asserts                                                |
-| ------------------------------------------------------ | ------------------------------------------------------ |
-| Host → site + alias parsing (production)               | Correct split for `hello-world.freecode.camp`          |
-| Host → site + alias parsing (preview with `--preview`) | Correct split for `hello-world--preview.freecode.camp` |
-| Host without `root_domain` suffix                      | Returns 404 (not a configured root domain)             |
-| Alias file valid deploy ID                             | Path rewritten correctly                               |
-| Alias file with `..` in ID                             | 404 (path traversal rejected)                          |
-| Alias file > 64 chars                                  | 404 (regex violation)                                  |
-| Alias file empty                                       | 404                                                    |
-| Alias file with trailing whitespace                    | Whitespace trimmed; valid                              |
-| R2 returns 404 on alias                                | 404 to client; "missing" sentinel cached               |
-| R2 returns 500 on alias                                | 503 to client; no cache                                |
-| R2 returns 500 on file fetch                           | 503 to client                                          |
-| Cache TTL boundary                                     | 15s after lookup, cache is invalidated                 |
-| Cache concurrent stampede                              | Only one R2 call even with 1000 concurrent requests    |
-| Caddyfile UnmarshalCaddyfile                           | All directive tokens parsed                            |
+| Test case                                        | Asserts                                               |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| Host → site + alias parsing (production)         | Correct split for `hello-world.freecode.camp`         |
+| Host → site + alias parsing (preview dot-scheme) | Correct split for `hello-world.preview.freecode.camp` |
+| Host without `root_domain` suffix                | Returns 404 (not a configured root domain)            |
+| Alias file valid deploy ID                       | Path rewritten correctly                              |
+| Alias file with `..` in ID                       | 404 (path traversal rejected)                         |
+| Alias file > 64 chars                            | 404 (regex violation)                                 |
+| Alias file empty                                 | 404                                                   |
+| Alias file with trailing whitespace              | Whitespace trimmed; valid                             |
+| R2 returns 404 on alias                          | 404 to client; "missing" sentinel cached              |
+| R2 returns 500 on alias                          | 503 to client; no cache                               |
+| R2 returns 500 on file fetch                     | 503 to client                                         |
+| Cache TTL boundary                               | 15s after lookup, cache is invalidated                |
+| Cache concurrent stampede                        | Only one R2 call even with 1000 concurrent requests   |
+| Caddyfile UnmarshalCaddyfile                     | All directive tokens parsed                           |
 
 Target coverage: ≥ 85% statement coverage on the module.
 
@@ -2410,7 +2410,7 @@ Tests exercise both the `r2_alias` middleware (path rewrite) AND the `caddy.fs.r
 - Spin up the Phase 4 test bucket (`universe-static-apps-01` with temp DNS on `test.freecode.camp`).
 - Run `universe deploy --json` from a fixture repo; parse output for pipeline number.
 - Poll pipeline status via Woodpecker API; assert completes within 90s.
-- `curl https://test--preview.freecode.camp` returns expected content.
+- `curl https://test.preview.freecode.camp` returns expected content.
 - Run `universe promote`; poll; `curl https://test.freecode.camp` returns the same content.
 - Run `universe rollback --to <prev-id>`; assert production content changes back.
 
@@ -2431,7 +2431,7 @@ Documented in §9.3. Run during Phase 4 exit criterion.
 2. Edit `src/index.html`
 3. `git commit -am 'update title' && git push`
 4. Watch Woodpecker pipeline auto-trigger.
-5. Visit `https://hello-world--preview.freecode.camp` — new title visible within 30s.
+5. Visit `https://hello-world.preview.freecode.camp` — new title visible within 30s.
 6. `universe promote`
 7. Visit `https://hello-world.freecode.camp` — new title visible within 30s.
 8. Old deploys remain in `universe-static-apps-01/hello-world.freecode.camp/deploys/`; alias files point to latest.
@@ -2465,7 +2465,7 @@ Documented in §9.3. Run during Phase 4 exit criterion.
 | Woodpecker outage                                                | Medium       | No deploys possible; serving unaffected                                    | Acceptable (Woodpecker is not in serve path). Rebuild from Helm values + CNPG backup.                                                                             |
 | Alias cache staleness after deploy                               | High         | Deploy not visible for up to 15s                                           | Accepted. Matches CDN invalidation patterns. Cache purge step clears CF edge BEFORE alias flip.                                                                   |
 | Cache-fill attack on alias cache (Host header scan)              | Medium       | Caddy memory inflation                                                     | Bounded LRU (10k entries) + singleflight. Attack cannot exceed cache capacity (D27).                                                                              |
-| Preview SSL breaks on `{site}--preview.freecode.camp`            | Low          | Preview URL invalid cert                                                   | Validated in Phase 4 test site. Single-level wildcard confirmed.                                                                                                  |
+| Preview SSL breaks on `{site}.preview.freecode.camp`             | Low          | Preview URL invalid cert                                                   | Validated in Phase 4 test site. Single-level wildcard confirmed.                                                                                                  |
 | Deploy ID collision (same timestamp + 7-char SHA)                | Very Low     | One deploy overwrites another                                              | 7-char SHA × second-granularity timestamp. Retry in CLI if needed.                                                                                                |
 | Cleanup cron deletes live deploy (TOCTOU)                        | Low          | Alias points at deleted deploy → 404                                       | R2 lock + 1-hour grace + pre-delete alias re-check (D28). Dry-run mode on first run.                                                                              |
 | Woodpecker API token leak                                        | Medium       | Attacker triggers pipelines in repos                                       | Per-user 90-day rotation, revocable. Scope limited by GH perms. Incident runbook on laptop loss.                                                                  |

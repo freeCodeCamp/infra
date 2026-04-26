@@ -129,17 +129,18 @@ during 24h observation; `doctl compute droplet list` shows no
 
 ### T-dispatches
 
-| T-id | Area         | Subject                                       | Dispatch                                                                           | Status                                                                           |
-| ---- | ------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| T11  | windmill     | Per-site R2 secret provisioning flow          | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)               | [x] artifact done 2026-04-26 (windmill@`010d577`); live preview owed by operator |
-| T15  | infra        | Phase 4 smoke runbook + script                | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [x] artifact done; live run = G1.1.smoke                                         |
-| T16  | universe-cli | Woodpecker API client                         | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [x] done                                                                         |
-| T17  | universe-cli | Config schema + site name validation          | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [x] done                                                                         |
-| T18  | universe-cli | Rewrite `deploy` command                      | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [x] done                                                                         |
-| T19  | universe-cli | Rewrite `promote` + `rollback`                | [`dispatches/T19-cli-promote-rollback.md`](dispatches/T19-cli-promote-rollback.md) | [x] done                                                                         |
-| T20  | universe-cli | Strip legacy rclone/S3 + release 0.4.0-beta.1 | [`dispatches/T20-cli-strip-cut.md`](dispatches/T20-cli-strip-cut.md)               | [x] done — #25 unblocks                                                          |
-| T21  | infra        | `.woodpecker/deploy.yaml` template            | [`dispatches/T21-woodpecker-template.md`](dispatches/T21-woodpecker-template.md)   | [ ] pending                                                                      |
-| T22  | windmill     | Cleanup cron flow                             | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                 | [ ] pending                                                                      |
+| T-id      | Area           | Subject                                                      | Dispatch                                                                           | Status                                                                             |
+| --------- | -------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| T11       | windmill       | Per-site R2 secret provisioning flow                         | [`dispatches/T11-windmill-flow.md`](dispatches/T11-windmill-flow.md)               | [x] artifact done 2026-04-26 (windmill@`010d577`); live preview owed by operator   |
+| T15       | infra          | Phase 4 smoke runbook + script                               | [`dispatches/T15-smoke-runbook.md`](dispatches/T15-smoke-runbook.md)               | [x] artifact done; live run = G1.1.smoke                                           |
+| T-r2alias | infra/caddy-s3 | r2_alias dot-scheme migration + GH Actions canonical builder | [`dispatches/T-r2alias-dot-scheme.md`](dispatches/T-r2alias-dot-scheme.md)         | [ ] in-progress (started 2026-04-26; blocks G1.1.smoke; surfaces D35 module drift) |
+| T16       | universe-cli   | Woodpecker API client                                        | [`dispatches/T16-woodpecker-client.md`](dispatches/T16-woodpecker-client.md)       | [x] done                                                                           |
+| T17       | universe-cli   | Config schema + site name validation                         | [`dispatches/T17-cli-config.md`](dispatches/T17-cli-config.md)                     | [x] done                                                                           |
+| T18       | universe-cli   | Rewrite `deploy` command                                     | [`dispatches/T18-cli-deploy.md`](dispatches/T18-cli-deploy.md)                     | [x] done                                                                           |
+| T19       | universe-cli   | Rewrite `promote` + `rollback`                               | [`dispatches/T19-cli-promote-rollback.md`](dispatches/T19-cli-promote-rollback.md) | [x] done                                                                           |
+| T20       | universe-cli   | Strip legacy rclone/S3 + release 0.4.0-beta.1                | [`dispatches/T20-cli-strip-cut.md`](dispatches/T20-cli-strip-cut.md)               | [x] done — #25 unblocks                                                            |
+| T21       | infra          | `.woodpecker/deploy.yaml` template                           | [`dispatches/T21-woodpecker-template.md`](dispatches/T21-woodpecker-template.md)   | [ ] pending                                                                        |
+| T22       | windmill       | Cleanup cron flow                                            | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                 | [ ] pending                                                                        |
 
 **Out-of-scope / closed:**
 
@@ -157,8 +158,10 @@ G1.0a (operator) ─┐
                   ├──→ T11 (w-windmill) ──→ observe ✓
 G1.0b (operator) ─┘                            ↓
                                             Wave B fanout
-G1.1 (operator) ──→ G1.1.smoke (operator) ──→ Wave A.1 fully closed
-                    (RFC §6.6 Phase 4 exit ✓)
+G1.1 (operator) ──→ T-r2alias (session) ──→ G1.1.smoke (operator) ──→ Wave A.1 fully closed
+                    [D35 module fix +                                  (RFC §6.6 Phase 4 exit ✓)
+                     GH Actions canonical
+                     builder + chart bump]
 
 A.2 (w-cli) T16 → T17 → T18 → T19 → T20  ──→  ✅ done (slop strip + D37 follow-up landed)
 ```
