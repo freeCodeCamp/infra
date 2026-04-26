@@ -283,7 +283,7 @@ func TestIntegration_AliasFlip(t *testing.T) {
 func TestIntegration_PreviewRouting(t *testing.T) {
 	mock := startS3Mock(t)
 	prodSite := "site-a." + rootDomain
-	previewHost := "site-a--preview." + rootDomain
+	previewHost := "site-a.preview." + rootDomain
 
 	uploadDeployFixtures(t, mock.client, mock.bucket, prodSite, "v2")
 	putAlias(t, mock.client, mock.bucket, prodSite, "preview", "v2")

@@ -38,16 +38,16 @@ var errS3ServerError = errors.New("r2_alias: upstream 5xx")
 const maxAliasBodyBytes = 1024
 
 type R2Alias struct {
-	Bucket          string        `json:"bucket"`
-	Endpoint        string        `json:"endpoint"`
-	Region          string        `json:"region"`
-	AccessKeyID     string        `json:"access_key_id,omitempty"`
-	SecretAccessKey string        `json:"secret_access_key,omitempty"`
-	CacheTTL        time.Duration `json:"cache_ttl,omitempty"`
-	CacheMaxEntries int           `json:"cache_max_entries,omitempty"`
-	PreviewSuffix   string        `json:"preview_suffix,omitempty"`
-	RootDomain      string        `json:"root_domain,omitempty"`
-	DeployIDRegex   string        `json:"deploy_id_regex,omitempty"`
+	Bucket           string        `json:"bucket"`
+	Endpoint         string        `json:"endpoint"`
+	Region           string        `json:"region"`
+	AccessKeyID      string        `json:"access_key_id,omitempty"`
+	SecretAccessKey  string        `json:"secret_access_key,omitempty"`
+	CacheTTL         time.Duration `json:"cache_ttl,omitempty"`
+	CacheMaxEntries  int           `json:"cache_max_entries,omitempty"`
+	PreviewSubdomain string        `json:"preview_subdomain,omitempty"`
+	RootDomain       string        `json:"root_domain,omitempty"`
+	DeployIDRegex    string        `json:"deploy_id_regex,omitempty"`
 
 	client     *s3.Client
 	cache      *aliasCache
@@ -118,8 +118,8 @@ func (r *R2Alias) Validate() error {
 	if r.CacheMaxEntries == 0 {
 		r.CacheMaxEntries = 10000
 	}
-	if r.PreviewSuffix == "" {
-		r.PreviewSuffix = "--preview"
+	if r.PreviewSubdomain == "" {
+		r.PreviewSubdomain = "preview"
 	}
 	if r.RootDomain == "" {
 		r.RootDomain = "freecode.camp"
@@ -159,7 +159,7 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 		}
 	}()
 
-	site, aliasName, parseErr := parseSiteAndAlias(req.Host, r.RootDomain, r.PreviewSuffix)
+	site, aliasName, parseErr := parseSiteAndAlias(req.Host, r.RootDomain, r.PreviewSubdomain)
 	if parseErr != nil {
 		return caddyhttp.Error(http.StatusNotFound, parseErr)
 	}

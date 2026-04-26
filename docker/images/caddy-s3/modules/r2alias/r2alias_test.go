@@ -51,8 +51,8 @@ func TestValidate_DefaultsApplied(t *testing.T) {
 	if r.CacheMaxEntries != 10000 {
 		t.Errorf("CacheMaxEntries default: want 10000, got %d", r.CacheMaxEntries)
 	}
-	if r.PreviewSuffix != "--preview" {
-		t.Errorf("PreviewSuffix default: want \"--preview\", got %q", r.PreviewSuffix)
+	if r.PreviewSubdomain != "preview" {
+		t.Errorf("PreviewSubdomain default: want \"preview\", got %q", r.PreviewSubdomain)
 	}
 	if r.RootDomain != "freecode.camp" {
 		t.Errorf("RootDomain default: want \"freecode.camp\", got %q", r.RootDomain)
@@ -114,7 +114,7 @@ func TestUnmarshalCaddyfile_FullBlock(t *testing.T) {
 		secret_access_key s
 		cache_ttl 15s
 		cache_max_entries 10000
-		preview_suffix "--preview"
+		preview_subdomain "preview"
 		root_domain "freecode.camp"
 		deploy_id_regex "^[A-Za-z0-9._-]{1,64}$"
 	}`
@@ -135,8 +135,8 @@ func TestUnmarshalCaddyfile_FullBlock(t *testing.T) {
 	if r.CacheMaxEntries != 10000 {
 		t.Errorf("CacheMaxEntries: want 10000, got %d", r.CacheMaxEntries)
 	}
-	if r.PreviewSuffix != "--preview" {
-		t.Errorf("PreviewSuffix mismatch: %q", r.PreviewSuffix)
+	if r.PreviewSubdomain != "preview" {
+		t.Errorf("PreviewSubdomain mismatch: %q", r.PreviewSubdomain)
 	}
 	if r.RootDomain != "freecode.camp" {
 		t.Errorf("RootDomain mismatch: %q", r.RootDomain)
@@ -177,15 +177,15 @@ func TestCaddyModule_ID(t *testing.T) {
 func newProvisionedForTest(t *testing.T) *R2Alias {
 	t.Helper()
 	r := &R2Alias{
-		Bucket:          "test-bucket",
-		Endpoint:        "https://r2.example",
-		Region:          "auto",
-		RootDomain:      "freecode.camp",
-		PreviewSuffix:   "--preview",
-		DeployIDRegex:   `^[A-Za-z0-9._-]{1,64}$`,
-		CacheTTL:        1 * time.Second,
-		CacheMaxEntries: 10,
-		logger:          zap.NewNop(),
+		Bucket:           "test-bucket",
+		Endpoint:         "https://r2.example",
+		Region:           "auto",
+		RootDomain:       "freecode.camp",
+		PreviewSubdomain: "preview",
+		DeployIDRegex:    `^[A-Za-z0-9._-]{1,64}$`,
+		CacheTTL:         1 * time.Second,
+		CacheMaxEntries:  10,
+		logger:           zap.NewNop(),
 	}
 	r.deployIDRe = regexp.MustCompile(r.DeployIDRegex)
 	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL)
@@ -250,7 +250,7 @@ func TestServeHTTP_RewritePreview(t *testing.T) {
 	r.fetcher = stubFetcher(aliasEntry{DeployID: "20260501-130000-z9y8x7w", Present: true}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Host = "hello-world--preview.freecode.camp"
+	req.Host = "hello-world.preview.freecode.camp"
 	rec := httptest.NewRecorder()
 	next := &capturingNext{}
 
@@ -258,7 +258,8 @@ func TestServeHTTP_RewritePreview(t *testing.T) {
 		t.Fatalf("ServeHTTP: %v", err)
 	}
 	// Site key is the PRODUCTION subdomain even though the request hit the
-	// --preview host — deploys are shared, only the alias file differs.
+	// preview host (`<site>.preview.<root>` per D35) — deploys are shared,
+	// only the alias file differs.
 	want := "/hello-world.freecode.camp/deploys/20260501-130000-z9y8x7w/"
 	if next.path != want {
 		t.Fatalf("path rewrite: want %q, got %q", want, next.path)

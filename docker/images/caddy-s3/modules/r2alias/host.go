@@ -7,12 +7,14 @@ import (
 
 // parseSiteAndAlias extracts (site, alias) from a Host header.
 //
-// The preview suffix is recognized ONLY on the leftmost label — an inner
-// label that ends in `--preview` is part of the site name. The returned
-// site always uses the production subdomain because preview and production
-// share the same {site}/deploys/{id}/* prefix in R2; only the alias file
-// differs.
-func parseSiteAndAlias(host, rootDomain, previewSuffix string) (site, alias string, err error) {
+// Preview routing keys off the rightmost label of the site prefix being
+// equal to the configured preview subdomain (D35, supersedes D5
+// double-dash suffix scheme). Hostname `<labels>.preview.<root>` resolves
+// to site `<labels>.<root>` with alias=preview. Anywhere else, a `preview`
+// token is part of the site name and routing falls through to production
+// — preview and production share the same `{site}/deploys/{id}/*` prefix
+// in R2; only the alias file differs.
+func parseSiteAndAlias(host, rootDomain, previewSubdomain string) (site, alias string, err error) {
 	suffix := "." + rootDomain
 	if !strings.HasSuffix(host, suffix) {
 		return "", "", fmt.Errorf("host %q is not under root domain %q", host, rootDomain)
@@ -22,20 +24,16 @@ func parseSiteAndAlias(host, rootDomain, previewSuffix string) (site, alias stri
 		return "", "", fmt.Errorf("host %q has no subdomain", host)
 	}
 
-	var firstLabel, rest string
-	if i := strings.IndexByte(prefix, '.'); i >= 0 {
-		firstLabel = prefix[:i]
-		rest = prefix[i:]
-	} else {
-		firstLabel = prefix
-	}
-
-	if strings.HasSuffix(firstLabel, previewSuffix) {
-		stripped := strings.TrimSuffix(firstLabel, previewSuffix)
-		if stripped == "" {
-			return "", "", fmt.Errorf("host %q has empty site label before preview suffix", host)
+	if i := strings.LastIndexByte(prefix, '.'); i >= 0 {
+		if prefix[i+1:] == previewSubdomain {
+			sitePrefix := prefix[:i]
+			if sitePrefix == "" {
+				return "", "", fmt.Errorf("host %q has empty site label before preview subdomain", host)
+			}
+			return sitePrefix + suffix, "preview", nil
 		}
-		return stripped + rest + suffix, "preview", nil
+	} else if prefix == previewSubdomain {
+		return "", "", fmt.Errorf("host %q has no site label (preview-only apex)", host)
 	}
 
 	return prefix + suffix, "production", nil

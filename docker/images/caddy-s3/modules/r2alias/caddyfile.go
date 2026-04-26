@@ -27,7 +27,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    secret_access_key <str>
 //	    cache_ttl <duration>
 //	    cache_max_entries <int>
-//	    preview_suffix <str>
+//	    preview_subdomain <str>
 //	    root_domain <str>
 //	    deploy_id_regex <str>
 //	}
@@ -83,11 +83,11 @@ func (r *R2Alias) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("cache_max_entries: %v", err)
 				}
 				r.CacheMaxEntries = n
-			case "preview_suffix":
+			case "preview_subdomain":
 				if !d.NextArg() {
 					return d.ArgErr()
 				}
-				r.PreviewSuffix = d.Val()
+				r.PreviewSubdomain = d.Val()
 			case "root_domain":
 				if !d.NextArg() {
 					return d.ArgErr()
