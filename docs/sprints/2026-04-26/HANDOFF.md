@@ -11,6 +11,51 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T32 closed: universe-cli v0.4 rewrite
+
+T32 worker session in `~/DEV/fCC-U/universe-cli` (branch
+`feat/proxy-pivot`) shipped CLI v0.4 — namespaced static surface
+(`universe login`, `whoami`, `static deploy/promote/rollback/ls`)
+per ADR-016 §Authn/authz + amended T32 dispatch §CLI surface (CLI
+ns pivot 2026-04-27). Worker discipline clean: own repo + own
+dispatch Status flip already committed at `infra@b1f1f3e4`.
+
+**Closing commits:**
+
+- universe-cli `feat/proxy-pivot` (not pushed): `24d6fa1` — T32 closure (CLI v0.4 rewrite)
+- infra `feat/k3s-universe`: `b1f1f3e4` — `docs(sprints): close T32 — universe-cli@24d6fa1` (worker-flipped Status header)
+
+**Gates evidenced (worker handoff):**
+
+- `pnpm test` → 265/265 across 23 files
+- `pnpm lint` (oxlint) → 0 warn / 0 err
+- `pnpm typecheck` → clean
+- `pnpm build` → ESM 47.63 KB / CJS 859.32 KB; no Woodpecker refs in dist
+- AWS SDK deps purged (4 packages removed — proxy contract holds R2 creds)
+
+**In-scope deferrals (recorded in dispatch closure notes):**
+
+- per-file PUT vs multipart upload — wording clarified in dispatch
+- OIDC slot stub — placeholder retained for future GHA / WP OIDC wiring
+- husky `tsc` gate — pre-commit hook added
+
+**Out-of-scope deferrals (parked):**
+
+- `oxfmt --check` not run — package never installed in repo despite
+  T32 dispatch + T33 HANDOFF mention. Follow-up dispatch needed:
+  add `oxfmt` to `devDependencies` + wire into `package.json` scripts
+  - husky pre-commit. Parked at `docs/TODO-park.md` §Toolchain.
+
+**Sprint state delta this commit (infra):**
+
+- PLAN top-level task chain row T32 → `done` w/ `universe-cli@24d6fa1`.
+- PLAN dispatch matrix row T32 → `[x] done`.
+- STATUS Open table T32 → `done` (oxfmt deferred); Shipped section
+  gained universe-cli `24d6fa1` + worker close `b1f1f3e4` + sops
+  T34 update `a7bfbc4c` + R2 GC TODO-park `e99da31b`; concurrency
+  plan rewritten — only T34 lane open (blocks on artemis GHCR image).
+- HANDOFF — this entry.
+
 ### 2026-04-27 — T22 closed: cleanup cron Windmill flow
 
 T22 worker session in `~/DEV/fCC-U/windmill` shipped 7d-retention

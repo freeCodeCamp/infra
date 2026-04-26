@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (T31 + T33 + T22 closed; CLI ns pivot) · Branch: `feat/k3s-universe` · Ahead of origin: 11+
+Updated: 2026-04-27 (T32 closed; T31 + T33 + T22 closed; CLI ns pivot) · Branch: `feat/k3s-universe` · Ahead of origin: 13+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -22,12 +22,16 @@ infra (`feat/k3s-universe`):
 - `8bb867c4` — `docs(sprints): reconcile T31 PLAN+STATUS+HANDOFF`
 - `a967cf24` — `docs(sprints): close T22 cleanup cron (windmill)`
 - `22140aed` — `docs(sprints): pivot CLI surface to static ns`
-- `<incoming>` — `docs(sprints): reconcile T22 PLAN+STATUS+HANDOFF`
+- `a7bfbc4c` — `docs(sprints): T34 sops dotenv decrypt incant`
+- `b1f1f3e4` — `docs(sprints): close T32 — universe-cli@24d6fa1`
+- `e99da31b` — `docs(todo-park): R2 lifecycle GC for artemis orphans`
+- `<incoming>` — `docs(sprints): reconcile T32 PLAN+STATUS+HANDOFF`
 
 universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 
 - `8788648` — `feat(lib): add platform.yaml v2 schema + parser`
 - `5d7b6ef` — `docs(platform-yaml): add v2 schema reference + migration`
+- `24d6fa1` — T32 closure (CLI v0.4 rewrite — login/static deploy/promote/rollback/ls/whoami)
 
 artemis (`main` — greenfield, NEW remote, not pushed):
 
@@ -52,20 +56,21 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 
 ## Open
 
-| Dispatch                                                                      | Repo                                                                  | State                                                  |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------ |
-| **T30** — D016 ADR draft + amend                                              | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                          |
-| **T31** — artemis svc (Go, scaffold + endpoints + tests)                      | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                           |
-| **T32** — universe-cli v0.4 rewrite (login/deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | pending — partial-parallel with T31                    |
-| **T33** — `platform.yaml` v2 schema + validator + doc                         | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                      |
-| **T34** — Caddy reverse proxy + DNS prep + smoke retarget                     | infra `feat/k3s-universe`                                             | pending (blocks on T31 image tag)                      |
-| **T22** — Cleanup cron flow (windmill, 7d retention)                          | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending |
+| Dispatch                                                                             | Repo                                                                  | State                                                  |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------ |
+| **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                          |
+| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                           |
+| **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1`) — oxfmt deferred     |
+| **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                      |
+| **T34** — Caddy reverse proxy + DNS prep + smoke retarget                            | infra `feat/k3s-universe`                                             | pending (blocks on T31 image tag)                      |
+| **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending |
 
 **Concurrency plan:**
 
-- T31 ✅ + T33 ✅ + T22 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`). T32 fire-ready under amended dispatch. T34 needs artemis image tag.
-- 2 lanes fire-ready: T32 (universe-cli v0.4 — namespaced surface), T34 (Caddy + DNS + smoke retarget).
+- T30 ✅ + T31 ✅ + T32 ✅ + T33 ✅ + T22 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
+- 1 lane open: **T34** (Caddy + DNS + smoke retarget). Blocks on artemis GHCR image tag (T31 CI fix in flight per operator). Sprint G1 ticks at T34 close.
 - T22 live verify (operator gates: provision `u/admin/r2_admin_s3` Resource → MCP preview dry-run → enable schedule dry-run → flip dry-run false) blocks on T34 prod live, optional during sprint.
+- npm publish `@freecodecamp/universe-cli@0.4.0` blocks on T34 smoke green (G2 gate).
 
 ## Operator-owned actions (post session ship)
 
