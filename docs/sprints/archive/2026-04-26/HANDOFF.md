@@ -11,6 +11,61 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 (closeout) — Sprint 2026-04-26 closed; archived
+
+Sprint goal hit: Universe Static-Apps Proxy Pillar shipped end-to-end. Staff devs run `universe static deploy <site>` from any environment → live on `<site>.freecode.camp` with zero R2 tokens in staff or CI hands; identity = GitHub team membership; upload plane = artemis Go microservice on gxy-management.
+
+**Gate state at close:**
+
+| Gate | State    | Evidence                                                                                           |
+| ---- | -------- | -------------------------------------------------------------------------------------------------- |
+| G1   | GREEN    | T34 live-verify postmortem `infra@4e7aea8e`                                                        |
+| G2   | GREEN    | npm `dist-tags.latest = 0.4.0`; tag `v0.4.0` → `universe-cli@45faeca`; `main` 0/0 vs origin        |
+| G3   | DEFERRED | gxy-static teardown — post-MVP, explicitly out of 2026-04-26 scope; carries forward to next sprint |
+
+**Dispatches (8 closed):** T22, T30, T31, T32, T33, T34, T35, T36 — all `done` with closing commits in [`STATUS.md` §Shipped](STATUS.md).
+
+**Archive move.** `docs/sprints/2026-04-26/` → `docs/sprints/archive/2026-04-26/` (full content preserved including audit/, dispatches/, reports/).
+
+**TODO-park preservation.** Five entries parked during sprint, all live at `docs/TODO-park.md` (root of `docs/`, NOT inside sprint dir — survives archive move untouched):
+
+- `T-build-residency` — pillar image build location migration (commit `b8c59b0b`).
+- R2 lifecycle GC for artemis orphan deploy prefixes (commit `e99da31b`).
+- oxfmt wiring on universe-cli (commit `964c8d22`).
+- artemis sites slim + embedded KV (commit `fdf74dc6`).
+- Justfile slop sweep — refactor `artemis-deploy` + `mirror-artemis-secrets` per `GUIDELINES §Justfile slop discipline` (commit `8a1a2375`).
+
+Reactivation triggers + owners + ADR refs all captured per `TODO-park.md` schema. Monthly trim sweeps for fired triggers.
+
+**Out-of-scope residuals (operator-owned, NOT closeout-blocking):**
+
+1. Windmill schedule operational flip — `cleanup_old_deploys.schedule.yaml` `enabled: true` + `dry_run: false` is operational ClickOps (not sprint config). Runbook + IaC complete; flip when ready.
+2. `WMILL_TOKEN` rotate — leaked mid-T35 session.
+3. ADR-016 amendment owed to Universe team — drop "proxy reuses" claim on `u/admin/cf_r2_provisioner` (lines 209 + 244); artemis owns admin S3 keys via `infra-secrets/management/artemis.env.enc` (cross-repo, broken-ownership amendment block).
+4. Sprint-close push — infra `feat/k3s-universe` (29 commits ahead; upstream gone) + windmill `main` (2 ahead). Operator owns push per CLAUDE.md CRIT.
+
+**Cross-references:**
+
+- Predecessor: [`../archive/2026-04-21/`](../archive/2026-04-21/).
+- Successor: opens lazily when next sprint starts.
+- Universe ADR D016: `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`.
+- Field-note journal entry: `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §Journal 2026-04-27.
+- TODO-park entries: `docs/TODO-park.md` (preserved at repo `docs/` root).
+
+**Per-task closure checklist (from `GUIDELINES §Sprint docs`):**
+
+- [x] Dispatch-doc Status headers all `done`.
+- [x] Sprint matrix rows in `PLAN.md` complete (PLAN stable, no patch needed).
+- [x] HANDOFF closure entry (this entry).
+- [x] Cluster flight-manual updated (`gxy-management.md` §Phase 7 amended during T34).
+- [x] Field-note journal entry — separate Universe commit.
+- [x] Runbooks landed (`secrets-decrypt.md`, `deploy-artemis-service.md`, E2E setup/teardown).
+- [x] ADR amendments landed (D016 amends ×4 in Universe; one residual amendment owed — operator).
+- [x] TODO-park entries — 5 parked items at `docs/TODO-park.md`.
+- [x] STATUS.md final pre-archive roll committed (`infra@0808bb0` "roll STATUS pre-archive").
+
+---
+
 ### 2026-04-27 — T35 + T36 closed: R2 admin IaC + T11 retirement (windmill)
 
 T35 worker session at `~/DEV/fCC-U/windmill` (branch `main`)
@@ -69,7 +124,7 @@ docs (STATUS, PLAN, T35 dispatch, audit/windmill.md) swept to
 - T35 dispatch Status `pending → done` (worker side already flipped).
 - PLAN top-level task chain: T34 row corrected `pending → done`; T35 + T36 rows added (both done).
 - PLAN dispatch matrix: T35 row added; T36 row added with "no dispatch — opportunistic cleanup" note.
-- STATUS header timestamp `post-T35-T36-close`; Open table T35 row done + T36 row added; Operator-owned actions §Outstanding step 1 (T35) dropped, T22 + G2 renumbered, WMILL_TOKEN rotate added; windmill repo Shipped block extended b511d17 → 342e874; Boneyard line rewritten to drop "proxy reuses" + log T35/T36 deletion. Governor resume rewritten.
+- STATUS header timestamp `post-T35-T36-close`; Open table T35 row done + T36 row added; Operator-owned actions §Outstanding step 1 (T35) dropped, T22 + G2 renumbered; windmill repo Shipped block extended b511d17 → 342e874; Boneyard line rewritten to drop "proxy reuses" + log T35/T36 deletion. Governor resume rewritten.
 - HANDOFF — this entry.
 
 **ADR-016 amendment owed (Universe team — not this repo's lane):** `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md` lines 209 + 244 reference `u/admin/cf_r2_provisioner` as "proxy reuses". Both lines stale post-T36 — Resource deleted; artemis holds admin S3 keys cluster-side via `infra-secrets/management/artemis.env.enc`. Per Universe doc-ownership rule (`feedback_two_repo_ownership.md`), ADR amendments are Universe-team owned — flagged here for next Universe-team pass; this session does not touch.
