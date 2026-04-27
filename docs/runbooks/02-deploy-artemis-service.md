@@ -1,8 +1,7 @@
 # Deploy artemis service (Universe deploy proxy)
 
 End-to-end operator runbook for the artemis svc on `gxy-management`.
-Public surface: `https://uploads.freecode.camp`. Spec: ADR-016. Sprint
-dispatch: `T34-caddy-dns-smoke` (sprint-2026-04-26).
+Public surface: `https://uploads.freecode.camp`. Spec: ADR-016.
 
 Architecture: see `k3s/gxy-management/apps/artemis/README.md`. No
 Tailscale, no Caddy/cassiopeia hop, no CF Access (programmatic API

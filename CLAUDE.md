@@ -6,19 +6,20 @@ freeCodeCamp.org infra-as-code. Primary: freeCodeCamp Universe platform (Digital
 
 ## Doc ownership
 
-Authoritative model + flow diagram READ if needed Universe/CLAUDE.md
+Authoritative model + flow diagram in Universe/CLAUDE.md (read on demand).
 
-Field notes for this repo (Infra team owns): `Universe/spike/field-notes/infra.md` — read on demand. Trim policy + format in `docs/GUIDELINES.md`
+Field notes for this repo (Infra team owns): `Universe/spike/field-notes/infra.md` — read on demand.
+
+Internal-only material (sprints, planning conventions, parked items) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
 
 This repo owns:
 
 | Path                   | Purpose                                            |
 | ---------------------- | -------------------------------------------------- |
-| `docs/GUIDELINES.md`   | Doc conventions, sprint protocol, monthly trim     |
 | `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`) |
 | `docs/runbooks/`       | Single-purpose ops runbooks                        |
 | `docs/architecture/`   | RFCs for non-trivial work                          |
-| `docs/sprints/`        | Active sprint at top, archive below                |
+| `docs/infra-guides/`   | Generic primers (k3s layout, etc.)                 |
 
 ## Working directory rule (HARD)
 
@@ -61,15 +62,6 @@ Decrypt: `*.env.enc` envelopes need explicit `--input-type dotenv --output-type 
 
 `just` lists recipes. cd into `k3s/<galaxy>/` first for cluster-scoped recipes (see Working directory rule).
 
-## Sprint protocol
-
-Sprint-driven work. Active sprint = newest non-archive dir under `docs/sprints/`. Multi-session work flows through sprint docs on disk, not external trackers.
-
-**Operator vocabulary, closure checklist, sprint invariants** all live in `docs/GUIDELINES.md` §Sprint docs. Most-used phrases:
-
-- `start the sprint` → read active `sprints/<date>/{README,STATUS}.md`, report state, wait for `go`.
-- `next move?` → name next unblocked task with ID, dispatch path, blockedBy.
-
 ## Ansible
 
 - Per-galaxy config: `ansible/inventory/group_vars/<group>.yml`
@@ -82,12 +74,11 @@ Per-galaxy state, providers, and rollout phase live in `Universe/spike/spike-pla
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
-| Galaxy           | Inventory Group      | Status   |
-| ---------------- | -------------------- | -------- |
-| `gxy-management` | `gxy_management_k3s` | -        |
-| `gxy-static`     | `gxy_static_k3s`     | RETIRING |
-| `gxy-launchbase` | `gxy_launchbase_k3s` | -        |
-| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | -        |
+| Galaxy           | Inventory Group      |
+| ---------------- | -------------------- |
+| `gxy-management` | `gxy_management_k3s` |
+| `gxy-launchbase` | `gxy_launchbase_k3s` |
+| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` |
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 
@@ -110,11 +101,12 @@ Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-bac
 
 ## Pre-merge checklists
 
-- **New chart** at `k3s/<cluster>/apps/<app>/charts/` → `docs/GUIDELINES.md` §Chart pre-merge checklist (5-point: Middleware ns, NetworkPolicy CRD type, env contract, key-format round-trip, CF zone SSL).
-- **New justfile recipe** → `docs/GUIDELINES.md` §Justfile slop discipline (4 rules + reviewer rule).
+- **New chart** at `k3s/<cluster>/apps/<app>/charts/`: confirm 5-point — Middleware ns, NetworkPolicy CRD type matches cluster CNI (Cilium = `CiliumNetworkPolicy`), env contract round-trip, key-format placeholders match consumer, CF zone SSL mode.
+- **New justfile recipe**: must be reusable across galaxies/apps; no one-shot slop. Use per-app `apps/<app>/.deploy-flags.sh` for extras instead of bespoke recipes.
 
 ## CRIT
 
 DO NOT WORRY ABOUT:
+
 - ASKING USER to PUSH, they know their job
 - COMMITING FILES YOU DID NOT TOUCH. MOST CLAUDE.md files are gitignored BY DESIGN

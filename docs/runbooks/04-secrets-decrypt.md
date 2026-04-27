@@ -1,7 +1,7 @@
 # Runbook — Decrypt sops-encrypted secrets
 
 **Type:** Operator-local · read-only.
-**Owners:** Infra team (per `docs/GUIDELINES.md` doc-type matrix).
+**Owners:** Infra team.
 **Last verified:** 2026-04-27.
 
 Single-purpose: decrypt one of the `*.env.enc` / `*.values.yaml.enc`
@@ -93,6 +93,5 @@ Read-only operation. Nothing to roll back.
 
 ## References
 
-- `docs/GUIDELINES.md` §Runbook format
 - Field-note origin: `infra/CLAUDE.md` §infra-secrets coupling (now
   pointer-only).

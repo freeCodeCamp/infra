@@ -6,9 +6,9 @@ membership against `config/sites.yaml` (loaded from
 forwards authorized PUTs to Cloudflare R2 with admin S3 keys held
 cluster-side. Public surface: `https://uploads.freecode.camp`.
 
-Spec: ADR-016 (Universe deploy proxy). Sprint dispatch: `T34-caddy-dns-smoke`.
+Spec: ADR-016 (Universe deploy proxy).
 
-## Architecture (Path X — 2026-04-27 reframe)
+## Architecture
 
 ```
 universe CLI / GHA / curl

@@ -4,11 +4,12 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose           | Apps                             |
-| -------------------- | ----------------- | -------------------------------- |
-| ops-backoffice-tools | Internal tools    | Appsmith, Outline                |
-| gxy-management       | Universe platform | Windmill, ArgoCD, Zot (deferred) |
-| gxy-static           | Static hosting    | Caddy                            |
+| Cluster              | Purpose           | Apps                           |
+| -------------------- | ----------------- | ------------------------------ |
+| ops-backoffice-tools | Internal tools    | Appsmith, Outline              |
+| gxy-management       | Universe platform | Windmill, ArgoCD, Zot, artemis |
+| gxy-launchbase       | Supply chain      | Woodpecker, CNPG preview DBs   |
+| gxy-cassiopeia       | Static hosting    | Caddy + R2                     |
 
 ## Quick Access
 
@@ -19,8 +20,8 @@ cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 # Galaxy management cluster
 cd k3s/gxy-management && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
-# Galaxy static cluster
-cd k3s/gxy-static && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+# Galaxy cassiopeia cluster
+cd k3s/gxy-cassiopeia && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 ```
 
 ## Structure
@@ -31,12 +32,20 @@ k3s/
 ├── gxy-management/
 │   ├── apps/
 │   │   ├── argocd/
+│   │   ├── artemis/
 │   │   ├── windmill/
 │   │   └── zot/
 │   └── cluster/
 │       ├── cilium/
 │       └── security/
-├── gxy-static/
+├── gxy-launchbase/
+│   ├── apps/
+│   │   ├── cnpg/
+│   │   └── woodpecker/
+│   └── cluster/
+│       ├── cilium/
+│       └── security/
+├── gxy-cassiopeia/
 │   ├── apps/
 │   │   └── caddy/
 │   └── cluster/
@@ -67,11 +76,12 @@ k3s/
 
 ### Droplets
 
-| Cluster        | Name Pattern              | Count | Specs               | Tags           |
-| -------------- | ------------------------- | ----- | ------------------- | -------------- |
-| tools          | ops-vm-tools-k3s-nyc3-0X  | 3     | 4 vCPU, 8GB, 160GB  | tools_k3s      |
-| gxy-management | gxy-vm-management-k3s-{1,2,3}   | 3     | 8 vCPU, 16GB, 320GB | gxy-management-k3s   |
-| gxy-static     | gxy-vm-static-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-static-k3s |
+| Cluster        | Name Pattern                  | Count | Specs               | Tags               |
+| -------------- | ----------------------------- | ----- | ------------------- | ------------------ |
+| tools          | ops-vm-tools-k3s-nyc3-0X      | 3     | 4 vCPU, 8GB, 160GB  | tools_k3s          |
+| gxy-management | gxy-vm-management-k3s-{1,2,3} | 3     | 8 vCPU, 16GB, 320GB | gxy-management-k3s |
+| gxy-launchbase | gxy-vm-launchbase-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-launchbase-k3s |
+| gxy-cassiopeia | gxy-vm-cassiopeia-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-cassiopeia-k3s |
 
 ### Load Balancer
 
@@ -90,11 +100,10 @@ just play k3s--cluster tools_k3s
 # Longhorn storage (tools)
 just play k3s--longhorn tools_k3s
 
-# Deploy gxy-management galaxy
+# Deploy any Universe galaxy (k3s + Cilium + Tailscale)
 just play k3s--bootstrap gxy_management_k3s
-
-# Deploy gxy-static galaxy
-just play k3s--bootstrap gxy_static_k3s
+just play k3s--bootstrap gxy_launchbase_k3s
+just play k3s--bootstrap gxy_cassiopeia_k3s
 ```
 
 ---
@@ -130,8 +139,9 @@ See `tailscale/README.md` (repo root) for device inventory.
 | windmill.freecodecamp.net | A    | gxy-management node IPs | Full (Strict)            |
 | argocd.freecodecamp.net   | A    | gxy-management node IPs | Full (Strict)            |
 | registry.freecodecamp.net | A    | gxy-management node IPs | Full (Strict) (deferred) |
-| freecode.camp             | A    | gxy-static node IPs     | Flexible                 |
-| \*.freecode.camp          | A    | gxy-static node IPs     | Flexible                 |
+| freecode.camp             | A    | gxy-cassiopeia node IPs | Flexible                 |
+| \*.freecode.camp          | A    | gxy-cassiopeia node IPs | Flexible                 |
+| uploads.freecode.camp     | A    | gxy-management node IPs | Flexible                 |
 
 ---
 
@@ -191,21 +201,20 @@ CNI: Cilium    Storage: local-path    SSH/kubectl: Tailscale
 | ArgoCD   | 1 (single replica)  | Direct | CF Access deferred |
 | Zot      | deferred            | —      | Phase 1            |
 
-### gxy-static
+### gxy-cassiopeia
 
 ```
 Internet → Cloudflare (Flexible) → Node Public IPs → Traefik (hostNetwork) → Gateway API → Caddy
                                                                                               │
-                                                                              ┌───────────────┘
-                                                                              ↓
-                                                                    Local SSD ← rclone ← R2
+                                                                                              ↓
+                                                                                R2 (caddy-s3 in-tree)
 
 CNI: Cilium    Storage: emptyDir    SSH/kubectl: Tailscale
 ```
 
-| App   | Replicas | Domain        | Notes                                |
-| ----- | -------- | ------------- | ------------------------------------ |
-| Caddy | 3        | freecode.camp | R2 bucket gxy-static-1, apex→fcc.org |
+| App   | Replicas | Domain        | Notes                                                  |
+| ----- | -------- | ------------- | ------------------------------------------------------ |
+| Caddy | 3        | freecode.camp | R2 bucket `universe-static-apps-01`, alias-pinned read |
 
 ---
 

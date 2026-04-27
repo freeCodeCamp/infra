@@ -35,5 +35,4 @@ lands.
 - First o11y tool is deployed
 - Cross-galaxy scrape / ingest endpoints are configured
 
-Cross-ref: [00-index.md](00-index.md) for shared infrastructure,
-[../GUIDELINES.md](../GUIDELINES.md) for flight-manual format.
+Cross-ref: [00-index.md](00-index.md) for shared infrastructure.

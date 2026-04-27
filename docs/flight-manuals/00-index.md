@@ -4,18 +4,15 @@ Per-cluster doomsday rebuild manuals. One file per galaxy. Rebuild ordering,
 cross-cluster notes, and lifecycle pins live in this index; galaxy-specific
 phases live in each manual.
 
-Doc conventions: see [GUIDELINES.md](../GUIDELINES.md) §Flight-manual format.
-
 ## Galaxies
 
-| Galaxy         | File                                   | Role                                                               | State          | Provider (now → future)   |
-| -------------- | -------------------------------------- | ------------------------------------------------------------------ | -------------- | ------------------------- |
-| gxy-management | [gxy-management.md](gxy-management.md) | Control plane (ArgoCD + Windmill + Zot + Atlantis)                 | Live           | DO FRA1                   |
-| gxy-launchbase | [gxy-launchbase.md](gxy-launchbase.md) | Supply chain (Woodpecker + CNPG preview DBs)                       | Live           | DO FRA1 → Hetzner post-M5 |
-| gxy-cassiopeia | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static hosting (Caddy + R2)                                        | Live           | DO FRA1 → Hetzner post-M5 |
-| gxy-static     | [gxy-static.md](gxy-static.md)         | **Legacy** — retires at cassiopeia cutover                         | Live, retiring | DO FRA1                   |
-| gxy-backoffice | [gxy-backoffice.md](gxy-backoffice.md) | Backoffice + observability (VM + ClickHouse + HyperDX + GlitchTip) | Planned        | TBD → Hetzner             |
-| gxy-triangulum | [gxy-triangulum.md](gxy-triangulum.md) | Dynamic hosting ("Heroku-like" containers)                         | Future         | Hetzner BM                |
+| Galaxy         | File                                   | Role                                                               | State   | Provider (now → future)   |
+| -------------- | -------------------------------------- | ------------------------------------------------------------------ | ------- | ------------------------- |
+| gxy-management | [gxy-management.md](gxy-management.md) | Control plane (ArgoCD + Windmill + Zot + Atlantis)                 | Live    | DO FRA1                   |
+| gxy-launchbase | [gxy-launchbase.md](gxy-launchbase.md) | Supply chain (Woodpecker + CNPG preview DBs)                       | Live    | DO FRA1 → Hetzner post-M5 |
+| gxy-cassiopeia | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static hosting (Caddy + R2)                                        | Live    | DO FRA1 → Hetzner post-M5 |
+| gxy-backoffice | [gxy-backoffice.md](gxy-backoffice.md) | Backoffice + observability (VM + ClickHouse + HyperDX + GlitchTip) | Planned | TBD → Hetzner             |
+| gxy-triangulum | [gxy-triangulum.md](gxy-triangulum.md) | Dynamic hosting ("Heroku-like" containers)                         | Future  | Hetzner BM                |
 
 ## Rebuild order (full platform from zero)
 
@@ -30,8 +27,6 @@ Strict dependency chain. Do not skip ahead.
 4. **gxy-backoffice** fourth (planned) — observability lands once there's
    sustained platform traffic worth observing.
 5. **gxy-triangulum** fifth (future) — dynamic workloads, prod DBs, Ceph.
-
-Retire `gxy-static` only after cassiopeia cutover validates.
 
 ## Common pre-flight (every galaxy)
 

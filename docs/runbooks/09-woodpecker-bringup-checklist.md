@@ -83,8 +83,9 @@ replacement is parked.
 
 Woodpecker's own `.woodpecker/caddy-s3-build.yaml` pipeline tags and pushes
 the caddy-s3 image. As of this runbook, `gxy-cassiopeia` runs a locally
-built `dev-*` tag. The follow-up is to move that pipeline to GitHub Actions
-— see TODO-park before touching the Woodpecker `.woodpecker/` workflows.
+built `dev-*` tag. Follow-up is to move that pipeline to GitHub Actions
+(build-residency: pillars build outside Universe so recovery is never
+circular).
 
 ## 7. Observability (deferred)
 

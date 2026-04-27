@@ -33,5 +33,4 @@ placeholder.
 - Rook-Ceph baselined
 
 Cross-ref: [00-index.md](00-index.md) for shared infrastructure + Post-M5
-Hetzner migration constraints, [../GUIDELINES.md](../GUIDELINES.md) for
-flight-manual format.
+Hetzner migration constraints.

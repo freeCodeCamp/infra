@@ -1,8 +1,7 @@
 # Flight Manual — gxy-cassiopeia
 
-Production static-hosting galaxy. Serves Universe constellations (e.g.
-`freecode.camp` cutover target, first-party static sites) via Caddy + R2.
-Replaces `gxy-static` once the cutover runbook closes.
+Production static-hosting galaxy. Serves Universe constellations
+(`freecode.camp` + first-party static sites) via Caddy + R2.
 
 Last rebuild-verified: 2026-04-20.
 
@@ -135,9 +134,10 @@ doctl compute droplet list --tag-name gxy-cassiopeia-k3s --format Name,PublicIPv
 - 3× A records per production domain → cassiopeia node public IPs (Proxy ON)
 - SSL mode: Full (Strict) for domains with origin cert, Flexible otherwise
 
-Use `just cf-dns-cutover <zone> <ips>` for declarative zone flips (see
-[../runbooks/dns-cutover.md](../runbooks/dns-cutover.md)). Run
-`just cutover-preflight` first — it exits non-zero on any failing site.
+Set A records (`@`, `www`, `*`) via Cloudflare dashboard or `dash.cloudflare.com` API.
+Cutover already applied for cassiopeia zones — historical tooling lived under
+justfile §`cf-dns` group (retired post-cutover). For DR rewind, use Cloudflare
+Audit Log → revert.
 
 ### 23.3 Origin allow-list
 
@@ -146,17 +146,17 @@ TBD when `gxy-static-k7d.14` closes. Until then, the cluster firewall
 (`gxy-fw-fra1`) accepts 80/443 from the public internet; CF WAF is the only
 layer gating origin hits.
 
-## Phase 24: First deploy via Woodpecker pipeline
+## Phase 24: Deploy plane
 
-The production pipeline template (build artifact → push to R2 with deploy
-ID → promote via `universe` CLI) is TBD when `gxy-static-k7d.21` closes.
-Until then, immutable deploy + alias promotion flow is the same as
-[gxy-static.md](gxy-static.md) Phase 12 — point `S3_ENDPOINT` at the
-`universe-static-apps-01` bucket and run the `universe static deploy` /
-`universe static promote` pair.
+Production deploys land via the artemis upload-proxy on `gxy-management`
+(`uploads.freecode.camp`) — see ADR-016 §deploy proxy. Staff run
+`universe static deploy <site>` from any environment; artemis writes
+`<site>.freecode.camp/<ts>-<sha>/` to `universe-static-apps-01` and
+flips the `production`/`preview` alias key. cassiopeia caddy reads
+the alias-pinned object and serves at the edge.
 
-Post-cutover from `gxy-static` (T25 — `gxy-static-k7d.25`), production DNS
-for `freecode.camp` and first-party constellation hosts resolves here.
+Production DNS for `freecode.camp` + first-party constellation hosts
+resolves to cassiopeia node IPs.
 
 ## Troubleshooting
 
