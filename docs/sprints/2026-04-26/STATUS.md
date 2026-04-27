@@ -78,7 +78,7 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 **Concurrency plan:**
 
 - T30 ✅ + T31 ✅ + T32 ✅ + T33 ✅ + T22 ✅ + T34 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
-- **All sprint code lanes closed.** Operator gates remaining for G1 tick: (a) `just mirror-artemis-secrets` + `just artemis-deploy`; (b) `just phase5-smoke` green E2E; (c) T22 live verify (R2 admin Resource + schedule flip).
+- **All sprint code lanes closed.** Operator gates remaining for G1 tick: (a) verify CF zone SSL = Flexible; (b) `just deploy gxy-management artemis`; (c) `just phase5-smoke` green E2E; (d) T22 live verify (R2 admin Resource + schedule flip).
 - **T32 addendum** (bake `UNIVERSE_GH_CLIENT_ID` default in source) — short follow-up worker fire on `feat/proxy-pivot`. Blocks G2 (npm publish), not G1. See dispatch §Addendum 2026-04-27.
 - npm publish `@freecodecamp/universe-cli@0.4.0` blocks on phase5-smoke green + T32 addendum (G2 gate).
 

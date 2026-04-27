@@ -79,31 +79,47 @@ type flags. See `infra/CLAUDE.md` §Secrets.
 ### 5. Mint sops YAML overlay (helm input) — `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`
 
 The dotenv envelope is the source of truth. The YAML overlay is the
-helm input mirror — same secret values in YAML form. Generated
-automatically:
+helm input mirror — same secret values in YAML form. One-time mint
+(also re-run on env-var rotation, ≤1×/quarter typical). Paste this
+block from the infra repo root:
 
 ```bash
-just mirror-artemis-secrets
+SOT="../infra-secrets/management/artemis.env.enc"
+TGT="../infra-secrets/k3s/gxy-management/artemis.values.yaml.enc"
+TMP_DOT=$(mktemp); TMP_YAML=$(mktemp); TMP_ENC=$(mktemp)
+trap "rm -f $TMP_DOT $TMP_YAML $TMP_ENC" EXIT
+sops -d --input-type dotenv --output-type dotenv "$SOT" > "$TMP_DOT"
+{
+  echo "# Auto-generated mirror from $SOT. Do NOT hand-edit."
+  echo
+  echo "secretEnv:"
+  while IFS='=' read -r KEY VAL; do
+    case "$KEY" in
+      R2_ENDPOINT|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|GH_CLIENT_ID|JWT_SIGNING_KEY)
+        ESC=$(printf '%s' "$VAL" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+        printf '  %s: "%s"\n' "$KEY" "$ESC"
+        ;;
+    esac
+  done < "$TMP_DOT"
+} > "$TMP_YAML"
+python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$TMP_YAML"
+sops --config ../infra-secrets/.sops.yaml \
+  --encrypt --input-type yaml --output-type yaml "$TMP_YAML" > "$TMP_ENC"
+mv "$TMP_ENC" "$TGT"
+echo "Sealed $TGT"
 ```
 
-The recipe:
-
-1. Decrypts the dotenv via `sops` with explicit `--input-type dotenv`.
-2. Pulls the 5 secret keys, emits `secretEnv:` block.
-3. Validates the assembled YAML via `python3 -c "import yaml; ..."`.
-4. Re-seals with `sops --encrypt --input-type yaml`.
-
-No env vars required. (No TLS material — CF Flexible SSL; see §2.)
+No TLS material — CF Flexible SSL on `freecode.camp` (see §2).
 
 After it succeeds, commit the new `.enc` from infra-secrets:
 
 ```bash
-git -C infra-secrets add k3s/gxy-management/artemis.values.yaml.enc
-git -C infra-secrets commit -m "feat(gxy-management): seal artemis values overlay"
+git -C ../infra-secrets add k3s/gxy-management/artemis.values.yaml.enc
+git -C ../infra-secrets commit -m "feat(gxy-management): seal artemis values overlay"
+git -C ../infra-secrets push
 ```
 
-Re-run after env-var rotation. The dotenv stays the SOT — never
-hand-edit the YAML overlay.
+The dotenv stays the SOT — never hand-edit the YAML overlay.
 
 ### 6. sites.yaml seed — `freeCodeCamp/artemis` repo
 
@@ -117,7 +133,7 @@ sites:
 ```
 
 PR-reviewed by platform team. Operator pulls the artemis repo locally
-on the deploy host so `just artemis-deploy` can `--set-file` it.
+on the deploy host so `just deploy gxy-management artemis` can `--set-file` it via `apps/artemis/.deploy-flags.sh`.
 
 ```bash
 cd ~/DEV/fCC-U/artemis
@@ -147,20 +163,22 @@ Once all preconditions land:
 
 ```bash
 cd ~/DEV/fCC/infra
-just artemis-deploy
+just deploy gxy-management artemis
 ```
 
-The recipe:
+The generic `deploy` recipe smart-dispatches on `apps/<app>/`:
 
 1. Loads chart defaults (`charts/artemis/values.yaml`).
 2. Loads production overlay (`apps/artemis/values.production.yaml`).
 3. Decrypts + loads sops sealed overlay
    (`infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`).
-4. Renders sites.yaml from `$ARTEMIS_REPO/config/sites.yaml`
-   (default `$HOME/DEV/fCC-U/artemis/config/sites.yaml`) via
-   `--set-file sites=...`.
+4. Sources `apps/artemis/.deploy-flags.sh` which appends
+   `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` (default
+   `$HOME/DEV/fCC-U/artemis/config/sites.yaml`) to the helm
+   invocation.
 5. Runs `helm upgrade --install` into the `artemis` namespace.
-6. Waits for rollout (120s timeout).
+
+Optional: `kubectl -n artemis rollout status deploy/artemis --timeout=120s`.
 
 ## Verify
 
@@ -182,19 +200,19 @@ Exit 0 on green.
 
 ## Rotate
 
-| What rotates                         | Recipe                                                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; then `just mirror-artemis-secrets` + `just artemis-deploy`               |
-| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch |
-| sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC-U/artemis pull`; `just artemis-deploy` (fsnotify ≤1min)         |
-| Image tag                            | bump `apps/artemis/values.production.yaml` `image.tag`; `just artemis-deploy`                                |
+| What rotates                         | Recipe                                                                                                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                      |
+| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch        |
+| sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC-U/artemis pull`; `just deploy gxy-management artemis` (fsnotify ≤1min) |
+| Image tag                            | bump `apps/artemis/values.production.yaml` `image.tag`; `just deploy gxy-management artemis`                        |
 
 ## Failure modes
 
 | Symptom                                                           | Likely cause                                 | Action                                                               |
 | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------- |
 | `Error unmarshalling input json: invalid character '#'` from sops | dotenv decrypted without explicit type flags | use the canonical incantation in §4                                  |
-| Helm fail with `.Values.secretEnv.X is required`                  | sops overlay missing key                     | re-run `just mirror-artemis-secrets`                                 |
+| Helm fail with `.Values.secretEnv.X is required`                  | sops overlay missing key                     | re-run §5 mint block (paste-once)                                    |
 | Helm fail with `.Values.sites is empty`                           | artemis repo not pulled or wrong path        | `git -C ~/DEV/fCC-U/artemis pull` or set `ARTEMIS_REPO`              |
 | 503 on `uploads.freecode.camp/healthz`                            | Gateway not bound; HTTPRoute not picked up   | `kubectl -n artemis describe gateway,httproute` — check Traefik logs |
 | 502 / "no available server" via CF                                | CF zone SSL = Strict + origin no cert        | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)   |
