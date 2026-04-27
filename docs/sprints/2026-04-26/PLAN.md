@@ -2,6 +2,27 @@
 
 Stable plan. Patched only when scope/phases/dispatch-graph change. Live cursor lives in [`STATUS.md`](STATUS.md). Locked Q/D rows in [`DECISIONS.md`](DECISIONS.md). Per-task briefs in [`dispatches/T<N>-<slug>.md`](dispatches/).
 
+## CRIT — sprint planning discipline (2026-04-27, T34 closeout)
+
+**Pattern study before code.** For every dispatch that touches an
+existing surface (chart, recipe, runbook), read the **full** matching
+files in adjacent apps end-to-end before drafting. Pattern-grepping
+for keywords is insufficient — proliferates one-off conventions and
+duplicates body content (T34 `artemis-deploy` recipe cloned the
+helm-install body of generic `helm-upgrade` instead of extending it
+via per-app config). Pattern study is dispatch-time work, not
+implementation-time afterthought.
+
+**One-time ops live in runbooks, not recipes.** Anything run ≤3×
+per year per cluster (mint, seal, mirror, certificate dance) is a
+runbook step, not a justfile recipe. Recipes exist for repeated
+operational commands worth memorizing — `<verb>-<noun>`. T34
+`mirror-artemis-secrets` violated this; refactor parked at
+TODO-park §Justfile slop sweep.
+
+See `infra/CLAUDE.md` §CRIT — justfile recipe slop discipline for
+the full rule set.
+
 ## Sprint goal
 
 Staff dev runs `universe static deploy` from **any environment** (laptop, GHA, Woodpecker, etc.) with **only `platform.yaml`** + GitHub identity in their hands. Zero R2 credentials persist outside cluster. Site live at `<site>.freecode.camp` (production) and `<site>.preview.freecode.camp` (preview siblings). Vendor-neutral throughout (R2 = S3-compat; portable to MinIO/Backblaze/Wasabi).
