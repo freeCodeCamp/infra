@@ -537,3 +537,31 @@ caddy-s3-verify:
     echo "${MODULES}" | grep -q '^caddy.fs.r2$' || { echo "FAIL: caddy.fs.r2 not listed"; exit 1; }
     ! echo "${MODULES}" | grep -q '^caddy.fs.s3$' || { echo "FAIL: caddy.fs.s3 present (D32 violated)"; exit 1; }
     echo "OK: http.handlers.r2_alias + caddy.fs.r2 present; caddy.fs.s3 absent"
+
+# ---------------------------------------------------------------------------
+# Docs maintenance
+# ---------------------------------------------------------------------------
+
+# List canonical journal entries (### YYYY-MM-DD —) in a field-notes file with
+# their ages in days. Read-only; useful before running field-notes-trim.
+[group('docs')]
+field-notes-list area="infra":
+    python3 scripts/trim-field-notes.py \
+        ../Universe/spike/field-notes/{{area}}.md --list
+
+# Dry-run: show which dated journal entries would be archived. Default cutoff
+# 30 days per `docs/GUIDELINES.md` §Monthly doc trim. Override with `age=N`.
+[group('docs')]
+field-notes-trim-plan area="infra" age="30":
+    python3 scripts/trim-field-notes.py \
+        ../Universe/spike/field-notes/{{area}}.md \
+        --age-days {{age}} --dry-run
+
+# Apply: archive dated journal entries older than `age` days into
+# `journal-archive/YYYY-MM.md` siblings of the field-notes file. Idempotent.
+# Run from a clean working tree — emits a cross-repo diff in Universe.
+[group('docs')]
+field-notes-trim area="infra" age="30":
+    python3 scripts/trim-field-notes.py \
+        ../Universe/spike/field-notes/{{area}}.md \
+        --age-days {{age}}
