@@ -136,7 +136,7 @@ PR-reviewed by platform team. Operator pulls the artemis repo locally
 on the deploy host so `just deploy gxy-management artemis` can `--set-file` it via `apps/artemis/.deploy-flags.sh`.
 
 ```bash
-cd ~/DEV/fCC-U/artemis
+cd ~/DEV/fCC/artemis
 git checkout main && git pull --ff-only
 ```
 
@@ -174,7 +174,7 @@ The generic `deploy` recipe smart-dispatches on `apps/<app>/`:
    (`infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`).
 4. Sources `apps/artemis/.deploy-flags.sh` which appends
    `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` (default
-   `$HOME/DEV/fCC-U/artemis/config/sites.yaml`) to the helm
+   `$HOME/DEV/fCC/artemis/config/sites.yaml`) to the helm
    invocation.
 5. Runs `helm upgrade --install` into the `artemis` namespace.
 
@@ -200,12 +200,12 @@ Exit 0 on green.
 
 ## Rotate
 
-| What rotates                         | Recipe                                                                                                              |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                      |
-| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch        |
-| sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC-U/artemis pull`; `just deploy gxy-management artemis` (fsnotify ≤1min) |
-| Image tag                            | bump `apps/artemis/values.production.yaml` `image.tag`; `just deploy gxy-management artemis`                        |
+| What rotates                         | Recipe                                                                                                            |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                    |
+| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch      |
+| sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC/artemis pull`; `just deploy gxy-management artemis` (fsnotify ≤1min) |
+| Image tag                            | bump `apps/artemis/values.production.yaml` `image.tag`; `just deploy gxy-management artemis`                      |
 
 ## Failure modes
 
@@ -213,7 +213,7 @@ Exit 0 on green.
 | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------- |
 | `Error unmarshalling input json: invalid character '#'` from sops | dotenv decrypted without explicit type flags | use the canonical incantation in §4                                  |
 | Helm fail with `.Values.secretEnv.X is required`                  | sops overlay missing key                     | re-run §5 mint block (paste-once)                                    |
-| Helm fail with `.Values.sites is empty`                           | artemis repo not pulled or wrong path        | `git -C ~/DEV/fCC-U/artemis pull` or set `ARTEMIS_REPO`              |
+| Helm fail with `.Values.sites is empty`                           | artemis repo not pulled or wrong path        | `git -C ~/DEV/fCC/artemis pull` or set `ARTEMIS_REPO`                |
 | 503 on `uploads.freecode.camp/healthz`                            | Gateway not bound; HTTPRoute not picked up   | `kubectl -n artemis describe gateway,httproute` — check Traefik logs |
 | 502 / "no available server" via CF                                | CF zone SSL = Strict + origin no cert        | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)   |
 | ERR_SSL_PROTOCOL_ERROR in browser                                 | CF zone SSL = Off                            | set CF zone SSL to Flexible                                          |

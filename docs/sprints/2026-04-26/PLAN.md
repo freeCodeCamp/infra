@@ -148,7 +148,7 @@ separate Claude Code sessions / terminals.
 
 - `~/DEV/fCC/infra` (`feat/k3s-universe`) — **governor (this session)** + T34 worker (post-T31). Holds sprint-doc edits (STATUS / PLAN / HANDOFF / DECISIONS) + dispatch Status reconciliation.
 - `~/DEV/fCC-U/Universe` (`main`) — T30 (D016 ADR + amendments). **Done** at `Universe@310c7e1`.
-- `~/DEV/fCC-U/artemis` (`main`, NEW) — T31 worker. Greenfield Go scaffold.
+- `~/DEV/fCC/artemis` (`main`, NEW) — T31 worker. Greenfield Go scaffold.
 - `~/DEV/fCC-U/universe-cli` (`feat/proxy-pivot`, NEW off `main`) — T32 + T33 workers. Two parallel sessions OK (same branch; coordinate file-by-file or two sub-branches merged at close).
 - `~/DEV/fCC-U/windmill` (`main`) — T22 worker + boneyard headers on T11 source.
 
