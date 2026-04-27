@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (pillar audit pass + T34 sites.yaml pinned + windmill boneyard + Universe spike-plan artemis placement) · Branch: `feat/k3s-universe` · Ahead of origin: 14+
+Updated: 2026-04-27 (pillar audit + sites.yaml ADR realign — option A; B + KV parked) · Branch: `feat/k3s-universe` · Ahead of origin: 16+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -28,7 +28,9 @@ infra (`feat/k3s-universe`):
 - `4ff9e2cc` — `docs(sprints): reconcile T32 PLAN+STATUS+HANDOFF`
 - `964c8d22` — `docs(todo-park): oxfmt wiring on universe-cli`
 - `0bbaca02` — `docs(sprints): T32 addendum bake gh client_id`
-- `<incoming>` — `docs(sprints): T34 sites.yaml + audit trail`
+- `5e42cc80` — `docs(sprints): T34 sites.yaml + audit trail`
+- `<incoming>` — `docs(sprints): T34 sites.yaml ADR realign`
+- `<incoming-2>` — `docs(todo-park): artemis sites slim + embedded KV`
 
 universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 

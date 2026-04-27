@@ -135,52 +135,108 @@ time by chart `templates/secret.yaml` calling sops with flags above).
 
 ### 5. sites.yaml seed — initial team→site map
 
-**Landing path (locked 2026-04-27).**
+**Source of truth (per ADR-016 §sites.yaml lifecycle, line 178).**
 
 ```
-infra/k3s/gxy-management/apps/artemis/sites.yaml
+freeCodeCamp/artemis repo:  config/sites.yaml
 ```
 
-Chart-internal default. Plain YAML (NO secrets — team slug list +
-site slug list only; safe to commit). Helm chart `templates/configmap.yaml`
-loads it via `{{ .Files.Get "../sites.yaml" | toYaml }}` (or equivalent
-relative path) and mounts at `/etc/artemis/sites.yaml` inside the pod
-(default per T31 dispatch `SITES_YAML_PATH`).
-
-Hot-reload via fsnotify (artemis svc watches mount path; no pod
-restart needed on ConfigMap update — k8s ConfigMap → mounted file
-update propagates within ~1min, artemis reloads on next request).
-
-**Initial seed (operator edits per actual freeCodeCamp team slugs
-before first `helm upgrade`):**
+PR-reviewed by platform team in the **artemis repo**. Schema per
+ADR-016 §Q11 (line 35) — file-based static map, hot-reload:
 
 ```yaml
-# infra/k3s/gxy-management/apps/artemis/sites.yaml
+# ~/DEV/fCC-U/artemis/config/sites.yaml
 #
-# Map of <site-slug> → list of authorized GitHub team slugs (under
-# the `freeCodeCamp` org per `GH_ORG` envelope default). artemis
-# membership probe: GET /orgs/freeCodeCamp/teams/{slug}/memberships/{user}
+# Source of truth for artemis authorization map. Per ADR-016 §Q11.
+# PR-reviewed by platform team in this repo. artemis svc loads this
+# file (via ConfigMap mount in cluster) and probes team membership
+# per request: GET /orgs/freeCodeCamp/teams/{slug}/memberships/{user}
 # cached `GH_MEMBERSHIP_CACHE_TTL` seconds (default 300).
 #
-# Hot-reloaded via fsnotify on file change. Add a site here, push to
-# infra `feat/k3s-universe` (or `main` post-merge), `helm upgrade`
-# refreshes the ConfigMap, artemis picks up within ~1min — no pod
-# restart.
+# Hot-reloaded via fsnotify on ConfigMap update; no pod restart.
 sites:
   example-site:
     teams: ["platform"]
 ```
 
-**Operator action.** Edit the `sites:` block to seed real freeCodeCamp
-team slugs ↔ first one or two production sites BEFORE firing T34
-worker. T34 chart deploy uses this file at install time.
+**Drift correction (2026-04-27).** Earlier T34 step-5 draft pinned
+`sites.yaml` to `infra/k3s/gxy-management/apps/artemis/sites.yaml`.
+That was wrong — that path is the **render target** (chart-side
+ConfigMap source), not the source of truth. ADR-016 §sites.yaml
+lifecycle is explicit: source = artemis repo `config/sites.yaml`;
+infra-side ConfigMap is one delivery mechanism among several.
 
-**Rotation.** Per-site team list edits land via PR + merge cycle
-(no out-of-band wmill/secrets dance — file is plain YAML in infra
-repo). Removing a team-membership from authorized set takes effect
-on next sites.yaml read (≤1min hot-reload).
+**Delivery to k8s (T34 chart designer's call; v1 path).**
 
-**Cross-ref.** Sample env `~/DEV/fCC/infra-secrets/management/artemis.env.sample` §SITES_YAML_PATH; ADR-016 §Authn/authz Q11 (team-membership probe semantics).
+T34 worker selects ONE of:
+
+- **(v1 default — recommended)** Helm `--set-file` from operator's
+  artemis local checkout at deploy time:
+
+  ```bash
+  helm upgrade artemis ./chart \
+    --set-file sites=$HOME/DEV/fCC-U/artemis/config/sites.yaml \
+    ... (other flags)
+  ```
+
+  Wrapped in justfile recipe (e.g. `just helm-upgrade gxy-management
+artemis`) so operator never types the long path. T34 chart
+  `templates/configmap.yaml` renders ConfigMap from `.Values.sites`.
+
+- **(future — when ArgoCD multi-cluster lands)** ArgoCD multi-source
+  app sources artemis repo `config/sites.yaml` + infra chart in
+  parallel. Eliminates manual sync. Parked at TODO-park §ArgoCD
+  multi-cluster wiring.
+
+- **(option C — image-bake)** artemis CI bakes `config/sites.yaml`
+  into the image at build time; pod reads from `/etc/artemis/sites.yaml`
+  inside container layer. Pros: zero infra coupling. Cons: image
+  rebuild + rollout per site change; defeats fsnotify hot-reload.
+  ADR-016 line 180 lists this as alternative ("CI builds image OR
+  ships ConfigMap-only update"). Reject for v1 — fsnotify hot-reload
+  is the locked-in pattern.
+
+**ConfigMap mount path inside pod:** `/etc/artemis/sites.yaml`
+per `SITES_YAML_PATH` env (T31 dispatch default).
+
+**Operator action BEFORE T34 worker fires.**
+
+```bash
+cd ~/DEV/fCC-U/artemis
+mkdir -p config
+cat > config/sites.yaml <<'YAML'
+sites:
+  example-site:
+    teams: ["platform"]
+YAML
+# Edit example-site → real first production site slug + team slugs
+# matching freeCodeCamp org reality (e.g. "platform", "staff", or
+# editorial team slugs)
+
+git add config/sites.yaml
+git commit -m "feat(config): initial sites.yaml seed"
+git push   # operator-owned push
+```
+
+T34 worker references this file via `--set-file` in the Helm install
+recipe; no further action needed beyond ensuring the path is current
+on the operator's machine at deploy time.
+
+**Lifecycle (per ADR-016 §sites.yaml lifecycle):**
+
+- New site / team change: PR to `freeCodeCamp/artemis` repo
+  `config/sites.yaml` → review → merge → operator runs
+  `just helm-upgrade gxy-management artemis` → ConfigMap renders
+  from latest local checkout → fsnotify reload in pod (≤1min). No
+  pod restart.
+- Cache invalidation per ADR-016 line 182: clear `(user, site)` and
+  `(user, slug)` cache entries scoped to changed sites on reload.
+
+**Cross-ref.** ADR-016 §sites.yaml lifecycle (line 178); §Authn/authz
+Q11 (line 35); env sample
+`~/DEV/fCC/infra-secrets/management/artemis.env.sample` §SITES_YAML_PATH;
+TODO-park §Application config (artemis sites.yaml schema slim +
+embedded registry — followup for scale + simpler reality).
 
 ---
 
