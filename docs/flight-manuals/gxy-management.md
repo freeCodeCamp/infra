@@ -338,7 +338,7 @@ condensed rebuild flow:
 | 2   | CF zone `freecode.camp` SSL = `Flexible` (CF Edge HTTPS, origin HTTP)               | CF dashboard                                                    |
 | 3   | GitHub OAuth App `Universe CLI` (Device Flow ✅)                                    | freeCodeCamp org settings                                       |
 | 4   | Sealed dotenv `infra-secrets/management/artemis.env.enc`                            | `sops encrypt`                                                  |
-| 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`      | `just mirror-artemis-secrets`                                   |
+| 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`      | runbook §5 mint block (paste-once)                              |
 | 6   | `freeCodeCamp/artemis` repo cloned on operator host with `config/sites.yaml` seeded | git clone + PR                                                  |
 | 7   | First GHCR image build for artemis                                                  | `gh workflow run ci.yml --repo freeCodeCamp/artemis --ref main` |
 
@@ -346,7 +346,7 @@ condensed rebuild flow:
 
 ```
 cd ~/DEV/fCC/infra
-just artemis-deploy
+just deploy gxy-management artemis
 ```
 
 Recipe layers chart values → production overlay → sops sealed
