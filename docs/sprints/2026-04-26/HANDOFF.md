@@ -11,6 +11,56 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T32 addendum landed — G2 unblocked
+
+Single-commit follow-up on T32 main closure (`24d6fa1`). Bakes the
+public freeCodeCamp GitHub OAuth App client id into universe-cli
+source so the npm-published binary works out of the box on user
+laptops without exporting `UNIVERSE_GH_CLIENT_ID` first. Env override
+preserved for fork tenants and self-hosted mirrors. Matches `gh`,
+`vercel`, `supabase` CLI patterns.
+
+**Closing commit:**
+
+- universe-cli `feat/proxy-pivot`: `0a3f1ce` —
+  `feat(login): bake default GH OAuth client_id`
+  - `src/lib/constants.ts` (NEW) — `DEFAULT_GH_CLIENT_ID =
+"Iv23liIuGmZRyPd5wUeN"` (public; device flow uses no
+    `client_secret`, safe to ship in source).
+  - `src/commands/login.ts` — `env["UNIVERSE_GH_CLIENT_ID"] ??
+DEFAULT_GH_CLIENT_ID`; dropped `EXIT_CONFIG` import + branch (no
+    longer reachable).
+  - `tests/commands/login.test.ts` — replaced "errors when env
+    unset" case with three new positive cases (env-unset →
+    fallback, empty-string → fallback, whitespace → fallback). All
+    267 vitest tests green.
+  - `README.md` — environment table updated; baked-in default
+    documented + override semantics.
+  - `CHANGELOG.md` — `0.4.0-alpha.2` entry (Added / Changed /
+    Removed sections).
+  - `package.json` — version bumped `0.4.0-alpha.1` →
+    `0.4.0-alpha.2` via `npm version --no-git-tag-version`
+    (preflight check-version-consistency action requires
+    package.json + CHANGELOG header alignment).
+
+**Validation pass before commit:**
+
+- `pnpm test` → 267/267 (10 in login suite, +3 net vs. prior).
+- `pnpm typecheck` → clean.
+- `pnpm lint` (oxlint) → 0 warnings, 0 errors on 49 files.
+
+**G2 status:** unblocked. `pnpm publish` of
+`@freecodecamp/universe-cli@0.4.0-alpha.2` is now operator-owned
+ClickOps via the existing OIDC Trusted Publisher CI workflow.
+
+**Cross-ref.** Dispatch
+[`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)
+§Addendum 2026-04-27 — landed as specified, no scope drift. T32
+dispatch Status header stays `done` (addendum closure does not
+re-flip per dispatch protocol).
+
+---
+
 ### 2026-04-27 — T34 live verify GREEN — sprint G1 ticks
 
 Operator-gated live verify against the 2026-04-27 T34 closure

@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (G1 GREEN — T34 live verify pass: artemis live, phase5-smoke E2E green, /api/whoami auth proven) · Branch: `feat/k3s-universe` · Ahead of origin: 35+
+Updated: 2026-04-27 (G2 unblocked — T32 addendum landed, default GH OAuth client_id baked into universe-cli; G1 still GREEN) · Branch: `feat/k3s-universe` · Ahead of origin: 35+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -32,12 +32,14 @@ infra (`feat/k3s-universe`):
 - `c9dd8817` — `docs(sprints): T34 sites.yaml ADR realign`
 - `fdf74dc6` — `docs(todo-park): artemis sites slim + embedded KV`
 - `<incoming>` — `docs(sprints): seed artemis sites.yaml — T34 precondition`
+- `<incoming>` — `docs(sprints): close T32 addendum — cli@0a3f1ce`
 
 universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 
 - `8788648` — `feat(lib): add platform.yaml v2 schema + parser`
 - `5d7b6ef` — `docs(platform-yaml): add v2 schema reference + migration`
 - `24d6fa1` — T32 closure (CLI v0.4 rewrite — login/static deploy/promote/rollback/ls/whoami)
+- `0a3f1ce` — `feat(login): bake default GH OAuth client_id` _(T32 addendum — G2 gate cleared; package bumped to `0.4.0-alpha.2`)_
 
 artemis (`main` — greenfield, NEW remote, not pushed):
 
@@ -66,35 +68,32 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 
 ## Open
 
-| Dispatch                                                                             | Repo                                                                  | State                                                                                                           |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                                                                                   |
-| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                                                                                    |
-| **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1`) — addendum: bake `UNIVERSE_GH_CLIENT_ID` default (G2 blocker); oxfmt deferred |
-| **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                               |
-| **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@0b8d6238`) — operator-gated: helm-deploy + phase5-smoke (live verify)                          |
-| **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending                                                          |
+| Dispatch                                                                             | Repo                                                                  | State                                                                                                                 |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                                                                                         |
+| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                                                                                          |
+| **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1` + addendum `0a3f1ce` — default GH OAuth client_id baked, G2 cleared; oxfmt deferred) |
+| **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                                     |
+| **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@0b8d6238`) — operator-gated: helm-deploy + phase5-smoke (live verify)                                |
+| **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending                                                                |
 
 **Concurrency plan:**
 
-- T30 ✅ + T31 ✅ + T32 ✅ + T33 ✅ + T22 ✅ + T34 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
-- **All sprint code lanes closed.** Operator gates remaining for G1 tick: (a) verify CF zone SSL = Flexible; (b) `just deploy gxy-management artemis`; (c) `just phase5-smoke` green E2E; (d) T22 live verify (R2 admin Resource + schedule flip).
-- **T32 addendum** (bake `UNIVERSE_GH_CLIENT_ID` default in source) — short follow-up worker fire on `feat/proxy-pivot`. Blocks G2 (npm publish), not G1. See dispatch §Addendum 2026-04-27.
-- npm publish `@freecodecamp/universe-cli@0.4.0` blocks on phase5-smoke green + T32 addendum (G2 gate).
+- T30 ✅ + T31 ✅ + T32 ✅ (+ addendum ✅) + T33 ✅ + T22 ✅ + T34 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
+- **G1 GREEN** (T34 live verify GREEN 2026-04-27 — see HANDOFF).
+- **G2 unblocked** — npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2` clear to ship now that default GH OAuth client_id is baked in source.
+- T22 live verify (R2 admin Resource + Windmill schedule flip) still operator-gated; gate is windmill-side only, does not block G1/G2 ticks.
 
 ## Operator-owned actions (post session ship)
 
-- Create CF DNS A record `uploads.freecode.camp` → gxy-management public IP (CF proxied; SSL Full Strict via existing `*.freecode.camp` cert)
-- Create GitHub OAuth App in `freeCodeCamp` org settings:
-  - Name: `Universe CLI`
-  - Homepage: `https://uploads.freecode.camp`
-  - Device flow: enabled
-  - Capture `client_id` for CLI default + artemis `GH_CLIENT_ID` env
-- Trigger first GHCR image build for artemis (CI workflow lands in T31; first build via `gh workflow run`)
-- Helm install: `just helm-upgrade gxy-management artemis` (T34)
-- Smoke run: T34 retargeted script (E2E proxy upload)
-- npm publish `@freecodecamp/universe-cli@0.4.0` after smoke green
-- Push 5 repos: infra (`feat/k3s-universe`), Universe (`main`), windmill (`main`), universe-cli (`feat/proxy-pivot`), artemis (`main`, NEW remote)
+- ~~CF DNS A record `uploads.freecode.camp`~~ — DONE 2026-04-27 (T34 precondition).
+- ~~GitHub OAuth App `Universe CLI` (`Iv23liIuGmZRyPd5wUeN`)~~ — DONE 2026-04-27 (T34 precondition).
+- ~~CF zone SSL verify (Flexible)~~ — DONE 2026-04-27 (artemis chart drops origin TLS per cassiopeia parity).
+- ~~First GHCR image build for artemis~~ — DONE 2026-04-27 (`ghcr.io/freecodecamp/artemis:sha-7d6eed3c…`).
+- ~~Helm install + phase5 smoke~~ — DONE 2026-04-27 (G1 GREEN; see HANDOFF).
+- T22 live verify — flip Windmill cleanup cron schedule active + verify admin S3 Resource resolves (R2 sweep dry-run first).
+- npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2` (G2 — addendum landed; `pnpm publish` from `feat/proxy-pivot` head, OIDC Trusted Publisher).
+- Push 5 repos: infra (`feat/k3s-universe`), Universe (`main`), windmill (`main`), universe-cli (`feat/proxy-pivot`), artemis (`main`, NEW remote).
 
 ## Boneyard (kept as archaeology, do not invoke)
 
