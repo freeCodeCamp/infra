@@ -55,14 +55,16 @@ Filesystem-driven. Per-task dispatch docs at `dispatches/T<N>-<slug>.md` carry s
 
 ## Top-level task chain
 
-| ID  | Subject                                         | Status  | Notes                               |
-| --- | ----------------------------------------------- | ------- | ----------------------------------- |
-| T30 | D016 ADR draft + lock                           | done    | Cross-repo Universe; broken-owner   |
-| T31 | Artemis svc (Go) — scaffold + endpoints + tests | done    | `artemis@861e4c4` (greenfield init) |
-| T32 | universe-cli v0.4 rewrite                       | done    | `universe-cli@24d6fa1`              |
-| T33 | `platform.yaml` v2 schema + validator + doc     | done    | `universe-cli@5d7b6ef`              |
-| T34 | Caddy reverse proxy + DNS prep + smoke retarget | pending | After T31                           |
-| T22 | Cleanup cron Windmill flow                      | done    | `windmill@016a868`                  |
+| ID  | Subject                                                | Status | Notes                                                             |
+| --- | ------------------------------------------------------ | ------ | ----------------------------------------------------------------- |
+| T30 | D016 ADR draft + lock                                  | done   | Cross-repo Universe; broken-owner                                 |
+| T31 | Artemis svc (Go) — scaffold + endpoints + tests        | done   | `artemis@861e4c4` (greenfield init)                               |
+| T32 | universe-cli v0.4 rewrite                              | done   | `universe-cli@24d6fa1`                                            |
+| T33 | `platform.yaml` v2 schema + validator + doc            | done   | `universe-cli@5d7b6ef`                                            |
+| T34 | Artemis chart + DNS + phase5 smoke (Path X)            | done   | `infra@0b8d6238`; G1 GREEN                                        |
+| T22 | Cleanup cron Windmill flow                             | done   | `windmill@016a868`                                                |
+| T35 | IaC convert R2 admin Resource (`f/ops/r2_admin_s3`)    | done   | `windmill@8739953` + path-fix `7e26390`; native `s3`, drift clean |
+| T36 | Retire T11 carryover + woodpecker admin (RTs + script) | done   | `windmill@c6c22c5`; provisioner artifacts destroyed               |
 
 ## Phases + gates
 
@@ -103,14 +105,16 @@ Sub-deliverables:
 
 ## Dispatch matrix
 
-| T-id | Area               | Subject                                          | Dispatch                                                                             | Status   |
-| ---- | ------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------ | -------- |
-| T30  | Universe (xrepo)   | D016 ADR — deploy proxy plane (broken ownership) | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md) | [x] done |
-| T31  | artemis (new repo) | Artemis svc Go — scaffold + endpoints + tests    | [`dispatches/T31-artemis-service.md`](dispatches/T31-artemis-service.md)             | [x] done |
-| T32  | universe-cli       | v0.4 rewrite — proxy client (`feat/proxy-pivot`) | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)             | [x] done |
-| T33  | universe-cli       | `platform.yaml` v2 schema + validator + doc      | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)           | [x] done |
-| T34  | infra              | Artemis chart + DNS + phase5 smoke (Path X)      | [`dispatches/T34-caddy-dns-smoke.md`](dispatches/T34-caddy-dns-smoke.md)             | [x] done |
-| T22  | windmill           | Cleanup cron flow                                | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                   | [x] done |
+| T-id | Area               | Subject                                                | Dispatch                                                                                  | Status   |
+| ---- | ------------------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------- | -------- |
+| T30  | Universe (xrepo)   | D016 ADR — deploy proxy plane (broken ownership)       | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md)      | [x] done |
+| T31  | artemis (new repo) | Artemis svc Go — scaffold + endpoints + tests          | [`dispatches/T31-artemis-service.md`](dispatches/T31-artemis-service.md)                  | [x] done |
+| T32  | universe-cli       | v0.4 rewrite — proxy client (`feat/proxy-pivot`)       | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)                  | [x] done |
+| T33  | universe-cli       | `platform.yaml` v2 schema + validator + doc            | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)                | [x] done |
+| T34  | infra              | Artemis chart + DNS + phase5 smoke (Path X)            | [`dispatches/T34-caddy-dns-smoke.md`](dispatches/T34-caddy-dns-smoke.md)                  | [x] done |
+| T22  | windmill           | Cleanup cron flow                                      | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                        | [x] done |
+| T35  | windmill           | IaC convert R2 admin Resource (`f/ops/r2_admin_s3`)    | [`dispatches/T35-r2-admin-resource-iac.md`](dispatches/T35-r2-admin-resource-iac.md)      | [x] done |
+| T36  | windmill           | Retire T11 carryover + woodpecker admin (RTs + script) | _no dispatch — opportunistic cleanup, governor-authorized under explicit operator B-path_ | [x] done |
 
 ## Wave dispatch graph
 

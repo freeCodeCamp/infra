@@ -11,6 +11,71 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T35 + T36 closed: R2 admin IaC + T11 retirement (windmill)
+
+T35 worker session at `~/DEV/fCC-U/windmill` (branch `main`)
+landed `f/ops/r2_admin_s3` as native Windmill `s3` Resource —
+declarative, sops-encrypted, replaces T22 step-1 ClickOps. (Initial
+landing under `f/admin/r2_admin_s3` in `8739953`; renamed to
+`f/ops/r2_admin_s3` in follow-up `7e26390` — see Path drift note
+below.) T36
+piggybacked under same operator B-path authorization to retire
+T11 carryover artifacts (script set + RTs + Resources) now that
+artemis owns admin S3 keys cluster-side via
+`infra-secrets/management/artemis.env.enc`.
+
+**Closing commits (windmill `main`, b511d17..342e874, 6 commits):**
+
+- `b7d96dd` — `docs(secrets): first-create resource flow`
+- `8739953` — `feat(admin): add r2_admin_s3 s3 Resource (T35)` _(T35 close)_
+- `53e59b9` — `style(static): oxfmt sweep r2_credentials`
+- `c6c22c5` — `chore(static): retire T11 + woodpecker admin (T36)` _(T36 close)_
+- `14e87f5` — `chore(static): canonicalize cleanup schedule defaults`
+- `342e874` — `chore(static): order schedule fields alphabetically`
+
+**Apply log (2 `just apply` rounds + 1 direct API delete pass):**
+
+- Round 1 (post-T35): 10 changes — T35 add (`f/admin/folder.meta.yaml` + `r2_admin_s3.resource.yaml`) + T22 cron (`016a868`, held for boneyard sequencing) + T11 boneyard markers (`f8e99b9`, held) + `windmill-client` lock bump 1.691.0 → 1.691.1.
+- Round 2 (T36): 4 changes — delete RT `c_cf_r2_provisioner` + RT `c_woodpecker_admin` + script set `provision_site_r2_credentials` (3 files: `.ts` + `.test.ts` + `.resource-type.yaml`).
+- Direct API delete (out-of-sync-scope, `curl` to wmill API): Resource `u/admin/cf_r2_provisioner` + Resource `u/admin/woodpecker_admin`. `wmill sync` does not own Resource _values_ that lack a tracked `.resource.yaml` — manual delete required. Operator-authorized.
+
+**Final remote state (verified `wmill resource list` + `just drift`):**
+
+- Resources: `f/github/apollo_11_app`, `f/ops/r2_admin_s3` (T35 new; renamed from `f/admin/` in `7e26390`). All others gone.
+- Scripts: `provision_site_r2_credentials` set deleted. `cleanup_old_deploys` live (`enabled: false`, `dry_run: true`).
+- `just drift`: clean (no diff).
+
+**Boneyard hygiene:** windmill `f/static/provision_site_r2_credentials.{ts,test.ts,resource-type.yaml}` files fully deleted (boneyard headers from `f8e99b9` no longer needed). Boneyard line in STATUS rewritten to drop "(proxy reuses)" claim — proxy plane (artemis) owns admin S3 keys at the cluster, NOT via Windmill Resource reuse.
+
+**T35 dispatch §Acceptance:** all 7 criteria met. Operator deletion warnings during round-2 `wmill sync` consumed under explicit B-path authorization (not silently dismissed) — matches feedback memory `feedback_never_dismiss_sync_deletions.md`.
+
+**Path drift correction (windmill@7e26390):** Initial T35 landing
+used `f/admin/r2_admin_s3` (folder path) + `cleanup_old_deploys.ts`
+constant `"u/admin/r2_admin_s3"` (Windmill resource path on user
+scope). Both inconsistent and divergent from the `f/static/`
+consumer location convention. Follow-up commit
+`7e26390 fix(static/cleanup): r2_admin_s3 path → f/ops` renamed
+`workspaces/platform/f/admin/` → `workspaces/platform/f/ops/`
+(via `git mv`, 100% rename) and flipped the code constant to
+`"f/ops/r2_admin_s3"` to align consumer path with resource path
+on a folder-scope (not user-scope) location. Round-1 apply log
+above describes the original `f/admin/` landing for archaeology;
+final remote state reflects the post-rename `f/ops/` path. Sprint
+docs (STATUS, PLAN, T35 dispatch, audit/windmill.md) swept to
+`f/ops/r2_admin_s3` on 2026-04-27.
+
+**Sprint state delta this commit (infra):**
+
+- T35 dispatch Status `pending → done` (worker side already flipped).
+- PLAN top-level task chain: T34 row corrected `pending → done`; T35 + T36 rows added (both done).
+- PLAN dispatch matrix: T35 row added; T36 row added with "no dispatch — opportunistic cleanup" note.
+- STATUS header timestamp `post-T35-T36-close`; Open table T35 row done + T36 row added; Operator-owned actions §Outstanding step 1 (T35) dropped, T22 + G2 renumbered, WMILL_TOKEN rotate added; windmill repo Shipped block extended b511d17 → 342e874; Boneyard line rewritten to drop "proxy reuses" + log T35/T36 deletion. Governor resume rewritten.
+- HANDOFF — this entry.
+
+**ADR-016 amendment owed (Universe team — not this repo's lane):** `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md` lines 209 + 244 reference `u/admin/cf_r2_provisioner` as "proxy reuses". Both lines stale post-T36 — Resource deleted; artemis holds admin S3 keys cluster-side via `infra-secrets/management/artemis.env.enc`. Per Universe doc-ownership rule (`feedback_two_repo_ownership.md`), ADR amendments are Universe-team owned — flagged here for next Universe-team pass; this session does not touch.
+
+**Unblocks:** T22 live verify (next operator action — schedule flip after `runScriptPreviewAndWaitResult` dry-run pass). G2 npm publish independent. Sprint G1 closure unaffected (already GREEN at T34).
+
 ### 2026-04-27 — T32 addendum landed — G2 unblocked
 
 Single-commit follow-up on T32 main closure (`24d6fa1`). Bakes the
@@ -503,7 +568,7 @@ own dispatch Status flip (already committed at `infra@a967cf24`).
 
 **Operator-owned post-deploy gates (per closure block):**
 
-1. Provision Resource `u/admin/r2_admin_s3` (native `s3` type) — admin R2 S3 keys
+1. Provision Resource `f/ops/r2_admin_s3` (native `s3` type) — admin R2 S3 keys
 2. `runScriptPreviewAndWaitResult` MCP with `dry_run=true` against live Windmill
 3. Flip `schedule.enabled: true` (still `dry_run=true`) → review pending list
 4. Switch `args.dry_run: false` for live retention sweep

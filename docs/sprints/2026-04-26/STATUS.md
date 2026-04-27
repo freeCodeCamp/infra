@@ -1,8 +1,9 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (post-`roll the sprint`) · All 6 sub-tasks
-**done** · G1 GREEN · G2 unblocked · 5 repos pushed + synced ·
-Operator gates remaining: T22 ClickOps + npm publish.
+Updated: 2026-04-27 (post-T35-T36-close) · 7 sub-tasks **done** ·
+G1 GREEN · G2 unblocked · 5 repos pushed + synced · Operator gates
+remaining: T22 ClickOps schedule flip + G2 npm publish + WMILL_TOKEN
+rotate.
 
 Canonical session-roll output. Overwritten each `roll the sprint`.
 Read this **before** PLAN.md or DECISIONS.md.
@@ -102,11 +103,11 @@ artifacts:
 Plus PH1-B18..B24 hardening commits (perf/refactor/fix) committed
 before B25 — see `git log artemis/main`.
 
-### windmill `main` — `b511d17` HEAD
+### windmill `main` — `342e874` HEAD
 
 - `010d577` — `feat(flows/static): T11 per-site R2 credential provisioning` _(carryover, then boneyard)_
-- `aaeab60` — `feat(resource-type): add c_cf_r2_provisioner for T11` _(carryover)_
-- `786b257` — `feat(resource-type): add c_woodpecker_admin for T11/G1.0b` _(carryover)_
+- `aaeab60` — `feat(resource-type): add c_cf_r2_provisioner for T11` _(carryover, deleted T36)_
+- `786b257` — `feat(resource-type): add c_woodpecker_admin for T11/G1.0b` _(carryover, deleted T36)_
 - `d44783a` — `fix(static/provision_site_r2_credentials): wpAdmin field name + URL drift`
 - `e1db0be` — `chore(format): oxfmt canonical pass + skill header injection`
 - `c5d9f92` — `fix(static/provision_site_r2_credentials): Bug C+D — UUIDs + SPA-HTML probe`
@@ -114,6 +115,12 @@ before B25 — see `git log artemis/main`.
 - `016a868` — `feat(static): add cleanup cron for R2 deploys (T22)` _(T22 close)_
 - `f8e99b9` — `chore(static): boneyard T11 files + fmt pass`
 - `b511d17` — `docs(claude): @import cross-repo refs`
+- `b7d96dd` — `docs(secrets): first-create resource flow`
+- `8739953` — `feat(admin): add r2_admin_s3 s3 Resource (T35)` _(T35 close)_
+- `53e59b9` — `style(static): oxfmt sweep r2_credentials`
+- `c6c22c5` — `chore(static): retire T11 + woodpecker admin (T36)` _(T36 close)_
+- `14e87f5` — `chore(static): canonicalize cleanup schedule defaults`
+- `342e874` — `chore(static): order schedule fields alphabetically`
 
 ### Universe `main` — `c2f274d` HEAD
 
@@ -128,14 +135,16 @@ before B25 — see `git log artemis/main`.
 
 ## Open
 
-| Dispatch                                                | Repo                                          | State                                                                                  |
-| ------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| **T22** — Cleanup cron flow (windmill, 7d retention)    | `~/DEV/fCC-U/windmill` `main`                 | **done** (`windmill@016a868`); operator gate: schedule flip + R2 admin Resource verify |
-| **T30** — D016 ADR draft + amends                       | `~/DEV/fCC-U/Universe` `main`                 | **done** (`Universe@e2a9356` + 3 amends; latest `c2f274d`)                             |
-| **T31** — artemis svc (Go scaffold + endpoints + tests) | `~/DEV/fCC/artemis` `main`                    | **done** (`artemis@861e4c4`; PH1-B18..B25 hardening on top)                            |
-| **T32** — universe-cli v0.4 rewrite + addendum          | `~/DEV/fCC-U/universe-cli` `feat/proxy-pivot` | **done** (`universe-cli@24d6fa1` main + `0a3f1ce` addendum + `f448125` path-doc fix)   |
-| **T33** — `platform.yaml` v2 schema + validator + doc   | `~/DEV/fCC-U/universe-cli` `feat/proxy-pivot` | **done** (`universe-cli@5d7b6ef`)                                                      |
-| **T34** — Artemis chart + DNS + phase5 smoke            | `~/DEV/fCC/infra` `feat/k3s-universe`         | **done** (`infra@0b8d6238`); G1 GREEN per `4e7aea8e` postmortem                        |
+| Dispatch                                                      | Repo                                          | State                                                                                                                                                                    |
+| ------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **T22** — Cleanup cron flow (windmill, 7d retention)          | `~/DEV/fCC-U/windmill` `main`                 | **done** (`windmill@016a868`); blocked on T35 for live verify; then ClickOps gate (schedule flip)                                                                        |
+| **T30** — D016 ADR draft + amends                             | `~/DEV/fCC-U/Universe` `main`                 | **done** (`Universe@e2a9356` + 3 amends; latest `c2f274d`)                                                                                                               |
+| **T31** — artemis svc (Go scaffold + endpoints + tests)       | `~/DEV/fCC/artemis` `main`                    | **done** (`artemis@861e4c4`; PH1-B18..B25 hardening on top)                                                                                                              |
+| **T32** — universe-cli v0.4 rewrite + addendum                | `~/DEV/fCC-U/universe-cli` `feat/proxy-pivot` | **done** (`universe-cli@24d6fa1` main + `0a3f1ce` addendum + `f448125` path-doc fix)                                                                                     |
+| **T33** — `platform.yaml` v2 schema + validator + doc         | `~/DEV/fCC-U/universe-cli` `feat/proxy-pivot` | **done** (`universe-cli@5d7b6ef`)                                                                                                                                        |
+| **T34** — Artemis chart + DNS + phase5 smoke                  | `~/DEV/fCC/infra` `feat/k3s-universe`         | **done** (`infra@0b8d6238`); G1 GREEN per `4e7aea8e` postmortem                                                                                                          |
+| **T35** — IaC convert R2 admin Resource (`f/ops/r2_admin_s3`) | `~/DEV/fCC-U/windmill` `main`                 | **done** (`windmill@8739953`; path-drift fix `windmill@7e26390` renamed `f/admin/` → `f/ops/`); native `s3` Resource live, `just drift` clean. Unblocks T22 live verify. |
+| **T36** — Retire T11 carryover + woodpecker admin             | `~/DEV/fCC-U/windmill` `main`                 | **done** (`windmill@c6c22c5`); `c_cf_r2_provisioner` + `c_woodpecker_admin` Resources + RTs deleted; `provision_site_r2_credentials` script set deleted.                 |
 
 ## Operator-owned actions remaining
 
@@ -144,19 +153,24 @@ pushed; every branch tracks origin; ahead/behind = 0/0 verified.
 
 Outstanding:
 
-1. **T22 live verify (windmill ClickOps).** Flip cleanup-cron
-   schedule → active. Verify admin S3 Resource resolves. Sweep
-   dry-run first against an empty deploy window. Closes the
-   windmill-side gate; G1/G2 unaffected.
+1. **T22 live verify (T35 unblocked).** Run
+   `mcp__windmill-platform__runScriptPreviewAndWaitResult` on
+   `f/static/cleanup_old_deploys` with `dry_run=true` against live
+   Windmill — confirm pending list shape resolves the new
+   `f/ops/r2_admin_s3` Resource cleanly. Then flip
+   `cleanup_old_deploys.schedule.yaml` `enabled: true` (still
+   `dry_run=true`) for one cycle, review report. Then flip
+   `args.dry_run: false`, push. (Schedule flip stays ClickOps —
+   operational state, not config.)
 
 2. **G2 — npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2`.**
    Branch `feat/proxy-pivot` is pushed; CI Trusted Publisher OIDC
    handles the npm side on tag. Cut release tag, watch CI green,
-   verify package on registry.
+   verify package on registry. Independent of T22.
 
 ## Boneyard (kept as archaeology, do not invoke)
 
-- windmill: `f/static/provision_site_r2_credentials.{ts,test.ts,resource-type.yaml}` boneyard headers landed `f8e99b9`; Resources `u/admin/cf_r2_provisioner` (proxy reuses) + `u/admin/woodpecker_admin` (retired).
+- windmill: `f/static/provision_site_r2_credentials.{ts,test.ts,resource-type.yaml}` boneyard headers landed `f8e99b9`; full retirement at `c6c22c5` (T36) — script set deleted; Resources `u/admin/cf_r2_provisioner` + `u/admin/woodpecker_admin` deleted (proxy plane via artemis owns admin S3 keys via `infra-secrets/management/artemis.env.enc`); RTs `c_cf_r2_provisioner` + `c_woodpecker_admin` deleted.
 - universe-cli: branch `feat/woodpecker-pivot` (4 commits ahead of `main`, never merged).
 - T21 Woodpecker template — demoted to optional reference (archived at `../archive/2026-04-21/dispatches/archive/`).
 
@@ -176,15 +190,19 @@ Outstanding:
 ## Governor resume — paste in fresh session if this session lost
 
 ▎ Resume Sprint 2026-04-26 governor (Universe static-apps proxy
-pillar). All 6 sub-tasks closed (T22 + T30 + T31 + T32 + T33 + T34).
-G1 GREEN (T34 live verify postmortem `infra@4e7aea8e`). G2 unblocked
-(T32 addendum `universe-cli@0a3f1ce`). All 5 repos pushed + synced
-0/0. Drift audit 2026-04-27 — runtime ↔ chart code zero drift; doc
-drift on artemis local path fixed across infra (`e843e04`),
-universe-cli (`f448125`), Universe ADR-016 amendment (`c2f274d`).
-Outstanding operator gates: T22 windmill ClickOps (cron schedule
-flip + R2 admin Resource verify) + G2 npm publish
-`@freecodecamp/universe-cli@0.4.0-alpha.2` via OIDC Trusted
-Publisher tag-trigger. Sprint is one operator session away from
-archival under `docs/sprints/archive/2026-04-26/`. Read order: this
-STATUS → PLAN → DECISIONS → HANDOFF.
+pillar). 7 sub-tasks closed (T22 + T30 + T31 + T32 + T33 + T34 +
+T35 + T36). G1 GREEN (T34 live verify postmortem `infra@4e7aea8e`).
+G2 unblocked (T32 addendum `universe-cli@0a3f1ce`). All 5 repos
+pushed + synced 0/0. T35 closed `windmill@8739953` — native `s3`
+Resource `f/ops/r2_admin_s3` live (path-drift fix `windmill@7e26390`); `just drift` clean. T36
+closed `windmill@c6c22c5` — T11 carryover + woodpecker admin RTs
+
+- Resources + provisioner script set fully retired. Outstanding
+  gates: T22 ClickOps live verify (now unblocked) → schedule flip;
+  G2 npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2` via
+  OIDC Trusted Publisher tag-trigger; WMILL_TOKEN rotate (leaked
+  mid-T35 session). ADR-016 amendment owed to Universe team — drop
+  "proxy reuses" claim on `u/admin/cf_r2_provisioner` (lines 209 +
+  244); artemis owns admin S3 keys via
+  `infra-secrets/management/artemis.env.enc`. Read order: this
+  STATUS → PLAN → DECISIONS → HANDOFF.
