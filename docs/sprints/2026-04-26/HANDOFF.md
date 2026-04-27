@@ -11,6 +11,57 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — artemis sites.yaml seeded (T34 precondition #5; broken ownership)
+
+Operator delegated: "do it for me." Governor session created the
+seed in artemis repo per realigned T34 §step 5 (commit `c9dd8817`,
+prior entry).
+
+**Closing commits:**
+
+- artemis `main` (not pushed): `49d2f32` — `feat(config): seed sites.yaml + un-gitignore`
+  - Created `config/sites.yaml` with single-site seed for `test`
+    site → `[staff]` (narrowest team while smoke shakes out;
+    enables T34 §smoke retarget against `test.freecode.camp` +
+    `test.preview.freecode.camp`)
+  - Removed `config/sites.yaml` from `.gitignore` — drift from
+    ADR-016 §sites.yaml lifecycle (line 178: "PRs reviewed by
+    platform team" → committed source of truth, not operator-private).
+    T31 worker had gitignored it as runtime/local config; ADR
+    explicit otherwise.
+  - In-file comment block documents schema, lifecycle, fCC GitHub
+    teams reference (verified via `gh api` 2026-04-27), and parked
+    follow-up cross-ref to TODO-park §Application config.
+
+- infra `feat/k3s-universe`: `<incoming>` — `docs(sprints): seed artemis sites.yaml — T34 precondition`
+  - STATUS Shipped log gains artemis `49d2f32` + `7d6eed3` (CI fix
+    that landed post-T31 closure; matches GHCR `:sha-7d6eed3c...`
+    image)
+  - STATUS header — preconditions 5/5 GREEN
+  - HANDOFF — this entry
+
+**fCC GH org teams reality (verified `gh api /orgs/freeCodeCamp/teams`):**
+
+```
+bots, classroom, curriculum, dev-team, devdocs, i18n, mobile,
+moderators, none, ops, staff
+```
+
+`platform` team **does not exist** in `freeCodeCamp` org. Operator's
+mental model used "platform" generically. Seed uses `staff` (narrowest
+match for "platform team / operator" semantics). Operator may either:
+
+- create `platform` team in freeCodeCamp org for cleaner separation
+  of concerns; then re-seed `config/sites.yaml` with both teams
+- continue using `staff` as universal authorized team
+
+Either path: edit artemis `config/sites.yaml`, PR + merge in artemis
+repo, `just helm-upgrade gxy-management artemis` re-renders
+ConfigMap.
+
+**T34 fire-readiness:** all 5 preconditions GREEN (DNS, OAuth App,
+GHCR image, sops envelope, sites.yaml seed). T34 worker can fire.
+
 ### 2026-04-27 — sites.yaml ADR realignment (option A; T34 §step 5 fix)
 
 **Drift correction.** Prior T34 §step 5 (commit `5e42cc80`,

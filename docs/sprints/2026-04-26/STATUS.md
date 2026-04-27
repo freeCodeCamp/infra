@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (pillar audit + sites.yaml ADR realign — option A; B + KV parked) · Branch: `feat/k3s-universe` · Ahead of origin: 16+
+Updated: 2026-04-27 (artemis sites.yaml seeded — T34 preconditions 5/5 GREEN) · Branch: `feat/k3s-universe` · Ahead of origin: 17+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -29,8 +29,9 @@ infra (`feat/k3s-universe`):
 - `964c8d22` — `docs(todo-park): oxfmt wiring on universe-cli`
 - `0bbaca02` — `docs(sprints): T32 addendum bake gh client_id`
 - `5e42cc80` — `docs(sprints): T34 sites.yaml + audit trail`
-- `<incoming>` — `docs(sprints): T34 sites.yaml ADR realign`
-- `<incoming-2>` — `docs(todo-park): artemis sites slim + embedded KV`
+- `c9dd8817` — `docs(sprints): T34 sites.yaml ADR realign`
+- `fdf74dc6` — `docs(todo-park): artemis sites slim + embedded KV`
+- `<incoming>` — `docs(sprints): seed artemis sites.yaml — T34 precondition`
 
 universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 
@@ -41,6 +42,8 @@ universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 artemis (`main` — greenfield, NEW remote, not pushed):
 
 - `861e4c4` — `feat: initial artemis service scaffold`
+- `7d6eed3` — `ci: split into reusable test + manual docker (PH1-B25)` _(landed post-T31; matches GHCR :sha-7d6eed3c... image)_
+- `49d2f32` — `feat(config): seed sites.yaml + un-gitignore` _(T34 precondition #5)_
 
 windmill (`main`, not pushed):
 
@@ -197,11 +200,47 @@ parallel.
 
 ### T34 worker — Caddy + DNS + smoke retarget
 
-▎ Resume Sprint 2026-04-26 / T34. **BLOCKED** until T31 publishes first
-GHCR image. Repo: `~/DEV/fCC/infra` branch `feat/k3s-universe`. Spec:
-dispatch `~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T34-caddy-dns-smoke.md`.
-Note: this lane shares repo with governor session — coordinate via
-governor before firing.
+▎ Resume Sprint 2026-04-26 / T34. **UNBLOCKED 2026-04-27.** All 5
+operator preconditions GREEN: CF DNS A `uploads.freecode.camp` (CF
+proxied), GH OAuth App `Universe CLI` (`Iv23liIuGmZRyPd5wUeN`), artemis
+GHCR image (`ghcr.io/freecodecamp/artemis:sha-7d6eed3c58fd25407f52a905bad458c4a70ed277`
+
+- `:main` + `:latest`), sops envelope sealed
+  (`infra-secrets/management/artemis.env.enc`, 15/15 vars), sites.yaml
+  seed (`artemis@49d2f32` — `config/sites.yaml`). Repo:
+  `~/DEV/fCC/infra` branch `feat/k3s-universe`. Spec: dispatch
+  `~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T34-caddy-dns-smoke.md`
+  (read in full incl. amended §step 5 — sites.yaml source-of-truth is
+  artemis repo `config/sites.yaml`, NOT infra repo; chart loads via
+  Helm `--set-file` from operator's local artemis checkout). Goal:
+  Helm chart for artemis svc (`k3s/gxy-management/apps/artemis/`),
+  Caddy reverse-proxy upstream rule on
+  `k3s/gxy-cassiopeia/apps/caddy/values.production.yaml`
+  (`uploads.freecode.camp` → Tailscale upstream
+  `artemis.management.tailscale.fcc:8080`), justfile recipe
+  (`just helm-upgrade gxy-management artemis` wrapping `--set-file
+sites=$HOME/DEV/fCC-U/artemis/config/sites.yaml`), runbook
+  `docs/runbooks/deploy-artemis-service.md` (NEW), flight-manual
+  section `docs/flight-manuals/gxy-management.md` artemis subsection,
+  smoke script `scripts/phase5-proxy-smoke.sh` (NEW — replaces
+  `phase4-test-site-smoke.sh` direct-S3; new flow: init → upload →
+  finalize → preview curl → promote → prod curl per dispatch §Smoke
+  retarget). Image pin: prefer immutable SHA tag over `:main` for
+  production values. **Mode B coordination:** governor session
+  (`~/DEV/fCC/infra` cwd) is **idle** until T34 closes — same repo /
+  same tree, no parallel governor edits. Worker has free hand on all
+  sprint-doc-cluster-EXCLUDED files (everything in `k3s/`, `ansible/`,
+  `justfile`, `scripts/`, `docs/runbooks/`, `docs/flight-manuals/`,
+  `docs/architecture/`). Worker MUST NOT edit `STATUS.md` / `PLAN.md` /
+  `HANDOFF.md` / `DECISIONS.md` / `audit/*.md` / `dispatches/T*.md`
+  EXCEPT for own dispatch Status header flip (`pending → in-progress`
+  on start; `→ done` on closure) — governor reconciles
+  PLAN matrix + STATUS + HANDOFF in separate infra commit
+  post-closure. TDD per dispatch §Acceptance criteria. One commit per
+  sub-task close, title-only `cmd-git-rules`. First move: read T34
+  dispatch in full + verify image still pinnable
+  (`gh api /orgs/freeCodeCamp/packages/container/artemis/versions
+--jq '.[] | {tags: .metadata.container.tags}'`).
 
 ## Governor resume — paste in fresh session if this session lost
 
