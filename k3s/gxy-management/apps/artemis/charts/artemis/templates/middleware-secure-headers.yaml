@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Values.middlewares.secureHeaders }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+spec:
+  headers:
+    # CF terminates HTTPS at the edge (Flexible SSL on freecode.camp).
+    # CF→origin is plain HTTP, but the request was originally HTTPS;
+    # set X-Forwarded-Proto so artemis logs and any downstream OAuth
+    # callback URL builders see the correct scheme. Mirrors
+    # windmill / zot / argocd `secure-headers` middleware on this cluster.
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
