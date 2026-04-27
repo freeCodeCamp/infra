@@ -11,6 +11,83 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T32 addendum filed: bake `UNIVERSE_GH_CLIENT_ID` default
+
+Operator verify pass 2026-04-27 (artemis GHCR image + CF DNS +
+GH OAuth App) flagged design gap in T32 closure: `login.ts:50` reads
+`UNIVERSE_GH_CLIENT_ID` from env at runtime; npm-published v0.4
+binary refuses `universe login` out-of-the-box on user laptops. OAuth
+client_id is public-grade (device flow, no client_secret) — bake
+default in source matches `gh` / `vercel` / `supabase` CLI patterns.
+Operator approved bake-at-build 2026-04-27.
+
+**Commits:**
+
+- infra `feat/k3s-universe`: `<incoming>` — `docs(sprints): T32 addendum bake gh client_id` (T32 dispatch §Addendum 2026-04-27 + STATUS Open table note + STATUS resume prompt for addendum worker)
+
+**Why correction-style append (not edit of T32 closure entry).**
+T32 main work closure (above entry) accurately reflects what
+shipped — main rewrite + closure notes. Addendum is **new work**
+deferred from closure scope; per HANDOFF discipline (never edit
+past entries) appended as standalone correction.
+
+**Scope (single follow-up commit on `feat/proxy-pivot`).** See T32
+dispatch §Addendum 2026-04-27. Fold or new `src/lib/constants.ts`,
+`login.ts` env-fallback wiring, test for env-unset case, README +
+CHANGELOG (`0.4.0-alpha.2`).
+
+**Blocks G2 (npm publish), not G1.** Can fire in parallel with T34
+or after T34 smoke green; G1 close does not depend.
+
+**Cross-ref.** Verify report 2026-04-27 (governor session) confirmed
+artemis envelope `GH_CLIENT_ID` matches the live OAuth App
+(`Iv23li...`, 20 chars; same value goes into the source constant).
+
+### 2026-04-27 — T32 closed: universe-cli v0.4 rewrite
+
+T32 worker session in `~/DEV/fCC-U/universe-cli` (branch
+`feat/proxy-pivot`) shipped CLI v0.4 — namespaced static surface
+(`universe login`, `whoami`, `static deploy/promote/rollback/ls`)
+per ADR-016 §Authn/authz + amended T32 dispatch §CLI surface (CLI
+ns pivot 2026-04-27). Worker discipline clean: own repo + own
+dispatch Status flip already committed at `infra@b1f1f3e4`.
+
+**Closing commits:**
+
+- universe-cli `feat/proxy-pivot` (not pushed): `24d6fa1` — T32 closure (CLI v0.4 rewrite)
+- infra `feat/k3s-universe`: `b1f1f3e4` — `docs(sprints): close T32 — universe-cli@24d6fa1` (worker-flipped Status header)
+
+**Gates evidenced (worker handoff):**
+
+- `pnpm test` → 265/265 across 23 files
+- `pnpm lint` (oxlint) → 0 warn / 0 err
+- `pnpm typecheck` → clean
+- `pnpm build` → ESM 47.63 KB / CJS 859.32 KB; no Woodpecker refs in dist
+- AWS SDK deps purged (4 packages removed — proxy contract holds R2 creds)
+
+**In-scope deferrals (recorded in dispatch closure notes):**
+
+- per-file PUT vs multipart upload — wording clarified in dispatch
+- OIDC slot stub — placeholder retained for future GHA / WP OIDC wiring
+- husky `tsc` gate — pre-commit hook added
+
+**Out-of-scope deferrals (parked):**
+
+- `oxfmt --check` not run — package never installed in repo despite
+  T32 dispatch + T33 HANDOFF mention. Follow-up dispatch needed:
+  add `oxfmt` to `devDependencies` + wire into `package.json` scripts
+  - husky pre-commit. Parked at `docs/TODO-park.md` §Toolchain.
+
+**Sprint state delta this commit (infra):**
+
+- PLAN top-level task chain row T32 → `done` w/ `universe-cli@24d6fa1`.
+- PLAN dispatch matrix row T32 → `[x] done`.
+- STATUS Open table T32 → `done` (oxfmt deferred); Shipped section
+  gained universe-cli `24d6fa1` + worker close `b1f1f3e4` + sops
+  T34 update `a7bfbc4c` + R2 GC TODO-park `e99da31b`; concurrency
+  plan rewritten — only T34 lane open (blocks on artemis GHCR image).
+- HANDOFF — this entry.
+
 ### 2026-04-27 — T22 closed: cleanup cron Windmill flow
 
 T22 worker session in `~/DEV/fCC-U/windmill` shipped 7d-retention

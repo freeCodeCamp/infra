@@ -43,6 +43,31 @@ sprint planning when an activation trigger fires.
 - **Owner:** infra team.
 - **Ref:** ADR-003 §Hardened CI pipeline.
 
+## Toolchain
+
+### oxfmt wiring on universe-cli (T32 follow-up)
+
+- **Activation trigger:** next universe-cli sprint touch — pre-commit
+  format consistency desired before next contributor wave.
+- **Owner:** universe-cli maintainer (single dispatch, ~half-day).
+- **Ref:** Windmill toolchain mandate 2026-04-08 (oxfmt + oxlint +
+  vitest + Bun + pnpm + husky); T32 closure HANDOFF note 2026-04-27.
+- **Why parked.** T32 worker shipped CLI v0.4 with `oxlint` + `tsc`
+  gates green but `oxfmt --check` not run — package never installed
+  in repo despite T32 dispatch + T33 HANDOFF reference. Out-of-scope
+  for T32 closure (proxy-pillar critical path); blocks G1 only if
+  formatting drift surfaces during T34 smoke.
+- **Scope (single dispatch).**
+  - `pnpm add -D oxfmt` (devDep, pinned)
+  - `package.json` scripts: `format`, `format:check`
+  - husky `pre-commit`: add `oxfmt --check` before existing `tsc` gate
+  - One-shot `oxfmt --write` over `src/` + `test/` (separate commit
+    from wiring commit so review diffs split cleanly)
+  - Verify CI workflow picks up `format:check` step
+- **Open question.** Whether to gate CI on `format:check` (hard fail)
+  or report-only (advisory) for first sprint after wire-in. Default
+  hard fail — matches windmill repo posture.
+
 ## Automation
 
 ### Atlantis for OpenTofu PR automation
@@ -185,6 +210,32 @@ Phase 2 only opens if cross-repo audit surfaces additional pillars.
   gxy-management is sufficient.
 - **Owner:** infra team.
 - **Ref:** ADR-001 §Component placement (ArgoCD multi-cluster on mgmt).
+
+### R2 lifecycle GC for orphan deploy prefixes (artemis)
+
+- **Activation trigger:** first prod-load on `uploads.freecode.camp` —
+  when `<site>/deploys/<ts>-<sha>/` orphan prefixes accumulate from
+  failed / aborted deploys (CLI re-init after mid-upload crash leaves
+  old prefix behind). Estimate: when bucket size grows >10% above
+  current-alias keep-set, or after 30 days of real deploy traffic.
+- **Owner:** infra team. R2 lifecycle rule, NOT artemis svc concern —
+  keeps artemis stateless + idempotent.
+- **Ref:** ADR-016 §Failure semantics (deploy retry idempotency model);
+  T31 dispatch §Retry-and-failure (no queue, no state, idempotent by
+  `deployId`).
+- **Scope:** R2 bucket `universe-static-apps-01` lifecycle rule
+  matching prefix `*/deploys/*` with age > N days (initial guess: 14d;
+  tune from observed deploy cadence). MUST NOT match alias keys
+  `<site>/preview` / `<site>/production` (no `/deploys/` segment) or
+  `caddy.fs.r2` cache keys.
+- **Why parked.** v1 artemis is single-tenant, deploys/day not /sec.
+  Orphan accumulation is cosmetic until storage cost or list-objects
+  latency surfaces. Premature GC rule risks deleting last-good preview
+  during long-running deploy retry windows. Defer until trigger fires
+  with real traffic shape.
+- **Open question.** Whether to keep last-N successful deploys per
+  site (rollback depth) or rely on alias key history alone. ADR-016
+  amend candidate at activation.
 
 ## Reliability
 
