@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (G2 unblocked — T32 addendum landed, default GH OAuth client_id baked into universe-cli; G1 still GREEN) · Branch: `feat/k3s-universe` · Ahead of origin: 35+
+Updated: 2026-04-27 (drift-audit pass — artemis local path fixed across infra+universe-cli+Universe ADR-016; G1 GREEN; G2 unblocked) · Branch: `feat/k3s-universe` · Ahead of origin: 43
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -86,14 +86,30 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 
 ## Operator-owned actions (post session ship)
 
-- ~~CF DNS A record `uploads.freecode.camp`~~ — DONE 2026-04-27 (T34 precondition).
-- ~~GitHub OAuth App `Universe CLI` (`Iv23liIuGmZRyPd5wUeN`)~~ — DONE 2026-04-27 (T34 precondition).
-- ~~CF zone SSL verify (Flexible)~~ — DONE 2026-04-27 (artemis chart drops origin TLS per cassiopeia parity).
-- ~~First GHCR image build for artemis~~ — DONE 2026-04-27 (`ghcr.io/freecodecamp/artemis:sha-7d6eed3c…`).
-- ~~Helm install + phase5 smoke~~ — DONE 2026-04-27 (G1 GREEN; see HANDOFF).
-- T22 live verify — flip Windmill cleanup cron schedule active + verify admin S3 Resource resolves (R2 sweep dry-run first).
-- npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2` (G2 — addendum landed; `pnpm publish` from `feat/proxy-pivot` head, OIDC Trusted Publisher).
-- Push 5 repos: infra (`feat/k3s-universe`), Universe (`main`), windmill (`main`), universe-cli (`feat/proxy-pivot`), artemis (`main`, NEW remote).
+Completed in earlier sessions on 2026-04-27 (see HANDOFF for the
+T34 live-verify chain): CF DNS, GitHub OAuth App
+(`Iv23liIuGmZRyPd5wUeN`), CF zone SSL (Flexible — cassiopeia
+parity), first GHCR image build
+(`ghcr.io/freecodecamp/artemis:sha-7d6eed3c…@sha256:afb2c…`),
+helm install on gxy-management, phase5 E2E smoke (G1 GREEN).
+
+Outstanding:
+
+- **T22 live verify (windmill-side ClickOps).** Flip the Windmill
+  cleanup-cron schedule to active + verify the admin S3 Resource
+  resolves; sweep dry-run first against an empty bucket window.
+  Gates the windmill-only T22 closure; does not block G1/G2.
+- **G2 — npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2`.**
+  T32 addendum landed (`universe-cli@0a3f1ce`), branch comment
+  drift cleaned (`f448125`); branch must be pushed first. CI does
+  the publish via OIDC Trusted Publisher on tag.
+- **Sprint-close push (5 repos).**
+  - `infra` `feat/k3s-universe` — 43 commits ahead of origin.
+  - `Universe` `main` — 11 commits ahead of origin.
+  - `windmill` `main` — 7 commits ahead of origin.
+  - `universe-cli` `feat/proxy-pivot` — branch never pushed
+    (no upstream); set upstream on first push.
+  - `artemis` `main` — 1 commit ahead of origin (sites.yaml seed).
 
 ## Boneyard (kept as archaeology, do not invoke)
 
