@@ -135,17 +135,52 @@ time by chart `templates/secret.yaml` calling sops with flags above).
 
 ### 5. sites.yaml seed — initial team→site map
 
-Land alongside artemis chart as ConfigMap source. Initial seed (operator
-edits per actual freeCodeCamp team slugs):
+**Landing path (locked 2026-04-27).**
+
+```
+infra/k3s/gxy-management/apps/artemis/sites.yaml
+```
+
+Chart-internal default. Plain YAML (NO secrets — team slug list +
+site slug list only; safe to commit). Helm chart `templates/configmap.yaml`
+loads it via `{{ .Files.Get "../sites.yaml" | toYaml }}` (or equivalent
+relative path) and mounts at `/etc/artemis/sites.yaml` inside the pod
+(default per T31 dispatch `SITES_YAML_PATH`).
+
+Hot-reload via fsnotify (artemis svc watches mount path; no pod
+restart needed on ConfigMap update — k8s ConfigMap → mounted file
+update propagates within ~1min, artemis reloads on next request).
+
+**Initial seed (operator edits per actual freeCodeCamp team slugs
+before first `helm upgrade`):**
 
 ```yaml
+# infra/k3s/gxy-management/apps/artemis/sites.yaml
+#
+# Map of <site-slug> → list of authorized GitHub team slugs (under
+# the `freeCodeCamp` org per `GH_ORG` envelope default). artemis
+# membership probe: GET /orgs/freeCodeCamp/teams/{slug}/memberships/{user}
+# cached `GH_MEMBERSHIP_CACHE_TTL` seconds (default 300).
+#
+# Hot-reloaded via fsnotify on file change. Add a site here, push to
+# infra `feat/k3s-universe` (or `main` post-merge), `helm upgrade`
+# refreshes the ConfigMap, artemis picks up within ~1min — no pod
+# restart.
 sites:
   example-site:
     teams: ["platform"]
 ```
 
-Mount path inside pod: `/etc/artemis/sites.yaml` (default per T31 dispatch
-`SITES_YAML_PATH`).
+**Operator action.** Edit the `sites:` block to seed real freeCodeCamp
+team slugs ↔ first one or two production sites BEFORE firing T34
+worker. T34 chart deploy uses this file at install time.
+
+**Rotation.** Per-site team list edits land via PR + merge cycle
+(no out-of-band wmill/secrets dance — file is plain YAML in infra
+repo). Removing a team-membership from authorized set takes effect
+on next sites.yaml read (≤1min hot-reload).
+
+**Cross-ref.** Sample env `~/DEV/fCC/infra-secrets/management/artemis.env.sample` §SITES_YAML_PATH; ADR-016 §Authn/authz Q11 (team-membership probe semantics).
 
 ---
 

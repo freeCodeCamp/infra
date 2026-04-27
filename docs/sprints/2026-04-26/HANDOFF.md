@@ -11,6 +11,48 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — pillar audit pass + 3 follow-up commits (broken ownership)
+
+Operator-requested grounded-truth audit across all 5 repos touched by
+the static-apps proxy pillar. 5 parallel Explore subagents, one per
+repo + Universe ADRs. Reports landed at
+`docs/sprints/2026-04-26/audit/{artemis,universe-cli,windmill,infra,universe-adrs}.md`.
+
+**Verdict roll-up:** GREEN with 1 known YELLOW gap (T32 addendum
+already filed) + 2 documentation drifts (windmill T11 boneyard
+headers + Universe spike-plan artemis placement). No G1 blockers;
+T34 fire-ready.
+
+**Three follow-up commits landed (broken ownership at operator
+request — governor session edited worker-team repos directly):**
+
+1. **windmill `main`: `f8e99b9`** — `chore(static): boneyard T11 files + fmt pass`
+   - Boneyard headers added to T11 source files marking
+     `provision_site_r2_credentials.{ts,test.ts,script.yaml}` archaeology
+     post-2026-04-26 pivot
+   - Resource-type `c_woodpecker_admin.resource-type.yaml` description
+     updated with retired marker (`u/admin/cf_r2_provisioner` left
+     alive — proxy reuses)
+   - oxfmt save-hook reformatted file bodies (266 lines) — included in
+     same commit; tests 412/412 still green
+   - Files do NOT participate in live wmill flow; archive-only marker
+
+2. **Universe `main`: `c5a1144`** — `docs(spike-plan): add artemis on gxy-management`
+   - Galaxy placement matrix gains artemis row (gxy-management,
+     Sprint 2026-04-26, Option A locked)
+   - "What NEVER moves" bullet added — artemis stays on gxy-management
+   - Universe-team owns spike-plan; operator approved governor edit
+
+3. **infra `feat/k3s-universe`: `<incoming>`** — `docs(sprints): T34 sites.yaml + audit trail`
+   - T34 dispatch §step 5 rewritten — sites.yaml landing path pinned
+     to `infra/k3s/gxy-management/apps/artemis/sites.yaml` (chart-
+     internal default; plain YAML; hot-reload via fsnotify; rotation
+     via PR+merge cycle)
+   - This HANDOFF entry
+
+**Cross-ref.** Audit reports remain on disk for follow-up. Operator
+reads each for full file:line refs + tables.
+
 ### 2026-04-27 — T32 addendum filed: bake `UNIVERSE_GH_CLIENT_ID` default
 
 Operator verify pass 2026-04-27 (artemis GHCR image + CF DNS +

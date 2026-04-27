@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (T32 closed; T31 + T33 + T22 closed; CLI ns pivot) · Branch: `feat/k3s-universe` · Ahead of origin: 13+
+Updated: 2026-04-27 (pillar audit pass + T34 sites.yaml pinned + windmill boneyard + Universe spike-plan artemis placement) · Branch: `feat/k3s-universe` · Ahead of origin: 14+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -25,7 +25,10 @@ infra (`feat/k3s-universe`):
 - `a7bfbc4c` — `docs(sprints): T34 sops dotenv decrypt incant`
 - `b1f1f3e4` — `docs(sprints): close T32 — universe-cli@24d6fa1`
 - `e99da31b` — `docs(todo-park): R2 lifecycle GC for artemis orphans`
-- `<incoming>` — `docs(sprints): reconcile T32 PLAN+STATUS+HANDOFF`
+- `4ff9e2cc` — `docs(sprints): reconcile T32 PLAN+STATUS+HANDOFF`
+- `964c8d22` — `docs(todo-park): oxfmt wiring on universe-cli`
+- `0bbaca02` — `docs(sprints): T32 addendum bake gh client_id`
+- `<incoming>` — `docs(sprints): T34 sites.yaml + audit trail`
 
 universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 
@@ -40,12 +43,14 @@ artemis (`main` — greenfield, NEW remote, not pushed):
 windmill (`main`, not pushed):
 
 - `016a868` — `feat(static): add cleanup cron for R2 deploys (T22)`
+- `f8e99b9` — `chore(static): boneyard T11 files + fmt pass`
 
 Universe (`main`):
 
 - `e2a9356` — `feat(decisions): D016 deploy proxy plane`
 - `310c7e1` — `docs(decisions): D016 amend artemis + JWT scope`
 - `df255b9` — `docs(decisions): D016 amend CLI namespace static`
+- `c5a1144` — `docs(spike-plan): add artemis on gxy-management`
 
 Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 
