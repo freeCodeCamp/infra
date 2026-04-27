@@ -199,7 +199,7 @@ PR-reviewed by platform team in the **artemis repo**. Schema per
 ADR-016 §Q11 (line 35) — file-based static map, hot-reload:
 
 ```yaml
-# ~/DEV/fCC-U/artemis/config/sites.yaml
+# ~/DEV/fCC/artemis/config/sites.yaml
 #
 # Source of truth for artemis authorization map. Per ADR-016 §Q11.
 # PR-reviewed by platform team in this repo. artemis svc loads this
@@ -229,7 +229,7 @@ T34 worker selects ONE of:
 
   ```bash
   helm upgrade artemis ./chart \
-    --set-file sites=$HOME/DEV/fCC-U/artemis/config/sites.yaml \
+    --set-file sites=$HOME/DEV/fCC/artemis/config/sites.yaml \
     ... (other flags)
   ```
 
@@ -256,7 +256,7 @@ per `SITES_YAML_PATH` env (T31 dispatch default).
 **Operator action BEFORE T34 worker fires.**
 
 ```bash
-cd ~/DEV/fCC-U/artemis
+cd ~/DEV/fCC/artemis
 mkdir -p config
 cat > config/sites.yaml <<'YAML'
 sites:

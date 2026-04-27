@@ -75,7 +75,7 @@ present → helm phase. Layers values:
 2. `apps/artemis/values.production.yaml` — production overlay
 3. `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` — sops-sealed (5 secret env keys)
 
-`apps/artemis/.deploy-flags.sh` is sourced; appends `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` to the helm invocation. Operator never types the path. Default `ARTEMIS_REPO=$HOME/DEV/fCC-U/artemis`.
+`apps/artemis/.deploy-flags.sh` is sourced; appends `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` to the helm invocation. Operator never types the path. Default `ARTEMIS_REPO=$HOME/DEV/fCC/artemis`.
 
 The sops sealed overlay is operator-owned. Mint via the paste-once
 shell block in `docs/runbooks/deploy-artemis-service.md` §5. Re-run
@@ -95,7 +95,7 @@ Materialized into a ConfigMap by the chart at deploy time via
 Updates:
 
 1. PR to `freeCodeCamp/artemis` `config/sites.yaml` → review → merge.
-2. `git -C ~/DEV/fCC-U/artemis pull --ff-only`
+2. `git -C ~/DEV/fCC/artemis pull --ff-only`
 3. `just deploy gxy-management artemis` — re-renders ConfigMap,
    fsnotify reload (≤1min). No pod restart.
 

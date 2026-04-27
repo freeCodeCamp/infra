@@ -23,7 +23,7 @@ docs/sprints/2026-04-26/
 └── dispatches/
     ├── T22-cleanup-cron.md           — windmill (post-T31 live)
     ├── T30-d016-deploy-proxy-adr.md  — Universe (cross-repo) — DONE
-    ├── T31-artemis-service.md        — new repo `~/DEV/fCC-U/artemis` (renamed 2026-04-26)
+    ├── T31-artemis-service.md        — new repo `~/DEV/fCC/artemis` (renamed 2026-04-26)
     ├── T32-cli-v04-rewrite.md        — universe-cli `feat/proxy-pivot`
     ├── T33-platform-yaml-v2.md       — universe-cli `feat/proxy-pivot`
     └── T34-caddy-dns-smoke.md        — infra

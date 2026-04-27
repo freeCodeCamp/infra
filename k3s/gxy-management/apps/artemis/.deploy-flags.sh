@@ -7,7 +7,7 @@
 # elsewhere. SOT lives in the artemis repo at config/sites.yaml
 # (PR-reviewed by platform team per ADR-016 §sites.yaml lifecycle).
 
-SITES_PATH="${ARTEMIS_REPO:-$HOME/DEV/fCC-U/artemis}/config/sites.yaml"
+SITES_PATH="${ARTEMIS_REPO:-$HOME/DEV/fCC/artemis}/config/sites.yaml"
 if [ ! -f "$SITES_PATH" ]; then
   echo "Error: $SITES_PATH not found." >&2
   echo "       Pull freeCodeCamp/artemis or set ARTEMIS_REPO=<path>." >&2

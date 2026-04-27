@@ -188,7 +188,7 @@ _(a) Refactor `artemis-deploy` → extend generic `helm-upgrade`._
   `helm-upgrade` if present; exports `EXTRA_HELM_ARGS` appended to
   the helm invocation. Document in justfile recipe header + GUIDELINES.
 - Land `apps/artemis/.deploy-flags.sh` emitting
-  `EXTRA_HELM_ARGS+=" --set-file sites=${ARTEMIS_REPO:-$HOME/DEV/fCC-U/artemis}/config/sites.yaml"`.
+  `EXTRA_HELM_ARGS+=" --set-file sites=${ARTEMIS_REPO:-$HOME/DEV/fCC/artemis}/config/sites.yaml"`.
   Validate path inside the script (operator-friendly error).
 - Drop `artemis-deploy` recipe. Operator runs
   `just helm-upgrade gxy-management artemis` like every other app.

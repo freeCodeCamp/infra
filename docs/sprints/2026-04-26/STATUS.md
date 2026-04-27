@@ -71,7 +71,7 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 | Dispatch                                                                             | Repo                                                                  | State                                                                                                                 |
 | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                                                                                         |
-| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                                                                                          |
+| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC/artemis` (NEW greenfield repo)                             | **done** (`artemis@861e4c4`)                                                                                          |
 | **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1` + addendum `0a3f1ce` — default GH OAuth client_id baked, G2 cleared; oxfmt deferred) |
 | **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                                     |
 | **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@0b8d6238`) — operator-gated: helm-deploy + phase5-smoke (live verify)                                |
@@ -111,7 +111,7 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 - CF zones: `freecodecamp.net` + `freecode.camp` proxied. Origin certs `*.freecodecamp.net`, `*.freecode.camp`, `*.preview.freecode.camp` ACM-issued + CF-activated.
 - R2 bucket: `universe-static-apps-01` (single bucket, prefix-scoped). Layout unchanged by pivot.
 - Tools verified: sops, age, doctl, wmill, direnv, aws-cli v2, **Go 1.26.2 (`/opt/homebrew/bin/go`)** for T31.
-- Artemis local repo: `~/DEV/fCC-U/artemis/` initialized as empty git repo (no files yet; first commit lands per T31).
+- Artemis local repo: `~/DEV/fCC/artemis/` initialized as empty git repo (no files yet; first commit lands per T31).
 
 ## Multi-session resume prompts
 
@@ -119,7 +119,7 @@ Each worker session pastes its block in a fresh Claude Code terminal. Governor (
 
 ### T31 worker — artemis Go svc
 
-▎ Resume Sprint 2026-04-26 / T31. Repo: `~/DEV/fCC-U/artemis` (greenfield;
+▎ Resume Sprint 2026-04-26 / T31. Repo: `~/DEV/fCC/artemis` (greenfield;
 empty git repo). Spec: `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`
 (ADR-016 + 2 dated amendments — read in full incl. Amendments). Dispatch:
 `~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T31-artemis-service.md`.
@@ -132,7 +132,7 @@ host stays). TDD: red→green→refactor. Closure: flip dispatch Status
 header `pending → done` in same commit; one commit allowed since
 greenfield init. Do NOT edit `STATUS.md` / `PLAN.md` / `HANDOFF.md` /
 `DECISIONS.md` — governor session reconciles. First move:
-`cd ~/DEV/fCC-U/artemis && go mod init github.com/freeCodeCamp/artemis`.
+`cd ~/DEV/fCC/artemis && go mod init github.com/freeCodeCamp/artemis`.
 
 ### T33 worker — universe-cli platform.yaml v2 schema
 
@@ -217,7 +217,7 @@ GHCR image (`ghcr.io/freecodecamp/artemis:sha-7d6eed3c58fd25407f52a905bad458c4a7
   (`uploads.freecode.camp` → Tailscale upstream
   `artemis.management.tailscale.fcc:8080`), justfile recipe
   (`just helm-upgrade gxy-management artemis` wrapping `--set-file
-sites=$HOME/DEV/fCC-U/artemis/config/sites.yaml`), runbook
+sites=$HOME/DEV/fCC/artemis/config/sites.yaml`), runbook
   `docs/runbooks/deploy-artemis-service.md` (NEW), flight-manual
   section `docs/flight-manuals/gxy-management.md` artemis subsection,
   smoke script `scripts/phase5-proxy-smoke.sh` (NEW — replaces

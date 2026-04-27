@@ -2,7 +2,7 @@
 
 **Status:** done
 **Worker:** w-artemis (governor session, role-overridden 2026-04-26 evening)
-**Repo:** `~/DEV/fCC-U/artemis` (branch: `main`) — empty git repo (only `.git/`); files land in this dispatch
+**Repo:** `~/DEV/fCC/artemis` (branch: `main`) — empty git repo (only `.git/`); files land in this dispatch
 **Spec:** D016 (`~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`) §Architecture + §Authn/authz + §R2 layout + §Amendments (read in full — covers `uploads → artemis` rename + JWT scope clarification)
 **Cross-ref:** D43 + 2 dated amendments in sprint `DECISIONS.md`
 **Toolchain:** Go 1.26.2 (`/opt/homebrew/bin/go`); chi router; AWS SDK Go v2 for R2; testify
@@ -17,7 +17,7 @@
 | Surface         | Value                                                                                                                |
 | --------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Repo            | `freeCodeCamp/artemis`                                                                                               |
-| Local path      | `~/DEV/fCC-U/artemis/`                                                                                               |
+| Local path      | `~/DEV/fCC/artemis/`                                                                                                 |
 | Go module       | `github.com/freeCodeCamp/artemis`                                                                                    |
 | Container image | `ghcr.io/freecodecamp/artemis:<sha>`                                                                                 |
 | k3s Deployment  | `artemis`                                                                                                            |
@@ -28,7 +28,7 @@
 ## Files to create
 
 ```
-~/DEV/fCC-U/artemis/
+~/DEV/fCC/artemis/
 ├── .gitignore
 ├── .editorconfig
 ├── go.mod                                   # module github.com/freeCodeCamp/artemis

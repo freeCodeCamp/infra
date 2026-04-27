@@ -219,7 +219,7 @@ Chart.yaml: icon is recommended` informational only
 3. `just mirror-artemis-secrets` — produces sealed YAML overlay at
    `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`.
    Commit + push from infra-secrets.
-4. `git -C ~/DEV/fCC-U/artemis pull --ff-only` — ensure
+4. `git -C ~/DEV/fCC/artemis pull --ff-only` — ensure
    `config/sites.yaml` current.
 5. `cd ~/DEV/fCC/infra && just artemis-deploy` — helm install.
 6. `curl -fsS https://uploads.freecode.camp/healthz` — expect
@@ -559,7 +559,7 @@ unstaged "T-build-residency" parking entry from a separate session
 
 ### 2026-04-27 — T31 closed: artemis Go svc greenfield scaffold
 
-T31 worker session in `~/DEV/fCC-U/artemis` (greenfield repo) shipped
+T31 worker session in `~/DEV/fCC/artemis` (greenfield repo) shipped
 full Go microservice scaffold per dispatch §Files + §API surface +
 §Acceptance. Single commit allowed for greenfield init.
 
