@@ -1,0 +1,21 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-ratelimit
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+spec:
+  rateLimit:
+    # Average requests-per-second per source IP, sliding 1s window.
+    # Burst absorbs short bursts (e.g. parallel multipart PUTs from a
+    # single deploy). Tune via values overlay if real traffic shifts.
+    average: {{ .Values.rateLimit.average | default 20 }}
+    burst:   {{ .Values.rateLimit.burst   | default 60 }}
+    period:  {{ .Values.rateLimit.period  | default "1s" | quote }}
+    sourceCriterion:
+      ipStrategy:
+        # Trust CF IPs as the immediate hop. CF rewrites
+        # X-Forwarded-For with the real client IP. Skip Traefik's
+        # default node-IP source (would group all CF traffic into
+        # one bucket and trivially bypass per-client limits).
+        depth: 1

@@ -1,0 +1,141 @@
+# Default values for the artemis chart.
+# Production overlay at ../../values.production.yaml.
+# Secret credentials overlay at (sops) infra-secrets/k3s/gxy-management/artemis.values.yaml.enc.
+# Consumed by `just helm-upgrade gxy-management artemis`.
+#
+# Layer order (lowest → highest precedence):
+#   1. THIS FILE (chart defaults)
+#   2. apps/artemis/values.production.yaml (production overlay — image pin, replicas, non-secret env)
+#   3. infra-secrets/k3s/gxy-management/artemis.values.yaml.enc (sops sealed — secret env + TLS)
+
+# ---------------------------------------------------------------------
+# Image
+# ---------------------------------------------------------------------
+# Per Universe RUN-residency rule: artemis pillar pulls from
+# ghcr.io/freecodecamp/artemis direct. NEVER through zot.management
+# (zot lives on this same galaxy → chicken-egg on cluster wipe). See
+# Universe/spike/field-notes/infra.md §2026-04-27.
+image:
+  repository: ghcr.io/freecodecamp/artemis
+  tag: "dev"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ---------------------------------------------------------------------
+# Workload sizing
+# ---------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# ---------------------------------------------------------------------
+# Pod & container security context (PSS baseline-compliant; artemis
+# namespace runs PSS baseline — no privileged escalation needed).
+# ---------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------
+# Service
+# ---------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+# ---------------------------------------------------------------------
+# Application env (non-secret) — defaults per artemis.env.sample.
+# Values flow into the ConfigMap mounted into the pod via envFrom.
+# Secret env (R2 keys, GH_CLIENT_ID, JWT_SIGNING_KEY) live under
+# `secretEnv:` and come from the sops overlay.
+# ---------------------------------------------------------------------
+env:
+  R2_BUCKET: "universe-static-apps-01"
+  GH_ORG: "freeCodeCamp"
+  GH_API_BASE: "https://api.github.com"
+  SITES_YAML_PATH: "/etc/artemis/sites.yaml"
+  JWT_TTL_SECONDS: "900" # 15 min, per ADR-016 amend 2026-04-26
+  GH_MEMBERSHIP_CACHE_TTL: "300"
+  ALIAS_PRODUCTION: "production"
+  ALIAS_PREVIEW: "preview"
+  DEPLOY_PREFIX_FORMAT: "{site}/deploys/{deployId}/"
+  LOG_LEVEL: "info"
+
+# Required secret env keys — populated by sops overlay
+# (infra-secrets/k3s/gxy-management/artemis.values.yaml.enc).
+# Listed here as null so chart fail-fasts via `required` template
+# helpers if the overlay is missing or incomplete.
+secretEnv:
+  R2_ENDPOINT: null
+  R2_ACCESS_KEY_ID: null
+  R2_SECRET_ACCESS_KEY: null
+  GH_CLIENT_ID: null
+  JWT_SIGNING_KEY: null
+
+# ---------------------------------------------------------------------
+# sites.yaml — authorization map. Materialized into a ConfigMap and
+# mounted at SITES_YAML_PATH. Source of truth lives in the artemis
+# repo at config/sites.yaml; loaded into Helm via `--set-file
+# sites=$ARTEMIS_REPO/config/sites.yaml` in the artemis-deploy recipe.
+# ---------------------------------------------------------------------
+sites: ""
+
+# ---------------------------------------------------------------------
+# TLS — per-app pattern (matches gxy-cassiopeia caddy precedent).
+# Cert + key for `uploads.freecode.camp` (CF Origin cert, wildcard
+# `*.freecode.camp` acceptable; mint via CF dashboard). Sops-sealed in
+# the values overlay alongside secretEnv.
+# ---------------------------------------------------------------------
+tls:
+  cert: null
+  key: null
+
+# ---------------------------------------------------------------------
+# Gateway / HTTPRoute (Traefik gatewayClassName) — public surface
+# `uploads.freecode.camp`. Pattern matches windmill / zot / argocd on
+# gxy-management. Traefik runs hostNetwork DaemonSet on ports 80/443
+# (per ADR-001 §traefik); listeners bind those entrypoints.
+# ---------------------------------------------------------------------
+gateway:
+  hostname: "uploads.freecode.camp"
+  # Existing gxy-management apps use per-app Gateway CRs. We do the
+  # same so artemis lifecycle is independent of windmill / zot / argocd.
+
+# Traefik middleware references (cluster-installed — see
+# k3s/gxy-management/cluster/traefik/middlewares.yaml). Names match
+# windmill / zot / argocd usage for parity.
+middlewares:
+  redirectHttps: redirect-https
+  secureHeaders: secure-headers
+
+# ---------------------------------------------------------------------
+# Rate limit (Traefik Middleware — chart-internal). Per-source-IP
+# limit (CF X-Forwarded-For depth=1). Production overlay tunes.
+# ---------------------------------------------------------------------
+rateLimit:
+  average: 20
+  burst: 60
+  period: "1s"
+
+# ---------------------------------------------------------------------
+# NetworkPolicy
+# ---------------------------------------------------------------------
+networkPolicy:
+  enabled: true

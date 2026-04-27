@@ -11,6 +11,125 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T34 closed: artemis chart + Path X reframe (drop Tailscale, drop Caddy/cassiopeia hop)
+
+T34 worker session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`)
+shipped the artemis Helm chart, justfile recipes, phase5 E2E smoke,
+operator runbook, and gxy-management flight-manual section. Mid-flight
+two architectural reframes landed:
+
+**Reframe A — RUN-residency clause (image pull path).** Operator
+flagged: artemis chart cannot pull from `zot.management.tailscale.fcc`
+(zot lives on the same galaxy → cluster-wipe rebuild deadlocks).
+Documented as 2026-04-27 amendment to the 2026-04-26 build-residency
+field-note entry; auto-memory feedback file added; TODO-park
+T-build-residency Phase 1 audit scope extended to cover
+`image.repository` fields in pillar charts.
+
+**Reframe B — Path X (drop Tailscale + Caddy/cassiopeia hop).**
+Operator flagged: dispatch's proposed
+`uploads → CF → Caddy/cassiopeia → Tailscale → artemis` conflicts
+with ADR-009 (Tailscale Operator rejected). Reframe to
+`uploads → CF → gxy-management public IP → Traefik Gateway/HTTPRoute
+→ artemis Service` — windmill / zot / argocd pattern, single galaxy
+hop. Caddy/cassiopeia stays on `*.freecode.camp` tenant traffic only,
+no involvement in `uploads.freecode.camp` path. Caddy values change
+in original dispatch dropped as N/A.
+
+**Reframe C — auth (path A).** Confirmed artemis = programmatic API
+(GH OAuth Bearer per ADR-016, no CF Access). Compensating controls:
+chart-internal Traefik rate-limit Middleware + CF WAF rules.
+
+**Closing commits:**
+
+- infra `feat/k3s-universe` (not pushed): `<incoming>` —
+  `docs(sprints): close T34 — artemis chart + Path X reframe`
+  (single closure commit covers chart + recipes + smoke + runbook +
+  flight-manual + sprint-doc state flip + DECISIONS amend block +
+  TODO-park RUN-residency amend + Universe field-note RUN-residency
+  entry + auto-memory feedback file + .prettierignore for chart
+  templates)
+
+**Files landed (this commit):**
+
+```
+.prettierignore                                                     (NEW — exclude helm template trees from Prettier)
+docs/TODO-park.md                                                   (RUN-residency amend block on T-build-residency entry)
+docs/runbooks/deploy-artemis-service.md                             (NEW — operator runbook)
+docs/flight-manuals/gxy-management.md                               (NEW §Phase 7 Artemis)
+docs/sprints/2026-04-26/{STATUS,PLAN,DECISIONS,HANDOFF}.md          (close + amend)
+docs/sprints/2026-04-26/dispatches/T34-caddy-dns-smoke.md           (Path X amend + close)
+justfile                                                            (NEW recipes: artemis-deploy, mirror-artemis-secrets, phase5-smoke)
+k3s/gxy-management/apps/artemis/charts/artemis/Chart.yaml           (NEW)
+k3s/gxy-management/apps/artemis/charts/artemis/values.yaml          (NEW — chart defaults, fail-fast required helpers)
+k3s/gxy-management/apps/artemis/charts/artemis/templates/_helpers.tpl
+k3s/gxy-management/apps/artemis/charts/artemis/templates/namespace.yaml
+k3s/gxy-management/apps/artemis/charts/artemis/templates/configmap.yaml      (env + sites.yaml ConfigMaps)
+k3s/gxy-management/apps/artemis/charts/artemis/templates/secret-env.yaml     (5 secret env keys, sops overlay)
+k3s/gxy-management/apps/artemis/charts/artemis/templates/secret-tls.yaml     (CF Origin cert, sops overlay)
+k3s/gxy-management/apps/artemis/charts/artemis/templates/middleware-ratelimit.yaml
+k3s/gxy-management/apps/artemis/charts/artemis/templates/gateway.yaml
+k3s/gxy-management/apps/artemis/charts/artemis/templates/httproute.yaml      (web→redirect-https + websecure→Service)
+k3s/gxy-management/apps/artemis/charts/artemis/templates/service.yaml
+k3s/gxy-management/apps/artemis/charts/artemis/templates/deployment.yaml
+k3s/gxy-management/apps/artemis/charts/artemis/templates/networkpolicy.yaml
+k3s/gxy-management/apps/artemis/values.production.yaml              (image digest pin, replicas, prod env, ratelimit tunables)
+k3s/gxy-management/apps/artemis/README.md                           (chart docs)
+scripts/phase5-proxy-smoke.sh                                       (NEW — E2E init/upload/finalize/preview/promote/prod)
+~/.claude/auto-memory/feedback_universe_run_residency.md            (cross-repo — auto-memory; not part of infra commit)
+~/DEV/fCC-U/Universe/spike/field-notes/infra.md                     (cross-repo — RUN-residency entry; separate Universe commit)
+```
+
+**Gates evidenced (worker handoff):**
+
+- `helm lint charts/artemis` → 1 chart linted, 0 failed
+- `helm template artemis charts/artemis ...` → 12 resources render
+  (Namespace, NetworkPolicy, 2× Secret, 2× ConfigMap, Service,
+  Deployment, Gateway, 2× HTTPRoute, Middleware) — `[INFO]
+Chart.yaml: icon is recommended` informational only
+- `bash -n scripts/phase5-proxy-smoke.sh` → OK
+- `just --list` → `artemis-deploy`, `mirror-artemis-secrets`,
+  `phase5-smoke` recipes registered
+
+**Operator-gated actions (G1 tick):**
+
+1. CF dashboard — mint Origin cert for `*.freecode.camp` (if not
+   already minted by cassiopeia caddy work — verify and reuse if so).
+2. Export `ARTEMIS_TLS_CERT` + `ARTEMIS_TLS_KEY` paths.
+3. `just mirror-artemis-secrets` — produces sealed YAML overlay at
+   `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`.
+   Commit + push from infra-secrets.
+4. `git -C ~/DEV/fCC-U/artemis pull --ff-only` — ensure
+   `config/sites.yaml` current.
+5. `cd ~/DEV/fCC/infra && just artemis-deploy` — helm install.
+6. `curl -fsS https://uploads.freecode.camp/healthz` — expect
+   `{"ok":true}`.
+7. `just phase5-smoke` — E2E green ⇒ G1 ticks.
+
+**Out-of-scope deferrals (parked):**
+
+- CF Access service-token hardening for artemis (Path C from auth
+  decision menu) — defer; revisit post-G2 if abuse appears. Rate-
+  limit + WAF compensating controls are the v1 surface. (Park location:
+  see TODO-park §Application config later sprint.)
+- Single-envelope unification (drop dotenv envelope OR drop YAML
+  overlay — currently mirror via `just mirror-artemis-secrets`).
+  Park alongside dual-envelope fragility analysis.
+- `gxy-management` cluster-wipe rebuild rehearsal with zot
+  unreachable (RUN-residency operational invariant). Add to
+  flight-manual rebuild calendar.
+
+**Sprint state delta this commit:**
+
+- PLAN top-level dispatch matrix row T34 → `[x] done`.
+- STATUS Open table T34 → `done` (operator-gated).
+- STATUS header — `Updated:` line refreshed; ahead-of-origin bumped.
+- STATUS concurrency plan — all code lanes closed; only operator
+  gates remain for G1.
+- DECISIONS — D43 amendment block (Path X reframe; RUN-residency
+  clause; auth Path A confirmed).
+- HANDOFF — this entry.
+
 ### 2026-04-27 — artemis sites.yaml seeded (T34 precondition #5; broken ownership)
 
 Operator delegated: "do it for me." Governor session created the

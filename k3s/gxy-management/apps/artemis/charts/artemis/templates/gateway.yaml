@@ -1,0 +1,27 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Release.Name }}-gateway
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: websecure
+      protocol: HTTPS
+      port: 443
+      hostname: {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ .Release.Name }}-tls-cloudflare
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: web
+      protocol: HTTP
+      port: 80
+      hostname: {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname }}
+      allowedRoutes:
+        namespaces:
+          from: Same

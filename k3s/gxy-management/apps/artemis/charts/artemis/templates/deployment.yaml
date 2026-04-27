@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "artemis.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "artemis.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll pods on env / sites / secret changes (fsnotify covers
+        # sites.yaml hot-reload at runtime, but a chart change should
+        # also propagate via rollout — covers env mutations + edge
+        # cases where ConfigMap projection lags fsnotify).
+        checksum/config-env:  {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret-env:  {{ include (print $.Template.BasePath "/secret-env.yaml") . | sha256sum }}
+        checksum/secret-tls:  {{ include (print $.Template.BasePath "/secret-tls.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "artemis.selectorLabels" . | nindent 20 }}
+      containers:
+        - name: artemis
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-env
+            - secretRef:
+                name: {{ .Release.Name }}-env-secret
+          volumeMounts:
+            - name: sites-config
+              mountPath: /etc/artemis
+              readOnly: true
+            # Writable tmp for read-only-root-fs Go binary scratch.
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: sites-config
+          configMap:
+            name: {{ .Release.Name }}-sites
+        - name: tmp
+          emptyDir: {}

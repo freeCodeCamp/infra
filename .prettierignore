@@ -1,0 +1,10 @@
+# Helm chart templates use Go template syntax (`{{ ... }}`) inside YAML
+# scalar positions. Prettier 3.x parses these as flow mappings and
+# silently mangles them into `{ { ... } }`, breaking the chart at
+# render time. Exclude the entire chart templates tree.
+k3s/*/apps/*/charts/*/templates/
+k3s/*/apps/*/charts/*/templates/**
+
+# Sample files for sops envelopes (PEM / dotenv) — not YAML in a
+# meaningful sense; preserve operator-friendly layout.
+infra-secrets/**/*.sample

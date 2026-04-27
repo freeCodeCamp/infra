@@ -1,0 +1,61 @@
+# Production overlay for the artemis chart on gxy-management.
+# Loaded by `just helm-upgrade gxy-management artemis` between chart
+# defaults and the sops sealed overlay so the layering is:
+#
+#   chart values.yaml  <  THIS FILE  <  infra-secrets/k3s/gxy-management/artemis.values.yaml.enc
+#
+# Secret credentials and TLS PEM live in the sops overlay only.
+# Anything in this file is git-tracked and may be inspected publicly.
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/freecodecamp/artemis
+  # Pinned by tag + digest. OCI spec: when both are present, digest
+  # wins. Kubelet/containerd pull by digest (immutable). Tag retained
+  # for human grok in `helm list` / `kubectl describe pod`.
+  #
+  # Resolve digest with:
+  #   docker buildx imagetools inspect ghcr.io/freecodecamp/artemis:<tag>
+  #
+  # Build provenance: GitHub Actions on freeCodeCamp/artemis repo
+  # (.github/workflows/) — pushes every commit on main with the full
+  # SHA tag. Build-residency clean per Universe field-note 2026-04-26
+  # (build pipeline outside Universe). Run-residency clean per
+  # 2026-04-27 amendment (pulls from GHCR direct, not zot).
+  tag: "sha-7d6eed3c58fd25407f52a905bad458c4a70ed277@sha256:afb2c3152fdaf0d5d31f0593776c0358b3f615813c0423e336e7ac33fa83c70c"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+# Production env defaults (non-secret). Match artemis.env.sample.
+env:
+  R2_BUCKET: "universe-static-apps-01"
+  GH_ORG: "freeCodeCamp"
+  GH_API_BASE: "https://api.github.com"
+  SITES_YAML_PATH: "/etc/artemis/sites.yaml"
+  JWT_TTL_SECONDS: "900"
+  GH_MEMBERSHIP_CACHE_TTL: "300"
+  ALIAS_PRODUCTION: "production"
+  ALIAS_PREVIEW: "preview"
+  DEPLOY_PREFIX_FORMAT: "{site}/deploys/{deployId}/"
+  LOG_LEVEL: "info"
+
+# Rate-limit tunables — Traefik Middleware (chart-internal). Per
+# source IP (CF-rewritten X-Forwarded-For depth=1).
+rateLimit:
+  average: 20
+  burst: 60
+  period: "1s"
+
+gateway:
+  hostname: "uploads.freecode.camp"
+
+networkPolicy:
+  enabled: true

@@ -82,14 +82,14 @@ Sub-deliverables:
 
 ## Dispatch matrix
 
-| T-id | Area               | Subject                                          | Dispatch                                                                             | Status      |
-| ---- | ------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------ | ----------- |
-| T30  | Universe (xrepo)   | D016 ADR — deploy proxy plane (broken ownership) | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md) | [x] done    |
-| T31  | artemis (new repo) | Artemis svc Go — scaffold + endpoints + tests    | [`dispatches/T31-artemis-service.md`](dispatches/T31-artemis-service.md)             | [x] done    |
-| T32  | universe-cli       | v0.4 rewrite — proxy client (`feat/proxy-pivot`) | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)             | [x] done    |
-| T33  | universe-cli       | `platform.yaml` v2 schema + validator + doc      | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)           | [x] done    |
-| T34  | infra              | Caddy reverse proxy + DNS prep + smoke retarget  | [`dispatches/T34-caddy-dns-smoke.md`](dispatches/T34-caddy-dns-smoke.md)             | [ ] pending |
-| T22  | windmill           | Cleanup cron flow                                | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                   | [x] done    |
+| T-id | Area               | Subject                                          | Dispatch                                                                             | Status   |
+| ---- | ------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------ | -------- |
+| T30  | Universe (xrepo)   | D016 ADR — deploy proxy plane (broken ownership) | [`dispatches/T30-d016-deploy-proxy-adr.md`](dispatches/T30-d016-deploy-proxy-adr.md) | [x] done |
+| T31  | artemis (new repo) | Artemis svc Go — scaffold + endpoints + tests    | [`dispatches/T31-artemis-service.md`](dispatches/T31-artemis-service.md)             | [x] done |
+| T32  | universe-cli       | v0.4 rewrite — proxy client (`feat/proxy-pivot`) | [`dispatches/T32-cli-v04-rewrite.md`](dispatches/T32-cli-v04-rewrite.md)             | [x] done |
+| T33  | universe-cli       | `platform.yaml` v2 schema + validator + doc      | [`dispatches/T33-platform-yaml-v2.md`](dispatches/T33-platform-yaml-v2.md)           | [x] done |
+| T34  | infra              | Artemis chart + DNS + phase5 smoke (Path X)      | [`dispatches/T34-caddy-dns-smoke.md`](dispatches/T34-caddy-dns-smoke.md)             | [x] done |
+| T22  | windmill           | Cleanup cron flow                                | [`dispatches/T22-cleanup-cron.md`](dispatches/T22-cleanup-cron.md)                   | [x] done |
 
 ## Wave dispatch graph
 

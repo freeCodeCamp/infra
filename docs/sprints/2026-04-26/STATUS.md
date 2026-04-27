@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (artemis sites.yaml seeded — T34 preconditions 5/5 GREEN) · Branch: `feat/k3s-universe` · Ahead of origin: 17+
+Updated: 2026-04-27 (T34 closed — Path X reframe; artemis chart + phase5 smoke + runbook + flight-manual) · Branch: `feat/k3s-universe` · Ahead of origin: 27+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -72,16 +72,15 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 | **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                                                                                    |
 | **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1`) — addendum: bake `UNIVERSE_GH_CLIENT_ID` default (G2 blocker); oxfmt deferred |
 | **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                               |
-| **T34** — Caddy reverse proxy + DNS prep + smoke retarget                            | infra `feat/k3s-universe`                                             | pending (blocks on T31 image tag)                                                                               |
+| **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@<incoming>`) — operator-gated: helm-deploy + phase5-smoke (live verify)                        |
 | **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending                                                          |
 
 **Concurrency plan:**
 
-- T30 ✅ + T31 ✅ + T32 ✅ + T33 ✅ + T22 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
-- 1 lane open: **T34** (Caddy + DNS + smoke retarget). Blocks on artemis GHCR image tag (T31 CI fix in flight per operator). Sprint G1 ticks at T34 close.
+- T30 ✅ + T31 ✅ + T32 ✅ + T33 ✅ + T22 ✅ + T34 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
+- **All sprint code lanes closed.** Operator gates remaining for G1 tick: (a) `just mirror-artemis-secrets` + `just artemis-deploy`; (b) `just phase5-smoke` green E2E; (c) T22 live verify (R2 admin Resource + schedule flip).
 - **T32 addendum** (bake `UNIVERSE_GH_CLIENT_ID` default in source) — short follow-up worker fire on `feat/proxy-pivot`. Blocks G2 (npm publish), not G1. See dispatch §Addendum 2026-04-27.
-- T22 live verify (operator gates: provision `u/admin/r2_admin_s3` Resource → MCP preview dry-run → enable schedule dry-run → flip dry-run false) blocks on T34 prod live, optional during sprint.
-- npm publish `@freecodecamp/universe-cli@0.4.0` blocks on T34 smoke green + T32 addendum (G2 gate).
+- npm publish `@freecodecamp/universe-cli@0.4.0` blocks on phase5-smoke green + T32 addendum (G2 gate).
 
 ## Operator-owned actions (post session ship)
 

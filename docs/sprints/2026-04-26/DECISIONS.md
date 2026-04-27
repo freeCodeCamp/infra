@@ -112,3 +112,104 @@ Server validates via `GET /user`, caches login→user 5 min. Authz separate (Q11
 - CLI = client surface. Proxy = server. Different audiences (staff devs vs platform team), different lifecycles, different deps (Go vs TS), different release cadence.
 - Naming: short, neutral, descriptive (`uploads`). Not `proxy` (too generic), not `deploy-proxy` (verbose).
 - Path: `~/DEV/fCC-U/uploads/`. Go module: `github.com/freeCodeCamp/uploads`.
+
+---
+
+### D43 amendment — 2026-04-27 — T34 Path X reframe + RUN-residency + auth path
+
+T34 worker session surfaced three architectural conflicts in the
+original dispatch wording. Resolved by operator (mrugesh) on
+2026-04-27. All three live as `D43` amendments because the original
+D43 row anchors the deploy-proxy plane (cross-ref `Universe ADR-016`).
+
+**Amend 1 — Path X (drop Tailscale + Caddy/cassiopeia hop).**
+
+Original dispatch wording proposed: `uploads.freecode.camp → CF →
+Caddy/cassiopeia → Tailscale → artemis/management`. Conflicts with
+**Universe ADR-009** ("Tailscale Operator rejected — node-level only,
+no operator on Universe galaxies; Cloudflare → node public IP →
+Traefik is the staff-access pattern").
+
+**Resolution.** Reframe to single-galaxy hop. DNS already aligned:
+`uploads.freecode.camp` A → gxy-management public IPs (operator-
+confirmed). Caddy on cassiopeia stays on `*.freecode.camp` tenant
+sites + previews; never sees `uploads.freecode.camp`.
+
+```
+uploads.freecode.camp
+    → CF proxied (orange) → CF Origin → gxy-management public IP
+    → Traefik (hostNetwork DaemonSet)
+    → Gateway (artemis-gateway, ns artemis, websecure listener)
+    → HTTPRoute (artemis-route, hostname uploads.freecode.camp)
+    → Service artemis (ClusterIP :8080)
+    → Pod artemis (Go binary)
+```
+
+Same shape as `windmill.freecodecamp.net`,
+`registry.freecodecamp.net`, `argocd.freecodecamp.net` — except on
+the `freecode.camp` zone instead of `freecodecamp.net`. Per-app TLS
+overlay (CF Origin cert sealed inside the values overlay) matches
+the cassiopeia caddy precedent.
+
+**Amend 2 — RUN-residency clause for Universe platform pillars.**
+
+Operator flagged: artemis pillar deployed on `gxy-management` MUST
+NOT pull its container image from a registry on the same galaxy
+(zot lives at `gxy-management`). Cluster-wipe rebuild deadlock —
+kubelet cannot reach zot until zot runs; zot cannot run without
+its image; that image must come from zot. Same outage equivalent
+on any zot incident.
+
+**Resolution.** RUN-residency rule extends the 2026-04-26 build-
+residency rule (Universe field-note `infra.md` line 983):
+
+| Path                                             | Universe pillars (caddy-s3, artemis, ingress) | Tenant deploys (cassiopeia, launchbase)             |
+| ------------------------------------------------ | --------------------------------------------- | --------------------------------------------------- |
+| Build location                                   | Outside Universe (GitHub Actions)             | Universe Woodpecker                                 |
+| Pull source (`image.repository` in chart values) | **GHCR direct** (`ghcr.io/freecodecamp/<x>`)  | GHCR direct OR ratified zot pull-through (deferred) |
+| Storage backing                                  | Outside Universe (R2, etc.)                   | Inside Universe acceptable                          |
+
+Both build AND pull must clear the recovery boundary for pillars.
+Documented in Universe field-note 2026-04-27 + infra TODO-park
+§Build-residency migration amendment. Auto-memory feedback file
+landed for cross-session continuity.
+
+ADR proposal (Universe team owns) renamed: "Build + Run residency
+for Universe platform pillars" — supersedes the 2026-04-26 single-
+axis proposal.
+
+**Amend 3 — Auth path A (no CF Access on artemis).**
+
+Operator asked whether artemis should sit behind CF Access (Google
+OAuth) like windmill / argocd / zot. Answer: no — artemis is a
+programmatic API for the `universe` CLI + CI. Browser-based Google
+SSO incompatible with headless `universe deploy` invocations. CF
+Access service tokens (Path B) require per-CI provisioning and
+duplicate auth without adding meaningful security (GH membership
+check is the actual authorization gate per ADR-016 Q11).
+
+**Resolution.** Path A: GitHub OAuth Bearer + deploy-session JWT
+(HS256, 15min, scoped `(login, site, deployId)`) per ADR-016 §Authn/
+authz. Compensating controls:
+
+- chart-internal Traefik rate-limit Middleware (per-source-IP, CF
+  X-Forwarded-For depth=1, tunable via values overlay)
+- CF WAF rules on `freecode.camp` zone (deferred to operator post-
+  deploy; runbook §Failure modes)
+- read-only R2 keys + per-prefix scoping (D33 ×2)
+- JWT scope narrowing (cannot promote/rollback — those re-auth via
+  GH token)
+
+Path C (CF Access service tokens) parked at TODO-park §Application
+config — revisit post-G2 if abuse appears.
+
+**Cross-refs.**
+
+- `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-27
+  RUN-residency clause
+- `~/DEV/fCC/infra/docs/runbooks/deploy-artemis-service.md`
+- `~/DEV/fCC/infra/docs/flight-manuals/gxy-management.md` §Phase 7
+- `~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T34-caddy-dns-smoke.md`
+  §Galaxy placement (Path X reframe)
+- `~/DEV/fCC/infra/docs/TODO-park.md` §Build-residency migration
+  (RUN-residency amendment block)

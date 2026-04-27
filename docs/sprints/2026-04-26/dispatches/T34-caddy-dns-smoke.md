@@ -1,14 +1,14 @@
 # T34 — Caddy reverse proxy + DNS prep + smoke retarget
 
-**Status:** pending
+**Status:** done
 **Worker:** w-infra (multi-session true-parallel — T34 worker session; shares repo with governor)
 **Repo:** `~/DEV/fCC/infra` (branch: `feat/k3s-universe`)
-**Spec:** D016 §Operational surface + 2026-04-26 amend (`uploads → artemis` rename) + 2026-04-26 amend (deploy-session JWT in v1) + 2026-04-27 amend (CLI namespace `static`)
+**Spec:** D016 §Operational surface + 2026-04-26 amend (`uploads → artemis` rename) + 2026-04-26 amend (deploy-session JWT in v1) + 2026-04-27 amend (CLI namespace `static`) + 2026-04-27 reframe (Path X — drop Tailscale + Caddy/cassiopeia hop, see DECISIONS D43 amend block)
 **Cross-ref:** D43 amendment in sprint `DECISIONS.md`
-**Toolchain:** Helm + Caddy + ansible; existing infra recipes
-**Started:** —
-**Closed:** —
-**Closing commit(s):** —
+**Toolchain:** Helm + ansible; existing infra recipes
+**Started:** 2026-04-27
+**Closed:** 2026-04-27
+**Closing commit(s):** `<incoming>` — `docs(sprints): close T34 — artemis chart + Path X reframe`
 
 ---
 
@@ -24,42 +24,89 @@
 | Public host     | `uploads.freecode.camp` _(unchanged)_      |
 | Caddy upstream  | Tailscale name to gxy-management k3s svc   |
 
-## Galaxy placement — locked **Option A (gxy-management)**
+## Galaxy placement — locked **Option A (gxy-management)** — 2026-04-27 reframe
 
-`uploads.freecode.camp` → CF proxied → Caddy on gxy-cassiopeia
-(existing) → reverse-proxy via Tailscale to artemis svc on
-gxy-management. gxy-management already runs Windmill + Zot;
-artemis is low-overhead Go binary. Cross-galaxy hop accepted —
-serve plane (Caddy + R2) stays on cassiopeia for role clarity.
+**Reframe (2026-04-27, T34 worker):** original wording proposed
+`uploads → CF → Caddy/cassiopeia → Tailscale → artemis/management`.
+Operator (mrugesh, 2026-04-27) flagged the Tailscale leg conflicts
+with **ADR-009** ("Tailscale Operator rejected — node-level only").
+gxy-management runs no Tailscale Operator; the proposed
+`artemis.management.tailscale.fcc:8080` MagicDNS hostname does not
+exist. **Reframe:** drop the Caddy/cassiopeia hop entirely. Use the
+**windmill / zot / argocd pattern**: each gxy-management app exposes
+itself directly via its own Gateway + HTTPRoute (Traefik
+gatewayClassName) on its own public hostname.
+
+**New path (Path X — locked):**
+
+```
+uploads.freecode.camp
+    → CF proxied (orange cloud)
+    → CF Origin → gxy-management public IP (Traefik hostNetwork)
+    → Gateway (artemis-gateway, ns artemis, sectionName: websecure)
+    → HTTPRoute (artemis-route, hostname uploads.freecode.camp)
+    → Service artemis (ClusterIP, port 8080)
+    → Pod artemis (Go binary)
+```
+
+No Caddy-cassiopeia in path. No Tailscale in path. No cross-galaxy
+hop. Same shape as `windmill.freecodecamp.net`,
+`registry.freecodecamp.net`, `argocd.freecodecamp.net` — except on
+the `freecode.camp` zone instead of `freecodecamp.net`.
+
+**Cassiopeia Caddy untouched.** Caddy continues serving
+`*.freecode.camp` (sites + previews via R2 alias). It does not see
+`uploads.freecode.camp` traffic.
 
 (Pre-lock options B / C lived in earlier draft; archived in HANDOFF.)
 
-## Files to touch
+## Files to touch (Path X reframe — 2026-04-27)
 
 ```
 infra/
 ├── k3s/gxy-management/
 │   └── apps/artemis/
-│       ├── chart/                      # Helm chart for artemis svc
+│       ├── charts/artemis/             # Helm chart (we own — no upstream)
 │       │   ├── Chart.yaml
-│       │   ├── values.production.yaml
+│       │   ├── values.yaml             # defaults (chart-internal)
 │       │   └── templates/
+│       │       ├── _helpers.tpl
 │       │       ├── deployment.yaml
-│       │       ├── service.yaml
-│       │       ├── secret.yaml         # env source (sealed via sops)
-│       │       └── configmap.yaml      # sites.yaml mounted file
+│       │       ├── service.yaml        # ClusterIP :8080
+│       │       ├── configmap.yaml      # sites.yaml + non-secret env
+│       │       ├── secret-env.yaml     # 5 secret env vars (sops overlay)
+│       │       ├── secret-tls.yaml     # CF Origin cert (sops overlay)
+│       │       ├── gateway.yaml        # Gateway API (Traefik) — web + websecure listeners
+│       │       ├── httproute.yaml      # web→redirect-https + websecure→Service
+│       │       ├── namespace.yaml
+│       │       └── networkpolicy.yaml
+│       ├── values.production.yaml      # production overlay (image, replicas, defaulted env)
 │       └── README.md
-├── k3s/gxy-cassiopeia/apps/caddy/      # update Caddy chart values
-│   └── values.production.yaml          # add uploads.freecode.camp upstream rule
-├── ansible/playbooks/
-│   └── play-artemis-deploy.yml         # generic deploy playbook (if recipe needs it)
-├── justfile                            # add `just artemis-deploy` recipe (or reuse helm-upgrade)
+├── (NO change to k3s/gxy-cassiopeia/apps/caddy/) — Path X reframe
+├── justfile                            # add `mirror-artemis-secrets` recipe (dotenv → yaml overlay one-time)
+├── scripts/
+│   └── phase5-proxy-smoke.sh           # NEW — E2E artemis smoke (init/upload/finalize/promote)
 └── docs/
     ├── runbooks/
-    │   └── deploy-artemis-service.md   # NEW — operator runbook (DNS + OAuth + sops + helm)
+    │   └── deploy-artemis-service.md   # NEW — operator runbook (DNS + OAuth + cert mint + sops + helm)
     └── flight-manuals/
-        └── gxy-management.md           # add artemis service section
+        └── gxy-management.md           # add artemis service section + cluster-rebuild step
+
+infra-secrets/  (operator one-time, separate repo)
+└── k3s/gxy-management/
+    ├── artemis.values.yaml.sample      # NEW — schema reference (commit)
+    └── artemis.values.yaml.enc         # NEW — sops-sealed (operator-mints; commit)
 ```
+
+**Single sealed envelope going forward.** The legacy
+`infra-secrets/management/artemis.env.enc` (dotenv) becomes a SOT
+**reference only** for env-mint provenance / local-dev / artemis docker-
+compose. Helm consumes the new YAML overlay at
+`infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` via the
+existing `helm-upgrade` recipe. The new `just mirror-artemis-secrets`
+recipe converts dotenv → YAML overlay one-time so operator does not
+re-mint values. Drift-prevention parked at TODO-park §Application
+config (single-envelope unification).
 
 ## Operator preconditions (ClickOps; do BEFORE worker fires)
 
@@ -302,11 +349,15 @@ Flow:
 
 ## Closure checklist
 
-- [ ] Helm chart files landed
-- [ ] Caddy values updated
-- [ ] Smoke script landed
-- [ ] Runbook landed
-- [ ] Flight-manual section added
-- [ ] T34 Status `done`
-- [ ] PLAN matrix row checked
-- [ ] HANDOFF entry appended
+- [x] Helm chart files landed (`k3s/gxy-management/apps/artemis/charts/artemis/` + `apps/artemis/values.production.yaml` + README)
+- [x] ~~Caddy values updated~~ — N/A under Path X reframe (cassiopeia caddy not in path; dispatch §Galaxy placement amend 2026-04-27)
+- [x] Smoke script landed (`scripts/phase5-proxy-smoke.sh` + `just phase5-smoke`)
+- [x] Runbook landed (`docs/runbooks/deploy-artemis-service.md`)
+- [x] Flight-manual section added (`docs/flight-manuals/gxy-management.md` §Phase 7 Artemis)
+- [x] Justfile recipes added (`just artemis-deploy`, `just mirror-artemis-secrets`, `just phase5-smoke`)
+- [x] RUN-residency clause documented (Universe field-note 2026-04-27 + infra TODO-park amend + auto-memory)
+- [x] `.prettierignore` for chart templates (post-write formatter mangles helm `{{ }}` syntax)
+- [x] T34 Status `done`
+- [x] PLAN matrix row checked
+- [x] HANDOFF entry appended
+- [x] DECISIONS D43 Path X amend block appended
