@@ -1,148 +1,124 @@
 # CLAUDE.md
 
-freeCodeCamp.org infrastructure-as-code. Primary target: freeCodeCamp Universe platform (DigitalOcean + Hetzner planned, Cloudflare, R2). Legacy freeCodeCamp infra (Linode, Azure) coexist, retire post-Universe.
+freeCodeCamp.org infra-as-code. Primary: freeCodeCamp Universe platform (DigitalOcean + Hetzner planned, Cloudflare, R2). Legacy fCC infra (Linode, Azure) coexist, retire post-Universe.
 
-**Galaxy design flow from Universe ADRs + spike plan (see Doc Index). No dup design content this repo.**
+**Galaxy design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
-## CRIT — justfile recipe slop discipline (2026-04-27, T34 closeout)
+## Doc ownership
 
-**No new per-app one-off recipes.** Before adding any recipe under `[group('k3s')]` / `[group('secrets')]` / `[group('smoke')]`:
+Authoritative model + flow diagram auto-loaded:
 
-1. Read the **full** existing recipe set end-to-end (`just --list`, `wc -l justfile`). Not just grep keywords.
-2. If the new operation is a thin wrapper over `helm-upgrade` with one extra flag (e.g. `--set-file`), **extend the generic recipe** via a per-app convention (e.g. optional `apps/<app>/.deploy-flags.sh` sourced for `EXTRA_HELM_ARGS`). Do NOT clone the helm-install body into a per-app recipe.
-3. If the new operation is **one-time** per cluster (mint, mirror, seal), put the commands **inline in the runbook**. Only promote to a recipe if it gets re-run more than ~3× per year.
-4. Sweep for duplication after adding any recipe: `git diff justfile | grep '^+' | head -50` — if you see `helm upgrade --install` repeated, refactor before commit.
+@~/DEV/fCC-U/Universe/CLAUDE.md
 
-Violation example (T34, sprint-2026-04-26): `artemis-deploy` cloned the helm-install body of `helm-upgrade` purely to inject `--set-file sites=...`. `mirror-artemis-secrets` was a one-time mint dressed up as a recipe. Both were avoidable. Both convoluted the justfile + cost operator time + tokens. Refactor parked at TODO-park §Justfile slop sweep (post-G1).
+Field notes for this repo (Infra team owns):
 
-Reviewer rule (candidate): any recipe added in the same commit as a new app under `k3s/<cluster>/apps/<app>/` is a code smell — flag for inline-in-runbook OR generic-recipe-extension before merge.
+@~/DEV/fCC-U/Universe/spike/field-notes/infra.md
 
-## Doc Index
+This repo owns:
 
-Cross-repo docs, strict ownership. Full model in [Universe/CLAUDE.md](~/DEV/fCC-U/Universe/CLAUDE.md). Info flow: field notes → ADRs → spike plan.
+| Path                   | Purpose                                            |
+| ---------------------- | -------------------------------------------------- |
+| `docs/GUIDELINES.md`   | Doc conventions + monthly trim                     |
+| `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`) |
+| `docs/runbooks/`       | Single-purpose ops runbooks                        |
+| `docs/architecture/`   | RFCs for non-trivial work                          |
+| `docs/sprints/`        | Active sprint at top, archive below                |
 
-### Universe repo (`~/DEV/fCC-U/Universe`) — Universe team owns
+## Working directory rule (HARD)
 
-| Doc                             | Purpose                                         |
-| ------------------------------- | ----------------------------------------------- |
-| `CLAUDE.md`                     | Source/index — doc-ownership model live here    |
-| `decisions/001-015`             | Architecture Decision Records (15 ADRs)         |
-| `spike/spike-plan.md`           | Master delivery plan + galaxy placement map     |
-| `spike/field-notes/infra.md`    | Infra team operational findings (this team own) |
-| `spike/field-notes/windmill.md` | Windmill team operational findings              |
+**Repo-wide `just` recipes that touch a cluster MUST run from `k3s/<galaxy>/` subfolder.** direnv `.envrc` hierarchy loads cluster-scoped tokens + `KUBECONFIG` only inside the galaxy dir:
 
-### This repo (`~/DEV/fCC/infra`) — Infra team owns
+- root `.envrc` → loads `$SECRETS_DIR/global/.env.enc` (org-wide tokens)
+- `k3s/<galaxy>/.envrc` → sources root, loads `$SECRETS_DIR/do-universe/.env.enc` (DO Universe token), exports `KUBECONFIG=$(expand_path .kubeconfig.yaml)`
 
-| Doc                    | Purpose                                                              |
-| ---------------------- | -------------------------------------------------------------------- |
-| `docs/GUIDELINES.md`   | Canonical doc conventions + monthly trim discipline                  |
-| `docs/flight-manuals/` | Per-cluster doomsday rebuild manuals (index at `00-index.md`)        |
-| `docs/runbooks/`       | Single-purpose operational runbooks (DNS cutover, R2 provision, etc) |
-| `docs/architecture/`   | RFCs for non-trivial infra work                                      |
-| `docs/sprints/`        | Per-sprint plans + dispatches (active sprint at top, archive below)  |
+Run `just deploy …` from repo root → wrong DO token, no `KUBECONFIG`, helm/kubectl hit wrong cluster or fail. Always:
 
-### Windmill repo (`~/DEV/fCC-U/windmill`) — Windmill team owns
+```
+cd k3s/<galaxy>/
+just <recipe>
+```
 
-| Doc                     | Purpose                  |
-| ----------------------- | ------------------------ |
-| `docs/FLIGHT-MANUAL.md` | Windmill rebuild runbook |
+Recipes that don't touch a cluster (e.g. `just play <playbook>` against ansible inventory) may run from repo root.
 
-## Secrets
+## infra-secrets coupling
 
-Private sibling repo `../infra-secrets` (sops+age). direnv auto-loads tokens on cd into cluster dirs. No secrets this repo — not even encrypted.
+Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age, single org key, `.sops.yaml` regex `.*`). Root `.envrc` resolves `SECRETS_DIR=../infra-secrets`; any other layout breaks direnv loading. No secrets this repo — not even encrypted.
 
-**`.env.enc` decrypt requires explicit type flags.** sops auto-detects from `.enc` extension and falls back to JSON parser; dotenv envelopes silently fail (`Error unmarshalling input json: invalid character '#'`). Canonical incantation:
+### Layout contract (consumed by `.envrc` + helm value overlays)
+
+| Path                    | Consumer                                               |
+| ----------------------- | ------------------------------------------------------ |
+| `global/.env.enc`       | Root `.envrc` — org-wide tokens                        |
+| `global/tls/`           | Cert material                                          |
+| `do-universe/.env.enc`  | Every Universe galaxy `.envrc` — DO team token         |
+| `do-primary/.env.enc`   | Legacy DO token                                        |
+| `k3s/<cluster>/`        | Per-cluster kubeconfigs / sealed material              |
+| `<app>/.env.enc`        | App-level overlay (e.g. `windmill/`, `outline/`)       |
+| `<scope>/<app>.env.enc` | Scoped app overlay (e.g. `management/artemis.env.enc`) |
+| `scratchpad/`           | Drafts — never consumed by recipes                     |
+
+New galaxy/app: mint secret at the matching path before first `just deploy`. Adding new top-level scopes requires updating the consumer (`.envrc` line or helm `--set-file` source).
+
+### Decrypt incantation
+
+`.env.enc` decrypt requires explicit type flags. sops auto-detect on `.enc` extension falls back to JSON parser; dotenv envelopes silently fail (`Error unmarshalling input json: invalid character '#'`).
 
 ```
 sops decrypt --input-type dotenv --output-type dotenv \
   ../infra-secrets/<scope>/<name>.env.enc
 ```
 
-Helm chart secret-rendering recipes + ops scripts MUST pass both flags. Alternative: pin `input_type: dotenv` per-glob in `.sops.yaml` (deferred — current rules block has no per-path type config).
+Helm chart secret-rendering recipes + ops scripts MUST pass both flags. Alternative (deferred): per-glob `input_type: dotenv` pin in `.sops.yaml` — current rules block has no per-path type config.
 
 ## Operations
 
-Run `just` see all recipes. cd into cluster dir first so direnv load right tokens.
+`just` lists recipes. cd into `k3s/<galaxy>/` first for cluster-scoped recipes (see Working directory rule).
 
-## Sprint protocol (auto-loaded session contract)
+## Sprint protocol
 
-This repo runs sprint-driven work. Active sprint = newest dir under
-`docs/sprints/` (not `archive/`). All multi-session work flows through
-sprint docs on disk, not external trackers.
+Sprint-driven work. Active sprint = newest non-archive dir under `docs/sprints/`. Multi-session work flows through sprint docs on disk, not external trackers.
 
-**Minimal-prompt vocabulary** — operator says one of:
+**Operator vocabulary** — full closure checklist + session-start ritual in `docs/GUIDELINES.md` §Sprint docs:
 
-| Operator says               | Claude does                                                                                                                                                                                                                                 |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `start the sprint`          | Read active `sprints/<date>/README.md` → `STATUS.md`. Report current state. No action until told `go`.                                                                                                                                      |
-| `roll the sprint`           | Rewrite active sprint's `STATUS.md` from current git log + dispatch-doc Status headers. Single commit. No push.                                                                                                                             |
-| `give me the resume prompt` | Print active sprint `STATUS.md` Resume-prompt block verbatim. Nothing else.                                                                                                                                                                 |
-| `next move?`                | Per active sprint `STATUS.md` Open + `PLAN.md` Wave graph, name next unblocked task. Show: task ID, dispatch path, blockedBy, ready y/n.                                                                                                    |
-| `dispatch <T-id>`           | Open `dispatches/<T-id>-*.md`. Confirm preconditions met. Flip Status header to `in-progress`. Begin work per dispatch brief.                                                                                                               |
-| `close <T-id>`              | Run per-task closure checklist (`docs/GUIDELINES.md` §Sprint docs): flip dispatch Status, update PLAN matrix, append HANDOFF entry, update derived docs (flight-manual / field-note / runbook / ADR / TODO-park as applicable). One commit. |
-| `verify <T-id\|G-id>`       | Run the dispatch's read-only Verify command block; report green/red. Required green before any "operator runs X" gate or G-dispatch closes. Added 2026-04-26 (sprint-2026-04-21 audit recovery).                                            |
-
-**Session-start ritual** (executed on `start the sprint`):
-
-1. `ls docs/sprints/` — pick newest non-archive dir.
-2. Read `README.md` for read-order.
-3. Read `STATUS.md` — live cursor.
-4. Skim `PLAN.md` Wave graph + `DECISIONS.md` summary table.
-5. Report: current wave, last shipped, next unblocked task, blockers.
-6. Wait for operator. No action.
-
-**Per-task closure discipline** — when any sub-task closes, the closure
-commit MUST update derived docs the change affects:
-
-- Dispatch-doc Status header → `done`.
-- Sprint matrix row in `PLAN.md` → `[x] done`.
-- `HANDOFF.md` → append dated entry with summary + commit SHA.
-- Cluster flight-manual (`docs/flight-manuals/gxy-<name>.md`) if rebuild steps changed.
-- Field-note Journal (`~/DEV/fCC-U/Universe/spike/field-notes/<area>.md`) if learning landed (separate commit; cross-repo).
-- Runbook (`docs/runbooks/<verb>-<noun>.md`) if procedure introduced/modified.
-- ADR amendment (`~/DEV/fCC-U/Universe/decisions/NNN-*.md`) if decision shifted.
-- TODO-park (`docs/TODO-park.md`) if work deferred with activation trigger.
-
-Skipping derived-doc updates is a **sprint bug**, not a deferral.
+| Operator says               | Claude does                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `start the sprint`          | Read active `sprints/<date>/{README,STATUS}.md`. Report state. Wait for `go`.                                |
+| `roll the sprint`           | Rewrite active `STATUS.md` from git log + dispatch Status headers. Single commit.                            |
+| `give me the resume prompt` | Print active `STATUS.md` Resume-prompt block verbatim.                                                       |
+| `next move?`                | Per `STATUS.md` Open + `PLAN.md` Wave graph, name next unblocked task with ID, dispatch path, blockedBy.     |
+| `dispatch <T-id>`           | Open `dispatches/<T-id>-*.md`. Confirm preconditions. Flip Status → `in-progress`. Begin work.               |
+| `close <T-id>`              | Run closure checklist (`docs/GUIDELINES.md`): flip Status, update PLAN matrix, append HANDOFF, derived docs. |
+| `verify <T-id\|G-id>`       | Run dispatch's read-only Verify block; report green/red. Required green before any operator-action gate.     |
 
 **Invariants:**
 
-- Operator pushes. Session never `git push` / `gh pr create` / `npm publish`.
-- Decisions never silently rewritten — always amendment block with date.
-- HANDOFF entries never edited — always append correction entry.
-- Conflicts between docs surfaced on detection, not silently resolved.
+- Decisions never silently rewritten — amendment block with date.
+- HANDOFF entries never edited — append correction.
+- Inter-doc conflicts surfaced on detection, not silently resolved.
+- Skipping derived-doc updates on closure = sprint bug.
 
 ## Ansible
 
-- Per-galaxy config in `ansible/inventory/group_vars/<group>.yml`
+- Per-galaxy config: `ansible/inventory/group_vars/<group>.yml`
 - Playbooks generic orchestrators — reference variables, not literal values
-- Add galaxy: create group_vars file match DO inventory tag
+- Add galaxy: create group_vars file matching DO inventory tag
 
 ## Clusters
 
-State match Universe spike plan as of 2026-04-20. Verify reality with `doctl compute droplet list` before acting.
+Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Universe/spike/spike-plan.md` (canonical). Verify reality with `doctl compute droplet list` before acting.
 
-### Universe galaxies
+Inventory groups (matches `ansible/inventory/group_vars/`):
 
-| Galaxy           | Provider          | Inventory Group      | State          | Per spec                                |
-| ---------------- | ----------------- | -------------------- | -------------- | --------------------------------------- |
-| `gxy-management` | DO FRA1           | `gxy_management_k3s` | Live           | ArgoCD + Windmill + Zot (ADR-003/005)   |
-| `gxy-static`     | DO FRA1           | `gxy_static_k3s`     | Live — sandbox | Retires at `gxy-cassiopeia` cutover     |
-| `gxy-launchbase` | DO FRA1 → Hetzner | `gxy_launchbase_k3s` | Planned        | Woodpecker + CNPG (ADR-003)             |
-| `gxy-cassiopeia` | DO FRA1 → Hetzner | `gxy_cassiopeia_k3s` | Planned        | Static v2 + `caddy.fs.r2` (ADR-007 D32) |
-| `gxy-triangulum` | Hetzner BM        | —                    | Future         | Production constellations (post-M5)     |
-| `gxy-backoffice` | TBD               | —                    | Future         | O11y stack (ADR-015)                    |
+| Galaxy           | Inventory Group      |
+| ---------------- | -------------------- |
+| `gxy-management` | `gxy_management_k3s` |
+| `gxy-static`     | `gxy_static_k3s`     |
+| `gxy-launchbase` | `gxy_launchbase_k3s` |
+| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` |
 
-### Legacy (out of scope Universe baseline; retires post-Universe)
+Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 
-| Cluster                | Role               |
-| ---------------------- | ------------------ |
-| `ops-backoffice-tools` | Legacy fCC tooling |
-| `ops-mgmt`             | Legacy fCC mgmt    |
-
-No touch legacy clusters when executing Universe baseline work.
-
-## Key Directories
+## Key directories
 
 | Path             | Purpose                                      |
 | ---------------- | -------------------------------------------- |
@@ -152,10 +128,22 @@ No touch legacy clusters when executing Universe baseline work.
 | `docker/swarm/`  | Legacy Docker Swarm stacks                   |
 | `cloud-init/`    | VM bootstrap configs                         |
 
-## Non-obvious Conventions
+## Non-obvious conventions
 
-- Helm chart repos stored `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `helm-upgrade` install from local chart dir
-- `.envrc` hierarchy: root load global tokens, cluster dirs load team-specific DO token
-- `just play` prepend `play-` + append `.yml` to playbook name arg
+- Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `helm-upgrade` installs from local chart dir
+- `just play` prepends `play-` + appends `.yml` to playbook arg
 - Gateway API listener ports must match Traefik entrypoint ports (80/443 with hostNetwork)
-- PSS admission exempt `windmill` + `tailscale` namespaces (privileged workloads)
+- PSS admission exempt: `windmill` + `tailscale` namespaces (privileged workloads)
+
+## justfile recipe slop discipline
+
+**No new per-app one-off recipes.** Before adding under `[group('k3s')]` / `[group('secrets')]` / `[group('smoke')]`:
+
+1. Read full existing recipe set end-to-end (`just --list`, `wc -l justfile`). Not grep keywords.
+2. Thin wrapper over `helm-upgrade` with one extra flag (e.g. `--set-file`) → **extend generic recipe** via per-app `apps/<app>/.deploy-flags.sh` sourced for `EXTRA_HELM_ARGS`. Do NOT clone helm-install body.
+3. **One-time** per cluster (mint, mirror, seal) → inline in runbook. Promote to recipe only if re-run >~3×/year.
+4. Sweep duplication: `git diff justfile | grep '^+' | head -50` — if `helm upgrade --install` repeated, refactor before commit.
+
+Reviewer rule: any recipe added in same commit as new app under `k3s/<cluster>/apps/<app>/` = code smell. Flag for inline-in-runbook OR generic-recipe-extension before merge.
+
+Background: T34 closeout (sprint-2026-04-26) — `artemis-deploy` + `mirror-artemis-secrets` violated rules 2+3. Refactor parked at `docs/TODO-park.md` §Justfile slop sweep (post-G1).
