@@ -78,7 +78,8 @@ mirror-artemis-secrets:
       done < "$TMP_DOT"
     } > "$TMP_YAML"
     python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$TMP_YAML"
-    sops --encrypt --input-type yaml --output-type yaml "$TMP_YAML" > "$TMP_ENC"
+    sops --config "{{ secrets_dir }}/.sops.yaml" \
+      --encrypt --input-type yaml --output-type yaml "$TMP_YAML" > "$TMP_ENC"
     mv "$TMP_ENC" "$TGT"
     echo "Sealed $TGT"
     echo
