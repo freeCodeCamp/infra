@@ -11,6 +11,38 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T32 addendum filed: bake `UNIVERSE_GH_CLIENT_ID` default
+
+Operator verify pass 2026-04-27 (artemis GHCR image + CF DNS +
+GH OAuth App) flagged design gap in T32 closure: `login.ts:50` reads
+`UNIVERSE_GH_CLIENT_ID` from env at runtime; npm-published v0.4
+binary refuses `universe login` out-of-the-box on user laptops. OAuth
+client_id is public-grade (device flow, no client_secret) — bake
+default in source matches `gh` / `vercel` / `supabase` CLI patterns.
+Operator approved bake-at-build 2026-04-27.
+
+**Commits:**
+
+- infra `feat/k3s-universe`: `<incoming>` — `docs(sprints): T32 addendum bake gh client_id` (T32 dispatch §Addendum 2026-04-27 + STATUS Open table note + STATUS resume prompt for addendum worker)
+
+**Why correction-style append (not edit of T32 closure entry).**
+T32 main work closure (above entry) accurately reflects what
+shipped — main rewrite + closure notes. Addendum is **new work**
+deferred from closure scope; per HANDOFF discipline (never edit
+past entries) appended as standalone correction.
+
+**Scope (single follow-up commit on `feat/proxy-pivot`).** See T32
+dispatch §Addendum 2026-04-27. Fold or new `src/lib/constants.ts`,
+`login.ts` env-fallback wiring, test for env-unset case, README +
+CHANGELOG (`0.4.0-alpha.2`).
+
+**Blocks G2 (npm publish), not G1.** Can fire in parallel with T34
+or after T34 smoke green; G1 close does not depend.
+
+**Cross-ref.** Verify report 2026-04-27 (governor session) confirmed
+artemis envelope `GH_CLIENT_ID` matches the live OAuth App
+(`Iv23li...`, 20 chars; same value goes into the source constant).
+
 ### 2026-04-27 — T32 closed: universe-cli v0.4 rewrite
 
 T32 worker session in `~/DEV/fCC-U/universe-cli` (branch

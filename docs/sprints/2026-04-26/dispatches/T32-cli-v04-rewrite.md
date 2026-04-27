@@ -185,3 +185,53 @@ universe-cli/
   `aws-sdk-client-mock`, `aws-sdk-client-mock-vitest`) removed.
   `tests/setup.ts` (mock extension only) removed; vitest setup file
   reference dropped from `vitest.config.ts`.
+
+---
+
+## Addendum 2026-04-27 — bake `UNIVERSE_GH_CLIENT_ID` default
+
+**Why.** `src/commands/login.ts:50` reads `UNIVERSE_GH_CLIENT_ID` from
+env and exits with `EXIT_CONFIG` if absent. npm-published binary
+(`@freecodecamp/universe-cli@0.4.0`) will refuse `universe login`
+out-of-the-box on user laptops — env var unset by default. OAuth
+client_id is public-grade (only client_secret is sensitive; device
+flow doesn't use one), so baking a default in source matches `gh`,
+`vercel`, `supabase` CLI patterns.
+
+**Blocks G2 gate.** npm publish must NOT ship the v0.4 binary until
+this addendum lands.
+
+**Scope (single follow-up commit, ~30min).**
+
+- `src/commands/login.ts`: import `DEFAULT_GH_CLIENT_ID` constant; use
+  `env["UNIVERSE_GH_CLIENT_ID"] ?? DEFAULT_GH_CLIENT_ID`. Hybrid:
+  env override still wins for self-hosted forks / mirror tenants.
+- `src/lib/constants.ts` (NEW or fold into existing config module):
+  ```ts
+  // GitHub OAuth App "Universe CLI" — public client_id, device flow.
+  // Mint: https://github.com/organizations/freeCodeCamp/settings/applications
+  export const DEFAULT_GH_CLIENT_ID = "Iv23liIuGmZRyPd5wUeN";
+  ```
+- Update `login` test cases:
+  - env-set: uses env value (existing behavior)
+  - env-unset: uses `DEFAULT_GH_CLIENT_ID` (NEW)
+  - empty-string env: still treated as unset → fallback to default
+- README: drop "Ask the platform team for client_id" wording from
+  Quick start; note env override still works for forks.
+- CHANGELOG `0.4.0-alpha.2` (or whatever next pre-release tag) entry.
+
+**Vendor neutrality.** Default constant is freeCodeCamp-tenant-specific
+but env override preserves portability — fork operators set
+`UNIVERSE_GH_CLIENT_ID` to their own OAuth App's id. Hybrid pattern,
+no breaking change.
+
+**No tsup define magic needed.** Plain TS constant. Reviewable in PR
+diff. No build-time env var dance, no missing-build-arg footgun.
+
+**Cross-ref.** Verify report 2026-04-27 (governor session) confirmed
+artemis `GH_CLIENT_ID` envelope value matches the live OAuth App
+(`Iv23li...`, 20 chars).
+
+**Closing.** Single commit on `feat/proxy-pivot`; flip nothing in this
+dispatch (already `done`); governor appends HANDOFF correction-style
+entry post-merge.

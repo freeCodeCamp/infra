@@ -56,21 +56,22 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 
 ## Open
 
-| Dispatch                                                                             | Repo                                                                  | State                                                  |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------ |
-| **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                          |
-| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                           |
-| **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1`) — oxfmt deferred     |
-| **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                      |
-| **T34** — Caddy reverse proxy + DNS prep + smoke retarget                            | infra `feat/k3s-universe`                                             | pending (blocks on T31 image tag)                      |
-| **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending |
+| Dispatch                                                                             | Repo                                                                  | State                                                                                                           |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                                                                                   |
+| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                                                                                    |
+| **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1`) — addendum: bake `UNIVERSE_GH_CLIENT_ID` default (G2 blocker); oxfmt deferred |
+| **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                               |
+| **T34** — Caddy reverse proxy + DNS prep + smoke retarget                            | infra `feat/k3s-universe`                                             | pending (blocks on T31 image tag)                                                                               |
+| **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending                                                          |
 
 **Concurrency plan:**
 
 - T30 ✅ + T31 ✅ + T32 ✅ + T33 ✅ + T22 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
 - 1 lane open: **T34** (Caddy + DNS + smoke retarget). Blocks on artemis GHCR image tag (T31 CI fix in flight per operator). Sprint G1 ticks at T34 close.
+- **T32 addendum** (bake `UNIVERSE_GH_CLIENT_ID` default in source) — short follow-up worker fire on `feat/proxy-pivot`. Blocks G2 (npm publish), not G1. See dispatch §Addendum 2026-04-27.
 - T22 live verify (operator gates: provision `u/admin/r2_admin_s3` Resource → MCP preview dry-run → enable schedule dry-run → flip dry-run false) blocks on T34 prod live, optional during sprint.
-- npm publish `@freecodecamp/universe-cli@0.4.0` blocks on T34 smoke green (G2 gate).
+- npm publish `@freecodecamp/universe-cli@0.4.0` blocks on T34 smoke green + T32 addendum (G2 gate).
 
 ## Operator-owned actions (post session ship)
 
@@ -167,6 +168,25 @@ proceed; deploy/promote/rollback HTTP client waits on T31 contract.
 Toolchain same as T33. Closure same protocol. First move: read T32
 dispatch + ensure `feat/proxy-pivot` branch exists (T33 may have cut
 it).
+
+### T32 addendum worker — bake `UNIVERSE_GH_CLIENT_ID` default
+
+▎ Resume Sprint 2026-04-26 / T32 addendum. Repo:
+`~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (T32 main work
+already closed at `24d6fa1`). Dispatch:
+`~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T32-cli-v04-rewrite.md`
+§Addendum 2026-04-27. Goal: bake default GH OAuth App client_id in
+source so npm-published binary works without env var; env override
+preserved for fork tenants. Single commit, ~30min. Files:
+`src/lib/constants.ts` (NEW or fold), `src/commands/login.ts` (env
+?? DEFAULT), `tests/commands/login.test.ts` (env-unset case),
+`README.md` (drop "ask platform team" wording), `CHANGELOG.md`
+(`0.4.0-alpha.2` entry). Constant value `Iv23liIuGmZRyPd5wUeN`
+(verified 2026-04-27 against artemis envelope). Public-grade — fine
+to commit. Closure: single commit; T32 dispatch already `done` (no
+flip); governor reconciles HANDOFF correction-style entry post-merge.
+Blocks G2 (npm publish), not G1 — fire after T34 smoke green or in
+parallel.
 
 ### T34 worker — Caddy + DNS + smoke retarget
 
