@@ -2,15 +2,13 @@
 
 freeCodeCamp.org infra-as-code. Primary: freeCodeCamp Universe platform (DigitalOcean + Hetzner planned, Cloudflare, R2). Legacy fCC infra (Linode, Azure) coexist, retire post-Universe.
 
-**Galaxy design lives in Universe ADRs + spike plan. No dup design content this repo.**
+**Design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
 ## Doc ownership
 
-Authoritative model + flow diagram auto-loaded:
+Authoritative model + flow diagram READ if needed Universe/CLAUDE.md
 
-@~/DEV/fCC-U/Universe/CLAUDE.md
-
-Field notes for this repo (Infra team owns): `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` — read on demand. Trim policy + format in `docs/GUIDELINES.md` §Field-note format + §Monthly doc trim. Use `just field-notes-list` / `just field-notes-trim-plan` / `just field-notes-trim` for the maintenance loop.
+Field notes for this repo (Infra team owns): `Universe/spike/field-notes/infra.md` — read on demand. Trim policy + format in `docs/GUIDELINES.md`
 
 This repo owns:
 
@@ -80,16 +78,16 @@ Sprint-driven work. Active sprint = newest non-archive dir under `docs/sprints/`
 
 ## Clusters
 
-Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Universe/spike/spike-plan.md` (canonical). Verify reality with `doctl compute droplet list` before acting.
+Per-galaxy state, providers, and rollout phase live in `Universe/spike/spike-plan.md` (canonical). Verify reality with `doctl compute droplet list` before acting.
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
-| Galaxy           | Inventory Group      |
-| ---------------- | -------------------- |
-| `gxy-management` | `gxy_management_k3s` |
-| `gxy-static`     | `gxy_static_k3s`     |
-| `gxy-launchbase` | `gxy_launchbase_k3s` |
-| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` |
+| Galaxy           | Inventory Group      | Status   |
+| ---------------- | -------------------- | -------- |
+| `gxy-management` | `gxy_management_k3s` | -        |
+| `gxy-static`     | `gxy_static_k3s`     | RETIRING |
+| `gxy-launchbase` | `gxy_launchbase_k3s` | -        |
+| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | -        |
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 
@@ -114,3 +112,9 @@ Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-bac
 
 - **New chart** at `k3s/<cluster>/apps/<app>/charts/` → `docs/GUIDELINES.md` §Chart pre-merge checklist (5-point: Middleware ns, NetworkPolicy CRD type, env contract, key-format round-trip, CF zone SSL).
 - **New justfile recipe** → `docs/GUIDELINES.md` §Justfile slop discipline (4 rules + reviewer rule).
+
+## CRIT
+
+DO NOT WORRY ABOUT:
+- ASKING USER to PUSH, they know their job
+- COMMITING FILES YOU DID NOT TOUCH. MOST CLAUDE.md files are gitignored BY DESIGN
