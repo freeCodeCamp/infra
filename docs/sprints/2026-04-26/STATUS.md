@@ -1,6 +1,6 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (pillar audit + sites.yaml ADR realign — option A; B + KV parked) · Branch: `feat/k3s-universe` · Ahead of origin: 16+
+Updated: 2026-04-27 (artemis sites.yaml seeded — T34 preconditions 5/5 GREEN) · Branch: `feat/k3s-universe` · Ahead of origin: 17+
 
 **🆕 Multi-session true-parallel mode active.** This session
 (`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
@@ -29,8 +29,9 @@ infra (`feat/k3s-universe`):
 - `964c8d22` — `docs(todo-park): oxfmt wiring on universe-cli`
 - `0bbaca02` — `docs(sprints): T32 addendum bake gh client_id`
 - `5e42cc80` — `docs(sprints): T34 sites.yaml + audit trail`
-- `<incoming>` — `docs(sprints): T34 sites.yaml ADR realign`
-- `<incoming-2>` — `docs(todo-park): artemis sites slim + embedded KV`
+- `c9dd8817` — `docs(sprints): T34 sites.yaml ADR realign`
+- `fdf74dc6` — `docs(todo-park): artemis sites slim + embedded KV`
+- `<incoming>` — `docs(sprints): seed artemis sites.yaml — T34 precondition`
 
 universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 
@@ -41,6 +42,8 @@ universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
 artemis (`main` — greenfield, NEW remote, not pushed):
 
 - `861e4c4` — `feat: initial artemis service scaffold`
+- `7d6eed3` — `ci: split into reusable test + manual docker (PH1-B25)` _(landed post-T31; matches GHCR :sha-7d6eed3c... image)_
+- `49d2f32` — `feat(config): seed sites.yaml + un-gitignore` _(T34 precondition #5)_
 
 windmill (`main`, not pushed):
 
