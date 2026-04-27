@@ -66,3 +66,6 @@ o11y/defaults/
 *.db
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+
+# k6 load test outputs
+loadtest/results/
