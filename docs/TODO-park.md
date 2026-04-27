@@ -166,6 +166,60 @@ inline or amend ADR-003 (platform controller chain).
 collapses to Phase 1 + Phase 3 — single dispatch, no sprint expansion.
 Phase 2 only opens if cross-repo audit surfaces additional pillars.
 
+## Justfile
+
+### Justfile slop sweep — T34 leftovers (post-G1, single dispatch)
+
+- **Activation trigger:** sprint G1 closes (artemis live, phase5 smoke green, `@freecodecamp/universe-cli@0.4.0` published) AND no other lane is hot. ~half-day refactor + manual re-test of `helm-upgrade` against caddy + windmill + zot.
+- **Owner:** infra team.
+- **Ref:** `infra/CLAUDE.md` §CRIT — justfile recipe slop discipline (2026-04-27); `infra/docs/sprints/2026-04-26/PLAN.md` §CRIT — sprint planning discipline.
+
+**Why parked.** T34 closeout 2026-04-27 surfaced two recipes that
+violate the discipline (operator flagged: "you have created useless
+one-time use just recipes for this sprint convoluting the
+justfile"). Kept under time pressure during sprint G1 push; refactor
+deferred to a clean post-G1 commit.
+
+**Scope (single dispatch).**
+
+_(a) Refactor `artemis-deploy` → extend generic `helm-upgrade`._
+
+- Add per-app convention `apps/<app>/.deploy-flags.sh` sourced inside
+  `helm-upgrade` if present; exports `EXTRA_HELM_ARGS` appended to
+  the helm invocation. Document in justfile recipe header + GUIDELINES.
+- Land `apps/artemis/.deploy-flags.sh` emitting
+  `EXTRA_HELM_ARGS+=" --set-file sites=${ARTEMIS_REPO:-$HOME/DEV/fCC-U/artemis}/config/sites.yaml"`.
+  Validate path inside the script (operator-friendly error).
+- Drop `artemis-deploy` recipe. Operator runs
+  `just helm-upgrade gxy-management artemis` like every other app.
+- Re-test against caddy + windmill + zot to confirm generic recipe
+  unchanged for apps without `.deploy-flags.sh`.
+
+_(b) Demote `mirror-artemis-secrets` → runbook inline._
+
+- Move the dotenv→YAML-overlay shell block into
+  `docs/runbooks/deploy-artemis-service.md` §5 as a literal command
+  block operator pastes once (and on env-rotation, ≤1×/quarter at
+  worst).
+- Drop `mirror-artemis-secrets` from justfile. Same pattern as
+  zot.tls.yaml.sample / windmill.tls.yaml.sample which are mint-once
+  runbook ops, not recipes.
+
+_(c) Update derived docs._
+
+- Runbook §5 — paste the literal sops command block (was: "run `just
+mirror-artemis-secrets`").
+- Flight-manual §7.1 row 5 — same swap.
+- README — drop `just mirror-artemis-secrets` reference.
+- HANDOFF — append correction entry referencing T34 closeout.
+
+**Out of scope (keep parked elsewhere):**
+
+- `phase5-smoke` recipe stays — matches `phase4-smoke` pattern,
+  re-runs frequently, valid recipe.
+- Generic `mirror-secrets <app>` factor across other apps (windmill,
+  zot dual envelopes) — separate dispatch if pattern proves out.
+
 ## Application config
 
 ### CF Access service-token hardening for artemis (Path C fallback)
