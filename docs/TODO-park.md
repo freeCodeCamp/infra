@@ -145,6 +145,83 @@ inline or amend ADR-003 (platform controller chain).
 collapses to Phase 1 + Phase 3 — single dispatch, no sprint expansion.
 Phase 2 only opens if cross-repo audit surfaces additional pillars.
 
+## Application config
+
+### artemis sites.yaml schema slim + embedded registry (single follow-up dispatch)
+
+- **Activation trigger:** ANY of:
+  - artemis `config/sites.yaml` site count crosses ~30 sites OR PR
+    cadence on the file exceeds 1/week
+  - per-site `teams:` list becomes monotonous boilerplate (every site
+    repeats the same 1–2 fixed teams — fCC reality at 30 staff)
+  - operator surfaces friction with PR-per-new-site cadence
+  - opportunistic — combine with next artemis maintenance sprint
+- **Owner:** infra team (artemis svc) + Universe team (ADR-016 amendment).
+- **Ref:** ADR-016 §sites.yaml lifecycle (line 178); §Authn/authz Q11
+  (line 35); §design tenet interaction-agnostic (line 41); §trust-collapse
+  (line 219). ADR-008 §Storage matrix (no platform KV primitive in current
+  set). Sprint 2026-04-26 HANDOFF 2026-04-27 (zoom-out reset; operator
+  picked option A for sprint close, parked B + C here).
+
+**Why parked.** Sprint 2026-04-26 G1 close trumps optimization. ADR-016
+Q11 as authored is correct shape (file-based static map). Mid-sprint
+artemis re-fire risks T34 image-tag coordination. Options B (schema
+slim) and C (KV register) combined here as single follow-up dispatch.
+
+**Two coupled changes (single dispatch covers both).**
+
+_Part 1 — Schema slim (option B from sprint 2026-04-26 zoom-out)._
+
+- `sites.yaml` schema: `map<site, {teams: []string}>` → `[]string`
+  (flat allowlist of site slugs).
+- New env `AUTHORIZED_TEAMS` (default `staff,platform`) — fixed teams
+  across all sites; matches fCC org reality.
+- artemis auth check: `site in allowlist` AND `user in any AUTHORIZED_TEAMS`.
+- ADR-016 §Q11 dated amendment block (schema delta).
+- Migration: artemis worker fire (~half-day); CI rebuild → new GHCR
+  tag → infra chart pin update.
+- Why slim: at fCC scale (2 fixed teams), per-site team mapping is
+  boilerplate noise. Future granularity (e.g. contractor team per
+  site) re-introduces via further amendment OR via Part 2 KV registry.
+
+_Part 2 — Embedded SQLite or lightweight KV inside artemis svc._
+
+- Replace static file with embedded SQLite (or BoltDB / Pebble / similar)
+  as the site registry inside the artemis pod.
+- New API endpoint: `POST /api/site/register` — interaction-agnostic
+  (CLI, GHA, Woodpecker, curl all hit same endpoint per ADR-016
+  §design tenet line 41 — NOT a CLI-only register surface).
+- Authorization for register: `platform` team only initially; broaden to
+  `staff` after policy shake-out.
+- Persistence: PVC mount for SQLite OR Litestream replication to R2
+  for durability (matches ADR-008 §Backup §SQLite + Litestream lineage).
+- Migration path from flat sites.yaml: one-shot import on first boot;
+  sites.yaml retires from artemis repo.
+- Why embedded (NOT external KV / postgres / CF KV):
+  - Honors ADR-016 §trust-collapse (line 219) — auth state stays in
+    one binary; no new admin token surface.
+  - Honors vendor-neutral tenet — SQLite + Litestream are portable.
+    CF KV would vendor-couple. CNPG postgres is parked until
+    gxy-triangulum (ADR-008 §Phase 1).
+  - Pattern reuse: ADR-008 §SQLite + Litestream already established.
+  - No new infra primitive required.
+- ADR-016 amendment block for new endpoint + storage primitive.
+- Open question (resolve at activation): register-on-first-deploy
+  auto-flow vs explicit `universe static register <site>` subcommand.
+  Latter is cleaner — site lifecycle becomes operator-explicit.
+
+**Sizing.** Single dispatch ~2–3 days end-to-end (schema slim + KV +
+new endpoint + migration logic + tests + ADR amendment + chart update
+
+- operator runbook). Half-day if Part 1 alone (defer Part 2 to even
+  later trigger).
+
+**Cross-refs.** ADR-016 (lines 35, 41, 178, 219); ADR-008 §Storage
+matrix + §SQLite Litestream; ADR-004 §scope-out 2026-04-26
+(constellation auth via BetterAuth, NOT platform-tool concern —
+artemis is platform-tool); sprint-2026-04-26 HANDOFF 2026-04-27
+zoom-out entry.
+
 ## Auth + identity
 
 ### BetterAuth + Account Service
