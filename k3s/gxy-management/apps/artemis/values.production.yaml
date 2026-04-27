@@ -44,9 +44,15 @@ env:
   SITES_YAML_PATH: "/etc/artemis/sites.yaml"
   JWT_TTL_SECONDS: "900"
   GH_MEMBERSHIP_CACHE_TTL: "300"
-  ALIAS_PRODUCTION_KEY_FORMAT: "<site>/production"
-  ALIAS_PREVIEW_KEY_FORMAT: "<site>/preview"
-  DEPLOY_PREFIX_FORMAT: "<site>/deploys/<ts>-<sha>/"
+  # Site key in R2 = `<site>.freecode.camp` (full FQDN). Matches the
+  # cassiopeia caddy r2_alias module's parseSiteAndAlias which returns
+  # site = `<sitePrefix> + .<rootDomain>` (host.go). Without the suffix
+  # caddy reads `test.freecode.camp/preview` while artemis writes
+  # `test/preview` → 404. Verified 2026-04-27 against
+  # docker/images/caddy-s3/modules/r2alias/host.go.
+  ALIAS_PRODUCTION_KEY_FORMAT: "<site>.freecode.camp/production"
+  ALIAS_PREVIEW_KEY_FORMAT: "<site>.freecode.camp/preview"
+  DEPLOY_PREFIX_FORMAT: "<site>.freecode.camp/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
 
 # Rate-limit tunables — Traefik Middleware (chart-internal). Per

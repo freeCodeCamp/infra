@@ -76,9 +76,9 @@ env:
   # Format placeholders are artemis-native: <site> per-site, <ts>-<sha>
   # per-deploy. Validated by artemis at startup
   # (internal/handler/deploykey.go).
-  ALIAS_PRODUCTION_KEY_FORMAT: "<site>/production"
-  ALIAS_PREVIEW_KEY_FORMAT: "<site>/preview"
-  DEPLOY_PREFIX_FORMAT: "<site>/deploys/<ts>-<sha>/"
+  ALIAS_PRODUCTION_KEY_FORMAT: "<site>.freecode.camp/production"
+  ALIAS_PREVIEW_KEY_FORMAT: "<site>.freecode.camp/preview"
+  DEPLOY_PREFIX_FORMAT: "<site>.freecode.camp/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
 
 # Required secret env keys — populated by sops overlay
