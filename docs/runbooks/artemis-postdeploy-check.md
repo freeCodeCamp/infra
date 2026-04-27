@@ -74,12 +74,47 @@ Tests defined in `artemis/internal/integration/proxy_e2e_test.go`:
 | `TestWhoAmI`         | `GET /api/whoami` returns login + `authorizedSites` containing `SITE`                                            |
 | `TestAuthRejections` | Bad token → 401/403, missing token → 401, unknown site → 403, no `site` → 400                                    |
 | `TestDeployFlow`     | Full happy path: init → upload → finalize(preview) → curl preview → promote → curl prod (D38 SLO) → list deploys |
-| `TestRollback`       | Production alias rewires to a prior deploy id; restore-to-head best-effort                                       |
+| `TestRollback`       | Production alias rewires to a prior deploy id                                                                    |
+
+## Setup / teardown
+
+Suite-level (`TestMain` in `artemis/internal/integration/setup_teardown_test.go`):
+
+| Phase    | Action                                                                                       |
+| -------- | -------------------------------------------------------------------------------------------- |
+| Setup    | Pre-flight `GET /healthz` — abort with exit 2 if artemis unreachable                         |
+| Setup    | Capture baseline production deploy id from `GET /api/site/{site}/deploys` (head entry)       |
+| Run      | Execute all tests in the package                                                             |
+| Teardown | `POST /api/site/{site}/rollback {"to": baseline}` — restore prod alias to the captured state |
+
+Net effect: the suite leaves the production alias **exactly where it
+found it**, even after `TestDeployFlow` promotes a new deploy mid-run.
+The new deploy prefix is left in R2 for cleanup-cron sweep (T22, 7-day
+retention).
+
+If teardown fails, the run output prints the manual recovery curl:
+
+```
+[teardown] WARN: restore prod alias failed: <err>
+[teardown]      manual fix: POST /api/site/test/rollback {"to":"<baseline>"}
+```
+
+Edge cases:
+
+- **Fresh site (no prior deploys):** baseline capture returns empty;
+  teardown becomes a no-op.
+- **`ARTEMIS_URL`/`GH_TOKEN` unset:** `TestMain` skips capture/teardown
+  entirely; individual tests `Skip` themselves.
+- **`/healthz` down at setup time:** `TestMain` aborts before any
+  test runs (exit 2) so the operator sees the deployment-side fault
+  immediately rather than five minutes of test-side timeouts.
 
 ## Pass criteria
 
 - `make integration` exits 0
-- Final line: `OK — full deploy flow green for site=test deployId=<id>`
+- Setup log: `[setup] healthz green at <ARTEMIS_URL>` and `[setup] captured baseline: site=test deployId=<id>`
+- Final test line: `OK — full deploy flow green for site=test deployId=<id>`
+- Teardown log: `[teardown] restored prod alias: site=test deployId=<id>`
 
 ## Failure paths
 
