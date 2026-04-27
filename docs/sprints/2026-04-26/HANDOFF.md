@@ -11,6 +11,76 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — T34 live verify GREEN — sprint G1 ticks
+
+Operator-gated live verify against the 2026-04-27 T34 closure
+(commit `0b8d6238`). Five mid-flight fixes surfaced before the smoke
+went green; all retroactively committed under the T34 closure scope:
+
+**Closing commits (T34 live-verify chain):**
+
+- infra `feat/k3s-universe`: `da5a5855` — `fix(justfile): sops --config for mirror-artemis-secrets`
+  - sops walks `.sops.yaml` from input file's parent up; recipe ran from infra repo root → no `.sops.yaml` found → `--config` flag added.
+- infra `feat/k3s-universe`: `cee53e5d` — `feat(artemis): drop TLS — CF Flexible (cassiopeia parity)` (already in T34 closure scope; surfaced during live preflight when cassiopeia caddy chart confirmed CF zone is on Flexible SSL, no origin cert at k8s layer).
+- infra `feat/k3s-universe`: `b4567c10` — `refactor(justfile): unify deploy verb; drop artemis slop`
+  - Operator flagged that `artemis-deploy` and `mirror-artemis-secrets` recipes were one-off slop. Refactor: smart-dispatch `deploy` recipe (helm if `charts/`, kustomize if `manifests/`, both if both), per-app `apps/<app>/.deploy-flags.sh` convention for extras, mirror logic moved inline to runbook §5. CRIT entries landed in `infra/CLAUDE.md` + sprint PLAN; slop-sweep itself executed early.
+- infra `feat/k3s-universe`: `5f725a09` — `fix(artemis): env keys + secure-headers MW + CNP`
+  - Three live-deploy bugs:
+    1. **Wrong env key names + placeholders.** Chart used `ALIAS_PRODUCTION` / `ALIAS_PREVIEW` and `{site}/deploys/{deployId}/`. Artemis expects `ALIAS_PRODUCTION_KEY_FORMAT` / `ALIAS_PREVIEW_KEY_FORMAT` and `<site>` / `<ts>-<sha>` placeholders. Pod CrashLoopBackOff at startup with `invalid DEPLOY_PREFIX_FORMAT … must contain <site> and <ts>-<sha>`.
+    2. **Missing secure-headers Middleware.** HTTPRoute referenced `secure-headers` Middleware in artemis ns; chart only created `artemis-ratelimit`. Each gxy-management app creates its own `secure-headers` per windmill / zot / argocd precedent. Added `templates/middleware-secure-headers.yaml`.
+    3. **Vanilla NetworkPolicy blocked Traefik (hostNetwork) cross-node.** Cluster CNI = Cilium; vanilla `networking.k8s.io/v1` NetworkPolicy `namespaceSelector` cannot resolve hostNetwork pods to their k8s namespace → blocked Traefik on 2 of 3 nodes (1 of 3 worked = same-node). Converted chart to `CiliumNetworkPolicy` with `fromEntities: [cluster, host]` matching cassiopeia caddy precedent.
+- infra `feat/k3s-universe`: `813d0171` — `fix(artemis): R2 site key uses FQDN`
+  - **Contract mismatch between artemis and cassiopeia caddy r2_alias module.** Caddy's `parseSiteAndAlias` returns site = `<sitePrefix> + .<rootDomain>` (full FQDN — `docker/images/caddy-s3/modules/r2alias/host.go`). Cache key `<bucket>/<site-fqdn>/<alias>` → S3 key `<site-fqdn>/<alias>`. Artemis was writing bare `<site>/preview` (no `.freecode.camp` suffix). Fix landed in chart values: `ALIAS_PRODUCTION_KEY_FORMAT=<site>.freecode.camp/production`, same for preview, same for `DEPLOY_PREFIX_FORMAT`. Comment in `values.production.yaml` references the caddy source line for future debug.
+
+Plus operator-side action:
+
+- **artemis GHCR package visibility flipped to public.** Repo stays
+  PRIVATE; only the OCI package goes public. Anonymous Bearer flow
+  required for kubelet pull (no imagePullSecret plumbing). Matches
+  caddy-s3 precedent. Decision irreversible per GitHub policy
+  (public packages cannot revert to private).
+
+**Phase 5 E2E smoke — GREEN end-to-end** (`scripts/phase5-proxy-smoke.sh`):
+
+```
+[1/8] preflight                                   ✓
+[2/8] POST /api/deploy/init  site=test            ✓ → deployId=20260427-064419-fe7342d
+[3/8] PUT  /api/deploy/{id}/upload                ✓
+[4/8] POST /api/deploy/{id}/finalize mode=preview ✓ → https://test.preview.freecode.camp
+[5/8] preview content marker match                ✓
+[6/8] POST /api/site/test/promote                 ✓ → https://test.freecode.camp
+[7/8] prod content marker match (≤2min SLO D38)   ✓
+[8/8] PASS  marker: phase5-20260427-064417-14413
+```
+
+`/api/whoami` (GH token) → `{"authorizedSites":["test"],"login":"raisedadead"}` confirms full GH OAuth Bearer + team-membership probe path.
+
+**G1 state (sprint-2026-04-26):** ticks. All sprint code lanes
+closed; all operator-gated live verifies green. Phase 2 (npm publish
+`@freecodecamp/universe-cli@0.4.0` + T22 live verify) unblocked.
+
+**Lessons learned — feed forward (CRIT-grade):**
+
+1. **Pattern study covers the whole adjacent app, including templates the candidate template depends on.** The `secure-headers` Middleware is an HTTPRoute filter ref; missed by reading only the chart templates list, present only when reading the manifests of windmill / argocd / zot. Future rule (added to `infra/CLAUDE.md` §CRIT in a follow-up commit): when a chart references a Middleware by name, grep adjacent apps for that middleware definition + ensure the chart provides one in its own ns.
+2. **Cluster CNI dictates which NetworkPolicy CRD applies.** This cluster runs Cilium → must use `CiliumNetworkPolicy` (not vanilla `networking.k8s.io/v1`) for hostNetwork-aware ingress. Cassiopeia caddy precedent was visible in `caddy/charts/caddy/templates/networkpolicy.yaml`. Future rule: read existing NetPol patterns in adjacent apps before writing new.
+3. **Service contract validation is dispatch-time work, not deploy-time.** The artemis env key shape (`*_KEY_FORMAT` + `<site>`/`<ts>-<sha>` placeholders) and the R2 site key contract (FQDN vs bare) were both findable in artemis source + cassiopeia caddy source. Future rule: read the service's `.env.sample` AND its config-loader source AND the consumer's contract module BEFORE writing chart `env:` values. Compare keys character-by-character.
+4. **Deploy-time pod readiness gating.** Phase5 smoke ran while artemis was still rolling out → 504 on init. The `just deploy` recipe rolls helm + kubectl rollout status (artemis-deploy had `--timeout=120s` builtin); generic `deploy` lacks that wait by design. Operators should bracket with explicit `kubectl rollout status` before smoke-test invocation. Smoke script could also poll-then-fail. Park as `phase5-smoke` enhancement.
+
+**Final infra commit chain (this verify cycle, all on `feat/k3s-universe`):**
+
+- `0b8d6238` feat(artemis): close T34 — chart + Path X reframe
+- `62dbb4e2` docs(sprints): T34 reconcile <incoming> → 0b8d6238
+- `cee53e5d` feat(artemis): drop TLS — CF Flexible (cassiopeia parity)
+- `8a1a2375` docs(crit): justfile slop discipline + slop sweep park
+- `ab241418` docs(claude): force-track + CRIT justfile slop entry
+- `da5a5855` fix(justfile): sops --config for mirror-artemis-secrets
+- `b4567c10` refactor(justfile): unify deploy verb; drop artemis slop
+- `5f725a09` fix(artemis): env keys + secure-headers MW + CNP
+- `813d0171` fix(artemis): R2 site key uses FQDN
+
+Push owned by operator (per session covenant). Branch ahead of
+origin by 35+ commits.
+
 ### 2026-04-27 — T34 closed: artemis chart + Path X reframe (drop Tailscale, drop Caddy/cassiopeia hop)
 
 T34 worker session in `~/DEV/fCC/infra` (branch `feat/k3s-universe`)

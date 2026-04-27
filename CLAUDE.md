@@ -147,3 +147,19 @@ Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-bac
 Reviewer rule: any recipe added in same commit as new app under `k3s/<cluster>/apps/<app>/` = code smell. Flag for inline-in-runbook OR generic-recipe-extension before merge.
 
 Background: T34 closeout (sprint-2026-04-26) — `artemis-deploy` + `mirror-artemis-secrets` violated rules 2+3. Refactor parked at `docs/TODO-park.md` §Justfile slop sweep (post-G1).
+
+## CRIT — chart-side pattern study (2026-04-27, T34 live-verify postmortem)
+
+T34 closure landed clean (`helm template` rendered all resources, lint passed) but live deploy surfaced **five preventable bugs** before phase5 smoke went green. All findable at dispatch time by reading adjacent apps end-to-end.
+
+1. **`Middleware` references must resolve in the same namespace.** Chart HTTPRoute references a Traefik Middleware by name (`secure-headers`, `redirect-https`) → Middleware MUST exist in chart's ns. Each gxy-management app creates its own copy. `grep -rln 'kind: Middleware' k3s/<cluster>/apps/`. T34 chart referenced `secure-headers` without creating one → Traefik 404'd until added.
+
+2. **Cluster CNI dictates NetworkPolicy CRD.** Cilium + hostNetwork Traefik → vanilla `networking.k8s.io/v1` NetworkPolicy `namespaceSelector: kube-system` does NOT match hostNetwork pods. Use `cilium.io/v2 CiliumNetworkPolicy` with `fromEntities: [cluster, host]` per cassiopeia caddy precedent. T34 vanilla NP blocked Traefik on 2 of 3 nodes.
+
+3. **Service env contract = read source + sample, not infer.** Chart `env:` values must match consumer service's config-loader keys AND validation rules character-for-character. Read `<service>/.env.sample` AND `<service>/internal/config/config.go` AND any token-format validation. T34 used wrong key suffixes (`*_KEY_FORMAT` missing) AND wrong placeholder syntax (`{site}/{deployId}` vs `<site>/<ts>-<sha>`) → pod CrashLoopBackOff at startup.
+
+4. **Producer/consumer shared-store key format must round-trip.** Two services share a bucket → writer's key format MUST match reader's. T34 wrote `<site>/preview`; caddy `r2_alias` reads `<site>.<root>/preview` (FQDN). Both formats configurable on writer side; read reader source FIRST to pin contract.
+
+5. **CF zone SSL mode is a deployment-time precondition.** Confirm CF zone SSL = Flexible / Full / Strict BEFORE writing chart Gateway listeners. Mismatch (chart HTTPS terminator vs zone Flexible) → 502/504 at edge with no origin-side error. T34 originally drafted HTTPS listener; reframed to HTTP-only after confirming cassiopeia precedent on same zone.
+
+Reviewer rule: any new chart at `k3s/<cluster>/apps/<app>/charts/` clears 5-point pre-merge checklist (Middleware presence, NetworkPolicy CRD type, env contract diff vs `.env.sample`, key-format round-trip vs reader, CF zone SSL verified). Add to dispatch closure checklist template next sprint.
