@@ -205,7 +205,94 @@ Exit 0 on green.
 | GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                    |
 | CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch      |
 | sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC/artemis pull`; `just deploy gxy-management artemis` (fsnotify ≤1min) |
-| Image tag                            | bump `apps/artemis/values.production.yaml` `image.tag`; `just deploy gxy-management artemis`                      |
+| Image tag                            | see [§Image update](#image-update-deploy-new-artemis-sha) — full procedure                                        |
+
+## Image update (deploy new artemis SHA)
+
+Use when artemis `main` advances past the deployed pin and the new
+SHA must roll into gxy-management. The image pin lives at
+`k3s/gxy-management/apps/artemis/values.production.yaml` under
+`image.tag` (format: `sha-<full-40-char-sha>@sha256:<digest>`).
+
+### 1. Confirm drift
+
+```bash
+kubectl -n artemis get deploy artemis \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+git -C ~/DEV/fCC/artemis log --oneline -1 main
+```
+
+If the deployed SHA prefix is not the artemis `main` HEAD, drift is
+real — proceed.
+
+### 2. Build GHCR image (if CI did not already on push)
+
+```bash
+gh workflow run ci.yml --repo freeCodeCamp/artemis --ref main
+gh run watch --repo freeCodeCamp/artemis
+```
+
+GHCR tag format on success: `ghcr.io/freecodecamp/artemis:sha-<full-sha>`.
+
+### 3. Resolve digest
+
+```bash
+SHA=$(git -C ~/DEV/fCC/artemis rev-parse main)
+docker buildx imagetools inspect "ghcr.io/freecodecamp/artemis:sha-${SHA}" \
+  | awk '/^Name:|^Digest:/'
+```
+
+Copy the `sha256:<digest>` line.
+
+### 4. Bump pin
+
+Edit `k3s/gxy-management/apps/artemis/values.production.yaml`:
+
+```yaml
+image:
+  repository: ghcr.io/freecodecamp/artemis
+  tag: "sha-<FULL_40_CHAR_SHA>@sha256:<DIGEST>"
+  pullPolicy: IfNotPresent
+```
+
+OCI rule: when both tag and digest are present, digest wins (kubelet
+pulls by digest, immutable). Tag retained for human grok in
+`kubectl describe pod`.
+
+### 5. Commit
+
+```bash
+cd ~/DEV/fCC/infra
+git add k3s/gxy-management/apps/artemis/values.production.yaml
+git commit -m "chore(artemis): bump image to sha-${SHA:0:7}"
+```
+
+Operator pushes.
+
+### 6. Deploy + watch rollout
+
+```bash
+just deploy gxy-management artemis
+kubectl -n artemis rollout status deploy/artemis --timeout=180s
+```
+
+### 7. Verify
+
+```bash
+kubectl -n artemis get pods -l app.kubernetes.io/name=artemis
+curl -fsS https://uploads.freecode.camp/healthz   # {"ok":true}
+just phase5-smoke
+```
+
+Phase5 smoke is the authoritative E2E check — green = the new image
+serves init/upload/finalize/promote correctly against R2 + GH OAuth.
+
+### Rollback
+
+Revert the `values.production.yaml` commit and re-run `just deploy
+gxy-management artemis`. Image is digest-pinned so rollback is
+deterministic. No DB / state migration on artemis (stateless svc
+over R2).
 
 ## Failure modes
 
@@ -224,6 +311,10 @@ Exit 0 on green.
 - ADR-016 — Universe deploy proxy
 - `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-26 build-residency, §2026-04-27 RUN-residency clause
 - `~/DEV/fCC-U/Universe/decisions/009-...` — Tailscale Operator rejected
-- `infra/CLAUDE.md` §Secrets (canonical sops dotenv decrypt)
+- [`01-deploy-new-constellation-site.md`](01-deploy-new-constellation-site.md) — staff-side deploy flow against this service
+- [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — E2E post-deploy gate
+- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops dotenv decrypt
+- [`05-r2-keys-rotation.md`](05-r2-keys-rotation.md) — R2 admin key rotation
+- `infra/CLAUDE.md` §Secrets
 - `infra/k3s/gxy-management/apps/artemis/README.md`
 - `infra/scripts/phase5-proxy-smoke.sh`

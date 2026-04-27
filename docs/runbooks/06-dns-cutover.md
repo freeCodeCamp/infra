@@ -4,6 +4,11 @@
 **Spec:** `docs/rfc/gxy-cassiopeia.md` §6.8 (execution) + §6.9 (soak + rollback) + §6.9.1 (content-parity caveat)
 **Scope:** Phase 6 cutover of `*.freecode.camp` from gxy-static to gxy-cassiopeia.
 
+> **Lifecycle note.** Move this file to [`archive/`](archive/) after gxy-static
+> decommission completes (post-cutover #26 + 30-day soak). Procedure is
+> single-use and only relevant during the active cutover window; once
+> gxy-static is gone, the playbook is historical.
+
 This runbook is the **only** supported cutover procedure. Deviating from the sequence risks either silent site 404s or a multi-hour outage.
 
 ---
