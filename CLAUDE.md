@@ -10,15 +10,13 @@ Authoritative model + flow diagram auto-loaded:
 
 @~/DEV/fCC-U/Universe/CLAUDE.md
 
-Field notes for this repo (Infra team owns):
-
-@~/DEV/fCC-U/Universe/spike/field-notes/infra.md
+Field notes for this repo (Infra team owns): `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` — read on demand. Trim policy + format in `docs/GUIDELINES.md` §Field-note format + §Monthly doc trim. Use `just field-notes-list` / `just field-notes-trim-plan` / `just field-notes-trim` for the maintenance loop.
 
 This repo owns:
 
 | Path                   | Purpose                                            |
 | ---------------------- | -------------------------------------------------- |
-| `docs/GUIDELINES.md`   | Doc conventions + monthly trim                     |
+| `docs/GUIDELINES.md`   | Doc conventions, sprint protocol, monthly trim     |
 | `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`) |
 | `docs/runbooks/`       | Single-purpose ops runbooks                        |
 | `docs/architecture/`   | RFCs for non-trivial work                          |
@@ -59,16 +57,7 @@ Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age,
 
 New galaxy/app: mint secret at the matching path before first `just deploy`. Adding new top-level scopes requires updating the consumer (`.envrc` line or helm `--set-file` source).
 
-### Decrypt incantation
-
-`.env.enc` decrypt requires explicit type flags. sops auto-detect on `.enc` extension falls back to JSON parser; dotenv envelopes silently fail (`Error unmarshalling input json: invalid character '#'`).
-
-```
-sops decrypt --input-type dotenv --output-type dotenv \
-  ../infra-secrets/<scope>/<name>.env.enc
-```
-
-Helm chart secret-rendering recipes + ops scripts MUST pass both flags. Alternative (deferred): per-glob `input_type: dotenv` pin in `.sops.yaml` — current rules block has no per-path type config.
+Decrypt: `*.env.enc` envelopes need explicit `--input-type dotenv --output-type dotenv` flags (sops auto-detect on `.enc` routes to JSON parser and silently fails). Full procedure in `docs/runbooks/secrets-decrypt.md`.
 
 ## Operations
 
@@ -78,24 +67,10 @@ Helm chart secret-rendering recipes + ops scripts MUST pass both flags. Alternat
 
 Sprint-driven work. Active sprint = newest non-archive dir under `docs/sprints/`. Multi-session work flows through sprint docs on disk, not external trackers.
 
-**Operator vocabulary** — full closure checklist + session-start ritual in `docs/GUIDELINES.md` §Sprint docs:
+**Operator vocabulary, closure checklist, sprint invariants** all live in `docs/GUIDELINES.md` §Sprint docs. Most-used phrases:
 
-| Operator says               | Claude does                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `start the sprint`          | Read active `sprints/<date>/{README,STATUS}.md`. Report state. Wait for `go`.                                |
-| `roll the sprint`           | Rewrite active `STATUS.md` from git log + dispatch Status headers. Single commit.                            |
-| `give me the resume prompt` | Print active `STATUS.md` Resume-prompt block verbatim.                                                       |
-| `next move?`                | Per `STATUS.md` Open + `PLAN.md` Wave graph, name next unblocked task with ID, dispatch path, blockedBy.     |
-| `dispatch <T-id>`           | Open `dispatches/<T-id>-*.md`. Confirm preconditions. Flip Status → `in-progress`. Begin work.               |
-| `close <T-id>`              | Run closure checklist (`docs/GUIDELINES.md`): flip Status, update PLAN matrix, append HANDOFF, derived docs. |
-| `verify <T-id\|G-id>`       | Run dispatch's read-only Verify block; report green/red. Required green before any operator-action gate.     |
-
-**Invariants:**
-
-- Decisions never silently rewritten — amendment block with date.
-- HANDOFF entries never edited — append correction.
-- Inter-doc conflicts surfaced on detection, not silently resolved.
-- Skipping derived-doc updates on closure = sprint bug.
+- `start the sprint` → read active `sprints/<date>/{README,STATUS}.md`, report state, wait for `go`.
+- `next move?` → name next unblocked task with ID, dispatch path, blockedBy.
 
 ## Ansible
 
@@ -135,31 +110,7 @@ Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-bac
 - Gateway API listener ports must match Traefik entrypoint ports (80/443 with hostNetwork)
 - PSS admission exempt: `windmill` + `tailscale` namespaces (privileged workloads)
 
-## justfile recipe slop discipline
+## Pre-merge checklists
 
-**No new per-app one-off recipes.** Before adding under `[group('k3s')]` / `[group('secrets')]` / `[group('smoke')]`:
-
-1. Read full existing recipe set end-to-end (`just --list`, `wc -l justfile`). Not grep keywords.
-2. Thin wrapper over `helm-upgrade` with one extra flag (e.g. `--set-file`) → **extend generic recipe** via per-app `apps/<app>/.deploy-flags.sh` sourced for `EXTRA_HELM_ARGS`. Do NOT clone helm-install body.
-3. **One-time** per cluster (mint, mirror, seal) → inline in runbook. Promote to recipe only if re-run >~3×/year.
-4. Sweep duplication: `git diff justfile | grep '^+' | head -50` — if `helm upgrade --install` repeated, refactor before commit.
-
-Reviewer rule: any recipe added in same commit as new app under `k3s/<cluster>/apps/<app>/` = code smell. Flag for inline-in-runbook OR generic-recipe-extension before merge.
-
-Background: T34 closeout (sprint-2026-04-26) — `artemis-deploy` + `mirror-artemis-secrets` violated rules 2+3. Refactor parked at `docs/TODO-park.md` §Justfile slop sweep (post-G1).
-
-## CRIT — chart-side pattern study (2026-04-27, T34 live-verify postmortem)
-
-T34 closure landed clean (`helm template` rendered all resources, lint passed) but live deploy surfaced **five preventable bugs** before phase5 smoke went green. All findable at dispatch time by reading adjacent apps end-to-end.
-
-1. **`Middleware` references must resolve in the same namespace.** Chart HTTPRoute references a Traefik Middleware by name (`secure-headers`, `redirect-https`) → Middleware MUST exist in chart's ns. Each gxy-management app creates its own copy. `grep -rln 'kind: Middleware' k3s/<cluster>/apps/`. T34 chart referenced `secure-headers` without creating one → Traefik 404'd until added.
-
-2. **Cluster CNI dictates NetworkPolicy CRD.** Cilium + hostNetwork Traefik → vanilla `networking.k8s.io/v1` NetworkPolicy `namespaceSelector: kube-system` does NOT match hostNetwork pods. Use `cilium.io/v2 CiliumNetworkPolicy` with `fromEntities: [cluster, host]` per cassiopeia caddy precedent. T34 vanilla NP blocked Traefik on 2 of 3 nodes.
-
-3. **Service env contract = read source + sample, not infer.** Chart `env:` values must match consumer service's config-loader keys AND validation rules character-for-character. Read `<service>/.env.sample` AND `<service>/internal/config/config.go` AND any token-format validation. T34 used wrong key suffixes (`*_KEY_FORMAT` missing) AND wrong placeholder syntax (`{site}/{deployId}` vs `<site>/<ts>-<sha>`) → pod CrashLoopBackOff at startup.
-
-4. **Producer/consumer shared-store key format must round-trip.** Two services share a bucket → writer's key format MUST match reader's. T34 wrote `<site>/preview`; caddy `r2_alias` reads `<site>.<root>/preview` (FQDN). Both formats configurable on writer side; read reader source FIRST to pin contract.
-
-5. **CF zone SSL mode is a deployment-time precondition.** Confirm CF zone SSL = Flexible / Full / Strict BEFORE writing chart Gateway listeners. Mismatch (chart HTTPS terminator vs zone Flexible) → 502/504 at edge with no origin-side error. T34 originally drafted HTTPS listener; reframed to HTTP-only after confirming cassiopeia precedent on same zone.
-
-Reviewer rule: any new chart at `k3s/<cluster>/apps/<app>/charts/` clears 5-point pre-merge checklist (Middleware presence, NetworkPolicy CRD type, env contract diff vs `.env.sample`, key-format round-trip vs reader, CF zone SSL verified). Add to dispatch closure checklist template next sprint.
+- **New chart** at `k3s/<cluster>/apps/<app>/charts/` → `docs/GUIDELINES.md` §Chart pre-merge checklist (5-point: Middleware ns, NetworkPolicy CRD type, env contract, key-format round-trip, CF zone SSL).
+- **New justfile recipe** → `docs/GUIDELINES.md` §Justfile slop discipline (4 rules + reviewer rule).
