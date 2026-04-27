@@ -4,7 +4,9 @@
 #
 #   chart values.yaml  <  THIS FILE  <  infra-secrets/k3s/gxy-management/artemis.values.yaml.enc
 #
-# Secret credentials and TLS PEM live in the sops overlay only.
+# Secret credentials live in the sops overlay only. No TLS PEM —
+# CF zone `freecode.camp` is on Flexible SSL (CF→origin HTTP);
+# matches cassiopeia caddy precedent on the same zone.
 # Anything in this file is git-tracked and may be inspected publicly.
 
 replicaCount: 3

@@ -23,17 +23,18 @@ behind GitHub OAuth Bearer + Traefik rate-limit + CF WAF).
 
 Verify: `dig +short uploads.freecode.camp` returns CF anycast IPs.
 
-### 2. CF Origin certificate (per-app TLS pattern)
+### 2. CF zone SSL mode (no origin cert at k8s layer)
 
-CF dashboard → SSL/TLS → Origin Server → Create Certificate.
+`freecode.camp` zone is on **Flexible SSL** — CF Edge terminates
+HTTPS using Universal SSL; CF→origin is plain HTTP. Matches the
+cassiopeia caddy precedent on the same zone. Verify via CF
+dashboard → SSL/TLS → Overview — mode = `Flexible`.
 
-| Field    | Value                                                  |
-| -------- | ------------------------------------------------------ |
-| Hostname | `*.freecode.camp` AND `freecode.camp` (wildcard reuse) |
-| Validity | 15 years                                               |
-| Format   | Origin CA                                              |
-
-Save PEM blocks locally; absolute paths feed the mirror recipe in §4.
+No origin cert mint required at the k8s layer; chart Gateway
+listener is HTTP :80 only. To flip the zone to Full Strict later,
+cassiopeia caddy + artemis charts both need TLS terminator
+listeners + sealed origin certs; file as a separate dispatch
+(`T-strict-tls`) — out of T34 scope.
 
 ### 3. GitHub OAuth App — `Universe CLI`
 
@@ -78,12 +79,10 @@ type flags. See `infra/CLAUDE.md` §Secrets.
 ### 5. Mint sops YAML overlay (helm input) — `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`
 
 The dotenv envelope is the source of truth. The YAML overlay is the
-helm input mirror — same secret values, plus the CF Origin cert/key
-PEM. Generated automatically:
+helm input mirror — same secret values in YAML form. Generated
+automatically:
 
 ```bash
-export ARTEMIS_TLS_CERT=/path/to/uploads.freecode.camp.cert.pem
-export ARTEMIS_TLS_KEY=/path/to/uploads.freecode.camp.key.pem
 just mirror-artemis-secrets
 ```
 
@@ -91,9 +90,10 @@ The recipe:
 
 1. Decrypts the dotenv via `sops` with explicit `--input-type dotenv`.
 2. Pulls the 5 secret keys, emits `secretEnv:` block.
-3. Inlines the cert + key PEMs into a `tls:` block.
-4. Validates the assembled YAML via `python3 -c "import yaml; ..."`.
-5. Re-seals with `sops --encrypt --input-type yaml`.
+3. Validates the assembled YAML via `python3 -c "import yaml; ..."`.
+4. Re-seals with `sops --encrypt --input-type yaml`.
+
+No env vars required. (No TLS material — CF Flexible SSL; see §2.)
 
 After it succeeds, commit the new `.enc` from infra-secrets:
 
@@ -102,8 +102,8 @@ git -C infra-secrets add k3s/gxy-management/artemis.values.yaml.enc
 git -C infra-secrets commit -m "feat(gxy-management): seal artemis values overlay"
 ```
 
-Re-run after env-var rotation OR cert rotation. The dotenv stays the
-SOT — never hand-edit the YAML overlay.
+Re-run after env-var rotation. The dotenv stays the SOT — never
+hand-edit the YAML overlay.
 
 ### 6. sites.yaml seed — `freeCodeCamp/artemis` repo
 
@@ -182,12 +182,12 @@ Exit 0 on green.
 
 ## Rotate
 
-| What rotates                    | Recipe                                                                                               |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| GH_CLIENT_ID, R2 keys, JWT key  | edit dotenv → `sops -e --in-place`; then `just mirror-artemis-secrets` + `just artemis-deploy`       |
-| CF Origin cert (15y — calendar) | new PEMs → `just mirror-artemis-secrets` + `just artemis-deploy`                                     |
-| sites.yaml                      | PR to artemis repo; merge; `git -C ~/DEV/fCC-U/artemis pull`; `just artemis-deploy` (fsnotify ≤1min) |
-| Image tag                       | bump `apps/artemis/values.production.yaml` `image.tag`; `just artemis-deploy`                        |
+| What rotates                         | Recipe                                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; then `just mirror-artemis-secrets` + `just artemis-deploy`               |
+| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch |
+| sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC-U/artemis pull`; `just artemis-deploy` (fsnotify ≤1min)         |
+| Image tag                            | bump `apps/artemis/values.production.yaml` `image.tag`; `just artemis-deploy`                                |
 
 ## Failure modes
 
@@ -196,8 +196,9 @@ Exit 0 on green.
 | `Error unmarshalling input json: invalid character '#'` from sops | dotenv decrypted without explicit type flags | use the canonical incantation in §4                                  |
 | Helm fail with `.Values.secretEnv.X is required`                  | sops overlay missing key                     | re-run `just mirror-artemis-secrets`                                 |
 | Helm fail with `.Values.sites is empty`                           | artemis repo not pulled or wrong path        | `git -C ~/DEV/fCC-U/artemis pull` or set `ARTEMIS_REPO`              |
-| Pod CrashLoopBackOff with TLS error                               | cert/key mismatch in sops overlay            | re-run mirror with correct PEM paths                                 |
 | 503 on `uploads.freecode.camp/healthz`                            | Gateway not bound; HTTPRoute not picked up   | `kubectl -n artemis describe gateway,httproute` — check Traefik logs |
+| 502 / "no available server" via CF                                | CF zone SSL = Strict + origin no cert        | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)   |
+| ERR_SSL_PROTOCOL_ERROR in browser                                 | CF zone SSL = Off                            | set CF zone SSL to Flexible                                          |
 | 429 on bulk upload                                                | rate-limit middleware tripped                | tune `rateLimit.average` / `.burst` in `values.production.yaml`      |
 
 ## Cross-references

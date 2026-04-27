@@ -45,26 +45,21 @@ secret-verify-all:
 
 # Mirror the artemis dotenv envelope (SOT) into the YAML helm values
 # overlay. Reads `{{ secrets_dir }}/management/artemis.env.enc` and
-# operator-supplied PEMs ($ARTEMIS_TLS_CERT, $ARTEMIS_TLS_KEY) and
 # writes a sealed `{{ secrets_dir }}/k3s/gxy-management/artemis.values.yaml.enc`
-# consumed by `just artemis-deploy`. Re-run after env-var rotation
-# OR cert rotation. Operator commits the resulting `.enc` from the
-# infra-secrets repo.
+# consumed by `just artemis-deploy`. Re-run after env-var rotation.
+# Operator commits the resulting `.enc` from the infra-secrets repo.
 #
-# Required env:
-#   ARTEMIS_TLS_CERT  path to CF Origin cert PEM (uploads.freecode.camp)
-#   ARTEMIS_TLS_KEY   path to CF Origin private key PEM (paired)
+# No TLS material handled here — CF zone `freecode.camp` is on
+# Flexible SSL (CF Edge terminates HTTPS, CF→origin plain HTTP),
+# matching the cassiopeia caddy precedent on the same zone. No origin
+# cert at the k8s layer.
 [group('secrets')]
 mirror-artemis-secrets:
     #!/usr/bin/env bash
     set -euo pipefail
     SOT="{{ secrets_dir }}/management/artemis.env.enc"
     TGT="{{ secrets_dir }}/k3s/gxy-management/artemis.values.yaml.enc"
-    [ -f "$SOT" ] || { echo "Error: missing $SOT (mint dotenv envelope first per dispatch §4)"; exit 1; }
-    : "${ARTEMIS_TLS_CERT:?ARTEMIS_TLS_CERT (path to CF Origin cert PEM)}"
-    : "${ARTEMIS_TLS_KEY:?ARTEMIS_TLS_KEY  (path to CF Origin private key PEM)}"
-    [ -r "$ARTEMIS_TLS_CERT" ] || { echo "Error: cannot read $ARTEMIS_TLS_CERT"; exit 1; }
-    [ -r "$ARTEMIS_TLS_KEY"  ] || { echo "Error: cannot read $ARTEMIS_TLS_KEY";  exit 1; }
+    [ -f "$SOT" ] || { echo "Error: missing $SOT (mint dotenv envelope first per runbook §4)"; exit 1; }
     TMP_DOT=$(mktemp); TMP_YAML=$(mktemp); TMP_ENC=$(mktemp)
     trap "rm -f $TMP_DOT $TMP_YAML $TMP_ENC" EXIT
     sops -d --input-type dotenv --output-type dotenv "$SOT" > "$TMP_DOT"
@@ -81,12 +76,6 @@ mirror-artemis-secrets:
             ;;
         esac
       done < "$TMP_DOT"
-      echo
-      echo "tls:"
-      echo "  cert: |"
-      sed 's/^/    /' "$ARTEMIS_TLS_CERT"
-      echo "  key: |"
-      sed 's/^/    /' "$ARTEMIS_TLS_KEY"
     } > "$TMP_YAML"
     python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$TMP_YAML"
     sops --encrypt --input-type yaml --output-type yaml "$TMP_YAML" > "$TMP_ENC"

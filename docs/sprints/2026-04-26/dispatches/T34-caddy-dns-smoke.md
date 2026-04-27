@@ -75,7 +75,6 @@ infra/
 │       │       ├── service.yaml        # ClusterIP :8080
 │       │       ├── configmap.yaml      # sites.yaml + non-secret env
 │       │       ├── secret-env.yaml     # 5 secret env vars (sops overlay)
-│       │       ├── secret-tls.yaml     # CF Origin cert (sops overlay)
 │       │       ├── gateway.yaml        # Gateway API (Traefik) — web + websecure listeners
 │       │       ├── httproute.yaml      # web→redirect-https + websecure→Service
 │       │       ├── namespace.yaml
@@ -118,8 +117,16 @@ consume. Bundle = "ready to dispatch T34" gate.
 - CF DNS → `freecode.camp` zone → add A record `uploads.freecode.camp`
   → gxy-management public IP
 - Proxied (orange cloud)
-- SSL Full (Strict) — origin cert `*.freecode.camp` already issued
 - TTL auto
+
+**SSL mode (2026-04-27 amend).** Original draft said "Full Strict —
+origin cert \*.freecode.camp already issued". Reframed: zone is on
+**Flexible SSL** (CF Edge terminates HTTPS using Universal SSL;
+CF→origin plain HTTP). Matches the cassiopeia caddy precedent on the
+same zone (Caddy chart Gateway = HTTP :80 only, `auto_https off`).
+No origin cert at the k8s layer; artemis chart Gateway listener is
+HTTP :80 only. Future flip to Strict requires a zone-wide change
+covering cassiopeia caddy too — separate `T-strict-tls` dispatch.
 
 ### 2. GitHub OAuth App — `Universe CLI`
 

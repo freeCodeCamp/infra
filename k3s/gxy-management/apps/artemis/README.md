@@ -34,6 +34,12 @@ No Tailscale. No Caddy/cassiopeia hop. No CF Access (programmatic API
 controls: Traefik rate-limit middleware (chart-internal) + CF WAF
 rules on the `freecode.camp` zone.
 
+**TLS:** CF Edge terminates HTTPS using the zone's Universal SSL
+cert. CF→origin is plain HTTP (Flexible SSL mode on the
+`freecode.camp` zone — matches the cassiopeia caddy precedent on
+the same zone). No origin cert at the k8s layer; chart Gateway
+listens on HTTP :80 only.
+
 ## Layout
 
 ```
@@ -48,9 +54,8 @@ apps/artemis/
 │       ├── service.yaml
 │       ├── configmap.yaml      # env + sites.yaml
 │       ├── secret-env.yaml     # 5 secret env vars (sops overlay)
-│       ├── secret-tls.yaml     # CF Origin cert (sops overlay)
 │       ├── middleware-ratelimit.yaml
-│       ├── gateway.yaml
+│       ├── gateway.yaml        # HTTP :80 only — CF Flexible SSL
 │       ├── httproute.yaml
 │       └── networkpolicy.yaml
 ├── values.production.yaml      # production overlay (image, replicas, env defaults)
@@ -106,11 +111,12 @@ pull path** — build- and run-residency rule for Universe pillars
 
 ## TLS
 
-Per-app pattern (matches gxy-cassiopeia caddy precedent). Cert + key
-sealed inside the sops values overlay (`tls.cert` / `tls.key`). Mint
-via CF dashboard → Origin Server → 15y validity. Wildcard
-`*.freecode.camp` acceptable (re-uses cassiopeia caddy cert family
-if convenient).
+CF Edge terminates HTTPS via the zone's Universal SSL cert.
+CF→origin is plain HTTP (Flexible SSL on `freecode.camp`, matches
+cassiopeia caddy on the same zone). No origin cert / no per-app
+cert at the k8s layer. Future flip to Full Strict (origin cert
+present at Traefik) requires zone-wide change touching cassiopeia
+caddy too — separate dispatch.
 
 ## Verify post-deploy
 

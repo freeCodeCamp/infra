@@ -335,7 +335,7 @@ condensed rebuild flow:
 | #   | What                                                                                | Where                                                           |
 | --- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | 1   | DNS A record `uploads.freecode.camp` → node public IP                               | CF dashboard                                                    |
-| 2   | CF Origin cert for `*.freecode.camp` (15y)                                          | CF dashboard                                                    |
+| 2   | CF zone `freecode.camp` SSL = `Flexible` (CF Edge HTTPS, origin HTTP)               | CF dashboard                                                    |
 | 3   | GitHub OAuth App `Universe CLI` (Device Flow ✅)                                    | freeCodeCamp org settings                                       |
 | 4   | Sealed dotenv `infra-secrets/management/artemis.env.enc`                            | `sops encrypt`                                                  |
 | 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`      | `just mirror-artemis-secrets`                                   |
