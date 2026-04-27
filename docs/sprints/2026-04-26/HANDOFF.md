@@ -11,6 +11,105 @@ Convention:
 
 ## Journal
 
+### 2026-04-27 — sites.yaml ADR realignment (option A; T34 §step 5 fix)
+
+**Drift correction.** Prior T34 §step 5 (commit `5e42cc80`,
+2026-04-27 earlier) pinned `sites.yaml` source-of-truth to
+`infra/k3s/gxy-management/apps/artemis/sites.yaml`. Wrong per
+ADR-016 §sites.yaml lifecycle (line 178) — source of truth is
+**artemis repo** `config/sites.yaml`; infra-side ConfigMap is the
+**render target**, not the source.
+
+**Operator zoom-out.** Operator surfaced cross-cutting concerns +
+"we're drifting from ADR goals." Reset performed: re-read ADR-016
+
+- ADR-004 + ADR-008. Identified 4 drift items (path location,
+  proposed schema slim, premature migration ladders, CLI-only
+  register endpoint violating interaction-agnostic tenet).
+
+**Decision matrix presented:** A (hold ADR as written, fix path
+drift only), B (slim schema — fixed teams env + flat sites
+allowlist; needs ADR-016 amendment + artemis worker re-fire),
+C (KV-backed register; multi-ADR design pivot, post-MVP).
+
+**Operator picked A** for sprint 2026-04-26 close (unblock T34;
+zero artemis re-fire risk). B + C parked together as single
+follow-up dispatch — embedded SQLite/lightweight KV registry +
+schema slim, both honor ADR-016 §trust-collapse + vendor-neutral
+tenets.
+
+**Closing commits:**
+
+- infra `feat/k3s-universe`: `<incoming>` —
+  `docs(sprints): T34 sites.yaml ADR realign`
+  - T34 dispatch §step 5 rewritten — source-of-truth re-pinned to
+    artemis repo `config/sites.yaml`; infra render target via Helm
+    `--set-file` from operator's local checkout (v1 default);
+    ArgoCD multi-source documented as future path; image-bake
+    rejected (defeats fsnotify hot-reload locked in ADR)
+  - Operator-action block updated to artemis-repo-first workflow
+  - This HANDOFF entry
+  - STATUS shipped log + ahead-origin count
+- infra `feat/k3s-universe`: `<incoming-2>` —
+  `docs(todo-park): artemis sites slim + embedded KV`
+  - New §Application config section in TODO-park
+  - Combined entry for B (schema slim) + C (embedded SQLite/KV
+    registry) — single future dispatch covers both
+  - Activation triggers + ADR amendment requirements documented
+
+**No artemis code changed; no ADR amendments filed.** Pure sprint-
+doc realignment. T34 fire-readiness preserved (operator action
+shifts from "edit infra path" to "seed artemis-repo file" — same
+half-line edit, different repo).
+
+**Cross-ref.** ADR-016 §sites.yaml lifecycle (line 178);
+§Authn/authz Q11 (line 35); §design tenet interaction-agnostic
+(line 41); §trust-collapse (line 219). ADR-008 §Storage matrix
+(no KV primitive in current set). ADR-004 §scope-out 2026-04-26
+(BetterAuth governs constellation auth, not platform tools).
+
+### 2026-04-27 — pillar audit pass + 3 follow-up commits (broken ownership)
+
+Operator-requested grounded-truth audit across all 5 repos touched by
+the static-apps proxy pillar. 5 parallel Explore subagents, one per
+repo + Universe ADRs. Reports landed at
+`docs/sprints/2026-04-26/audit/{artemis,universe-cli,windmill,infra,universe-adrs}.md`.
+
+**Verdict roll-up:** GREEN with 1 known YELLOW gap (T32 addendum
+already filed) + 2 documentation drifts (windmill T11 boneyard
+headers + Universe spike-plan artemis placement). No G1 blockers;
+T34 fire-ready.
+
+**Three follow-up commits landed (broken ownership at operator
+request — governor session edited worker-team repos directly):**
+
+1. **windmill `main`: `f8e99b9`** — `chore(static): boneyard T11 files + fmt pass`
+   - Boneyard headers added to T11 source files marking
+     `provision_site_r2_credentials.{ts,test.ts,script.yaml}` archaeology
+     post-2026-04-26 pivot
+   - Resource-type `c_woodpecker_admin.resource-type.yaml` description
+     updated with retired marker (`u/admin/cf_r2_provisioner` left
+     alive — proxy reuses)
+   - oxfmt save-hook reformatted file bodies (266 lines) — included in
+     same commit; tests 412/412 still green
+   - Files do NOT participate in live wmill flow; archive-only marker
+
+2. **Universe `main`: `c5a1144`** — `docs(spike-plan): add artemis on gxy-management`
+   - Galaxy placement matrix gains artemis row (gxy-management,
+     Sprint 2026-04-26, Option A locked)
+   - "What NEVER moves" bullet added — artemis stays on gxy-management
+   - Universe-team owns spike-plan; operator approved governor edit
+
+3. **infra `feat/k3s-universe`: `<incoming>`** — `docs(sprints): T34 sites.yaml + audit trail`
+   - T34 dispatch §step 5 rewritten — sites.yaml landing path pinned
+     to `infra/k3s/gxy-management/apps/artemis/sites.yaml` (chart-
+     internal default; plain YAML; hot-reload via fsnotify; rotation
+     via PR+merge cycle)
+   - This HANDOFF entry
+
+**Cross-ref.** Audit reports remain on disk for follow-up. Operator
+reads each for full file:line refs + tables.
+
 ### 2026-04-27 — T32 addendum filed: bake `UNIVERSE_GH_CLIENT_ID` default
 
 Operator verify pass 2026-04-27 (artemis GHCR image + CF DNS +
