@@ -1,19 +1,21 @@
 # Sprint 2026-04-26 — STATUS
 
-Updated: 2026-04-27 (drift-audit pass — artemis local path fixed across infra+universe-cli+Universe ADR-016; G1 GREEN; G2 unblocked) · Branch: `feat/k3s-universe` · Ahead of origin: 43
+Updated: 2026-04-27 (post-`roll the sprint`) · All 6 sub-tasks
+**done** · G1 GREEN · G2 unblocked · 5 repos pushed + synced ·
+Operator gates remaining: T22 ClickOps + npm publish.
 
-**🆕 Multi-session true-parallel mode active.** This session
-(`~/DEV/fCC/infra`) is **governor-only** — owns sprint-doc
-consolidation. Per-T workers fire from separate Claude Code
-sessions / terminals.
+Canonical session-roll output. Overwritten each `roll the sprint`.
+Read this **before** PLAN.md or DECISIONS.md.
 
-Canonical session-roll output. Overwritten each `roll the session`. Read this **before** PLAN.md or DECISIONS.md.
+## Shipped
 
-## Shipped (committed, not pushed)
+All sprint commits below are **pushed to origin** (verified
+`@{u}...HEAD == 0/0` on every repo).
 
-infra (`feat/k3s-universe`):
+### infra `feat/k3s-universe` — `65e91e7` HEAD
 
-- `8da379e5` — `docs(sprint/2026-04-21): D016 proxy plane pivot`
+Sprint commits since `cdf30bb` (sprint open):
+
 - `cdf30bbb` — `docs(sprints): close 2026-04-21, open 2026-04-26`
 - `3f525004` — `docs(sprints): close T30 (D016 ADR)`
 - `a80c1f64` — `docs(sprints): rename T31 svc to artemis`
@@ -22,6 +24,9 @@ infra (`feat/k3s-universe`):
 - `8bb867c4` — `docs(sprints): reconcile T31 PLAN+STATUS+HANDOFF`
 - `a967cf24` — `docs(sprints): close T22 cleanup cron (windmill)`
 - `22140aed` — `docs(sprints): pivot CLI surface to static ns`
+- `96a941f9` — `docs(sprints): reconcile T22 + ns pivot history`
+- `b8c59b0b` — `docs(TODO-park): park T-build-residency`
+- `b9797bd3` — `docs(sprints): refresh T34 post-rename + lock A`
 - `a7bfbc4c` — `docs(sprints): T34 sops dotenv decrypt incant`
 - `b1f1f3e4` — `docs(sprints): close T32 — universe-cli@24d6fa1`
 - `e99da31b` — `docs(todo-park): R2 lifecycle GC for artemis orphans`
@@ -31,245 +36,155 @@ infra (`feat/k3s-universe`):
 - `5e42cc80` — `docs(sprints): T34 sites.yaml + audit trail`
 - `c9dd8817` — `docs(sprints): T34 sites.yaml ADR realign`
 - `fdf74dc6` — `docs(todo-park): artemis sites slim + embedded KV`
-- `<incoming>` — `docs(sprints): seed artemis sites.yaml — T34 precondition`
-- `<incoming>` — `docs(sprints): close T32 addendum — cli@0a3f1ce`
+- `a1978deb` — `docs(sprints): seed artemis sites.yaml — T34 precondition`
+- `f7ebf424` — `docs(sprints): refresh T34 resume prompt`
+- `0b8d6238` — `feat(artemis): close T34 — chart + Path X reframe`
+- `62dbb4e2` — `docs(sprints): T34 reconcile <incoming> → 0b8d6238`
+- `cee53e5d` — `feat(artemis): drop TLS — CF Flexible (cassiopeia parity)`
+- `8a1a2375` — `docs(crit): justfile slop discipline + slop sweep park`
+- `ab241418` — `docs(claude): force-track + CRIT justfile slop entry`
+- `da5a5855` — `fix(justfile): sops --config for mirror-artemis-secrets`
+- `b4567c10` — `refactor(justfile): unify deploy verb; drop artemis slop`
+- `c291b317` — `docs(claude): consolidate cross-repo guidelines`
+- `5f725a09` — `fix(artemis): env keys + secure-headers MW + CNP`
+- `813d0171` — `fix(artemis): R2 site key uses FQDN`
+- `4e7aea8e` — `docs(crit): T34 live-verify postmortem + G1 tick`
+- `fd70e62c` — `feat(scripts): add trim-field-notes maintenance tool`
+- `0d445551` — `docs(runbooks): add secrets-decrypt procedure`
+- `a33309dc` — `docs(GUIDELINES): chart checklist + slop discipline + sprint vocab`
+- `c9068153` — `docs(claude): shrink kernel; move sections to canonical homes`
+- `41c7962d` — `docs(sprints): close T32 addendum — cli@0a3f1ce`
+- `e843e04e` — `docs(artemis): correct local repo path to fCC/`
+- `4f34c456` — `docs(sprints): STATUS reconcile post-drift-audit`
+- `65e91e70` — `chore: update CLAUDE`
 
-universe-cli (`feat/proxy-pivot` — NEW off `main`, not pushed):
+Pre-sprint carryover from `archive/2026-04-21/`: Phase 0 foundation
+(`e95f260` → `4c5e38b`), Wave A.1 Caddy D35 + namespace flip
+(`d6360c7f` → `3a8d9933`), G1.1 + smoke (`6ee679bf` +
+`phase4-20260426-080726`), T11 artifact (`010d577` + Bug C+D fixes
+later boneyarded).
 
-- `8788648` — `feat(lib): add platform.yaml v2 schema + parser`
-- `5d7b6ef` — `docs(platform-yaml): add v2 schema reference + migration`
-- `24d6fa1` — T32 closure (CLI v0.4 rewrite — login/static deploy/promote/rollback/ls/whoami)
-- `0a3f1ce` — `feat(login): bake default GH OAuth client_id` _(T32 addendum — G2 gate cleared; package bumped to `0.4.0-alpha.2`)_
+### universe-cli `feat/proxy-pivot` — `f448125` HEAD
 
-artemis (`main` — greenfield, NEW remote, not pushed):
+Branch cut fresh off `main` 2026-04-26. T32 + T33 + T32-addendum
+artifacts:
 
-- `861e4c4` — `feat: initial artemis service scaffold`
-- `7d6eed3` — `ci: split into reusable test + manual docker (PH1-B25)` _(landed post-T31; matches GHCR :sha-7d6eed3c... image)_
+- `8788648` — `feat(lib): add platform.yaml v2 schema + parser` _(T33)_
+- `5d7b6ef` — `docs(platform-yaml): add v2 schema reference + migration` _(T33)_
+- `ccc71ab` — `feat(lib): add proxy-client for artemis API`
+- `7438612` — `feat(lib): add token-store for device-flow auth`
+- `9f304d6` — `feat(lib): add identity priority chain (Q10)`
+- `99be630` — `feat(lib): add GitHub OAuth device flow`
+- `50b8ced` — `feat(lib): add gitignore-style ignore filter`
+- `045aedc` — `feat(commands): add login (device flow)`
+- `759ea1a` — `feat(commands): add logout`
+- `18b2871` — `feat(commands): add whoami`
+- `ff85afe` — `feat(cli): wire login/logout/whoami top-level`
+- `99581b0` — `feat(lib): add build runner for platform.yaml`
+- `ae9c477` — `fix(lib): tsc clean for whoami + identity`
+- `73bf894` — `feat(lib): add upload to proxy plane`
+- `f7f3b2b` — `build(husky): add tsc to pre-commit gate`
+- `2fe7c22` — `feat(commands): rewrite deploy for artemis proxy`
+- `bd02b9e` — `feat(commands): rewrite promote + rollback for proxy`
+- `392e88e` — `feat(commands): add ls + wire static ns`
+- `1b087ab` — `chore: remove v0.3 R2-direct + storage modules`
+- `4f29379` — `chore(release): v0.4.0-alpha.1 + drop AWS deps` _(T32 main close: `24d6fa1`)_
+- `24d6fa1` — `docs: rewrite README + CHANGELOG for v0.4 proxy`
+- `0a3f1ce` — `feat(login): bake default GH OAuth client_id` _(T32 addendum — G2 cleared)_
+- `f448125` — `docs(proxy-client): correct artemis repo path`
+
+### artemis `main` — `49d2f32` HEAD (greenfield repo)
+
+- `861e4c4` — `feat: initial artemis service scaffold` _(T31 close)_
+- `7d6eed3` — `ci: split into reusable test + manual docker (PH1-B25)` _(GHCR image source)_
 - `49d2f32` — `feat(config): seed sites.yaml + un-gitignore` _(T34 precondition #5)_
 
-windmill (`main`, not pushed):
+Plus PH1-B18..B24 hardening commits (perf/refactor/fix) committed
+before B25 — see `git log artemis/main`.
 
-- `016a868` — `feat(static): add cleanup cron for R2 deploys (T22)`
+### windmill `main` — `b511d17` HEAD
+
+- `010d577` — `feat(flows/static): T11 per-site R2 credential provisioning` _(carryover, then boneyard)_
+- `aaeab60` — `feat(resource-type): add c_cf_r2_provisioner for T11` _(carryover)_
+- `786b257` — `feat(resource-type): add c_woodpecker_admin for T11/G1.0b` _(carryover)_
+- `d44783a` — `fix(static/provision_site_r2_credentials): wpAdmin field name + URL drift`
+- `e1db0be` — `chore(format): oxfmt canonical pass + skill header injection`
+- `c5d9f92` — `fix(static/provision_site_r2_credentials): Bug C+D — UUIDs + SPA-HTML probe`
+- `63488b7` — `chore(format): oxfmt canonical pass post-Bug-C+D`
+- `016a868` — `feat(static): add cleanup cron for R2 deploys (T22)` _(T22 close)_
 - `f8e99b9` — `chore(static): boneyard T11 files + fmt pass`
+- `b511d17` — `docs(claude): @import cross-repo refs`
 
-Universe (`main`):
+### Universe `main` — `c2f274d` HEAD
 
-- `e2a9356` — `feat(decisions): D016 deploy proxy plane`
+- `e2a9356` — `feat(decisions): D016 deploy proxy plane` _(T30 close)_
 - `310c7e1` — `docs(decisions): D016 amend artemis + JWT scope`
 - `df255b9` — `docs(decisions): D016 amend CLI namespace static`
 - `c5a1144` — `docs(spike-plan): add artemis on gxy-management`
-
-Carried forward from `../archive/2026-04-21/` (still committed not pushed):
-
-- All Phase 0 foundation commits (`e95f260` through `4c5e38b`)
-- Wave A.1 — Caddy D35 + canonical builder + namespace flip (`d6360c7f` through `3a8d9933`)
-- G1.1 + G1.1.smoke (`6ee679bf` + `phase4-20260426-080726`)
-- T11 artifact at `windmill@010d577` + Bug C+D fixes (boneyard pending — incoming windmill commit)
+- `fce38c9` — `docs(field-notes): RUN-residency clause for pillars`
+- `4c12213` — `docs(claude): drop drift-prone status sections`
+- `fc6be47` — `docs(field-notes/infra): T34 chart-side postmortem`
+- `c2f274d` — `docs(decisions): D016 amend artemis local path`
 
 ## Open
 
-| Dispatch                                                                             | Repo                                                                  | State                                                                                                                 |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **T30** — D016 ADR draft + amend                                                     | `~/DEV/fCC-U/Universe`                                                | **done** (`Universe@310c7e1`)                                                                                         |
-| **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC/artemis` (NEW greenfield repo)                             | **done** (`artemis@861e4c4`)                                                                                          |
-| **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1` + addendum `0a3f1ce` — default GH OAuth client_id baked, G2 cleared; oxfmt deferred) |
-| **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                                     |
-| **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@0b8d6238`) — operator-gated: helm-deploy + phase5-smoke (live verify)                                |
-| **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending                                                                |
+| Dispatch                                                | Repo                                          | State                                                                                  |
+| ------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **T22** — Cleanup cron flow (windmill, 7d retention)    | `~/DEV/fCC-U/windmill` `main`                 | **done** (`windmill@016a868`); operator gate: schedule flip + R2 admin Resource verify |
+| **T30** — D016 ADR draft + amends                       | `~/DEV/fCC-U/Universe` `main`                 | **done** (`Universe@e2a9356` + 3 amends; latest `c2f274d`)                             |
+| **T31** — artemis svc (Go scaffold + endpoints + tests) | `~/DEV/fCC/artemis` `main`                    | **done** (`artemis@861e4c4`; PH1-B18..B25 hardening on top)                            |
+| **T32** — universe-cli v0.4 rewrite + addendum          | `~/DEV/fCC-U/universe-cli` `feat/proxy-pivot` | **done** (`universe-cli@24d6fa1` main + `0a3f1ce` addendum + `f448125` path-doc fix)   |
+| **T33** — `platform.yaml` v2 schema + validator + doc   | `~/DEV/fCC-U/universe-cli` `feat/proxy-pivot` | **done** (`universe-cli@5d7b6ef`)                                                      |
+| **T34** — Artemis chart + DNS + phase5 smoke            | `~/DEV/fCC/infra` `feat/k3s-universe`         | **done** (`infra@0b8d6238`); G1 GREEN per `4e7aea8e` postmortem                        |
 
-**Concurrency plan:**
+## Operator-owned actions remaining
 
-- T30 ✅ + T31 ✅ + T32 ✅ (+ addendum ✅) + T33 ✅ + T22 ✅ + T34 ✅ closed. CLI namespace pivot ✅ landed pre-T32 (`universe static <verb>`).
-- **G1 GREEN** (T34 live verify GREEN 2026-04-27 — see HANDOFF).
-- **G2 unblocked** — npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2` clear to ship now that default GH OAuth client_id is baked in source.
-- T22 live verify (R2 admin Resource + Windmill schedule flip) still operator-gated; gate is windmill-side only, does not block G1/G2 ticks.
-
-## Operator-owned actions (post session ship)
-
-Completed in earlier sessions on 2026-04-27 (see HANDOFF for the
-T34 live-verify chain): CF DNS, GitHub OAuth App
-(`Iv23liIuGmZRyPd5wUeN`), CF zone SSL (Flexible — cassiopeia
-parity), first GHCR image build
-(`ghcr.io/freecodecamp/artemis:sha-7d6eed3c…@sha256:afb2c…`),
-helm install on gxy-management, phase5 E2E smoke (G1 GREEN).
+Sprint-close push: **DONE 2026-04-27 (operator)**. All 5 repos
+pushed; every branch tracks origin; ahead/behind = 0/0 verified.
 
 Outstanding:
 
-- **T22 live verify (windmill-side ClickOps).** Flip the Windmill
-  cleanup-cron schedule to active + verify the admin S3 Resource
-  resolves; sweep dry-run first against an empty bucket window.
-  Gates the windmill-only T22 closure; does not block G1/G2.
-- **G2 — npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2`.**
-  T32 addendum landed (`universe-cli@0a3f1ce`), branch comment
-  drift cleaned (`f448125`); branch must be pushed first. CI does
-  the publish via OIDC Trusted Publisher on tag.
-- **Sprint-close push (5 repos).**
-  - `infra` `feat/k3s-universe` — 43 commits ahead of origin.
-  - `Universe` `main` — 11 commits ahead of origin.
-  - `windmill` `main` — 7 commits ahead of origin.
-  - `universe-cli` `feat/proxy-pivot` — branch never pushed
-    (no upstream); set upstream on first push.
-  - `artemis` `main` — 1 commit ahead of origin (sites.yaml seed).
+1. **T22 live verify (windmill ClickOps).** Flip cleanup-cron
+   schedule → active. Verify admin S3 Resource resolves. Sweep
+   dry-run first against an empty deploy window. Closes the
+   windmill-side gate; G1/G2 unaffected.
+
+2. **G2 — npm publish `@freecodecamp/universe-cli@0.4.0-alpha.2`.**
+   Branch `feat/proxy-pivot` is pushed; CI Trusted Publisher OIDC
+   handles the npm side on tag. Cut release tag, watch CI green,
+   verify package on registry.
 
 ## Boneyard (kept as archaeology, do not invoke)
 
-- windmill: `f/static/provision_site_r2_credentials.{ts,test.ts,resource-type.yaml}` (boneyard headers incoming) + Resources `u/admin/cf_r2_provisioner` (proxy reuses) + `u/admin/woodpecker_admin` (retired)
-- universe-cli: branch `feat/woodpecker-pivot` (4 commits ahead of `main`, never merged)
-- T21 Woodpecker template — demoted to optional reference (archived at `../archive/2026-04-21/dispatches/archive/`)
+- windmill: `f/static/provision_site_r2_credentials.{ts,test.ts,resource-type.yaml}` boneyard headers landed `f8e99b9`; Resources `u/admin/cf_r2_provisioner` (proxy reuses) + `u/admin/woodpecker_admin` (retired).
+- universe-cli: branch `feat/woodpecker-pivot` (4 commits ahead of `main`, never merged).
+- T21 Woodpecker template — demoted to optional reference (archived at `../archive/2026-04-21/dispatches/archive/`).
 
 ## Other state
 
-- Cluster gxy-management: GREEN. Will host artemis per T34 lean (Option A confirmed pending operator).
+- Cluster gxy-management: GREEN. Hosts artemis (3 replicas; image `ghcr.io/freecodecamp/artemis:sha-7d6eed3c…@sha256:afb2c…`).
 - Cluster gxy-launchbase: GREEN. Demoted from critical path post-pivot.
-- Cluster gxy-cassiopeia: GREEN. Caddy 3/3 on `caddy-s3:sha-712c6e3@sha256:e024af67…` D35 dot-scheme. Adds `uploads.freecode.camp` upstream rule (→ artemis svc) via T34.
+- Cluster gxy-cassiopeia: GREEN. Caddy 3/3 on `caddy-s3:sha-712c6e3@sha256:e024af67…` D35 dot-scheme. R2-served sites (`<site>.freecode.camp`) flow here; **does not** front the artemis upload endpoint (artemis has its own Gateway on gxy-management at `uploads.freecode.camp`).
 - Cluster gxy-static: Live, retiring at #26 cutover (post-MVP).
 - CF account: `ad45585c4383c97ec7023d61b8aef8c8`.
-- CF zones: `freecodecamp.net` + `freecode.camp` proxied. Origin certs `*.freecodecamp.net`, `*.freecode.camp`, `*.preview.freecode.camp` ACM-issued + CF-activated.
-- R2 bucket: `universe-static-apps-01` (single bucket, prefix-scoped). Layout unchanged by pivot.
-- Tools verified: sops, age, doctl, wmill, direnv, aws-cli v2, **Go 1.26.2 (`/opt/homebrew/bin/go`)** for T31.
-- Artemis local repo: `~/DEV/fCC/artemis/` initialized as empty git repo (no files yet; first commit lands per T31).
-
-## Multi-session resume prompts
-
-Each worker session pastes its block in a fresh Claude Code terminal. Governor (this session) keeps the global resume at the bottom for continuity.
-
-### T31 worker — artemis Go svc
-
-▎ Resume Sprint 2026-04-26 / T31. Repo: `~/DEV/fCC/artemis` (greenfield;
-empty git repo). Spec: `~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`
-(ADR-016 + 2 dated amendments — read in full incl. Amendments). Dispatch:
-`~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T31-artemis-service.md`.
-Goal: Go microservice scaffold + endpoints + tests per dispatch §Files,
-§API surface, §Acceptance. Toolchain: Go 1.26.2 darwin/arm64
-(`/opt/homebrew/bin/go`); chi router; AWS SDK Go v2 for R2; testify;
-HS256 deploy-session JWT. Module: `github.com/freeCodeCamp/artemis`.
-Hostname: `uploads.freecode.camp` (UNCHANGED — repo renamed but public
-host stays). TDD: red→green→refactor. Closure: flip dispatch Status
-header `pending → done` in same commit; one commit allowed since
-greenfield init. Do NOT edit `STATUS.md` / `PLAN.md` / `HANDOFF.md` /
-`DECISIONS.md` — governor session reconciles. First move:
-`cd ~/DEV/fCC/artemis && go mod init github.com/freeCodeCamp/artemis`.
-
-### T33 worker — universe-cli platform.yaml v2 schema
-
-▎ Resume Sprint 2026-04-26 / T33. Repo: `~/DEV/fCC-U/universe-cli`
-branch `feat/proxy-pivot` (NEW; cut fresh off `main` — first action).
-Spec: ADR-016 + dispatch
-`~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T33-platform-yaml-v2.md`.
-Goal: `platform.yaml` v2 schema (strip credential paths; build + deploy
-config only) + validator + doc. Parallel with T31 — no artemis API
-contract dep. Toolchain: Bun + vitest + oxfmt + oxlint + tsup + husky.
-TDD: red→green. One commit per sub-task close. Title-only conventional
-commit. Do NOT edit sprint docs — governor reconciles. First move:
-`cd ~/DEV/fCC-U/universe-cli && git checkout main && git checkout -b feat/proxy-pivot`.
-
-### T22 worker — windmill cleanup cron
-
-▎ Resume Sprint 2026-04-26 / T22. Repo: `~/DEV/fCC-U/windmill` branch
-`main`. Spec: ADR-016 §R2 layout + dispatch
-`~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T22-cleanup-cron.md`
-
-- D39 (7d retention) + D41 (admin S3 keys). Goal: Windmill flow that
-  sweeps unreferenced `<site>/deploys/<id>/` prefixes after 7d retention;
-  aliased prefixes pinned. Code can land parallel with T31; live verify
-  blocks on T31 deployed. Toolchain: Bun + wmill (`bunx wmill ...` from
-  windmill repo cwd; never global). Test: vitest + mocked windmill-client
-  locally before any preview/push. Closure: flip dispatch Status header
-  in own commit. Do NOT edit sprint docs. First move: read dispatch +
-  verify admin S3 Resource available.
-
-### T32 worker — universe-cli v0.4 rewrite
-
-▎ Resume Sprint 2026-04-26 / T32. Repo: `~/DEV/fCC-U/universe-cli`
-branch `feat/proxy-pivot` (shared with T33 — coordinate file-by-file
-or split sub-branches). Spec: ADR-016 §Authn/authz + dispatch
-`~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T32-cli-v04-rewrite.md`.
-Goal: CLI v0.4 — `login` (device flow), `deploy`, `promote`, `rollback`,
-`ls`, `whoami`. Identity priority chain (Q10): env → GHA OIDC → WP OIDC
-→ `gh auth token` → device-flow stored. HTTP client targets artemis
-`/api/*`. Partial-parallel with T31 — scaffold + identity chain can
-proceed; deploy/promote/rollback HTTP client waits on T31 contract.
-Toolchain same as T33. Closure same protocol. First move: read T32
-dispatch + ensure `feat/proxy-pivot` branch exists (T33 may have cut
-it).
-
-### T32 addendum worker — bake `UNIVERSE_GH_CLIENT_ID` default
-
-▎ Resume Sprint 2026-04-26 / T32 addendum. Repo:
-`~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (T32 main work
-already closed at `24d6fa1`). Dispatch:
-`~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T32-cli-v04-rewrite.md`
-§Addendum 2026-04-27. Goal: bake default GH OAuth App client_id in
-source so npm-published binary works without env var; env override
-preserved for fork tenants. Single commit, ~30min. Files:
-`src/lib/constants.ts` (NEW or fold), `src/commands/login.ts` (env
-?? DEFAULT), `tests/commands/login.test.ts` (env-unset case),
-`README.md` (drop "ask platform team" wording), `CHANGELOG.md`
-(`0.4.0-alpha.2` entry). Constant value `Iv23liIuGmZRyPd5wUeN`
-(verified 2026-04-27 against artemis envelope). Public-grade — fine
-to commit. Closure: single commit; T32 dispatch already `done` (no
-flip); governor reconciles HANDOFF correction-style entry post-merge.
-Blocks G2 (npm publish), not G1 — fire after T34 smoke green or in
-parallel.
-
-### T34 worker — Caddy + DNS + smoke retarget
-
-▎ Resume Sprint 2026-04-26 / T34. **UNBLOCKED 2026-04-27.** All 5
-operator preconditions GREEN: CF DNS A `uploads.freecode.camp` (CF
-proxied), GH OAuth App `Universe CLI` (`Iv23liIuGmZRyPd5wUeN`), artemis
-GHCR image (`ghcr.io/freecodecamp/artemis:sha-7d6eed3c58fd25407f52a905bad458c4a70ed277`
-
-- `:main` + `:latest`), sops envelope sealed
-  (`infra-secrets/management/artemis.env.enc`, 15/15 vars), sites.yaml
-  seed (`artemis@49d2f32` — `config/sites.yaml`). Repo:
-  `~/DEV/fCC/infra` branch `feat/k3s-universe`. Spec: dispatch
-  `~/DEV/fCC/infra/docs/sprints/2026-04-26/dispatches/T34-caddy-dns-smoke.md`
-  (read in full incl. amended §step 5 — sites.yaml source-of-truth is
-  artemis repo `config/sites.yaml`, NOT infra repo; chart loads via
-  Helm `--set-file` from operator's local artemis checkout). Goal:
-  Helm chart for artemis svc (`k3s/gxy-management/apps/artemis/`),
-  Caddy reverse-proxy upstream rule on
-  `k3s/gxy-cassiopeia/apps/caddy/values.production.yaml`
-  (`uploads.freecode.camp` → Tailscale upstream
-  `artemis.management.tailscale.fcc:8080`), justfile recipe
-  (`just helm-upgrade gxy-management artemis` wrapping `--set-file
-sites=$HOME/DEV/fCC/artemis/config/sites.yaml`), runbook
-  `docs/runbooks/deploy-artemis-service.md` (NEW), flight-manual
-  section `docs/flight-manuals/gxy-management.md` artemis subsection,
-  smoke script `scripts/phase5-proxy-smoke.sh` (NEW — replaces
-  `phase4-test-site-smoke.sh` direct-S3; new flow: init → upload →
-  finalize → preview curl → promote → prod curl per dispatch §Smoke
-  retarget). Image pin: prefer immutable SHA tag over `:main` for
-  production values. **Mode B coordination:** governor session
-  (`~/DEV/fCC/infra` cwd) is **idle** until T34 closes — same repo /
-  same tree, no parallel governor edits. Worker has free hand on all
-  sprint-doc-cluster-EXCLUDED files (everything in `k3s/`, `ansible/`,
-  `justfile`, `scripts/`, `docs/runbooks/`, `docs/flight-manuals/`,
-  `docs/architecture/`). Worker MUST NOT edit `STATUS.md` / `PLAN.md` /
-  `HANDOFF.md` / `DECISIONS.md` / `audit/*.md` / `dispatches/T*.md`
-  EXCEPT for own dispatch Status header flip (`pending → in-progress`
-  on start; `→ done` on closure) — governor reconciles
-  PLAN matrix + STATUS + HANDOFF in separate infra commit
-  post-closure. TDD per dispatch §Acceptance criteria. One commit per
-  sub-task close, title-only `cmd-git-rules`. First move: read T34
-  dispatch in full + verify image still pinnable
-  (`gh api /orgs/freeCodeCamp/packages/container/artemis/versions
---jq '.[] | {tags: .metadata.container.tags}'`).
+- CF zones: `freecodecamp.net` + `freecode.camp` proxied. SSL mode = **Flexible** on `freecode.camp`; CF Edge terminates HTTPS, origin HTTP :80 (artemis chart Gateway + cassiopeia caddy parity).
+- R2 bucket: `universe-static-apps-01` (single bucket, prefix-scoped).
+- Live drift check (post-audit): runtime infra ↔ chart code = ✅ zero drift on image SHA, all 10 env keys, sites.yaml schema, secrets envelope. Audit ran 2026-04-27.
+- Tools verified: sops, age, doctl, wmill, direnv, aws-cli v2, Go 1.26.2.
+- Artemis local repo: `~/DEV/fCC/artemis/` (corrected from `fCC-U/` per ADR-016 amendment 2026-04-27).
 
 ## Governor resume — paste in fresh session if this session lost
 
-▎ Resume Sprint 2026-04-26 governor (Universe static-apps proxy pillar).
-Branch point from `../archive/2026-04-21/` (Wave A.1 ✅). Goal: staff
-`universe static deploy` → live site, zero R2 tokens in staff/CI hands. Upload
-plane = Go svc `artemis` at host `uploads.freecode.camp` (repo renamed
-2026-04-26 evening; hostname unchanged). T30 closed (`Universe@310c7e1`).
-T31 + T33 + T22 fire-ready (multi-session true-parallel). T32 partial-
-parallel. T34 blocks on T31 image. **Governor scope:** sprint-doc
-consolidation only — never edit T-worker repo files. Workers flip own
-dispatch Status; governor reconciles PLAN matrix + HANDOFF in separate
-infra commits at task close. Tree: infra `feat/k3s-universe` ahead origin
-by 6+. Operator pushes at sprint close (5 repos). Authority: broken-
-ownership single governing session per operator 2026-04-26 evening; ADRs
-append-only via dated amendment block. Per-task covenant: TDD, title-only
-`type(scope): subject` ≤50 char. Read order: this STATUS → PLAN → DECISIONS
-→ HANDOFF.
+▎ Resume Sprint 2026-04-26 governor (Universe static-apps proxy
+pillar). All 6 sub-tasks closed (T22 + T30 + T31 + T32 + T33 + T34).
+G1 GREEN (T34 live verify postmortem `infra@4e7aea8e`). G2 unblocked
+(T32 addendum `universe-cli@0a3f1ce`). All 5 repos pushed + synced
+0/0. Drift audit 2026-04-27 — runtime ↔ chart code zero drift; doc
+drift on artemis local path fixed across infra (`e843e04`),
+universe-cli (`f448125`), Universe ADR-016 amendment (`c2f274d`).
+Outstanding operator gates: T22 windmill ClickOps (cron schedule
+flip + R2 admin Resource verify) + G2 npm publish
+`@freecodecamp/universe-cli@0.4.0-alpha.2` via OIDC Trusted
+Publisher tag-trigger. Sprint is one operator session away from
+archival under `docs/sprints/archive/2026-04-26/`. Read order: this
+STATUS → PLAN → DECISIONS → HANDOFF.
