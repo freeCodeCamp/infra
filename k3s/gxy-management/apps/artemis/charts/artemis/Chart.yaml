@@ -1,0 +1,34 @@
+apiVersion: v2
+name: artemis
+description: |
+  Artemis — Universe deploy proxy. Go service that authenticates GitHub
+  OAuth device-flow tokens, validates per-site team membership against
+  config/sites.yaml, mints HS256 deploy-session JWTs, and forwards
+  authorized PUTs to Cloudflare R2 with admin S3 keys held cluster-side.
+
+  Built and stored outside Universe (build-residency + run-residency
+  per ADR-XXX proposal — see Universe/spike/field-notes/infra.md
+  §2026-04-27 RUN-residency clause). Pulls from
+  ghcr.io/freecodecamp/artemis direct.
+
+  Chart owns: Deployment, Service, ConfigMap (sites.yaml + non-secret
+  env), Secret (env + TLS), Gateway + HTTPRoute (Traefik gateway
+  class), NetworkPolicy. No upstream chart — greenfield.
+type: application
+# Chart version (this chart's release cadence — bump on chart-shape changes).
+version: 0.1.0
+# appVersion tracks the artemis service tag in GHCR — bump alongside
+# image tag rolls in values.production.yaml so `helm list` reflects
+# what is actually running.
+appVersion: "sha-7d6eed3c58fd25407f52a905bad458c4a70ed277"
+home: https://github.com/freeCodeCamp/artemis
+sources:
+  - https://github.com/freeCodeCamp/artemis
+keywords:
+  - universe
+  - artemis
+  - deploy-proxy
+  - r2
+maintainers:
+  - name: freeCodeCamp Infra Team
+    url: https://github.com/freeCodeCamp/infra

@@ -104,6 +104,27 @@ sprint planning when an activation trigger fires.
 (closed 2026-04-26). Residency principle established in field-note.
 Remaining work needs sizing + sprint placement before dispatch.
 
+**Run-residency clause (2026-04-27 amendment).** Build-residency rule
+also implies a **RUN-residency** clause for Universe platform pillars:
+no pillar deployment may pull its container image from a registry
+hosted **inside Universe** (e.g. zot on `gxy-management`). GHCR-direct
+mandatory until ratified zot pull-through-cache wiring exists outside
+Universe. Rationale: zot lives on `gxy-management`; if a pillar on the
+same galaxy required zot for image pull, a cluster-wipe rebuild would
+brick — kubelet cannot reach zot until zot itself runs, but zot
+cannot run without its image, which it must pull from… itself.
+Chicken-and-egg.
+
+Concretely: any chart `image.repository` field for a pillar (caddy-s3,
+artemis, future ingress, recovery scripts) must point at
+`ghcr.io/freecodecamp/<pillar>` — never `zot.management.tailscale.fcc/...`.
+Tenant deploys (apps on cassiopeia / launchbase) MAY pull from zot
+once pull-through is ratified (Universe target = same recovery
+boundary anyway). Audit boundary table in
+`~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-26
+Build-residency rule covers BUILD path; this amendment extends to
+PULL path with same dichotomy.
+
 **Scope (3 phases).**
 
 _Phase 1 — Audit (single dispatch, ~half-day)._ Discovery only. Sweep
@@ -146,6 +167,46 @@ collapses to Phase 1 + Phase 3 — single dispatch, no sprint expansion.
 Phase 2 only opens if cross-repo audit surfaces additional pillars.
 
 ## Application config
+
+### CF Access service-token hardening for artemis (Path C fallback)
+
+- **Activation trigger:** abuse signals on `uploads.freecode.camp`
+  exceed compensating controls (Traefik rate-limit + CF WAF + GH
+  membership probe). Specifically: (a) sustained 4xx auth-fail spikes
+  beyond rate-limit envelope, (b) API key compromise blast radius
+  exceeds JWT scope mitigations, (c) operator decides defense-in-depth
+  warrants the operational cost. Revisit no earlier than post-G2.
+- **Owner:** infra team (chart + ratelimit middleware + CF Access
+  policy) + Universe team (ADR-016 amendment if auth model changes).
+- **Ref:** sprint-2026-04-26 DECISIONS §D43 amend 3 (auth path A
+  selected; Path C parked).
+
+**Why parked.** Path A (GH OAuth Bearer + JWT only) selected for v1
+per dispatch §auth + ADR-016 §Authn/authz Q10/Q11. CF Access service
+tokens add per-CI/per-CLI provisioning surface and duplicate the
+authorization gate without strengthening it (membership probe is the
+real check). Compensating controls already shipped (rate-limit
+middleware chart-internal; CF WAF rules tracked in operator runbook).
+
+**Scope (single dispatch when activated, ~half-day).**
+
+- CF Access application binding for `uploads.freecode.camp` (gates
+  origin requests at CF edge).
+- Service-token mint per surface: `universe` CLI (one token, embedded
+  via `mirror-artemis-secrets`-equivalent), GHA CI, manual ops.
+- Token rotation calendar (quarterly; documented in runbook).
+- artemis chart middleware passthrough for `CF-Access-Client-Id` +
+  `CF-Access-Client-Secret` headers (currently artemis is unaware of
+  these — verify it does not strip).
+- README + runbook update referencing CF Access path on top of
+  GH OAuth.
+- ADR-016 amendment: dual-auth posture (CF Access at edge + GH OAuth
+  at app).
+
+**Scope (out — keep parked):**
+
+- Replacing GH OAuth with CF Access (would re-architect ADR-016
+  authn/authz). CF Access is layered, not substituting.
 
 ### artemis sites.yaml schema slim + embedded registry (single follow-up dispatch)
 

@@ -316,6 +316,70 @@ curl -s https://zot.freecodecamp.net/v2/ | head
 # Should return OCI registry response
 ```
 
+## Phase 7: Artemis (Universe deploy proxy)
+
+Public surface: `https://uploads.freecode.camp` (NOT
+`*.freecodecamp.net` — Universe domain). Auth: GitHub OAuth Bearer
+
+- deploy-session JWT (no CF Access — programmatic API). Build- and
+  RUN-residency clean: image pulls from `ghcr.io/freecodecamp/artemis`
+  direct; never via the zot mirror co-located on this galaxy
+  (chicken-egg on cluster wipe). See
+  `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-27.
+
+Full step-by-step in `docs/runbooks/deploy-artemis-service.md`. The
+condensed rebuild flow:
+
+### 7.1 Preconditions (one-time per cluster)
+
+| #   | What                                                                                | Where                                                           |
+| --- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1   | DNS A record `uploads.freecode.camp` → node public IP                               | CF dashboard                                                    |
+| 2   | CF Origin cert for `*.freecode.camp` (15y)                                          | CF dashboard                                                    |
+| 3   | GitHub OAuth App `Universe CLI` (Device Flow ✅)                                    | freeCodeCamp org settings                                       |
+| 4   | Sealed dotenv `infra-secrets/management/artemis.env.enc`                            | `sops encrypt`                                                  |
+| 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`      | `just mirror-artemis-secrets`                                   |
+| 6   | `freeCodeCamp/artemis` repo cloned on operator host with `config/sites.yaml` seeded | git clone + PR                                                  |
+| 7   | First GHCR image build for artemis                                                  | `gh workflow run ci.yml --repo freeCodeCamp/artemis --ref main` |
+
+### 7.2 Deploy
+
+```
+cd ~/DEV/fCC/infra
+just artemis-deploy
+```
+
+Recipe layers chart values → production overlay → sops sealed
+overlay; `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` injects
+the sites map; `helm upgrade --install` + 120s rollout wait.
+
+### 7.3 Verify
+
+```
+kubectl -n artemis get pods,svc,gateway,httproute
+curl -fsS https://uploads.freecode.camp/healthz   # → {"ok":true}
+```
+
+### 7.4 Smoke test
+
+```
+just phase5-smoke
+```
+
+E2E flow: init → upload → finalize (preview) → preview curl →
+promote → prod curl. Marker-content match on both surfaces. Trap
+rolls back to the prior production deploy on exit (success OR
+failure). Exit 0 = green.
+
+### 7.5 Cluster-wipe rebuild rehearsal (operational invariant)
+
+When rehearsing a galaxy rebuild from scratch, **run with zot
+unreachable**. Artemis must come up green from a cold cluster with
+zero zot dependency in the image-pull path. If artemis fails to
+pull its image without zot, RUN-residency is broken — fix the chart
+before claiming the rebuild green. See
+`~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-27.
+
 ## Backups
 
 ### What is backed up
