@@ -215,12 +215,29 @@ commit MUST update **all** derived docs the change affects:
 - [ ] TODO-park entry if work was deferred.
 - [ ] Last `STATUS.md` may stay — gets rewritten next "roll the session".
 
-**Session-roll commands:**
+**Operator vocabulary** — canonical phrases the operator uses to drive
+sprint state. Each phrase has a single, deterministic Claude action.
 
-- `roll the sprint` → rewrite `STATUS.md` from current git log + dispatch-doc state. Single commit.
-- `give me the resume prompt` → print `STATUS.md` Resume-prompt block verbatim.
-- `start the sprint` (fresh session) → read `README.md` → `STATUS.md` → report current state, no action.
-- `verify <G-id|T-id>` → run the dispatch's read-only **Verify command** block; report green/red. Required green before any operator-run gate (G-dispatch) or "awaits operator live run" T-dispatch closes. Added 2026-04-26 after sprint-2026-04-21 mid-sprint audit found 3 false-completion claims that would have been caught by a verify gate.
+| Operator says               | Claude does                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `start the sprint`          | Read active `sprints/<date>/{README,STATUS}.md`. Report state. Wait for `go`.                            |
+| `roll the sprint`           | Rewrite active `STATUS.md` from git log + dispatch Status headers. Single commit.                        |
+| `give me the resume prompt` | Print active `STATUS.md` Resume-prompt block verbatim.                                                   |
+| `next move?`                | Per `STATUS.md` Open + `PLAN.md` Wave graph, name next unblocked task with ID, dispatch path, blockedBy. |
+| `dispatch <T-id>`           | Open `dispatches/<T-id>-*.md`. Confirm preconditions. Flip Status → `in-progress`. Begin work.           |
+| `close <T-id>`              | Run closure checklist above: flip Status, update PLAN matrix, append HANDOFF, derived docs.              |
+| `verify <T-id\|G-id>`       | Run dispatch's read-only Verify block; report green/red. Required green before any operator-action gate. |
+
+`verify` was added 2026-04-26 after the sprint-2026-04-21 mid-sprint
+audit found 3 false-completion claims that would have been caught by a
+verify gate.
+
+**Sprint invariants:**
+
+- Decisions never silently rewritten — amendment block with date.
+- HANDOFF entries never edited — append correction.
+- Inter-doc conflicts surfaced on detection, not silently resolved.
+- Skipping derived-doc updates on closure = sprint bug.
 
 **Operator-bootstrap dispatch (G-dispatch) requirements:**
 
@@ -241,6 +258,68 @@ re-runnable green command lets state lies through.
 
 When a sprint closes, move its directory under
 `infra/docs/sprints/archive/`. Archives are read-only.
+
+## Chart pre-merge checklist
+
+Any new Helm chart at `k3s/<cluster>/apps/<app>/charts/` must clear all
+five points before the closing dispatch flips to `done`. Origin: T34
+live-verify postmortem (2026-04-27 — `helm template` + lint passed but
+five preventable bugs surfaced on live deploy). Full postmortem in
+`Universe/spike/field-notes/infra.md` Journal entry of that date.
+
+- [ ] **Middleware presence in chart namespace.** Traefik
+      `Middleware` references in HTTPRoute resolve only within the
+      chart's own namespace. If the chart references `secure-headers`
+      / `redirect-https` / etc., the chart MUST also create a copy of
+      them. Verify with
+      `grep -rln 'kind: Middleware' k3s/<cluster>/apps/`.
+- [ ] **NetworkPolicy CRD type matches cluster CNI.** Vanilla
+      `networking.k8s.io/v1 NetworkPolicy` with
+      `namespaceSelector: kube-system` does NOT match hostNetwork
+      Traefik on Cilium. Use `cilium.io/v2 CiliumNetworkPolicy` with
+      `fromEntities: [cluster, host]` per cassiopeia caddy precedent
+      when targeting hostNetwork pods.
+- [ ] **Chart `env:` diffs cleanly against consumer
+      `.env.sample` + config loader.** Read both
+      `<service>/.env.sample` AND `<service>/internal/config/config.go`
+      (or equivalent) AND any token-format validation. Match keys AND
+      placeholder syntax character-for-character.
+- [ ] **Shared-store key format round-trips writer ↔ reader.** When
+      two services share a bucket, read the reader's source first to
+      pin the contract. Writer-side key formats are usually
+      configurable; reader-side parsing is not.
+- [ ] **CF zone SSL mode verified before drafting Gateway listeners.**
+      Confirm CF zone SSL = Flexible / Full / Strict. Mismatch (chart
+      HTTPS terminator vs zone Flexible) → 502/504 at edge with no
+      origin-side error. Match same-zone precedent.
+
+Reviewer rule: PR adding a chart without the checklist ticked in the
+dispatch closure is blocked. The closing commit and the field-note
+Journal entry both reference the postmortem date.
+
+## Justfile slop discipline
+
+**No new per-app one-off recipes.** Before adding a recipe under
+`[group('k3s')]` / `[group('secrets')]` / `[group('smoke')]`:
+
+1. Read the full existing recipe set end-to-end (`just --list`,
+   `wc -l justfile`). Not grep keywords.
+2. Thin wrapper over `helm-upgrade` with one extra flag (e.g.
+   `--set-file`) → **extend the generic recipe** via per-app
+   `apps/<app>/.deploy-flags.sh` sourced for `EXTRA_HELM_ARGS`. Do NOT
+   clone the helm-install body.
+3. **One-time** per cluster (mint, mirror, seal) → inline in the
+   runbook. Promote to a recipe only if re-run >~3×/year.
+4. Sweep duplication: `git diff justfile | grep '^+' | head -50` — if
+   `helm upgrade --install` is repeated, refactor before commit.
+
+Reviewer rule: any recipe added in the same commit as a new app under
+`k3s/<cluster>/apps/<app>/` is a code smell — flag for
+inline-in-runbook OR generic-recipe-extension before merge.
+
+Origin: T34 closeout (sprint-2026-04-26) — `artemis-deploy` +
+`mirror-artemis-secrets` violated rules 2 + 3. Refactor parked at
+`docs/TODO-park.md` §Justfile slop sweep.
 
 ## Monthly doc trim
 
