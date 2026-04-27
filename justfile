@@ -474,32 +474,77 @@ cf-dns-restore snapshot mode="--dry-run":
     bash scripts/cf-dns-restore.sh {{ snapshot }} {{ mode }}
 
 # ---------------------------------------------------------------------------
-# Smoke (end-to-end gate scripts — Phase 4 exit, etc.)
+# Artemis — post-deploy verification + load testing
 # ---------------------------------------------------------------------------
+#
+# Source of truth for E2E correctness lives in the artemis repo at
+# `internal/integration/` (build-tagged Go suite, `make integration`).
+# This recipe is a thin wrapper that points the suite at a deployed
+# artemis. See `docs/runbooks/artemis-postdeploy-check.md`.
+#
+# Required env (or fall through to defaults):
+#   ARTEMIS_URL    default https://uploads.freecode.camp
+#   ARTEMIS_REPO   default $HOME/DEV/fCC/artemis
+#   GH_TOKEN       default `gh auth token`
+#   SITE           default test
+#   ROOT_DOMAIN    default freecode.camp
+[group('artemis')]
+artemis-postdeploy-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${ARTEMIS_URL:=https://uploads.freecode.camp}"
+    : "${ARTEMIS_REPO:=$HOME/DEV/fCC/artemis}"
+    : "${SITE:=test}"
+    : "${ROOT_DOMAIN:=freecode.camp}"
+    GH_TOKEN="${GH_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 
-# Phase 4 exit gate per RFC gxy-cassiopeia §6.6. Uploads a test deploy to
-# R2, writes prod+preview aliases, verifies serve via Caddy r2_alias on a
-# gxy-cassiopeia node, then purges the test prefix (trap covers failure paths).
-# See docs/runbooks/phase4-test-site-smoke.md for prerequisites + DNS setup.
-# Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET,
-# CF_API_TOKEN, CF_ZONE_ID (direnv), GXY_CASSIOPEIA_NODE_IP (operator export).
-[group('smoke')]
-phase4-smoke:
-    bash scripts/phase4-test-site-smoke.sh
+    printf '[1/2] healthz %s/healthz\n' "$ARTEMIS_URL"
+    if ! curl -fsS -o /dev/null --max-time 10 "$ARTEMIS_URL/healthz"; then
+      printf 'FAIL: %s/healthz unreachable\n' "$ARTEMIS_URL" >&2
+      exit 1
+    fi
 
-# Static contract test for phase4-test-site-smoke.sh — does not invoke the
-# script. Asserts strict mode, env guards, D35 dot-scheme preview hostname,
-# trap with R2 cleanup, shell rules, shellcheck clean.
-[group('smoke')]
-phase4-smoke-test:
-    bash scripts/tests/phase4-test-site-smoke.sh
+    if [[ -z "$GH_TOKEN" ]]; then
+      printf 'FAIL: GH_TOKEN unset and `gh auth token` returned empty\n' >&2
+      exit 2
+    fi
+    if [[ ! -d "$ARTEMIS_REPO" ]]; then
+      printf 'FAIL: ARTEMIS_REPO=%s not a directory\n' "$ARTEMIS_REPO" >&2
+      exit 2
+    fi
 
-# Phase 5 E2E smoke — exercises the artemis deploy proxy end-to-end:
-# init → multipart upload → finalize (preview) → preview curl → promote
-# → prod curl. Cleanup runs on success AND failure.
-[group('smoke')]
-phase5-smoke:
-    bash scripts/phase5-proxy-smoke.sh
+    printf '[2/2] artemis E2E — repo=%s url=%s site=%s\n' \
+      "$ARTEMIS_REPO" "$ARTEMIS_URL" "$SITE"
+    cd "$ARTEMIS_REPO"
+    ARTEMIS_URL="$ARTEMIS_URL" GH_TOKEN="$GH_TOKEN" \
+      SITE="$SITE" ROOT_DOMAIN="$ROOT_DOMAIN" \
+      make integration
+
+# k6 load test — pick a scenario from `loadtest/scenarios/`.
+#
+# Scenarios:
+#   caddy-serve         high-RPS GET against served production site
+#   caddy-serve-preview high-RPS GET against preview alias
+#   artemis-whoami      moderate-RPS GH-bearer probe of /api/whoami
+#   artemis-deploy      sustained init+upload+finalize bursts (write-heavy)
+#
+# Required env: see `loadtest/README.md` per scenario.
+[group('loadtest')]
+loadtest scenario:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SCRIPT="loadtest/scenarios/{{ scenario }}.js"
+    if [[ ! -f "$SCRIPT" ]]; then
+      printf 'FAIL: scenario %s not found at %s\n' '{{ scenario }}' "$SCRIPT" >&2
+      printf 'available:\n' >&2
+      ls loadtest/scenarios/*.js 2>/dev/null | sed 's|loadtest/scenarios/||;s|\.js||;s|^|  |' >&2
+      exit 2
+    fi
+    if ! command -v k6 >/dev/null 2>&1; then
+      printf 'FAIL: k6 not on PATH (brew install k6)\n' >&2
+      exit 2
+    fi
+    k6 run "$SCRIPT"
 
 # ---------------------------------------------------------------------------
 # Docker images (caddy-s3 — in-tree r2alias module via xcaddy)
