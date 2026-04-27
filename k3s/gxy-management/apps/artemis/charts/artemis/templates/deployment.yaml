@@ -20,7 +20,6 @@ spec:
         # cases where ConfigMap projection lags fsnotify).
         checksum/config-env:  {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret-env:  {{ include (print $.Template.BasePath "/secret-env.yaml") . | sha256sum }}
-        checksum/secret-tls:  {{ include (print $.Template.BasePath "/secret-tls.yaml") . | sha256sum }}
     spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}

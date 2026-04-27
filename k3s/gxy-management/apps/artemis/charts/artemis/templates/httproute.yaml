@@ -1,28 +1,9 @@
-# HTTP → HTTPS redirect (matches windmill / zot / argocd pattern).
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ .Release.Name }}-http-redirect
-  labels:
-    {{- include "artemis.labels" . | nindent 4 }}
-spec:
-  parentRefs:
-    - name: {{ .Release.Name }}-gateway
-      sectionName: web
-  hostnames:
-    - {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname | quote }}
-  rules:
-    - filters:
-        - type: ExtensionRef
-          extensionRef:
-            group: traefik.io
-            kind: Middleware
-            name: {{ .Values.middlewares.redirectHttps }}
-      backendRefs:
-        - name: {{ .Release.Name }}
-          port: {{ .Values.service.port }}
----
-# Main artemis route — websecure listener → artemis Service.
+# Single HTTPRoute on the web (HTTP :80) listener — CF Edge terminates
+# TLS upstream (Universal SSL on the freecode.camp zone). No
+# http-redirect route needed (and it would be wrong — CF requests
+# always arrive on :80 from CF→origin under Flexible SSL; redirecting
+# them would loop).
+#
 # Filter chain: rate-limit (chart-internal Middleware) → secure-headers (cluster-shared).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -33,7 +14,7 @@ metadata:
 spec:
   parentRefs:
     - name: {{ .Release.Name }}-gateway
-      sectionName: websecure
+      sectionName: web
   hostnames:
     - {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname | quote }}
   rules:

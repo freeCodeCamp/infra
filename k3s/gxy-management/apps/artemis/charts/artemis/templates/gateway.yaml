@@ -6,18 +6,11 @@ metadata:
     {{- include "artemis.labels" . | nindent 4 }}
 spec:
   gatewayClassName: traefik
+  # CF zone `freecode.camp` is on Flexible SSL (matches cassiopeia
+  # caddy precedent — k3s/gxy-cassiopeia/apps/caddy/charts/caddy/templates/gateway.yaml).
+  # CF Edge terminates TLS with the Universal SSL cert; CF→origin is
+  # plain HTTP. No origin cert at this layer.
   listeners:
-    - name: websecure
-      protocol: HTTPS
-      port: 443
-      hostname: {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname }}
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: {{ .Release.Name }}-tls-cloudflare
-      allowedRoutes:
-        namespaces:
-          from: Same
     - name: web
       protocol: HTTP
       port: 80

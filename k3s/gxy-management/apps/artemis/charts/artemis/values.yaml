@@ -6,7 +6,7 @@
 # Layer order (lowest → highest precedence):
 #   1. THIS FILE (chart defaults)
 #   2. apps/artemis/values.production.yaml (production overlay — image pin, replicas, non-secret env)
-#   3. infra-secrets/k3s/gxy-management/artemis.values.yaml.enc (sops sealed — secret env + TLS)
+#   3. infra-secrets/k3s/gxy-management/artemis.values.yaml.enc (sops sealed — secret env only)
 
 # ---------------------------------------------------------------------
 # Image
@@ -98,31 +98,19 @@ secretEnv:
 sites: ""
 
 # ---------------------------------------------------------------------
-# TLS — per-app pattern (matches gxy-cassiopeia caddy precedent).
-# Cert + key for `uploads.freecode.camp` (CF Origin cert, wildcard
-# `*.freecode.camp` acceptable; mint via CF dashboard). Sops-sealed in
-# the values overlay alongside secretEnv.
-# ---------------------------------------------------------------------
-tls:
-  cert: null
-  key: null
-
-# ---------------------------------------------------------------------
 # Gateway / HTTPRoute (Traefik gatewayClassName) — public surface
-# `uploads.freecode.camp`. Pattern matches windmill / zot / argocd on
-# gxy-management. Traefik runs hostNetwork DaemonSet on ports 80/443
-# (per ADR-001 §traefik); listeners bind those entrypoints.
+# `uploads.freecode.camp`. CF zone `freecode.camp` is on Flexible
+# SSL (CF Edge terminates HTTPS, CF→origin is plain HTTP — matches
+# the cassiopeia caddy precedent on the same zone). No TLS terminator
+# at the k8s layer; HTTP :80 listener only.
 # ---------------------------------------------------------------------
 gateway:
   hostname: "uploads.freecode.camp"
-  # Existing gxy-management apps use per-app Gateway CRs. We do the
-  # same so artemis lifecycle is independent of windmill / zot / argocd.
 
-# Traefik middleware references (cluster-installed — see
-# k3s/gxy-management/cluster/traefik/middlewares.yaml). Names match
+# Traefik middleware reference (cluster-installed — see
+# k3s/gxy-management/cluster/traefik/middlewares.yaml). Name matches
 # windmill / zot / argocd usage for parity.
 middlewares:
-  redirectHttps: redirect-https
   secureHeaders: secure-headers
 
 # ---------------------------------------------------------------------
