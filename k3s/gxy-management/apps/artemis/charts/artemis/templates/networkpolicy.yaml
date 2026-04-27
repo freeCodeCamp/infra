@@ -1,47 +1,64 @@
 {{- if .Values.networkPolicy.enabled -}}
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+# Cilium-native NetworkPolicy.  Uses CiliumNetworkPolicy (NOT vanilla
+# `networking.k8s.io/v1` NetworkPolicy) because the cluster's CNI is
+# Cilium and Traefik runs `hostNetwork: true`. Vanilla NetworkPolicy
+# `namespaceSelector` matches do NOT resolve hostNetwork pods back to
+# their k8s namespace — would silently block Traefik on cross-node hops
+# (mirrors caddy pattern at gxy-cassiopeia/apps/caddy).
+#
+# Ingress: any in-cluster entity to TCP :8080 (artemis HTTP API).
+#          Traefik hostNetwork → matches `host` entity reliably.
+# Egress:  cluster DNS (Cilium DNS proxy) + R2 + GitHub API + ghcr.io
+#          (image pulls happen at kubelet, not pod, but listed for
+#          completeness on future curl/probe paths).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
   name: {{ .Release.Name }}
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
 spec:
-  podSelector:
+  endpointSelector:
     matchLabels:
-      {{- include "artemis.selectorLabels" . | nindent 6 }}
-  policyTypes:
-    - Ingress
-    - Egress
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
   ingress:
-    # Traefik is the only legitimate ingress source — runs hostNetwork
-    # in kube-system. Match by namespace; pod label selectors on
-    # hostNetwork pods do not behave consistently across CNIs.
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - protocol: TCP
-          port: {{ .Values.service.targetPort }}
+    - fromEntities:
+        - cluster
+        - host
+      toPorts:
+        - ports:
+            - port: "{{ .Values.service.targetPort }}"
+              protocol: TCP
   egress:
-    # DNS — kube-dns / coredns lookups (R2 endpoint, GitHub API).
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
-    # HTTPS to the public internet (R2, GitHub API). NetworkPolicy
-    # cannot match by hostname, so this is necessarily a CIDR allow.
-    # Acceptable: artemis only initiates outbound to known APIs;
-    # admin S3 keys are scoped to the configured bucket.
-    - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-      ports:
-        - protocol: TCP
-          port: 443
+    # DNS — Cilium DNS proxy on kube-dns. L7 rules:dns block required
+    # so toFQDNs entries below are populated (otherwise FQDN egress
+    # silently drops with empty IP set).
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.r2.cloudflarestorage.com"
+              - matchPattern: "api.github.com"
+              - matchPattern: "ghcr.io"
+    # R2 — admin S3 endpoint (account-scoped subdomain).
+    - toFQDNs:
+        - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    # GitHub API — token validation + team-membership probe.
+    - toFQDNs:
+        - matchName: "api.github.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
 {{- end }}

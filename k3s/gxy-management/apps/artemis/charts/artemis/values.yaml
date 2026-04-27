@@ -73,9 +73,12 @@ env:
   SITES_YAML_PATH: "/etc/artemis/sites.yaml"
   JWT_TTL_SECONDS: "900" # 15 min, per ADR-016 amend 2026-04-26
   GH_MEMBERSHIP_CACHE_TTL: "300"
-  ALIAS_PRODUCTION: "production"
-  ALIAS_PREVIEW: "preview"
-  DEPLOY_PREFIX_FORMAT: "{site}/deploys/{deployId}/"
+  # Format placeholders are artemis-native: <site> per-site, <ts>-<sha>
+  # per-deploy. Validated by artemis at startup
+  # (internal/handler/deploykey.go).
+  ALIAS_PRODUCTION_KEY_FORMAT: "<site>/production"
+  ALIAS_PREVIEW_KEY_FORMAT: "<site>/preview"
+  DEPLOY_PREFIX_FORMAT: "<site>/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
 
 # Required secret env keys — populated by sops overlay

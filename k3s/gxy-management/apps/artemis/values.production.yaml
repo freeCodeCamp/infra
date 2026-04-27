@@ -44,9 +44,9 @@ env:
   SITES_YAML_PATH: "/etc/artemis/sites.yaml"
   JWT_TTL_SECONDS: "900"
   GH_MEMBERSHIP_CACHE_TTL: "300"
-  ALIAS_PRODUCTION: "production"
-  ALIAS_PREVIEW: "preview"
-  DEPLOY_PREFIX_FORMAT: "{site}/deploys/{deployId}/"
+  ALIAS_PRODUCTION_KEY_FORMAT: "<site>/production"
+  ALIAS_PREVIEW_KEY_FORMAT: "<site>/preview"
+  DEPLOY_PREFIX_FORMAT: "<site>/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
 
 # Rate-limit tunables — Traefik Middleware (chart-internal). Per

@@ -5,16 +5,16 @@ metadata:
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
 data:
-  R2_BUCKET:                {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
-  GH_ORG:                   {{ required ".Values.env.GH_ORG is required" .Values.env.GH_ORG | quote }}
-  GH_API_BASE:              {{ required ".Values.env.GH_API_BASE is required" .Values.env.GH_API_BASE | quote }}
-  SITES_YAML_PATH:          {{ required ".Values.env.SITES_YAML_PATH is required" .Values.env.SITES_YAML_PATH | quote }}
-  JWT_TTL_SECONDS:          {{ required ".Values.env.JWT_TTL_SECONDS is required" .Values.env.JWT_TTL_SECONDS | quote }}
-  GH_MEMBERSHIP_CACHE_TTL:  {{ required ".Values.env.GH_MEMBERSHIP_CACHE_TTL is required" .Values.env.GH_MEMBERSHIP_CACHE_TTL | quote }}
-  ALIAS_PRODUCTION:         {{ required ".Values.env.ALIAS_PRODUCTION is required" .Values.env.ALIAS_PRODUCTION | quote }}
-  ALIAS_PREVIEW:            {{ required ".Values.env.ALIAS_PREVIEW is required" .Values.env.ALIAS_PREVIEW | quote }}
-  DEPLOY_PREFIX_FORMAT:     {{ required ".Values.env.DEPLOY_PREFIX_FORMAT is required" .Values.env.DEPLOY_PREFIX_FORMAT | quote }}
-  LOG_LEVEL:                {{ default "info" .Values.env.LOG_LEVEL | quote }}
+  R2_BUCKET:                    {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
+  GH_ORG:                       {{ required ".Values.env.GH_ORG is required" .Values.env.GH_ORG | quote }}
+  GH_API_BASE:                  {{ required ".Values.env.GH_API_BASE is required" .Values.env.GH_API_BASE | quote }}
+  SITES_YAML_PATH:              {{ required ".Values.env.SITES_YAML_PATH is required" .Values.env.SITES_YAML_PATH | quote }}
+  JWT_TTL_SECONDS:              {{ required ".Values.env.JWT_TTL_SECONDS is required" .Values.env.JWT_TTL_SECONDS | quote }}
+  GH_MEMBERSHIP_CACHE_TTL:      {{ required ".Values.env.GH_MEMBERSHIP_CACHE_TTL is required" .Values.env.GH_MEMBERSHIP_CACHE_TTL | quote }}
+  ALIAS_PRODUCTION_KEY_FORMAT:  {{ required ".Values.env.ALIAS_PRODUCTION_KEY_FORMAT is required" .Values.env.ALIAS_PRODUCTION_KEY_FORMAT | quote }}
+  ALIAS_PREVIEW_KEY_FORMAT:     {{ required ".Values.env.ALIAS_PREVIEW_KEY_FORMAT is required" .Values.env.ALIAS_PREVIEW_KEY_FORMAT | quote }}
+  DEPLOY_PREFIX_FORMAT:         {{ required ".Values.env.DEPLOY_PREFIX_FORMAT is required" .Values.env.DEPLOY_PREFIX_FORMAT | quote }}
+  LOG_LEVEL:                    {{ default "info" .Values.env.LOG_LEVEL | quote }}
 ---
 apiVersion: v1
 kind: ConfigMap
