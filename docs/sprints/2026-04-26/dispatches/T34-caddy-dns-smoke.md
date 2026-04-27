@@ -8,7 +8,7 @@
 **Toolchain:** Helm + ansible; existing infra recipes
 **Started:** 2026-04-27
 **Closed:** 2026-04-27
-**Closing commit(s):** `<incoming>` — `docs(sprints): close T34 — artemis chart + Path X reframe`
+**Closing commit(s):** `0b8d6238` — `feat(artemis): close T34 — chart + Path X reframe`
 
 ---
 

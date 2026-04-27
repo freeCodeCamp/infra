@@ -72,7 +72,7 @@ Carried forward from `../archive/2026-04-21/` (still committed not pushed):
 | **T31** — artemis svc (Go, scaffold + endpoints + tests)                             | `~/DEV/fCC-U/artemis` (NEW greenfield repo)                           | **done** (`artemis@861e4c4`)                                                                                    |
 | **T32** — universe-cli v0.4 rewrite (login/static deploy/promote/rollback/ls/whoami) | `~/DEV/fCC-U/universe-cli` branch `feat/proxy-pivot` (NEW off `main`) | **done** (`universe-cli@24d6fa1`) — addendum: bake `UNIVERSE_GH_CLIENT_ID` default (G2 blocker); oxfmt deferred |
 | **T33** — `platform.yaml` v2 schema + validator + doc                                | universe-cli `feat/proxy-pivot`                                       | **done** (`universe-cli@5d7b6ef`)                                                                               |
-| **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@<incoming>`) — operator-gated: helm-deploy + phase5-smoke (live verify)                        |
+| **T34** — Artemis chart + DNS + phase5 smoke (Path X reframe)                        | infra `feat/k3s-universe`                                             | **done** (`infra@0b8d6238`) — operator-gated: helm-deploy + phase5-smoke (live verify)                          |
 | **T22** — Cleanup cron flow (windmill, 7d retention)                                 | `~/DEV/fCC-U/windmill` branch `main`                                  | **done** (`windmill@016a868`) — operator gates pending                                                          |
 
 **Concurrency plan:**

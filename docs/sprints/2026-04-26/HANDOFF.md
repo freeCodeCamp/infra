@@ -42,8 +42,8 @@ chart-internal Traefik rate-limit Middleware + CF WAF rules.
 
 **Closing commits:**
 
-- infra `feat/k3s-universe` (not pushed): `<incoming>` —
-  `docs(sprints): close T34 — artemis chart + Path X reframe`
+- infra `feat/k3s-universe` (not pushed): `0b8d6238` —
+  `feat(artemis): close T34 — chart + Path X reframe`
   (single closure commit covers chart + recipes + smoke + runbook +
   flight-manual + sprint-doc state flip + DECISIONS amend block +
   TODO-park RUN-residency amend + Universe field-note RUN-residency
