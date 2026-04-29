@@ -85,6 +85,12 @@ groups:
   stg_oldeworld_clt_swa:
     "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'swa' in
     (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_kor:
+    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'kor' in
+    (tags|list) and 'clt' in (tags|list)"
+  stg_oldeworld_clt_ara:
+    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ara' in
+    (tags|list) and 'clt' in (tags|list)"
 
   # Oldeworld Cluster -- Clients by Language - PRD
   prd_oldeworld_clt_eng:
@@ -116,6 +122,12 @@ groups:
     (tags|list) and 'clt' in (tags|list)"
   prd_oldeworld_clt_swa:
     "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'swa' in
+    (tags|list) and 'clt' in (tags|list)"
+  prd_oldeworld_clt_kor:
+    "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'kor' in
+    (tags|list) and 'clt' in (tags|list)"
+  prd_oldeworld_clt_ara:
+    "'prd' in (tags|list) and 'oldeworld' in (tags|list) and 'ara' in
     (tags|list) and 'clt' in (tags|list)"
 
 compose:

@@ -10,7 +10,7 @@
       include_role:
         name: nodejs
       vars:
-        nodejs_version: '{{ variable_nodejs_version | default("v22") }}'
+        nodejs_version: '{{ variable_nodejs_version | default("v24") }}'
 
     - name: Get the Node.js version
       shell:
