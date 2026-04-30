@@ -40,17 +40,6 @@ larger end-to-end procedures compose from these.
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows
 past 99.
 
-## Archive
-
-`archive/` holds runbooks whose triggering condition is gone. Kept for
-archaeology; not maintained.
-
-| File                                                                                         | Reason archived                                                                          |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| [archive/06-dns-cutover.md](archive/06-dns-cutover.md)                                       | gxy-static → cassiopeia DNS cutover complete (2026-04); cluster nuked                    |
-| [archive/cluster-rename-mgmt-to-management.md](archive/cluster-rename-mgmt-to-management.md) | Rename complete; CLAUDE.md inventory uses `gxy-management`                               |
-| [archive/r2-bucket-provision.md](archive/r2-bucket-provision.md)                             | Bucket `universe-static-apps-01` already provisioned; T11 rw key flow superseded by D016 |
-
 ## Cross-doc references
 
 - [`../flight-manuals/00-index.md`](../flight-manuals/00-index.md) — per-cluster rebuild manuals

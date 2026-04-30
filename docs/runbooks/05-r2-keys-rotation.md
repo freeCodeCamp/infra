@@ -19,10 +19,9 @@ every write behind GitHub team membership (see
 [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) and ADR-016).
 
 > **Superseded path.** A third role-key — Woodpecker per-site rw bootstrap
-> — was specced under T11 / D40. D016 (deploy-proxy plane) supersedes
+> — was specced under T11 / D40. ADR-016 (deploy-proxy plane) supersedes
 > that flow: Woodpecker no longer holds R2 credentials; artemis brokers
-> every write. Historical T11 mint procedure is archived at
-> [`archive/r2-bucket-provision.md`](archive/r2-bucket-provision.md).
+> every write.
 
 ---
 
@@ -196,5 +195,4 @@ Both rotations should produce a field-notes entry at
 - [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) — operator-side artemis lifecycle (sops envelope structure)
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — E2E gate after rotation
 - [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops dotenv decrypt pattern
-- [`archive/r2-bucket-provision.md`](archive/r2-bucket-provision.md) — historical bucket-creation steps + superseded T11 Woodpecker rw mint
 - ADR-016 — Universe deploy proxy

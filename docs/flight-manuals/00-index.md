@@ -86,8 +86,8 @@ explicit task in the backlog — not something that happens automatically.
 | CloudNativePG | chart `0.28` / `1.29` op  | 1.28 EOL 2026-06-30      | During `1.29.x`  | gxy-launchbase. Rolling in place via operator-guided pg_upgrade.      |
 | Cilium        | chart default (1.19 line) | 3-minor community window | On minor bump    | All galaxies. Bump behind feature-gate tests.                         |
 
-When a pin crosses its action window, create a beads task in the relevant
-epic and announce in the platform-team channel.
+When a pin crosses its action window, file a follow-up under the active
+sprint and announce in the platform-team channel.
 
 ## Shared infrastructure (not cluster-scoped)
 

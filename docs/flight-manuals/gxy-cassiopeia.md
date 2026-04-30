@@ -109,9 +109,10 @@ kubectl get httproute -n caddy
 
 ## Phase 22: R2 bucket provisioning
 
-Provision bucket `universe-static-apps-01` (versioning enabled, per-site rw/ro keys)
-per [../runbooks/r2-bucket-provision.md](../runbooks/r2-bucket-provision.md).
-Store the key pair encrypted at
+Bucket `universe-static-apps-01` is already provisioned (versioning enabled,
+prefix-scoped per site under ADR-016 artemis). For credential rotation use
+[`../runbooks/05-r2-keys-rotation.md`](../runbooks/05-r2-keys-rotation.md).
+Store key pairs encrypted at
 `infra-secrets/k3s/gxy-cassiopeia/r2-{rw,ro}.env.enc`.
 
 Verify end-to-end:

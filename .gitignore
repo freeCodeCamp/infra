@@ -59,9 +59,8 @@ secrets.overrides.yaml
 .ansible/
 o11y/defaults/
 
-.beads-credential-key
-
-# Beads / Dolt files (added by bd init)
+# Beads / Dolt (deprecated; dir kept ignored if it recurs)
+.beads/
 .dolt/
 *.db
 # CocoIndex Code (ccc)

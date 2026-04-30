@@ -2,24 +2,49 @@
 
 freeCodeCamp.org infra-as-code. Primary: freeCodeCamp Universe platform (DigitalOcean + Hetzner planned, Cloudflare, R2). Legacy fCC infra (Linode, Azure) coexist, retire post-Universe.
 
+Sibling repos this one wires up: `../infra-secrets` (sops+age vault), `../artemis` (static-apps deploy proxy, deployed via `docs/runbooks/02-deploy-artemis-service.md`).
+
 **Design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
 ## Doc ownership
 
-Authoritative model + flow diagram in Universe/CLAUDE.md (read on demand).
+Authoritative model + flow diagram in `Universe/CLAUDE.md`.
 
 Field notes for this repo (Infra team owns): `Universe/spike/field-notes/infra.md` — read on demand.
 
 Internal-only material (sprints, planning conventions, parked items) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
 
+### Sprint state (cross-session)
+
+`.scratchpad/sprints/<YYYY-MM-DD>-<slug>/STATUS.md` is the canonical cross-session status doc. **Read on session open. Update Done/Blocked/Next on session close.** TaskList is in-session only — STATUS.md is the persistent source of truth. Skeleton:
+
+```md
+# <slug> — STATUS
+
+## Done
+
+- <wave/task> — <outcome>
+
+## Blocked / Open
+
+- <thing> — <why> — <unblock action>
+
+## Next
+
+- <one concrete next step>
+```
+
+Optional siblings: `PLAN.md` (wave list, multi-wave sprints only), `dispatches/W<N>-<topic>.md` (per-wave envelopes Claude can re-read).
+
 This repo owns:
 
-| Path                   | Purpose                                            |
-| ---------------------- | -------------------------------------------------- |
-| `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`) |
-| `docs/runbooks/`       | Single-purpose ops runbooks                        |
-| `docs/architecture/`   | RFCs for non-trivial work                          |
-| `docs/infra-guides/`   | Generic primers (k3s layout, etc.)                 |
+| Path                   | Purpose                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`)                 |
+| `docs/runbooks/`       | Single-purpose ops runbooks (numbered, index `00-index.md`)        |
+| `docs/architecture/`   | RFCs for non-trivial work                                          |
+| `docs/infra-guides/`   | Generic primers (k3s layout, legacy fCC ops, etc.)                 |
+| `docs/GUIDELINES.md`   | Field-note format spec (consumed by `Universe/spike/field-notes/`) |
 
 ## Working directory rule (HARD)
 
@@ -41,22 +66,9 @@ Recipes that don't touch a cluster (e.g. `just play <playbook>` against ansible 
 
 Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age, single org key, `.sops.yaml` regex `.*`). Root `.envrc` resolves `SECRETS_DIR=../infra-secrets`; any other layout breaks direnv loading. No secrets this repo — not even encrypted.
 
-### Layout contract (consumed by `.envrc` + helm value overlays)
+Layout contract + per-path consumer matrix: `docs/architecture/rfc-secrets-layout.md`.
 
-| Path                    | Consumer                                               |
-| ----------------------- | ------------------------------------------------------ |
-| `global/.env.enc`       | Root `.envrc` — org-wide tokens                        |
-| `global/tls/`           | Cert material                                          |
-| `do-universe/.env.enc`  | Every Universe galaxy `.envrc` — DO team token         |
-| `do-primary/.env.enc`   | Legacy DO token                                        |
-| `k3s/<cluster>/`        | Per-cluster kubeconfigs / sealed material              |
-| `<app>/.env.enc`        | App-level overlay (e.g. `windmill/`, `outline/`)       |
-| `<scope>/<app>.env.enc` | Scoped app overlay (e.g. `management/artemis.env.enc`) |
-| `scratchpad/`           | Drafts — never consumed by recipes                     |
-
-New galaxy/app: mint secret at the matching path before first `just deploy`. Adding new top-level scopes requires updating the consumer (`.envrc` line or helm `--set-file` source).
-
-Decrypt: `*.env.enc` envelopes need explicit `--input-type dotenv --output-type dotenv` flags (sops auto-detect on `.enc` routes to JSON parser and silently fails). Full procedure in `docs/runbooks/secrets-decrypt.md`.
+Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to JSON parser and silently fails — explicit `--input-type dotenv --output-type dotenv` is required.
 
 ## Operations
 
@@ -94,19 +106,5 @@ Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-bac
 
 ## Non-obvious conventions
 
-- Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `helm-upgrade` installs from local chart dir
-- `just play` prepends `play-` + appends `.yml` to playbook arg
-- Gateway API listener ports must match Traefik entrypoint ports (80/443 with hostNetwork)
-- PSS admission exempt: `windmill` + `tailscale` namespaces (privileged workloads)
-
-## Pre-merge checklists
-
-- **New chart** at `k3s/<cluster>/apps/<app>/charts/`: confirm 5-point — Middleware ns, NetworkPolicy CRD type matches cluster CNI (Cilium = `CiliumNetworkPolicy`), env contract round-trip, key-format placeholders match consumer, CF zone SSL mode.
-- **New justfile recipe**: must be reusable across galaxies/apps; no one-shot slop. Use per-app `apps/<app>/.deploy-flags.sh` for extras instead of bespoke recipes.
-
-## CRIT
-
-DO NOT WORRY ABOUT:
-
-- ASKING USER to PUSH, they know their job
-- COMMITING FILES YOU DID NOT TOUCH. MOST CLAUDE.md files are gitignored BY DESIGN
+- Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `helm-upgrade` installs from local chart dir.
+- `just play` prepends `play-` + appends `.yml` to playbook arg.
