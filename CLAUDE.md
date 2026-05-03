@@ -86,11 +86,15 @@ Per-galaxy state, providers, and rollout phase live in `Universe/spike/spike-pla
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
-| Galaxy           | Inventory Group      |
-| ---------------- | -------------------- |
-| `gxy-management` | `gxy_management_k3s` |
-| `gxy-launchbase` | `gxy_launchbase_k3s` |
-| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` |
+| Galaxy           | Inventory Group      | Role                                                             |
+| ---------------- | -------------------- | ---------------------------------------------------------------- |
+| `gxy-management` | `gxy_management_k3s` | Control plane — Windmill + artemis (`uploads.freecode.camp`)     |
+| `gxy-launchbase` | `gxy_launchbase_k3s` | Standby (CNPG operator running) — woodpecker retired 2026-05-03  |
+| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2 |
+
+Retired:
+
+- `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). See `Universe/spike/field-notes/infra.md` journal.
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 
