@@ -47,6 +47,19 @@ spec:
               - matchPattern: "*.r2.cloudflarestorage.com"
               - matchPattern: "api.github.com"
               - matchPattern: "ghcr.io"
+              # In-cluster service DNS — required for the Valkey
+              # registry resolution (`valkey.valkey.svc.cluster.local`).
+              # Cilium DNS `matchPattern` wildcards do NOT cross dots
+              # (per `*` → regex `[^.]*`). k8s service DNS has the
+              # shape `<svc>.<ns>.svc.cluster.local` (4 labels), so
+              # the pattern needs two `*` placeholders. Belt-and-
+              # suspenders with an exact `matchName` so future
+              # readers don't have to derive the wildcard math.
+              # The TCP egress to the Valkey pod is gated separately
+              # by the toEndpoints rule below; this only authorizes
+              # the DNS lookup.
+              - matchName: "valkey.valkey.svc.cluster.local"
+              - matchPattern: "*.*.svc.cluster.local"
     # R2 — admin S3 endpoint (account-scoped subdomain).
     - toFQDNs:
         - matchPattern: "*.r2.cloudflarestorage.com"
