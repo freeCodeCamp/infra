@@ -68,3 +68,6 @@ o11y/defaults/
 
 # k6 load test outputs
 loadtest/results/
+
+# dossier: internal scratchpad theater tooling
+.scratchpad/
