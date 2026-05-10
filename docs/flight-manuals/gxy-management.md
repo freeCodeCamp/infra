@@ -242,76 +242,124 @@ migration for Windmill"`.
 ## §C — Valkey (registry KV substrate)
 
 Per [RFC §B](../architecture/rfc-gxy-cassiopeia-ga.md#section-b-static-apps-registry-kv-substrate-matrix-and-decision-s1):
-single-instance Valkey alongside artemis. AOF + RDB on PVC. Nightly
-RDB → R2.
-
-### C.1 Helm install
-
-```bash
-cd ~/DEV/fCC/infra
-
-helm get values -n artemis valkey >/dev/null 2>&1 \
-  && echo "✓ valkey release present" \
-  || just helm-upgrade gxy-management valkey
-
-just deploy gxy-management valkey
-```
-
-The valkey chart lives at `k3s/gxy-management/apps/valkey/charts/valkey/`.
-Production overlay at `apps/valkey/values.production.yaml` pins the
-image SHA + sets persistence + NetworkPolicy. AUTH password from sops
-overlay `infra-secrets/k3s/gxy-management/valkey.values.yaml.enc`.
+single-instance Valkey in its own namespace, AOF on PVC, ClusterIP
+locked to artemis pods via NetworkPolicy. Cross-namespace DNS:
+`valkey.valkey.svc.cluster.local:6379`.
 
 > **Bring-up gate:** §C runs **before** §D — artemis depends on
-> valkey reachable on `valkey.artemis.svc.cluster.local:6379`.
+> Valkey reachable + populated when `REGISTRY_BACKEND=valkey` is
+> set on the artemis chart.
 
-### C.2 Verify
+### C.1 Mint the sops envelope (once per cluster lifetime)
+
+Skip if `$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc`
+already exists. Re-mint only if rotating the password (which forces
+a Valkey pod restart — see C.5 rotation runbook).
+
+```bash
+# 1. Generate AUTH password (64 hex chars).
+openssl rand -hex 32 > /tmp/valkey-pass.txt
+
+# 2. Build the plaintext envelope from the chart-shipped template.
+cp ~/DEV/fCC/infra/k3s/gxy-management/apps/valkey/secrets/valkey.values.yaml.enc.template \
+   /tmp/valkey-mint.yaml
+
+# 3. Substitute the password into the template (in-place).
+PASS=$(cat /tmp/valkey-pass.txt)
+sed -i.bak "s|REPLACE_WITH_64_HEX_CHARS_FROM_OPENSSL_RAND_HEX_32|$PASS|" \
+  /tmp/valkey-mint.yaml
+rm /tmp/valkey-mint.yaml.bak
+
+# 4. Encrypt to the infra-secrets target path.
+sops --input-type yaml --output-type yaml --encrypt /tmp/valkey-mint.yaml \
+  > "$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc"
+
+# 5. Wipe the plaintext tempfiles.
+shred -u /tmp/valkey-mint.yaml /tmp/valkey-pass.txt
+
+# 6. Commit + push the .enc in infra-secrets.
+cd "$SECRETS_DIR"
+git add k3s/gxy-management/valkey.values.yaml.enc
+git commit -m "feat(gxy-management): valkey overlay"
+# (push is operator-owned per covenant)
+```
+
+### C.2 Helm install
 
 ```bash
 cd ~/DEV/fCC/infra/k3s/gxy-management
 export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
-kubectl -n artemis get pods,svc,pvc -l app=valkey
-# valkey-0 Running (StatefulSet); svc valkey ClusterIP; PVC bound
+# skip-if-already-deployed guard
+helm -n valkey list -q | grep -q '^valkey$' \
+  && echo "✓ valkey release present" \
+  || just deploy valkey
+```
 
-# Auth + ping
-PASS=$(sops decrypt --extract '["auth"]["password"]' \
-  ../../infra-secrets/k3s/gxy-management/valkey.values.yaml.enc)
-kubectl -n artemis exec sts/valkey -- valkey-cli -a "$PASS" PING
+`apps/valkey/.deploy-flags.sh` decrypts the sops envelope into a
+per-invocation tempfile and appends `--values $TMP` to the helm
+chain. The decrypted file lives only inside the shell scope of the
+recipe and is unlinked on shell exit (trap).
+
+### C.3 Verify
+
+```bash
+cd ~/DEV/fCC/infra/k3s/gxy-management
+export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+
+kubectl -n valkey get pods,svc,pvc
+# valkey-0 Running (StatefulSet); svc valkey ClusterIP + valkey-headless;
+# data-valkey-0 PVC bound to local-path-pv-...
+
+# Auth + ping (decrypt password to a tempfile, exec, wipe)
+sops --decrypt "$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc" \
+  | yq '.secretEnv.VALKEY_PASSWORD' > /tmp/.vk
+kubectl -n valkey exec sts/valkey -- \
+  valkey-cli -a "$(cat /tmp/.vk)" --no-auth-warning PING
+shred -u /tmp/.vk
 # → PONG
 
-# Persistence config
-kubectl -n artemis exec sts/valkey -- valkey-cli -a "$PASS" CONFIG GET appendonly
+# Persistence config (anonymized password — kubectl exec env var
+# is the cleanest path; see C.4 / import-sites.sh)
+kubectl -n valkey exec sts/valkey -- sh -c \
+  'valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning CONFIG GET appendonly'
 # → 1) "appendonly"  2) "yes"
 ```
 
-### C.3 Sites import (one-shot, migration step from `sites.yaml`)
+### C.4 Sites import (one-shot, cutover step)
 
-Skip if `SMEMBERS sites:all` is already non-empty.
+Pre-populates Valkey with the 11-site canonical registry derived
+from R2 (`rclone ls r2-gxy:universe-static-apps-01 | rg production`).
+Run **before** the artemis cutover in §D so the moment artemis flips
+to `REGISTRY_BACKEND=valkey` no `*.freecode.camp` request 404s.
 
-```bash
-cd ~/DEV/fCC/infra
-just artemis-registry-import       # one-shot Job: reads sites.yaml from artemis chart values, writes Valkey
-```
-
-(`just artemis-registry-import` is a follow-up sprint deliverable in
-the artemis repo — encode here as the operator anchor; recipe exits 0
-when valkey hash count matches `sites.yaml` entry count.)
-
-### C.4 Nightly RDB → R2 mirror
-
-The valkey chart ships a CronJob (`apps/valkey/manifests/base/rdb-backup.yaml`)
-that runs daily 03:00 UTC, execs `valkey-cli BGSAVE`, uploads
-`/data/dump.rdb` → `r2://universe-static-apps-01/_meta/registry/<date>.rdb`.
-30-day R2 lifecycle.
+Skip if `SMEMBERS sites:all` already returns 11 entries.
 
 ```bash
-kubectl -n artemis get cronjob valkey-rdb-backup
-# valkey-rdb-backup   0 3 * * *   ...
+cd ~/DEV/fCC/infra/k3s/gxy-management
+export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
-# Manual trigger to validate the path before waiting overnight:
-kubectl -n artemis create job valkey-rdb-test-$(date +%s) --from=cronjob/valkey-rdb-backup
+# 1. Dry-run prints the HSET / SADD / PUBLISH commands, no writes.
+../../infra/k3s/gxy-management/apps/valkey/scripts/import-sites.sh --dry-run
+
+# 2. Apply against the live pod. Idempotent — re-run is safe (HSET
+#    overwrites with identical fields; SADD is set-typed).
+../../infra/k3s/gxy-management/apps/valkey/scripts/import-sites.sh
+
+# 3. Verify
+kubectl -n valkey exec sts/valkey -- sh -c \
+  'valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning SMEMBERS sites:all | sort'
+# → 11 slugs, alphabetized
 ```
+
+### C.5 Backups (deferred — post-GA)
+
+Nightly RDB → R2 mirror is **not** part of the v0.1 chart. Tracked as
+post-GA scope in the cassiopeia GA RFC. Until then, Valkey AOF on the
+local-path PVC is the sole durability layer; an unscheduled node loss
+on the gxy-management node forfeits up to 1s of writes (`appendfsync
+everysec`). Acceptable for the 11-site / write-bursty-by-staff
+workload; revisit if write rate grows.
 
 ## §D — Artemis (deploy proxy)
 
@@ -454,15 +502,15 @@ curl -fsS https://uploads.freecode.camp/healthz
 
 ## §G — Backups
 
-| Data              | Method                                             | Schedule                             | Storage                                                           | Restore time                         |
-| ----------------- | -------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------ |
-| etcd              | k3s built-in S3 snapshots                          | Every 6h, 20 retained                | `s3://net-freecodecamp-universe-backups/etcd/gxy-management/`     | Minutes (k3s native)                 |
-| Windmill PG       | CronJob `pg_dumpall` → S3                          | Daily 02:00 UTC, 7 retained          | `s3://net-freecodecamp-universe-backups/windmill/gxy-management/` | Minutes (pg_restore)                 |
-| Valkey (registry) | CronJob `valkey-cli BGSAVE` → R2                   | Daily 03:00 UTC, 30-day R2 lifecycle | `r2://universe-static-apps-01/_meta/registry/<date>.rdb`          | Minutes (valkey-cli `--rdb` restore) |
-| ArgoCD            | not backed up — state in git                       | n/a                                  | n/a                                                               | re-deploy from git                   |
-| Zot (parked)      | not backed up                                      | n/a                                  | DO Spaces (when reactivated)                                      | n/a                                  |
-| Helm releases     | not backed up — chart values are source of truth   | n/a                                  | infra repo                                                        | `just helm-upgrade`                  |
-| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                                  | infra-secrets repo                                                | `just deploy`                        |
+| Data              | Method                                             | Schedule                    | Storage                                                           | Restore time         |
+| ----------------- | -------------------------------------------------- | --------------------------- | ----------------------------------------------------------------- | -------------------- |
+| etcd              | k3s built-in S3 snapshots                          | Every 6h, 20 retained       | `s3://net-freecodecamp-universe-backups/etcd/gxy-management/`     | Minutes (k3s native) |
+| Windmill PG       | CronJob `pg_dumpall` → S3                          | Daily 02:00 UTC, 7 retained | `s3://net-freecodecamp-universe-backups/windmill/gxy-management/` | Minutes (pg_restore) |
+| Valkey (registry) | **Deferred — post-GA** (see §C.5)                  | not yet running             | future: `r2://universe-static-apps-01/_meta/registry/<date>.rdb`  | post-GA scope        |
+| ArgoCD            | not backed up — state in git                       | n/a                         | n/a                                                               | re-deploy from git   |
+| Zot (parked)      | not backed up                                      | n/a                         | DO Spaces (when reactivated)                                      | n/a                  |
+| Helm releases     | not backed up — chart values are source of truth   | n/a                         | infra repo                                                        | `just helm-upgrade`  |
+| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                         | infra-secrets repo                                                | `just deploy`        |
 
 ### G.1 Ad-hoc Windmill backup (before maintenance)
 
@@ -478,34 +526,21 @@ teardown, or PG change.
 
 See B.3 above.
 
-### G.3 Restore Valkey from R2 RDB mirror
+### G.3 Restore Valkey from R2 RDB mirror — DEFERRED (post-GA)
 
-```bash
-cd ~/DEV/fCC/infra/k3s/gxy-management
-export KUBECONFIG=$(pwd)/.kubeconfig.yaml
-
-# Get latest mirror.
-DATE=$(aws --endpoint-url "$R2_ENDPOINT" s3 ls s3://universe-static-apps-01/_meta/registry/ \
-  | awk '{print $4}' | sort -r | head -1)
-
-aws --endpoint-url "$R2_ENDPOINT" s3 cp \
-  "s3://universe-static-apps-01/_meta/registry/$DATE" /tmp/dump.rdb
-
-# Quiesce artemis (optional; or accept brief 5xxs while valkey is restoring).
-kubectl scale deploy -n artemis artemis --replicas=0
-
-# Restore: copy file into the valkey pod and trigger a FLUSHALL+restore.
-PASS=$(sops decrypt --extract '["auth"]["password"]' \
-  ../../infra-secrets/k3s/gxy-management/valkey.values.yaml.enc)
-
-kubectl cp /tmp/dump.rdb artemis/valkey-0:/data/dump.rdb
-kubectl -n artemis exec sts/valkey -- valkey-cli -a "$PASS" SHUTDOWN NOSAVE
-# k8s restarts the pod; on boot Valkey loads dump.rdb.
-kubectl wait --for=condition=Ready pod/valkey-0 -n artemis --timeout=2m
-
-# Bring artemis back.
-kubectl scale deploy -n artemis artemis --replicas=3
-```
+> The R2 mirror CronJob is not yet running (see §C.5). Until it
+> ships, the only recovery path on Valkey data loss is the AOF on
+> the local-path PVC. Worst case (PVC loss + no nightly mirror):
+> rerun `apps/valkey/scripts/import-sites.sh` to re-seed the 11-site
+> registry, then accept that any sites registered after the seed
+> import are lost and must be re-`universe sites register`'d by
+> staff.
+>
+> When G.3 reactivates, the recipe will read from
+> `r2://universe-static-apps-01/_meta/registry/<date>.rdb`, copy
+> into the Valkey pod under `-n valkey`, and decrypt the password
+> from `secretEnv.VALKEY_PASSWORD` in the sops envelope (NOT
+> `auth.password` — schema in C.1).
 
 ### G.4 Restore etcd from S3
 

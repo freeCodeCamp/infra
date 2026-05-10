@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "valkey.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "valkey.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      {{- include "valkey.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "valkey.labels" . | nindent 8 }}
+      annotations:
+        # Force pod restart when valkey.conf changes — checksum the
+        # rendered ConfigMap content. Without this, kubelet caches
+        # the previous config until the next manual `rollout restart`.
+        checksum/config: {{ toYaml .Values.valkeyConfig | sha256sum }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: valkey
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Run with explicit config + AUTH from secret. Both
+          # `requirepass` and `masterauth` get the same value so
+          # future replication adds plug into Sentinel without
+          # config drift.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              exec valkey-server /etc/valkey/valkey.conf \
+                --requirepass "$VALKEY_PASSWORD" \
+                --masterauth "$VALKEY_PASSWORD"
+          envFrom:
+            - secretRef:
+                name: {{ include "valkey.fullname" . }}-env
+          ports:
+            - name: valkey
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning ping | grep -q PONG
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning ping | grep -q PONG
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: conf
+              mountPath: /etc/valkey
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: conf
+          configMap:
+            name: {{ include "valkey.fullname" . }}-conf
+        - name: tmp
+          emptyDir: {}
+{{- if not .Values.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+{{- end }}
+{{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "valkey.labels" . | nindent 10 }}
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+{{- end }}

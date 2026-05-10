@@ -1,0 +1,161 @@
+# Default values for the valkey chart.
+# Production overlay at ../../values.production.yaml.
+# Secret credentials overlay at (sops) infra-secrets/k3s/gxy-management/valkey.values.yaml.enc.
+# Consumed by `just helm-upgrade gxy-management valkey`.
+#
+# Layer order (lowest → highest precedence):
+#   1. THIS FILE (chart defaults)
+#   2. apps/valkey/values.production.yaml (production overlay — image pin, PVC size, non-secret env)
+#   3. infra-secrets/k3s/gxy-management/valkey.values.yaml.enc (sops sealed — AUTH password only)
+
+# ---------------------------------------------------------------------
+# Namespace
+# ---------------------------------------------------------------------
+namespace: valkey
+
+# ---------------------------------------------------------------------
+# Image
+# ---------------------------------------------------------------------
+# Per Universe RUN-residency rule: pull from upstream valkey/valkey
+# direct. NEVER through zot.management on this same galaxy.
+image:
+  repository: valkey/valkey
+  tag: "8.1.4-alpine"
+  pullPolicy: IfNotPresent
+
+# StatefulSet replicas. v0.1 ships 1 — single-AZ k3s; the registry
+# fits in <1MB so HA gain is marginal. Multi-replica + Sentinel is
+# post-GA scope.
+replicaCount: 1
+
+# ---------------------------------------------------------------------
+# Workload sizing
+# ---------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# ---------------------------------------------------------------------
+# Persistence — PVC backing AOF. Sized for ~10k registry rows worst
+# case; current load is ~11. local-path is k3s default storage class.
+# ---------------------------------------------------------------------
+persistence:
+  enabled: true
+  storageClass: "local-path"
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+# ---------------------------------------------------------------------
+# Service — ClusterIP only. Artemis (cross-namespace) connects via
+# `valkey.valkey.svc.cluster.local:6379`. NetworkPolicy below
+# restricts ingress to the artemis pod label set.
+# ---------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 6379
+  targetPort: 6379
+
+# ---------------------------------------------------------------------
+# Pod & container security context (PSS restricted-compliant; the
+# valkey namespace runs PSS restricted — Valkey holds the registry
+# source-of-truth and merits the strictest pod security profile).
+# ---------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  runAsGroup: 999
+  fsGroup: 999
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------
+# Valkey config (rendered into a ConfigMap, mounted at
+# /etc/valkey/valkey.conf, passed via --config to valkey-server).
+#
+# AOF on (`appendonly yes`): registry source-of-truth — RDB-only would
+# lose up-to-60s of writes on crash. fsync everysec is the standard
+# durability/perf balance.
+#
+# `protected-mode no` is safe here because:
+#   1. NetworkPolicy locks ingress to the artemis pod label.
+#   2. requirepass below is set from the sops secret (non-empty).
+#   3. Service is ClusterIP only — no external listener.
+#
+# requirepass is materialized from the sops Secret at runtime via
+# `--requirepass $VALKEY_PASSWORD` in the StatefulSet command — NOT
+# baked into this ConfigMap so the value never lives in plaintext on
+# disk.
+# ---------------------------------------------------------------------
+valkeyConfig: |
+  bind 0.0.0.0 -::*
+  port 6379
+  protected-mode no
+  appendonly yes
+  appendfsync everysec
+  appendfilename "appendonly.aof"
+  dir /data
+  save ""
+  maxmemory-policy noeviction
+  loglevel notice
+
+# Required secret env keys — populated by sops overlay
+# (infra-secrets/k3s/gxy-management/valkey.values.yaml.enc).
+# Listed here as null so chart fail-fasts via `required` template
+# helpers if the overlay is missing or incomplete.
+secretEnv:
+  VALKEY_PASSWORD: null
+
+# ---------------------------------------------------------------------
+# PodDisruptionBudget — minAvailable 1. With replicaCount 1 this
+# blocks voluntary disruptions during node drains; eviction must
+# wait for operator hand-roll. Acceptable for v0.1; revisit when
+# multi-replica.
+# ---------------------------------------------------------------------
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# ---------------------------------------------------------------------
+# NetworkPolicy
+# ---------------------------------------------------------------------
+# Ingress is locked to pods carrying these labels. Match must agree
+# with whatever artemis pods carry (chart writes labels via
+# `_helpers.tpl` — selectorLabels include `app.kubernetes.io/name:
+# artemis`). Update both sides if the artemis chart changes labels.
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: artemis
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: artemis
+
+# ---------------------------------------------------------------------
+# Liveness / readiness — `valkey-cli -a $VALKEY_PASSWORD ping` exec
+# probe. Returns PONG when the server is up; non-zero exit when
+# down or auth fails.
+# ---------------------------------------------------------------------
+probes:
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3

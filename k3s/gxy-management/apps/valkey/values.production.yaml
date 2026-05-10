@@ -1,0 +1,65 @@
+# Production overlay for the valkey chart on gxy-management.
+# Loaded by `just helm-upgrade gxy-management valkey` between chart
+# defaults and the sops sealed overlay so the layering is:
+#
+#   chart values.yaml  <  THIS FILE  <  infra-secrets/k3s/gxy-management/valkey.values.yaml.enc
+#
+# Secret credentials live in the sops overlay only. No TLS — Valkey
+# is ClusterIP-only and locked down by NetworkPolicy. AUTH password
+# is the source of trust.
+# Anything in this file is git-tracked and may be inspected publicly.
+
+replicaCount: 1
+
+image:
+  repository: valkey/valkey
+  # Pinned tag + digest. OCI spec: when both are present, digest
+  # wins. Kubelet/containerd pull by digest (immutable). Tag retained
+  # for human grok in `helm list` / `kubectl describe pod`.
+  #
+  # Resolve digest with:
+  #   docker buildx imagetools inspect valkey/valkey:8.1.4-alpine
+  #
+  # Build provenance: upstream valkey-io/valkey GHA pipeline.
+  # Run-residency clean per Universe field-note 2026-04-27 — pulls
+  # from upstream valkey/valkey direct, NOT through zot.management
+  # (zot lives on the same galaxy → chicken-egg on cluster wipe).
+  tag: "8.1.4-alpine"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+persistence:
+  enabled: true
+  storageClass: "local-path"
+  size: 2Gi
+
+# Production-tuned valkey.conf overrides chart default. Only the
+# `loglevel` is bumped to `notice` (chart default already), and the
+# AOF rewrite policy is set so the AOF file doesn't grow unbounded.
+valkeyConfig: |
+  bind 0.0.0.0 -::*
+  port 6379
+  protected-mode no
+  appendonly yes
+  appendfsync everysec
+  appendfilename "appendonly.aof"
+  dir /data
+  save ""
+  maxmemory-policy noeviction
+  loglevel notice
+  auto-aof-rewrite-percentage 100
+  auto-aof-rewrite-min-size 64mb
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true

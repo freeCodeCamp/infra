@@ -1,0 +1,39 @@
+apiVersion: v2
+name: valkey
+description: |
+  Valkey — registry KV substrate for the static-apps proxy plane.
+  Single-replica StatefulSet with AOF persistence backing the artemis
+  registry (hash `site:<slug>` + index set `sites:all` + pub/sub
+  channel `registry.changed`).
+
+  Per ADR-007 (storage) + cassiopeia GA RFC §3 (KV substrate matrix
+  decision) — Valkey was selected over CF KV / R2 JSON / Postgres /
+  etcd / Redis as the in-cluster vendor-neutral KV that decouples the
+  static-apps registry from the operator-on-PR loop.
+
+  Per Universe RUN-residency rule: image pulled from valkey/valkey
+  upstream registry direct, NOT through zot.management (zot lives on
+  this same galaxy → chicken-egg on cluster wipe).
+
+  Chart owns: Namespace, StatefulSet (1 replica + 1Gi PVC), Service
+  (ClusterIP 6379), ConfigMap (valkey.conf), Secret (AUTH password
+  from sops), PDB, NetworkPolicy. No upstream chart — greenfield
+  (the bitnami chart pulls 600+ lines we don't need; the upstream
+  valkey-io chart is helm-incompatible at the time of writing).
+type: application
+# Chart version (this chart's release cadence — bump on chart-shape changes).
+version: 0.1.0
+# appVersion tracks the Valkey upstream we pin to; bump alongside
+# image tag rolls in values.production.yaml.
+appVersion: "8.1.4"
+home: https://valkey.io
+sources:
+  - https://github.com/valkey-io/valkey
+keywords:
+  - universe
+  - valkey
+  - registry
+  - kv-store
+maintainers:
+  - name: freeCodeCamp Infra Team
+    url: https://github.com/freeCodeCamp/infra
