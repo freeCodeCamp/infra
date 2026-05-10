@@ -369,6 +369,24 @@ upgrade, new NIC, kernel bump), check Cilium's `devices` and `mtu`
 config still pin to `[eth0, eth1]` and `1500`. ADR-009 spike finding;
 recurring footgun.
 
+### Cilium CNP DNS L7 trap (heads-up; dormant in caddy today)
+
+The caddy chart ships a `CiliumNetworkPolicy` with an L7
+`rules.dns.matchPattern` allow-list scoped to external R2 only.
+Today's caddy egresses only to `*.r2.cloudflarestorage.com` so the
+trap is silent. **The moment caddy gains a cross-namespace cluster
+egress** (e.g. an internal status sidecar, a future PG-backed
+audit log, anything resolving `<svc>.<ns>.svc.cluster.local`),
+the L7 DNS proxy will refuse the cluster-local lookup and the pod
+will fail with `server misbehaving` from the Go resolver.
+
+This is the same trap that bit artemis on 2026-05-11 during the
+Valkey cutover; original 2026-04-07 incident on woodpecker is in
+archived field-notes. Read
+[`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md)
+**before** adding cluster-local egress to the caddy CNP, and
+upgrade from Pattern A → Pattern B per the rubric there.
+
 ## §G — Teardown
 
 Destructive. Confirm CF DNS has been flipped off cassiopeia before

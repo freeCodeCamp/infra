@@ -192,8 +192,17 @@ Rationale:
    operator, no PR, no helm-upgrade.
 5. **Right-sized footprint.** Single pod (~50 MiB RAM idle), single
    PVC (~1 GiB sufficient for ~10K sites of the schema below), one
-   Service `valkey.artemis.svc.cluster.local:6379`. NetworkPolicy
-   allows only `app=artemis` pods to connect.
+   Service. NetworkPolicy allows only `app=artemis` pods to connect.
+
+   **2026-05-11 amendment** — namespace decision: deployed to its own
+   `valkey` namespace (PSS restricted) rather than co-located in
+   `artemis` (PSS baseline). Stronger workload-isolation posture for
+   the registry source-of-truth. Cross-namespace DNS:
+   `valkey.valkey.svc.cluster.local:6379`. The artemis CNP needed a
+   `*.*.svc.cluster.local` DNS L7 pattern as a result — see
+   [`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md)
+   Pattern B and `gxy-management.md §C.6` for the cutover transcript.
+
 6. **DR posture.** AOF (appendfsync everysec) + RDB snapshot every 6
    h on PVC. Nightly RDB dump → `r2://universe-static-apps-01/_meta/registry/<date>.rdb`.
    On a cluster wipe: reattach PVC if it survived (`pv` reclaim
@@ -334,18 +343,18 @@ helm-embedded ConfigMap.
 
 Once the registry leaves `--set-file`, the chart simplifies:
 
-| Concern                              | Before                                                 | After                                                                                                     |
-| ------------------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `--set-file sites=...`               | required at every helm-upgrade                         | **dropped**                                                                                               |
-| Operator local artemis checkout      | required                                               | **not required**; checkout is a developer convenience only                                                |
-| `sites: ""` chart values placeholder | string injection point                                 | **removed**                                                                                               |
-| sites.yaml ConfigMap mount           | `/etc/artemis/sites.yaml` from helm-rendered ConfigMap | **removed** (one-release backward-compat mount window if needed for migration step 5)                     |
-| `SITES_YAML_PATH` env                | mount path                                             | **removed** (replaced by Valkey conn)                                                                     |
-| `VALKEY_ADDR` env                    | n/a                                                    | **added**: `valkey.artemis.svc.cluster.local:6379` (chart default)                                        |
-| `VALKEY_PASSWORD` (secret env)       | n/a                                                    | **added** from sops overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`                    |
-| `REGISTRY_BACKEND` env               | n/a                                                    | **added**: `valkey` (default once migration step 5 lands; `sites_yaml` for the one-release backward path) |
-| Artemis SA                           | none beyond default                                    | unchanged — Valkey is reached via TCP+AUTH, not k8s API; no RBAC growth                                   |
-| NetworkPolicy                        | artemis ingress allow CF→Traefik                       | **add egress** allow to `valkey.artemis.svc:6379`; valkey chart owns the matching ingress rule            |
+| Concern                              | Before                                                 | After                                                                                                                                      |
+| ------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--set-file sites=...`               | required at every helm-upgrade                         | **dropped**                                                                                                                                |
+| Operator local artemis checkout      | required                                               | **not required**; checkout is a developer convenience only                                                                                 |
+| `sites: ""` chart values placeholder | string injection point                                 | **removed**                                                                                                                                |
+| sites.yaml ConfigMap mount           | `/etc/artemis/sites.yaml` from helm-rendered ConfigMap | **removed** (one-release backward-compat mount window if needed for migration step 5)                                                      |
+| `SITES_YAML_PATH` env                | mount path                                             | **removed** (replaced by Valkey conn)                                                                                                      |
+| `VALKEY_ADDR` env                    | n/a                                                    | **added**: `valkey.valkey.svc.cluster.local:6379` (cross-namespace per §B 2026-05-11 amendment)                                            |
+| `VALKEY_PASSWORD` (secret env)       | n/a                                                    | **added** from sops overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`                                                     |
+| `REGISTRY_BACKEND` env               | dropped 2026-05-10                                     | **not present** — `sites_yaml` backend retired in artemis@f115198; Valkey is the only backend                                              |
+| Artemis SA                           | none beyond default                                    | unchanged — Valkey is reached via TCP+AUTH, not k8s API; no RBAC growth                                                                    |
+| NetworkPolicy                        | artemis ingress allow CF→Traefik                       | **add egress** allow to `valkey.valkey.svc:6379` (Pattern B per `infra-guides/cilium-cnp.md`); valkey chart owns the matching ingress rule |
 
 Other artemis hardening items (post-registry):
 

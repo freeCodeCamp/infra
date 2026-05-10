@@ -293,13 +293,16 @@ export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 # skip-if-already-deployed guard
 helm -n valkey list -q | grep -q '^valkey$' \
   && echo "✓ valkey release present" \
-  || just deploy valkey
+  || just deploy gxy-management valkey
 ```
 
-`apps/valkey/.deploy-flags.sh` decrypts the sops envelope into a
-per-invocation tempfile and appends `--values $TMP` to the helm
-chain. The decrypted file lives only inside the shell scope of the
-recipe and is unlinked on shell exit (trap).
+The `just deploy` recipe auto-decrypts the sops envelope at
+`$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc` (with the
+required `--input-type yaml --output-type yaml` flags — see
+`docs/runbooks/04-secrets-decrypt.md`) into a per-invocation
+tempfile and appends `--values $TMP` to the helm chain. The
+decrypted file lives only inside the recipe's shell scope and is
+unlinked on shell exit (trap).
 
 ### C.3 Verify
 
@@ -311,12 +314,15 @@ kubectl -n valkey get pods,svc,pvc
 # valkey-0 Running (StatefulSet); svc valkey ClusterIP + valkey-headless;
 # data-valkey-0 PVC bound to local-path-pv-...
 
-# Auth + ping (decrypt password to a tempfile, exec, wipe)
-sops --decrypt "$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc" \
-  | yq '.secretEnv.VALKEY_PASSWORD' > /tmp/.vk
+# Auth + ping (sops bare invocations on `.enc` route to JSON parser
+# and fail with `invalid character '#'` — both type flags required
+# on every read verb. See feedback memory + 04-secrets-decrypt.md.)
+PASS=$(sops --input-type yaml --output-type yaml --decrypt \
+  "$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc" \
+  | yq '.secretEnv.VALKEY_PASSWORD')
 kubectl -n valkey exec sts/valkey -- \
-  valkey-cli -a "$(cat /tmp/.vk)" --no-auth-warning PING
-shred -u /tmp/.vk
+  valkey-cli -a "$PASS" --no-auth-warning PING
+unset PASS
 # → PONG
 
 # Persistence config (anonymized password — kubectl exec env var
@@ -340,15 +346,16 @@ cd ~/DEV/fCC/infra/k3s/gxy-management
 export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
 # 1. Dry-run prints the HSET / SADD / PUBLISH commands, no writes.
-../../infra/k3s/gxy-management/apps/valkey/scripts/import-sites.sh --dry-run
+apps/valkey/scripts/import-sites.sh --dry-run
 
 # 2. Apply against the live pod. Idempotent — re-run is safe (HSET
 #    overwrites with identical fields; SADD is set-typed).
-../../infra/k3s/gxy-management/apps/valkey/scripts/import-sites.sh
+apps/valkey/scripts/import-sites.sh
 
 # 3. Verify
 kubectl -n valkey exec sts/valkey -- sh -c \
-  'valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning SMEMBERS sites:all | sort'
+  'valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning SMEMBERS sites:all' \
+  | sort
 # → 11 slugs, alphabetized
 ```
 
@@ -360,6 +367,101 @@ local-path PVC is the sole durability layer; an unscheduled node loss
 on the gxy-management node forfeits up to 1s of writes (`appendfsync
 everysec`). Acceptable for the 11-site / write-bursty-by-staff
 workload; revisit if write rate grows.
+
+### C.6 Cutover smoke gate G13 — 2026-05-11
+
+Closes the cassiopeia registry cutover phase (P7) plus G12 idempotency
+rehearsal. Run by mrugesh from a laptop hitting
+`https://uploads.freecode.camp` after Phase 5 deploy of artemis chart
+0.2.0 / image `sha256:f61f2b…`. Both rounds produced identical output
+(modulo per-call `created_at` / `updated_at` timestamps stamped by
+artemis at write time).
+
+Pre-state — `/api/sites` returns the 11 canonical slugs:
+
+```console
+$ curl -sS -H "Authorization: Bearer $(gh auth token)" \
+    https://uploads.freecode.camp/api/sites | jq 'length'
+11
+```
+
+Round 1 — `universe sites` write path against staff-authz endpoints:
+
+```console
+$ universe sites ls    (universe-cli v0.5.0 / built locally)
+│  SLUG                   TEAMS  CREATED BY  CREATED AT
+│  checkers               staff  mrugesh     2026-05-10T00:00:00Z
+│  cognitive-biases       staff  mrugesh     2026-05-10T00:00:00Z
+│  five-dice              staff  mrugesh     2026-05-10T00:00:00Z
+│  gomoku                 staff  mrugesh     2026-05-10T00:00:00Z
+│  hello-universe         staff  mrugesh     2026-05-10T00:00:00Z
+│  newton-laws-of-motion  staff  mrugesh     2026-05-10T00:00:00Z
+│  number-tiles           staff  mrugesh     2026-05-10T00:00:00Z
+│  projectile-motion      staff  mrugesh     2026-05-10T00:00:00Z
+│  reversi                staff  mrugesh     2026-05-10T00:00:00Z
+│  share-python           staff  mrugesh     2026-05-10T00:00:00Z
+│  test                   staff  mrugesh     2026-05-10T00:00:00Z
+
+$ universe sites register smoke-test  →  201, teams=[staff], created_by=raisedadead
+$ universe sites ls | rg smoke-test    →  present
+$ universe sites update smoke-test --team=staff,news-editors  →  200
+$ curl … /api/sites | jq '.[] | select(.slug=="smoke-test")'
+  →  teams=["staff","news-editors"], updated_at > created_at
+$ universe sites rm smoke-test         →  204 (R2 bytes preserved per cron)
+$ universe sites ls | rg smoke-test || echo absent ✓
+absent ✓
+```
+
+Round 2 — same cycle, different per-call timestamps:
+
+```console
+$ universe sites register smoke-test
+◆  Registered smoke-test
+│    Slug:        smoke-test
+│    Teams:       staff
+│    Created by:  raisedadead
+│    Created at:  2026-05-10T19:10:39.588586015Z
+
+$ universe sites update smoke-test --team=staff
+◆  Updated smoke-test
+│    Slug:        smoke-test
+│    Teams:       staff
+│    Updated at:  2026-05-10T19:10:40.67148201Z      ← +1.1s, server-stamped
+
+$ universe sites rm smoke-test
+◆  Deleted smoke-test
+│    Note: R2 deploy bytes are NOT removed; they age out via the
+│          post-GA cleanup cron.
+
+$ universe sites ls --json | jq '.count, ([.sites[].slug] | any(. == "smoke-test"))'
+11
+false
+```
+
+Identical output between rounds (modulo timestamps) → V3 idempotency
+holds end-to-end. G13 closed; G12 closed in same evidence trail.
+
+Side-finding (now closed): the artemis CiliumNetworkPolicy initially
+omitted in-cluster DNS L7 patterns. Cilium DNS proxy filtered the
+`valkey.valkey.svc.cluster.local` query, returning a malformed
+response that Go's resolver surfaced as `server misbehaving`. The new
+artemis pod CrashLoopBackOff'd on startup; old pods kept serving
+(RollingUpdate). Resolved by adding `matchName:
+valkey.valkey.svc.cluster.local` plus `matchPattern:
+*.*.svc.cluster.local` to the L7 rules (`*` doesn't cross dots in
+Cilium pattern semantics). Two follow-up commits during cutover:
+`fix(artemis): allow cluster.local DNS in CNP` (insufficient — single-
+label wildcard) and `fix(artemis): CNP DNS pattern crosses dots`
+(closed it).
+
+The trap had bitten before — woodpecker forge list on gxy-launchbase
+on 2026-04-07 with the same `server misbehaving` shape on a
+cross-namespace Postgres lookup. That history was captured in the
+archived field-notes (`Universe/spike/field-notes/archive/2026-05-10/infra.md`)
+but never promoted to canonical guidance, so the artemis chart
+re-discovered it from scratch. Promoted now to
+[`docs/infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) —
+read before adding any cross-namespace egress to a CNP'd pillar.
 
 ## §D — Artemis (deploy proxy)
 
