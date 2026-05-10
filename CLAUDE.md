@@ -2,17 +2,34 @@
 
 freeCodeCamp.org infra-as-code. Primary: freeCodeCamp Universe platform (DigitalOcean + Hetzner planned, Cloudflare, R2). Legacy fCC infra (Linode, Azure) coexist, retire post-Universe.
 
-Sibling repos this one wires up: `../infra-secrets` (sops+age vault), `../artemis` (static-apps deploy proxy, deployed via `docs/runbooks/02-deploy-artemis-service.md`).
+Related repos:
+
+- `../infra-secrets` — sops+age vault. Hard-coded relative-path sibling (see "infra-secrets coupling" below).
+- `../artemis` — static-apps deploy proxy. Deployed via `docs/runbooks/02-deploy-artemis-service.md`.
+- `~/DEV/fCC-U/Universe/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 16 ADRs at `decisions/00{1..16}-*.md` and the spike plan at `spike/spike-plan.md`.
+- `~/DEV/fCC-U/windmill/` — Windmill IaC (CLI sync repo for the gxy-management Windmill workspace).
 
 **Design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
 ## Doc ownership
 
-Authoritative model + flow diagram in `Universe/CLAUDE.md`.
+Authoritative model + flow diagram in `~/DEV/fCC-U/Universe/CLAUDE.md`.
 
-Field notes for this repo (Infra team owns): `Universe/spike/field-notes/infra.md` — read on demand.
+Operator-runnable flight manuals live in `docs/flight-manuals/`
+(this repo). Index at `docs/flight-manuals/00-index.md`; read order
+starts with `UNIVERSE.md`.
 
-Internal-only material (sprints, planning conventions, parked items) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
+ADR-vs-reality reconciliation: `docs/architecture/adr-drift-2026-05-10.md`.
+
+Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim,
+ingress/DNS posture): `docs/architecture/rfc-gxy-cassiopeia-ga.md`.
+
+Pre-2026-05-10 field-notes are archived in
+`~/DEV/fCC-U/Universe/spike/field-notes/archive/2026-05-10/`. New
+durable operator content goes into the flight-manuals or runbooks,
+not new field-notes.
+
+Internal-only material (sprints, planning conventions, parked items, audit dossiers) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
 
 ### Sprint state (cross-session)
 
@@ -38,13 +55,13 @@ Optional siblings: `PLAN.md` (wave list, multi-wave sprints only), `dispatches/W
 
 This repo owns:
 
-| Path                   | Purpose                                                            |
-| ---------------------- | ------------------------------------------------------------------ |
-| `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`)                 |
-| `docs/runbooks/`       | Single-purpose ops runbooks (numbered, index `00-index.md`)        |
-| `docs/architecture/`   | RFCs for non-trivial work                                          |
-| `docs/infra-guides/`   | Generic primers (k3s layout, legacy fCC ops, etc.)                 |
-| `docs/GUIDELINES.md`   | Field-note format spec (consumed by `Universe/spike/field-notes/`) |
+| Path                   | Purpose                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `docs/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`)               |
+| `docs/runbooks/`       | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
+| `docs/architecture/`   | RFCs for non-trivial work                                        |
+| `docs/infra-guides/`   | Generic primers (k3s layout, legacy fCC ops, etc.)               |
+| `docs/GUIDELINES.md`   | Field-note format spec (legacy; field-notes archived 2026-05-10) |
 
 ## Working directory rule (HARD)
 
@@ -82,7 +99,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Clusters
 
-Per-galaxy state, providers, and rollout phase live in `Universe/spike/spike-plan.md` (canonical). Verify reality with `doctl compute droplet list` before acting.
+Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Universe/spike/spike-plan.md` (canonical, Universe-team-owned). Cluster-vs-ADR reconciliation: `docs/architecture/adr-drift-2026-05-10.md`. Verify reality with `doctl compute droplet list` before acting.
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
@@ -94,7 +111,7 @@ Inventory groups (matches `ansible/inventory/group_vars/`):
 
 Retired:
 
-- `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). See `Universe/spike/field-notes/infra.md` journal.
+- `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). Historical journal: `~/DEV/fCC-U/Universe/spike/field-notes/archive/2026-05-10/infra.md`.
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 
