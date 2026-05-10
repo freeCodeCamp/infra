@@ -1,102 +1,84 @@
 # Flight Manuals — Index
 
-Per-cluster doomsday rebuild manuals. One file per galaxy. Rebuild ordering,
-cross-cluster notes, and lifecycle pins live in this index; galaxy-specific
-phases live in each manual.
+Per-cluster doomsday-rebuild manuals for the Universe Platform. Read
+order, galaxy state, and cross-cluster gotchas live here; everything
+else lives in `UNIVERSE.md` (shared phases) or in the per-galaxy
+chapter.
 
-## Galaxies
+## Read order (rebuilds)
 
-| Galaxy         | File                                   | Role                                                               | State   | Provider (now → future)   |
-| -------------- | -------------------------------------- | ------------------------------------------------------------------ | ------- | ------------------------- |
-| gxy-management | [gxy-management.md](gxy-management.md) | Control plane (ArgoCD + Windmill + Zot + Atlantis)                 | Live    | DO FRA1                   |
-| gxy-launchbase | [gxy-launchbase.md](gxy-launchbase.md) | Supply chain (Woodpecker + CNPG preview DBs)                       | Live    | DO FRA1 → Hetzner post-M5 |
-| gxy-cassiopeia | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static hosting (Caddy + R2)                                        | Live    | DO FRA1 → Hetzner post-M5 |
-| gxy-backoffice | [gxy-backoffice.md](gxy-backoffice.md) | Backoffice + observability (VM + ClickHouse + HyperDX + GlitchTip) | Planned | TBD → Hetzner             |
-| gxy-triangulum | [gxy-triangulum.md](gxy-triangulum.md) | Dynamic hosting ("Heroku-like" containers)                         | Future  | Hetzner BM                |
+1. **Always start with [`UNIVERSE.md`](UNIVERSE.md)** — §0 prereqs,
+   §1 DNS, §2 secrets, §3 shared infra, §4 lifecycle calendar.
+   Per-galaxy chapters assume these ran.
+2. **gxy-management first** — control plane (Windmill + artemis +
+   Valkey). Every other galaxy reads bytes that originate here.
+3. **gxy-launchbase** — standby (CNPG operator only post-woodpecker
+   retire); brings the database operator before any preview-DB
+   constellation lands.
+4. **gxy-cassiopeia** — static-apps serve plane. Reads R2 written by
+   artemis on gxy-management.
+5. **`UNIVERSE.md §99`** — cross-galaxy smoke. Run only after all
+   three chapters complete twice idempotently.
 
-## Rebuild order (full platform from zero)
+## Galaxies (current state)
 
-Strict dependency chain. Do not skip ahead.
+| Galaxy           | File                                   | Role                                        | State       | Provider (now → future)            |
+| ---------------- | -------------------------------------- | ------------------------------------------- | ----------- | ---------------------------------- |
+| `gxy-management` | [gxy-management.md](gxy-management.md) | Control plane — Windmill + artemis + Valkey | Live        | DO FRA1                            |
+| `gxy-launchbase` | [gxy-launchbase.md](gxy-launchbase.md) | Standby — CNPG operator (workload-free)     | Live (idle) | DO FRA1 → Hetzner post-M5 (parked) |
+| `gxy-cassiopeia` | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static-apps serve plane — Caddy + R2        | Live        | DO FRA1 → Hetzner post-M5 (parked) |
 
-1. **gxy-management** first — all other galaxies register to ArgoCD, pull
-   images from Zot, trigger Windmill flows.
-2. **gxy-launchbase** second — CI builds need somewhere to run before any
-   other galaxy can receive custom images.
-3. **gxy-cassiopeia** third — static serving for freecode.camp + first-party
-   constellations.
-4. **gxy-backoffice** fourth (planned) — observability lands once there's
-   sustained platform traffic worth observing.
-5. **gxy-triangulum** fifth (future) — dynamic workloads, prod DBs, Ceph.
+Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are
+**not** in this manual. When they're provisioned, add a chapter then.
+Active state for those galaxies lives in
+`Universe/spike/spike-plan.md` and `docs/architecture/adr-drift-2026-05-10.md`.
 
-## Common pre-flight (every galaxy)
+Retired galaxies:
 
-```
-cd ~/DEV/fCC/infra
-just ansible-install
-just secret-verify-all
-```
+| Galaxy       | Retired    | What replaced it                                              |
+| ------------ | ---------- | ------------------------------------------------------------- |
+| `gxy-static` | 2026-04-27 | gxy-cassiopeia (in-tree `caddy.fs.r2` module per ADR-007 D32) |
 
-- All secrets decrypt OK
-- age key on local machine (`~/.config/sops/age/keys.txt`)
-- Platform-wide secrets in `infra-secrets/global/` (direnv tokens +
-  per-zone CF Origin wildcards at `global/tls/<zone>.{crt,key}.enc`)
-- Per-cluster secrets in `infra-secrets/k3s/<galaxy>/` (see each manual)
-- Per-cluster TLS zone marker at `infra/k3s/<galaxy>/cluster.tls.zone`
-  selects which `global/tls/<zone>.*.enc` pair the deploy recipe uses
-  when no per-app TLS override is present. See
-  [`docs/architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md).
+## Cross-cluster known-issues (quick reference)
 
-## Post-M5 Hetzner migration
+Operational gotchas that bite once per rebuild — full notes link out.
 
-`gxy-launchbase` and `gxy-cassiopeia` both run on DO FRA1 today (per ADR-003
-for Woodpecker/CNPG and ADR-007 D32 for static v2). Both galaxies migrate to
-Hetzner post-M5 — tracked as `gxy-static-k7d.30` (**deferred**).
+| Issue                          | Workaround                                                      | See                                                      |
+| ------------------------------ | --------------------------------------------------------------- | -------------------------------------------------------- |
+| Pod→nodeVPCIP broken           | `hostNetwork: true` for monitoring                              | ADR-009 §"Tailscale scope" + spike Failure 8b (archived) |
+| Cilium picks up tailscale0 MTU | Pin `devices: [eth0, eth1]`, `mtu: 1500` per galaxy values.yaml | ADR-009 §"Cilium" + spike Failure 8a (archived)          |
+| DO native routing blocked      | Use VXLAN tunnel (DO anti-spoofing)                             | spike Cilium pitfalls (archived)                         |
+| sops `.enc` auto-detect        | Use `--input-type dotenv --output-type dotenv` for `*.env.enc`  | `docs/runbooks/04-secrets-decrypt.md`                    |
+| `kubeProxyReplacement: true`   | Works on k3s HA when devices/MTU pinned                         | ADR-009 §"Cilium" 2026-04-06 spike note                  |
 
-**Constraint:** the Talos / k0s distro evaluation must close before any
-Hetzner provisioning begins. Do not open a Hetzner project, cut DNS, or
-rebuild state on Hetzner until `gxy-static-k7d.30` lands. A premature
-migration locks the distro choice and strands any etcd state on the source
-cluster.
+## Anchors out (read these before deviating from any step)
 
-When the evaluation closes, a dedicated migration runbook lands in
-`../runbooks/` and gets linked from this section.
+| Anchor                                                                                 | Why                                                                      |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `Universe/decisions/00{1..16}-*.md`                                                    | 16 ADRs that govern the platform                                         |
+| [`../architecture/adr-drift-2026-05-10.md`](../architecture/adr-drift-2026-05-10.md)   | Audit reconciling each ADR with cluster reality                          |
+| [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md) | GA hardening RFC — Valkey KV decision, artemis trim, ingress/DNS posture |
+| [`../architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md)       | sops+age envelope contract, two-scope model, sample-twin discipline      |
+| `Universe/spike/spike-plan.md`                                                         | Galaxy placement, phase status, post-spike trigger conditions            |
 
-## Known issues (cross-cluster)
+## Operator runbooks (single-purpose)
 
-| Issue                          | Workaround                               | See                         |
-| ------------------------------ | ---------------------------------------- | --------------------------- |
-| Pod→nodeVPCIP broken           | `hostNetwork: true` for monitoring       | Field notes Failure 8b      |
-| Cilium picks up tailscale0 MTU | Pin `devices: [eth0, eth1]`, `mtu: 1500` | Field notes Failure 8a      |
-| DO native routing blocked      | Use VXLAN tunnel (DO anti-spoofing)      | Field notes Cilium pitfalls |
+`docs/runbooks/00-index.md` carries the index; key links:
 
-**Resolved:** `kubeProxyReplacement: true` works on k3s HA when devices/MTU
-are pinned. Failure 7 was a misdiagnosis (root cause: MTU pollution). See
-field notes.
+| Runbook                                                                        | Use when                                                   |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| [`02-deploy-artemis-service.md`](../runbooks/02-deploy-artemis-service.md)     | Deep dive on artemis bring-up; flight-manual §D summarizes |
+| [`03-artemis-postdeploy-check.md`](../runbooks/03-artemis-postdeploy-check.md) | Post-deploy smoke for artemis                              |
+| [`04-secrets-decrypt.md`](../runbooks/04-secrets-decrypt.md)                   | sops envelope decrypt gotchas                              |
+| [`05-r2-keys-rotation.md`](../runbooks/05-r2-keys-rotation.md)                 | R2 read-only / read-write key rotation                     |
 
-## Lifecycle calendar (cross-cluster pins)
+## Working-directory rule (HARD)
 
-Third-party pins with known end-of-life windows. Rolling these forward is an
-explicit task in the backlog — not something that happens automatically.
+Repeated from `UNIVERSE.md` because it's the single most-common
+footgun:
 
-| Component     | Current pin               | EOL / stale-after        | Action window    | Notes                                                                 |
-| ------------- | ------------------------- | ------------------------ | ---------------- | --------------------------------------------------------------------- |
-| k3s           | `v1.34.5+k3s1`            | 2026-10-27               | by Sept 2026     | All galaxies. Plan 1.35 upgrade. Test on gxy-management first.        |
-| Caddy         | `v2.11.2`                 | CVE-driven               | 14 days per D30  | Bump via PR with regression tests. Tracked by Windmill reminder.      |
-| Woodpecker    | `v3.13.0`                 | Community-driven         | On minor release | gxy-launchbase. CLI client isolated for quick swap if project stalls. |
-| CloudNativePG | chart `0.28` / `1.29` op  | 1.28 EOL 2026-06-30      | During `1.29.x`  | gxy-launchbase. Rolling in place via operator-guided pg_upgrade.      |
-| Cilium        | chart default (1.19 line) | 3-minor community window | On minor bump    | All galaxies. Bump behind feature-gate tests.                         |
+> Cluster-touching `just` recipes MUST run from `k3s/<galaxy>/`. The
+> galaxy `.envrc` loads the right DO token + `KUBECONFIG`. Repo-root
+> invocation hits the wrong cluster or fails silently.
 
-When a pin crosses its action window, file a follow-up under the active
-sprint and announce in the platform-team channel.
-
-## Shared infrastructure (not cluster-scoped)
-
-- **Cloudflare zones:** `freecodecamp.net`, `freecode.camp`
-- **CF Origin Certificate:** `*.freecodecamp.net` (reused across all galaxies)
-- **DO VPC:** `universe-vpc-fra1` (CIDR `10.110.0.0/20`)
-- **DO Cloud Firewall:** `gxy-fw-fra1` (attached to every galaxy tag)
-- **DO Spaces bucket:** `net-freecodecamp-universe-backups` (etcd +
-  Windmill + CNPG backups)
-- **Cloudflare R2 bucket:** `universe-static-apps-01` (cassiopeia static)
-- **Secrets repo:** `infra-secrets` (sibling, sops+age)
-- **Admin plane:** Tailscale for SSH + kubectl
+Each chapter repeats this above every relevant recipe.
