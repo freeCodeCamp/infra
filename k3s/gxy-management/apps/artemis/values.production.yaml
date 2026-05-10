@@ -25,7 +25,11 @@ image:
   # SHA tag. Build-residency clean per Universe field-note 2026-04-26
   # (build pipeline outside Universe). Run-residency clean per
   # 2026-04-27 amendment (pulls from GHCR direct, not zot).
-  tag: "sha-7d6eed3c58fd25407f52a905bad458c4a70ed277@sha256:afb2c3152fdaf0d5d31f0593776c0358b3f615813c0423e336e7ac33fa83c70c"
+  # Cutover 2026-05-10: feat/valkey-registry merged. Image carries the
+  # 4 new registry endpoints (POST /api/site/register, GET /api/sites,
+  # PATCH /api/site/{slug}, DELETE /api/site/{slug}) plus the Valkey
+  # backend. sites.yaml backend retired — see f115198 in artemis repo.
+  tag: "sha-6f492a3ce64415842a1f484b93cca2796915cc2b@sha256:f61f2b499aa793558ac73530cb1bfe723e84c95a37750e0167a9c65859b92eb7"
   pullPolicy: IfNotPresent
 
 resources:
@@ -41,7 +45,13 @@ env:
   R2_BUCKET: "universe-static-apps-01"
   GH_ORG: "freeCodeCamp"
   GH_API_BASE: "https://api.github.com"
-  SITES_YAML_PATH: "/etc/artemis/sites.yaml"
+  # Valkey registry (replaces SITES_YAML_PATH; sites_yaml backend
+  # retired in artemis@f115198). Cross-namespace cluster DNS:
+  #   <svc>.<ns>.svc.cluster.local — service named `valkey` in
+  #   namespace `valkey`. AUTH password rides in via the secretEnv
+  #   sops overlay (VALKEY_PASSWORD).
+  VALKEY_ADDR: "valkey.valkey.svc.cluster.local:6379"
+  REGISTRY_AUTHZ_TEAM: "staff"
   JWT_TTL_SECONDS: "900"
   GH_MEMBERSHIP_CACHE_TTL: "300"
   # Site key in R2 = `<site>.freecode.camp` (full FQDN). Matches the

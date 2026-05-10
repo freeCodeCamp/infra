@@ -16,11 +16,11 @@ description: |
   class), NetworkPolicy. No upstream chart — greenfield.
 type: application
 # Chart version (this chart's release cadence — bump on chart-shape changes).
-version: 0.1.0
+version: 0.2.0
 # appVersion tracks the artemis service tag in GHCR — bump alongside
 # image tag rolls in values.production.yaml so `helm list` reflects
 # what is actually running.
-appVersion: "sha-7d6eed3c58fd25407f52a905bad458c4a70ed277"
+appVersion: "sha-6f492a3ce64415842a1f484b93cca2796915cc2b"
 home: https://github.com/freeCodeCamp/artemis
 sources:
   - https://github.com/freeCodeCamp/artemis

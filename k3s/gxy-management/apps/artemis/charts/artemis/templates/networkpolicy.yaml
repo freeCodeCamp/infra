@@ -61,4 +61,16 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+    # Valkey registry (cross-namespace). Selects the valkey chart's
+    # StatefulSet pod label set in namespace `valkey`. Chart label
+    # contract: `app.kubernetes.io/name: valkey`. Update both sides
+    # if the valkey chart changes labels.
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": valkey
+            "k8s:app.kubernetes.io/name": valkey
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
 {{- end }}

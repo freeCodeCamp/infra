@@ -14,10 +14,11 @@ spec:
       labels:
         {{- include "artemis.selectorLabels" . | nindent 8 }}
       annotations:
-        # Roll pods on env / sites / secret changes (fsnotify covers
-        # sites.yaml hot-reload at runtime, but a chart change should
-        # also propagate via rollout — covers env mutations + edge
-        # cases where ConfigMap projection lags fsnotify).
+        # Roll pods on env / secret changes. Pre-cutover this also
+        # depended on a sites ConfigMap (fsnotify hot-reload of
+        # sites.yaml). Post-cutover registry state lives in Valkey;
+        # artemis subscribes to `registry.changed` for cache
+        # invalidation, so chart-time rolls are env-only.
         checksum/config-env:  {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret-env:  {{ include (print $.Template.BasePath "/secret-env.yaml") . | sha256sum }}
     spec:
@@ -48,9 +49,6 @@ spec:
             - secretRef:
                 name: {{ .Release.Name }}-env-secret
           volumeMounts:
-            - name: sites-config
-              mountPath: /etc/artemis
-              readOnly: true
             # Writable tmp for read-only-root-fs Go binary scratch.
             - name: tmp
               mountPath: /tmp
@@ -69,8 +67,5 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        - name: sites-config
-          configMap:
-            name: {{ .Release.Name }}-sites
         - name: tmp
           emptyDir: {}
