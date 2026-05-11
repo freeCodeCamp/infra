@@ -225,3 +225,14 @@ CNI: Cilium    Storage: emptyDir    SSH/kubectl: Tailscale
 | play-k3s--cluster.yml   | Deploy k3s HA cluster                                 |
 | play-k3s--longhorn.yml  | Install Longhorn storage                              |
 | play-k3s--bootstrap.yml | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |
+
+## Cross-refs
+
+- [`cilium-multi-nic.md`](./cilium-multi-nic.md) — MTU + device pinning
+  on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
+- [`cilium-cnp.md`](./cilium-cnp.md) — CiliumNetworkPolicy patterns and
+  the DNS L7 trap.
+- [`traefik-hostnetwork.md`](./traefik-hostnetwork.md) — Traefik DaemonSet
+  pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
+- [`chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) —
+  five-point gate every new chart clears before merge.

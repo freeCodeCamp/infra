@@ -199,6 +199,9 @@ unless Pattern B is justified by a cluster-local dependency.
 
 ## Cross-refs
 
+- [`docs/infra-guides/cilium-multi-nic.md`](./cilium-multi-nic.md) — sibling
+  guide on multi-NIC MTU + device pinning. Read alongside this one when
+  bringing up a new galaxy.
 - ADR-009 §CNI — Cilium choice rationale.
 - ADR-011 §Within-galaxy — constellation isolation posture.
 - `docs/flight-manuals/gxy-management.md §C.6` — 2026-05-11 cutover

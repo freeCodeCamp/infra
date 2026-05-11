@@ -10,6 +10,8 @@ ran; chapters do not repeat them.
 | §1   | DNS + Cloudflare baseline                             |
 | §2   | infra-secrets bootstrap                               |
 | §3   | Shared infrastructure — VPC, firewall, S3 backups, R2 |
+| §3.1 | DO Cloud Firewall required ports                      |
+| §3.2 | New-galaxy pre-flight files                           |
 | §4   | Lifecycle calendar (cross-cluster pins + EOLs)        |
 | §99  | Cross-galaxy smoke (post-bring-up)                    |
 | §100 | Teardown (reverse order, rarely run)                  |
@@ -177,6 +179,67 @@ referenced by every cluster.
 R2 bucket DR posture: versioning enabled; per-prefix retention is
 informal today (R2 lifecycle GC for orphan deploy bytes is parked
 per RFC §"Out of scope").
+
+### §3.1 — DO Cloud Firewall required ports
+
+`gxy-fw-fra1` is bound to tags `gxy-management-k3s,gxy-launchbase-k3s,
+gxy-cassiopeia-k3s` (orphan `gxy-static-k3s` tag retained but harmless).
+Every galaxy MUST have these ports open before bootstrap — missing
+etcd ports historically caused silent cluster failures (k3s
+"activating" forever).
+
+VPC-only (source `10.110.0.0/20`):
+
+| Port      | Protocol | Purpose                  | Reference                                                                                      |
+| --------- | -------- | ------------------------ | ---------------------------------------------------------------------------------------------- |
+| 2379-2380 | TCP      | etcd peer + client (HA)  | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
+| 4240      | TCP      | Cilium health checks     | [Cilium system requirements](https://docs.cilium.io/en/stable/operations/system_requirements/) |
+| 4244      | TCP      | Hubble relay peer        | [Cilium #14402](https://github.com/cilium/cilium/issues/14402)                                 |
+| 5001      | TCP      | Spegel embedded registry | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
+| 6443      | TCP      | k3s API server           | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
+| 8472      | UDP      | Cilium VXLAN overlay     | [Cilium system requirements](https://docs.cilium.io/en/stable/operations/system_requirements/) |
+| 10250     | TCP      | Kubelet metrics          | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
+
+Public (source `0.0.0.0/0`):
+
+| Port | Protocol | Purpose                      |
+| ---- | -------- | ---------------------------- |
+| 22   | TCP      | SSH (Tailscale handles auth) |
+| 80   | TCP      | HTTP (Traefik ingress)       |
+| 443  | TCP      | HTTPS (Traefik ingress)      |
+
+**Trap:** the DO cloud firewall is separate from host UFW. The
+k3s-ansible prereq role opens UFW; it does NOT touch the cloud
+firewall. Both layers must be configured. Verify attachment after
+provisioning — `droplet_ids` / `tags` empty on the firewall means
+the firewall exists in name only.
+
+### §3.2 — New-galaxy pre-flight files
+
+A fresh galaxy needs these files committed in this repo **before**
+the first `play-k3s--bootstrap` run. Group_vars alone is
+insufficient — the playbook hard-codes paths to every file listed
+below. Copy from a sibling galaxy and adjust only the pod CIDR.
+
+| File                                           | Purpose                                                         |
+| ---------------------------------------------- | --------------------------------------------------------------- |
+| `k3s/<g>/cluster/cilium/values.yaml`           | Cilium Helm values — devices, mtu, kubeProxyReplacement         |
+| `k3s/<g>/cluster/security/pss-admission.yaml`  | Pod Security Standards baseline + exemption namespace list      |
+| `k3s/<g>/cluster/security/audit-policy.yaml`   | k3s audit policy                                                |
+| `k3s/<g>/cluster/traefik-config.yaml`          | Traefik HelmChartConfig — entrypoints, hostNetwork, runAsUser   |
+| `k3s/<g>/.envrc`                               | direnv — `source ../../.envrc` + DO Universe token + KUBECONFIG |
+| `k3s/<g>/.gitignore`                           | excludes `.kubeconfig.yaml` + local backups                     |
+| `ansible/inventory/group_vars/gxy_<g>_k3s.yml` | group vars — VPC CIDR, pod CIDR, Cilium cluster id, tags        |
+
+**Pre-flight gates** (must all pass before `just play k3s--bootstrap`):
+
+```bash
+test -n "${DO_API_TOKEN:-}"        # direnv loaded the right token
+direnv exec k3s/gxy-<g> env | grep -E 'DIGITALOCEAN_TOKEN|KUBECONFIG'
+```
+
+DO inventory plugin resolves to empty without `DO_API_TOKEN`; Tailscale
+plays silent-fail in that state. Hard-gate before running anything.
 
 ## §4 — Lifecycle calendar (cross-cluster pins)
 

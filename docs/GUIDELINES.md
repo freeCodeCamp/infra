@@ -35,6 +35,14 @@ one file per team. This repo's team owns `infra.md`.
 - Lifecycle pins (k3s, Caddy, etc.) live in `flight-manuals/00-index.md`,
   not duplicated per galaxy.
 
+## Chart pre-merge checklist
+
+Every new chart under `k3s/<cluster>/apps/<app>/charts/<chart>/` clears the
+five-point gate in [`infra-guides/chart-pre-merge-checklist.md`](./infra-guides/chart-pre-merge-checklist.md):
+Middleware-in-chart, CNP-not-vanilla-NP, env-diff-vs-`.env.sample`,
+shared-store-key-round-trip, CF-zone-SSL-mode. Reviewer rejects with one
+of the five named reasons.
+
 ## RFC format (architecture/)
 
 - One RFC per non-trivial work item. Title: `rfc-<topic>.md`.
