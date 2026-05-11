@@ -72,11 +72,11 @@ the gate — anyone in `staff` may register any slug for any teams.
 ### A2. Verify
 
 ```bash
-universe sites ls --slug <slug>
+universe sites ls | grep "<slug>"
 ```
 
-Row returned → registry has it. The 3-column body shows the team
-list, creator, and timestamps.
+Row returned → registry has it. The table body shows the team list,
+creator, and timestamps.
 
 ```bash
 universe whoami
@@ -244,16 +244,16 @@ Same latency as promote.
 
 ## Failure modes (staff-side)
 
-| Symptom                                      | Cause                                               | Action                                                                                      |
-| -------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `universe whoami` does not list the new site | A1 not run, or Valkey cache lag (≤60 s TTL)         | `universe sites ls --slug <site>` to confirm registry; if listed, retry `whoami` after 60 s |
-| `403 forbidden` on `static deploy`           | user not in any team registered for the site        | `universe sites update <site> --team +<your-team>` (staff)                                  |
-| `404 site not found` on deploy               | `platform.yaml` `site:` does not match the registry | fix the slug in `platform.yaml`, or `universe sites register <slug>` it                     |
-| Preview URL returns 404                      | `finalize` not called yet                           | re-run `universe static deploy`                                                             |
-| Preview URL returns 502                      | artemis pod unhealthy or rate-limited               | check `https://uploads.freecode.camp/healthz`; ping ops                                     |
-| `build.command` fails                        | command not present, deps missing                   | run command locally first; install deps in CI step                                          |
-| 429 on bulk upload                           | Traefik middleware rate-limit tripped               | retry after 1 second; tune `rateLimit.average` in chart values                              |
-| Production URL stale after `promote`         | CF edge cache still hot                             | wait 30 seconds; if persistent, purge CF cache for the site                                 |
+| Symptom                                      | Cause                                               | Action                                                                                         |
+| -------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `universe whoami` does not list the new site | A1 not run, or Valkey cache lag (≤60 s TTL)         | `universe sites ls \| grep "<site>"` to confirm registry; if listed, retry `whoami` after 60 s |
+| `403 forbidden` on `static deploy`           | user not in any team registered for the site        | `universe sites update <site> --team +<your-team>` (staff)                                     |
+| `404 site not found` on deploy               | `platform.yaml` `site:` does not match the registry | fix the slug in `platform.yaml`, or `universe sites register <slug>` it                        |
+| Preview URL returns 404                      | `finalize` not called yet                           | re-run `universe static deploy`                                                                |
+| Preview URL returns 502                      | artemis pod unhealthy or rate-limited               | check `https://uploads.freecode.camp/healthz`; ping ops                                        |
+| `build.command` fails                        | command not present, deps missing                   | run command locally first; install deps in CI step                                             |
+| 429 on bulk upload                           | Traefik middleware rate-limit tripped               | retry after 1 second; tune `rateLimit.average` in chart values                                 |
+| Production URL stale after `promote`         | CF edge cache still hot                             | wait 30 seconds; if persistent, purge CF cache for the site                                    |
 
 ## Cross-references
 

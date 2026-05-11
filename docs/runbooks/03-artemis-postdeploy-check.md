@@ -19,14 +19,14 @@ how to wire and trigger the suite from the infra repo.
 
 ## Prerequisites
 
-| Requirement                 | Verify                                                                                       |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| Local artemis repo checkout | `ls $HOME/DEV/fCC/artemis/Makefile`                                                          |
-| Go toolchain (≥ 1.24)       | `go version`                                                                                 |
-| GitHub CLI authenticated    | `gh auth status` (any GH account; team must match site)                                      |
-| Caller's team in registry   | `gh api /user/teams --jq '.[].slug'` — at least one entry must appear under the slug's teams |
-| Artemis reachable           | `curl -fsS https://uploads.freecode.camp/healthz`                                            |
-| Test site authorized        | `universe sites ls --slug test` shows `test` registered with at least one team you belong to |
+| Requirement                 | Verify                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| Local artemis repo checkout | `ls $HOME/DEV/fCC/artemis/Makefile`                                                               |
+| Go toolchain (≥ 1.24)       | `go version`                                                                                      |
+| GitHub CLI authenticated    | `gh auth status` (any GH account; team must match site)                                           |
+| Caller's team in registry   | `gh api /user/teams --jq '.[].slug'` — at least one entry must appear under the slug's teams      |
+| Artemis reachable           | `curl -fsS https://uploads.freecode.camp/healthz`                                                 |
+| Test site authorized        | `universe sites ls \| grep '^test '` shows `test` registered with at least one team you belong to |
 
 ## Run
 
@@ -118,16 +118,16 @@ Edge cases:
 
 ## Failure paths
 
-| Symptom                                | Diagnose                                                           | Mitigate                                                                                          |
-| -------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `healthz unreachable`                  | DNS / CF / artemis pod down                                        | `kubectl -n artemis get pods,svc,httproute`; CF dashboard A-record; `kubectl logs`                |
-| `whoami: site not in authorized list`  | Caller's GH teams have no overlap with the slug's registered teams | `gh api /user/teams --jq '.[].slug'`; `universe sites ls --slug test` to inspect the slug's teams |
-| `bad token: status=200`                | Auth middleware not enforcing                                      | Inspect `RequireGitHubBearer` chain; check chart `httproute.yaml` is in front of pod              |
-| `init: 422 verify_failed`              | Caller's GH teams stale vs registry teams just-changed             | retry after ≤60 s TTL fallback; `kubectl -n artemis logs … \| grep registry.changed`              |
-| `finalize preview: 502 r2_put_failed`  | R2 endpoint or admin key wrong; bucket policy lacks PutObject      | Decrypt `infra-secrets/management/artemis.env.enc`; re-validate against R2 dashboard              |
-| `preview: marker not seen` (timeout)   | Caddy `r2_alias` cache TTL too long, or alias key format mismatch  | `kubectl -n caddy logs -l app=caddy --tail=200`; check `ALIAS_PREVIEW_KEY_FORMAT`                 |
-| `production: marker not seen` in 2 min | CF edge cache holding old content; alias path mismatch             | Check `cf-cache-status` header; CF cache purge tool                                               |
-| `rollback: deployId mismatch`          | Target deploy prefix swept by cleanup cron (T22, 7-day retention)  | Pick a more recent `deployId` from `/deploys`; or rerun TestDeployFlow twice                      |
+| Symptom                                | Diagnose                                                           | Mitigate                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `healthz unreachable`                  | DNS / CF / artemis pod down                                        | `kubectl -n artemis get pods,svc,httproute`; CF dashboard A-record; `kubectl logs`                     |
+| `whoami: site not in authorized list`  | Caller's GH teams have no overlap with the slug's registered teams | `gh api /user/teams --jq '.[].slug'`; `universe sites ls \| grep '^test '` to inspect the slug's teams |
+| `bad token: status=200`                | Auth middleware not enforcing                                      | Inspect `RequireGitHubBearer` chain; check chart `httproute.yaml` is in front of pod                   |
+| `init: 422 verify_failed`              | Caller's GH teams stale vs registry teams just-changed             | retry after ≤60 s TTL fallback; `kubectl -n artemis logs … \| grep registry.changed`                   |
+| `finalize preview: 502 r2_put_failed`  | R2 endpoint or admin key wrong; bucket policy lacks PutObject      | Decrypt `infra-secrets/management/artemis.env.enc`; re-validate against R2 dashboard                   |
+| `preview: marker not seen` (timeout)   | Caddy `r2_alias` cache TTL too long, or alias key format mismatch  | `kubectl -n caddy logs -l app=caddy --tail=200`; check `ALIAS_PREVIEW_KEY_FORMAT`                      |
+| `production: marker not seen` in 2 min | CF edge cache holding old content; alias path mismatch             | Check `cf-cache-status` header; CF cache purge tool                                                    |
+| `rollback: deployId mismatch`          | Target deploy prefix swept by cleanup cron (T22, 7-day retention)  | Pick a more recent `deployId` from `/deploys`; or rerun TestDeployFlow twice                           |
 
 ## Related
 

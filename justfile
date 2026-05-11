@@ -74,12 +74,13 @@ kubeconfig-sync cluster:
 # Both phases run when both dirs exist (helm first, kustomize second).
 #
 # Per-app extras: optional `apps/<app>/.deploy-flags.sh` sourced inside
-# the helm phase. May export `EXTRA_HELM_ARGS` (e.g. `--set-file sites=...`).
+# the helm phase. May export `EXTRA_HELM_ARGS` (e.g. extra `--set` /
+# `--set-file` knobs the chart needs from operator-local data).
 #
 # Examples:
 #   just deploy gxy-management windmill   → helm + kustomize
 #   just deploy gxy-cassiopeia caddy      → helm only
-#   just deploy gxy-management artemis    → helm only (with sites --set-file)
+#   just deploy gxy-management artemis    → helm only
 #   just deploy ops-backoffice-tools outline → kustomize only
 [group('k3s')]
 deploy cluster app:
