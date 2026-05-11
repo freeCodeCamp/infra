@@ -20,8 +20,9 @@ Staff dev runs `universe static deploy` from a laptop or CI. The CLI
 resolves a GitHub identity (env → GHA OIDC → `gh auth token` →
 device-flow token), packages the build output, and uploads it to the
 artemis proxy at `https://uploads.freecode.camp`. Artemis verifies
-the identity, looks up the site → teams map in `sites.yaml`, probes
-GitHub team membership, writes the artifact to the shared R2 bucket
+the identity, looks up the site → teams map in its Valkey-backed
+registry, probes GitHub team membership, writes the artifact to the
+shared R2 bucket
 under `<site>.freecode.camp/deploys/<ts>-<sha>/`, and (on `promote`)
 flips the `production` alias to that prefix. Caddy on
 `gxy-cassiopeia` serves `*.freecode.camp` from R2 via the
@@ -29,10 +30,10 @@ flips the `production` alias to that prefix. Caddy on
 
 ## Two-side flow
 
-| Side                   | Frequency         | Surface                                  |
-| ---------------------- | ----------------- | ---------------------------------------- |
-| **A — Platform admin** | Once per new site | `freeCodeCamp/artemis` repo `sites.yaml` |
-| **B — Staff dev**      | Per build         | `universe-cli` against site repo         |
+| Side                   | Frequency         | Surface                                                 |
+| ---------------------- | ----------------- | ------------------------------------------------------- |
+| **A — Platform admin** | Once per new site | `universe sites register` (staff-gated) against artemis |
+| **B — Staff dev**      | Per build         | `universe static deploy` against site repo              |
 
 Side A unblocks Side B. After A lands, staff devs deploy without
 further admin involvement.
@@ -41,70 +42,51 @@ further admin involvement.
 
 ## Side A — Platform admin (one-time per site)
 
-Bring a new `<site>` slug into the artemis authorization map.
+Bring a new `<site>` slug into the artemis registry.
 
-### A1. PR to `freeCodeCamp/artemis` `config/sites.yaml`
+### A1. Register the site
 
-Add an entry under `sites:`. The slug must match the public hostname
-prefix exactly (`forum` → `forum.freecode.camp`).
-
-```yaml
-sites:
-  test:
-    teams: [staff]
-  forum: # new
-    teams: [dev-team, staff] # any matching team membership grants access
-```
-
-Schema: `sites.<slug>.teams: [<gh-team-slug>, ...]`. ANY team match
-authorizes. Team slugs match `freeCodeCamp` org GitHub teams (e.g.
-`bots`, `curriculum`, `dev-team`, `i18n`, `mobile`, `moderators`,
-`ops`, `staff`).
-
-### A2. Review + merge
-
-Platform team reviews the PR. Merge to `main`.
-
-### A3. Reload artemis ConfigMap
-
-Operator on the deploy host:
+From any staff laptop with a GitHub identity in the `staff` team:
 
 ```bash
-git -C ~/DEV/fCC/artemis pull --ff-only
-cd ~/DEV/fCC/infra
-just deploy gxy-management artemis
+universe sites register <slug> --team <team>[,<team>...]
 ```
 
-The `just deploy` recipe re-renders the ConfigMap from the operator's
-local artemis checkout via `--set-file sites=$ARTEMIS_REPO/config/sites.yaml`
-(default `$HOME/DEV/fCC/artemis`). The artemis pod watches the
-ConfigMap mount with fsnotify and hot-reloads in ≤1 minute. **No pod
-restart, no downtime.**
+`--team` repeats or comma-separates. Omit it and the server defaults
+to `[staff]`. Slugs match `^[a-z][a-z0-9-]{0,62}$` (DNS-safe; the
+slug becomes the `<slug>.freecode.camp` subdomain). Team slugs match
+`freeCodeCamp` org GitHub teams (e.g. `bots`, `curriculum`,
+`dev-team`, `i18n`, `mobile`, `moderators`, `ops`, `staff`). ANY
+listed team grants deploy access.
 
-### A4. Verify reload landed
+The CLI `POST`s `/api/site/register` against artemis; the handler
+writes a row into the Valkey-backed registry and publishes a
+`registry.changed` event. Every artemis replica picks up the new
+row within seconds via pub-sub (or ≤60 s via the TTL fallback). No
+pod restart, no Helm upgrade, no PR.
+
+Mutations are gated on `staff` (the `REGISTRY_AUTHZ_TEAM` env on the
+artemis chart; default `staff`). Per-site teams are independent of
+the gate — anyone in `staff` may register any slug for any teams.
+
+### A2. Verify
 
 ```bash
-direnv exec ~/DEV/fCC/infra/k3s/gxy-management \
-  kubectl -n artemis logs -l app.kubernetes.io/name=artemis --tail=50 \
-  | grep -i 'sites.yaml'
+universe sites ls --slug <slug>
 ```
 
-Look for the `sites.yaml reloaded; N entries` line. `N` should match
-the count in the merged file.
-
-### A5. Verify the slug is live
-
-From any laptop with a GitHub identity in one of the new site's
-teams:
+Row returned → registry has it. The 3-column body shows the team
+list, creator, and timestamps.
 
 ```bash
 universe whoami
 ```
 
-The output should list the new `<site>` slug under "authorized
-sites". If missing, A3 did not reload the ConfigMap; re-run.
+The authorized-sites count goes up by one if you're in any team
+listed on the new slug. `universe sites ls --mine` inspects the
+full list.
 
-### A6. DNS
+### A3. DNS
 
 `*.freecode.camp` (wildcard) and `*.preview.freecode.camp` (wildcard)
 are already proxied through Cloudflare to `gxy-cassiopeia` Caddy
@@ -117,6 +99,16 @@ Exceptions requiring a separate dispatch:
   decision and is out of artemis scope.
 - Custom domains outside the `freecode.camp` zone — needs CF zone
   setup + R2 alias key-format extension.
+
+### A4. Cold-start bootstrap (rare)
+
+The authoritative registry is Valkey. The file at
+`freeCodeCamp/artemis` `config/sites.yaml` is a **dormant seed** —
+checked in for cold-recovery reference only, **not consumed at
+runtime**. A fresh artemis pod against an empty Valkey starts with
+zero sites; the operator re-populates by replaying
+`universe sites register` for each entry in the seed. Editing
+`config/sites.yaml` alone does **not** register anything live.
 
 ---
 
@@ -148,8 +140,9 @@ Opens a GitHub device-flow code in the browser. Token lands at
 universe whoami
 ```
 
-Confirms login + lists authorized site slugs (the union of all teams
-the user belongs to, intersected with the artemis `sites.yaml` map).
+Confirms login + lists the authorized-sites count (the intersection
+of the user's GitHub teams with the artemis registry). Inspect the
+list with `universe sites ls --mine`.
 
 ### B3. Add `platform.yaml` to the site repo root
 
@@ -169,7 +162,7 @@ build:
   output: dist
 ```
 
-The `site:` field MUST match the `sites.yaml` slug exactly. The
+The `site:` field MUST match the registered slug exactly. The
 `build.output` directory is what gets uploaded; everything else in
 the repo is ignored. Full schema reference (every field, defaults,
 validation rules, v0.3 → v0.4 migration):
@@ -251,16 +244,16 @@ Same latency as promote.
 
 ## Failure modes (staff-side)
 
-| Symptom                                      | Cause                                              | Action                                                               |
-| -------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
-| `universe whoami` does not list the new site | Side A not run, or A3 ConfigMap reload not yet hot | ping platform admin; retry after 1 minute                            |
-| `403 forbidden` on `static deploy`           | user not in any team listed for the site           | add user to a team in `sites.yaml` `<site>.teams`, or amend the file |
-| `404 site not found` on deploy               | `platform.yaml` `site:` does not match sites.yaml  | fix the slug in `platform.yaml`                                      |
-| Preview URL returns 404                      | `finalize` not called yet                          | re-run `universe static deploy`                                      |
-| Preview URL returns 502                      | artemis pod unhealthy or rate-limited              | check `https://uploads.freecode.camp/healthz`; ping ops              |
-| `build.command` fails                        | command not present, deps missing                  | run command locally first; install deps in CI step                   |
-| 429 on bulk upload                           | Traefik middleware rate-limit tripped              | retry after 1 second; tune `rateLimit.average` in chart values       |
-| Production URL stale after `promote`         | CF edge cache still hot                            | wait 30 seconds; if persistent, purge CF cache for the site          |
+| Symptom                                      | Cause                                               | Action                                                                                      |
+| -------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `universe whoami` does not list the new site | A1 not run, or Valkey cache lag (≤60 s TTL)         | `universe sites ls --slug <site>` to confirm registry; if listed, retry `whoami` after 60 s |
+| `403 forbidden` on `static deploy`           | user not in any team registered for the site        | `universe sites update <site> --team +<your-team>` (staff)                                  |
+| `404 site not found` on deploy               | `platform.yaml` `site:` does not match the registry | fix the slug in `platform.yaml`, or `universe sites register <slug>` it                     |
+| Preview URL returns 404                      | `finalize` not called yet                           | re-run `universe static deploy`                                                             |
+| Preview URL returns 502                      | artemis pod unhealthy or rate-limited               | check `https://uploads.freecode.camp/healthz`; ping ops                                     |
+| `build.command` fails                        | command not present, deps missing                   | run command locally first; install deps in CI step                                          |
+| 429 on bulk upload                           | Traefik middleware rate-limit tripped               | retry after 1 second; tune `rateLimit.average` in chart values                              |
+| Production URL stale after `promote`         | CF edge cache still hot                             | wait 30 seconds; if persistent, purge CF cache for the site                                 |
 
 ## Cross-references
 
@@ -269,5 +262,6 @@ Same latency as promote.
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — post-deploy smoke
 - [`05-r2-keys-rotation.md`](05-r2-keys-rotation.md) — R2 admin + read-only key rotation
 - [`universe-cli` README](https://github.com/freeCodeCamp-Universe/universe-cli/blob/main/README.md) — full CLI surface
-- `freeCodeCamp/artemis` `config/sites.yaml` — authorization SOT
+- `freeCodeCamp/artemis` registry (Valkey-backed; `config/sites.yaml`
+  in the artemis repo is a dormant cold-start seed only) — authorization SOT
 - `infra/k3s/gxy-management/apps/artemis/` — Helm chart + production overlay

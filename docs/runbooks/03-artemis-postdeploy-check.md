@@ -3,7 +3,7 @@
 End-to-end verification that a deployed artemis instance is healthy and
 serves the full deploy lifecycle. Run after every artemis chart upgrade
 or any change that touches the deploy/serve chain (artemis chart,
-caddy-s3 chart, R2 bucket policy, sites.yaml).
+caddy-s3 chart, R2 bucket policy, sites registry mutations).
 
 Source of truth for the test bodies lives in the artemis repo at
 `internal/integration/` (build-tagged Go suite). This runbook covers
@@ -13,20 +13,20 @@ how to wire and trigger the suite from the infra repo.
 
 - Immediately after `just deploy gxy-management artemis`
 - After caddy-s3 chart bump on `gxy-cassiopeia`
-- After any `sites.yaml` PR merge (validates the new site authorizes correctly)
+- After any `universe sites register/update` against a smoke-eligible slug (validates authz wiring)
 - After secrets rotation (R2 keys, JWT signing key, GH OAuth)
 - Before promoting a real customer site to production (smoke first)
 
 ## Prerequisites
 
-| Requirement                   | Verify                                                                                           |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| Local artemis repo checkout   | `ls $HOME/DEV/fCC/artemis/Makefile`                                                              |
-| Go toolchain (≥ 1.24)         | `go version`                                                                                     |
-| GitHub CLI authenticated      | `gh auth status` (any GH account; team must match site)                                          |
-| Caller's team in `sites.yaml` | `gh api /user/teams --jq '.[].slug'` — at least one entry must appear under `sites.<SITE>.teams` |
-| Artemis reachable             | `curl -fsS https://uploads.freecode.camp/healthz`                                                |
-| Test site authorized          | `config/sites.yaml` in `freeCodeCamp/artemis` lists `test:` with at least one team you belong to |
+| Requirement                 | Verify                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| Local artemis repo checkout | `ls $HOME/DEV/fCC/artemis/Makefile`                                                          |
+| Go toolchain (≥ 1.24)       | `go version`                                                                                 |
+| GitHub CLI authenticated    | `gh auth status` (any GH account; team must match site)                                      |
+| Caller's team in registry   | `gh api /user/teams --jq '.[].slug'` — at least one entry must appear under the slug's teams |
+| Artemis reachable           | `curl -fsS https://uploads.freecode.camp/healthz`                                            |
+| Test site authorized        | `universe sites ls --slug test` shows `test` registered with at least one team you belong to |
 
 ## Run
 
@@ -51,7 +51,7 @@ Expected wall time: 2–5 minutes (production-alias SLO is 2 min per D38).
 | `ARTEMIS_URL`  | `https://uploads.freecode.camp` | Live deployment to probe         |
 | `ARTEMIS_REPO` | `$HOME/DEV/fCC/artemis`         | Local artemis checkout           |
 | `GH_TOKEN`     | `gh auth token`                 | GH bearer authorized for `SITE`  |
-| `SITE`         | `test`                          | Site key in `sites.yaml`         |
+| `SITE`         | `test`                          | Registered site slug             |
 | `ROOT_DOMAIN`  | `freecode.camp`                 | Public root domain               |
 | `PROD_SLO`     | `2m`                            | Production-alias serve SLO (D38) |
 | `PREVIEW_SLO`  | `90s`                           | Preview-alias serve SLO          |
@@ -118,23 +118,23 @@ Edge cases:
 
 ## Failure paths
 
-| Symptom                                | Diagnose                                                          | Mitigate                                                                                             |
-| -------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `healthz unreachable`                  | DNS / CF / artemis pod down                                       | `kubectl -n artemis get pods,svc,httproute`; CF dashboard A-record; `kubectl logs`                   |
-| `whoami: site not in authorized list`  | Caller's GH teams have no overlap with `sites.test.teams`         | `gh api /user/teams --jq '.[].slug'`; cross-check `freeCodeCamp/artemis` `config/sites.yaml`         |
-| `bad token: status=200`                | Auth middleware not enforcing                                     | Inspect `RequireGitHubBearer` chain; check chart `httproute.yaml` is in front of pod                 |
-| `init: 422 verify_failed`              | sites.yaml on cluster differs from repo (ConfigMap drift)         | `kubectl -n artemis get cm artemis-sites -o yaml`; `just deploy gxy-management artemis` to reconcile |
-| `finalize preview: 502 r2_put_failed`  | R2 endpoint or admin key wrong; bucket policy lacks PutObject     | Decrypt `infra-secrets/management/artemis.env.enc`; re-validate against R2 dashboard                 |
-| `preview: marker not seen` (timeout)   | Caddy `r2_alias` cache TTL too long, or alias key format mismatch | `kubectl -n caddy logs -l app=caddy --tail=200`; check `ALIAS_PREVIEW_KEY_FORMAT`                    |
-| `production: marker not seen` in 2 min | CF edge cache holding old content; alias path mismatch            | Check `cf-cache-status` header; CF cache purge tool                                                  |
-| `rollback: deployId mismatch`          | Target deploy prefix swept by cleanup cron (T22, 7-day retention) | Pick a more recent `deployId` from `/deploys`; or rerun TestDeployFlow twice                         |
+| Symptom                                | Diagnose                                                           | Mitigate                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `healthz unreachable`                  | DNS / CF / artemis pod down                                        | `kubectl -n artemis get pods,svc,httproute`; CF dashboard A-record; `kubectl logs`                |
+| `whoami: site not in authorized list`  | Caller's GH teams have no overlap with the slug's registered teams | `gh api /user/teams --jq '.[].slug'`; `universe sites ls --slug test` to inspect the slug's teams |
+| `bad token: status=200`                | Auth middleware not enforcing                                      | Inspect `RequireGitHubBearer` chain; check chart `httproute.yaml` is in front of pod              |
+| `init: 422 verify_failed`              | Caller's GH teams stale vs registry teams just-changed             | retry after ≤60 s TTL fallback; `kubectl -n artemis logs … \| grep registry.changed`              |
+| `finalize preview: 502 r2_put_failed`  | R2 endpoint or admin key wrong; bucket policy lacks PutObject      | Decrypt `infra-secrets/management/artemis.env.enc`; re-validate against R2 dashboard              |
+| `preview: marker not seen` (timeout)   | Caddy `r2_alias` cache TTL too long, or alias key format mismatch  | `kubectl -n caddy logs -l app=caddy --tail=200`; check `ALIAS_PREVIEW_KEY_FORMAT`                 |
+| `production: marker not seen` in 2 min | CF edge cache holding old content; alias path mismatch             | Check `cf-cache-status` header; CF cache purge tool                                               |
+| `rollback: deployId mismatch`          | Target deploy prefix swept by cleanup cron (T22, 7-day retention)  | Pick a more recent `deployId` from `/deploys`; or rerun TestDeployFlow twice                      |
 
 ## Related
 
 - `internal/integration/doc.go` — full env-var contract
 - `make integration-help` (run inside artemis repo) — same as above, terse
 - ADR-016 (`Universe/decisions/016-deploy-proxy.md`) — design rationale, SLOs (Q6, D38)
-- `config/sites.yaml` (`freeCodeCamp/artemis`) — authoritative team→site map
+- artemis registry (Valkey-backed; `universe sites ls` to inspect) — authoritative team→site map
 
 ## Rollback
 

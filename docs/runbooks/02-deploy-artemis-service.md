@@ -120,26 +120,25 @@ git -C ../infra-secrets push
 
 The dotenv stays the SOT — never hand-edit the YAML overlay.
 
-### 6. sites.yaml seed — `freeCodeCamp/artemis` repo
+### 6. Bootstrap the sites registry
 
-Source of truth: `freeCodeCamp/artemis` `config/sites.yaml`. Initial
-seed:
-
-```yaml
-sites:
-  test:
-    teams: ["staff"]
-```
-
-PR-reviewed by platform team. Operator pulls the artemis repo locally
-on the deploy host so `just deploy gxy-management artemis` can `--set-file` it via `apps/artemis/.deploy-flags.sh`.
+Source of truth is Valkey, not a file. On a fresh cluster the registry
+starts empty; seed it with the `test` slug (smoke-target reserved for
+the post-deploy E2E suite) plus any production slugs:
 
 ```bash
-cd ~/DEV/fCC/artemis
-git checkout main && git pull --ff-only
+universe sites register test --team staff
+# Production slugs once you're past preconditions:
+# universe sites register hello-universe --team bots,staff
+# universe sites register <slug> --team <team>[,<team>...]
 ```
 
-Override path via `ARTEMIS_REPO=/some/other/path`.
+The CLI POSTs `/api/site/register` against artemis; staff-team
+membership gates writes (`REGISTRY_AUTHZ_TEAM` chart env, default
+`staff`). Cold-start reference: `freeCodeCamp/artemis`
+`config/sites.yaml` is a **dormant seed** of the historical map —
+not consumed at runtime; only useful when replaying entries after a
+full Valkey wipe.
 
 ### 7. artemis CI — first GHCR image
 
@@ -171,11 +170,7 @@ The generic `deploy` recipe smart-dispatches on `apps/<app>/`:
 2. Loads production overlay (`apps/artemis/values.production.yaml`).
 3. Decrypts + loads sops sealed overlay
    (`infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`).
-4. Sources `apps/artemis/.deploy-flags.sh` which appends
-   `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` (default
-   `$HOME/DEV/fCC/artemis/config/sites.yaml`) to the helm
-   invocation.
-5. Runs `helm upgrade --install` into the `artemis` namespace.
+4. Runs `helm upgrade --install` into the `artemis` namespace.
 
 Optional: `kubectl -n artemis rollout status deploy/artemis --timeout=120s`.
 
@@ -199,12 +194,12 @@ Exit 0 on green.
 
 ## Rotate
 
-| What rotates                         | Recipe                                                                                                            |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                    |
-| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch      |
-| sites.yaml                           | PR to artemis repo; merge; `git -C ~/DEV/fCC/artemis pull`; `just deploy gxy-management artemis` (fsnotify ≤1min) |
-| Image tag                            | see [§Image update](#image-update-deploy-new-artemis-sha) — full procedure                                        |
+| What rotates                         | Recipe                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                                 |
+| CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch                   |
+| sites registry entries               | `universe sites register/update/rm <slug> …` (staff-gated; live in seconds via `registry.changed` pub-sub, ≤60 s TTL fallback) |
+| Image tag                            | see [§Image update](#image-update-deploy-new-artemis-sha) — full procedure                                                     |
 
 ## Image update (deploy new artemis SHA)
 
@@ -299,7 +294,7 @@ over R2).
 | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------- |
 | `Error unmarshalling input json: invalid character '#'` from sops | dotenv decrypted without explicit type flags | use the canonical incantation in §4                                  |
 | Helm fail with `.Values.secretEnv.X is required`                  | sops overlay missing key                     | re-run §5 mint block (paste-once)                                    |
-| Helm fail with `.Values.sites is empty`                           | artemis repo not pulled or wrong path        | `git -C ~/DEV/fCC/artemis pull` or set `ARTEMIS_REPO`                |
+| `whoami` lists no sites on a freshly bootstrapped cluster         | Valkey registry not yet seeded               | `universe sites register <slug> --team <team>` per §6 bootstrap      |
 | 503 on `uploads.freecode.camp/healthz`                            | Gateway not bound; HTTPRoute not picked up   | `kubectl -n artemis describe gateway,httproute` — check Traefik logs |
 | 502 / "no available server" via CF                                | CF zone SSL = Strict + origin no cert        | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)   |
 | ERR_SSL_PROTOCOL_ERROR in browser                                 | CF zone SSL = Off                            | set CF zone SSL to Flexible                                          |

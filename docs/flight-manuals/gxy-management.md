@@ -496,19 +496,17 @@ just deploy gxy-management artemis
 ```
 
 The recipe layers chart values → production overlay → sops sealed
-overlay; in the post-RFC chart the `--set-file
-sites=$ARTEMIS_REPO/config/sites.yaml` from the legacy bring-up is
-**dropped**. Sites map lives in Valkey (§C). The chart sets:
+overlay. Post-cutover (artemis @ `f115198`, 2026-05-10) the chart no
+longer mounts a sites ConfigMap; the sites map lives in Valkey (§C)
+exclusively. The chart sets:
 
-- `VALKEY_ADDR=valkey.artemis.svc.cluster.local:6379`
+- `VALKEY_ADDR=valkey.valkey.svc.cluster.local:6379`
 - `VALKEY_PASSWORD` from sops overlay
-- `REGISTRY_BACKEND=valkey` (default once migration step 5 from RFC §B
-  Migration shape lands in artemis repo)
+- `REGISTRY_AUTHZ_TEAM=staff` (gate on registry-write endpoints)
 
-Backward-compat one-release window: artemis can read either Valkey
-(`REGISTRY_BACKEND=valkey`) or the helm-embedded ConfigMap
-(`REGISTRY_BACKEND=sites_yaml`). Operators flip the env after the §C.3
-import succeeds.
+`REGISTRY_BACKEND` is no longer wired — the `sites_yaml` backend was
+retired alongside the Valkey cutover and there is now exactly one
+read path.
 
 ### D.3 Verify
 
@@ -716,7 +714,7 @@ Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from
 RFC §E):
 
 - **G5** Valkey running with persistence + AUTH (§C.2).
-- **G6** artemis with `REGISTRY_BACKEND=valkey`, no `--set-file` (§D.2).
+- **G6** artemis on Valkey-only registry (no `--set-file`, no `REGISTRY_BACKEND` env; §D.2).
 - **G9** Registry survives `kubectl rollout restart deploy/artemis` —
   pod restarts; sites enum unchanged.
 - **G10** Registry survives `kubectl delete pod -l app=valkey` — PVC

@@ -3,17 +3,18 @@ name: artemis
 description: |
   Artemis — Universe deploy proxy. Go service that authenticates GitHub
   OAuth device-flow tokens, validates per-site team membership against
-  config/sites.yaml, mints HS256 deploy-session JWTs, and forwards
-  authorized PUTs to Cloudflare R2 with admin S3 keys held cluster-side.
+  the Valkey-backed sites registry, mints HS256 deploy-session JWTs,
+  and forwards authorized PUTs to Cloudflare R2 with admin S3 keys
+  held cluster-side.
 
   Built and stored outside Universe (build-residency + run-residency
   per ADR-XXX proposal — see Universe/spike/field-notes/infra.md
   §2026-04-27 RUN-residency clause). Pulls from
   ghcr.io/freecodecamp/artemis direct.
 
-  Chart owns: Deployment, Service, ConfigMap (sites.yaml + non-secret
-  env), Secret (env + TLS), Gateway + HTTPRoute (Traefik gateway
-  class), NetworkPolicy. No upstream chart — greenfield.
+  Chart owns: Deployment, Service, ConfigMap (non-secret env), Secret
+  (env + TLS), Gateway + HTTPRoute (Traefik gateway class),
+  NetworkPolicy. No upstream chart — greenfield.
 type: application
 # Chart version (this chart's release cadence — bump on chart-shape changes).
 version: 0.2.0

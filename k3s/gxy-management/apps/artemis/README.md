@@ -1,10 +1,10 @@
 # artemis — Universe deploy proxy (gxy-management)
 
 Authenticates GitHub OAuth device-flow tokens, validates per-site team
-membership against `config/sites.yaml` (loaded from
-`freeCodeCamp/artemis` repo), mints HS256 deploy-session JWTs, and
-forwards authorized PUTs to Cloudflare R2 with admin S3 keys held
-cluster-side. Public surface: `https://uploads.freecode.camp`.
+membership against the Valkey-backed sites registry, mints HS256
+deploy-session JWTs, and forwards authorized PUTs to Cloudflare R2
+with admin S3 keys held cluster-side. Public surface:
+`https://uploads.freecode.camp`.
 
 Spec: ADR-016 (Universe deploy proxy).
 
@@ -26,7 +26,7 @@ Service artemis (ClusterIP :8080)
 Pod artemis (Go binary)
     │  ── auth ── GitHub API (`/user`, team memberships)
     │  ── data ── Cloudflare R2 (S3 API)
-    └─── reads sites.yaml from ConfigMap (fsnotify hot-reload)
+    └─── sites registry ── Valkey (`registry.changed` pub-sub + TTL refresh)
 ```
 
 No Tailscale. No Caddy/cassiopeia hop. No CF Access (programmatic API
@@ -52,7 +52,7 @@ apps/artemis/
 │       ├── namespace.yaml
 │       ├── deployment.yaml
 │       ├── service.yaml
-│       ├── configmap.yaml      # env + sites.yaml
+│       ├── configmap.yaml      # non-secret env only
 │       ├── secret-env.yaml     # 5 secret env vars (sops overlay)
 │       ├── middleware-ratelimit.yaml
 │       ├── gateway.yaml        # HTTP :80 only — CF Flexible SSL
@@ -75,7 +75,10 @@ present → helm phase. Layers values:
 2. `apps/artemis/values.production.yaml` — production overlay
 3. `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` — sops-sealed (5 secret env keys)
 
-`apps/artemis/.deploy-flags.sh` is sourced; appends `--set-file sites=$ARTEMIS_REPO/config/sites.yaml` to the helm invocation. Operator never types the path. Default `ARTEMIS_REPO=$HOME/DEV/fCC/artemis`.
+No `.deploy-flags.sh` hook for artemis post-cutover — the chart no
+longer mounts a sites ConfigMap. The Valkey registry is the
+authoritative store; `universe sites <subcommand>` is the operator
+surface (see `docs/runbooks/01-deploy-new-constellation-site.md`).
 
 The sops sealed overlay is operator-owned. Mint via the paste-once
 shell block in `docs/runbooks/deploy-artemis-service.md` §5. Re-run
@@ -84,20 +87,31 @@ on env-var rotation. See runbook for end-to-end operator flow.
 No TLS material in the overlay — CF Flexible SSL on `freecode.camp`
 zone (CF terminates HTTPS, CF→origin plain HTTP).
 
-## Sites map (`sites.yaml`)
+## Sites registry
 
-Source of truth: `freeCodeCamp/artemis` repo `config/sites.yaml` (PR-
-reviewed by platform team, per ADR-016 §sites.yaml lifecycle).
-Materialized into a ConfigMap by the chart at deploy time via
-`--set-file sites=$ARTEMIS_REPO/config/sites.yaml` (injected by
-`apps/artemis/.deploy-flags.sh`).
+Source of truth: Valkey (`valkey.valkey.svc.cluster.local:6379`,
+namespace `valkey`). Mutated via the artemis registry endpoints
+(`POST /api/site/register`, `PATCH /api/site/{slug}`,
+`DELETE /api/site/{slug}`), gated on `staff` team membership
+(`REGISTRY_AUTHZ_TEAM` env, default `staff`). Reads
+(`GET /api/sites`) open to any GitHub bearer.
 
-Updates:
+`freeCodeCamp/artemis` `config/sites.yaml` is a **dormant cold-start
+seed** — checked in for cold-recovery reference, not consumed at
+runtime. Editing it does not register anything live.
 
-1. PR to `freeCodeCamp/artemis` `config/sites.yaml` → review → merge.
-2. `git -C ~/DEV/fCC/artemis pull --ff-only`
-3. `just deploy gxy-management artemis` — re-renders ConfigMap,
-   fsnotify reload (≤1min). No pod restart.
+Updates (staff):
+
+```bash
+universe sites register <slug> --team <team>[,<team>...]
+universe sites update   <slug> --team <team>[,<team>...]
+universe sites rm       <slug>
+universe sites ls       [--mine]
+```
+
+All artemis replicas pick up writes via `registry.changed` pub-sub
+within seconds; ≤60 s on the TTL fallback. No pod restart, no Helm
+upgrade. Full staff/admin flow: `docs/runbooks/01-deploy-new-constellation-site.md`.
 
 ## Image / build / pull
 
