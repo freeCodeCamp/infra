@@ -203,6 +203,82 @@ No change to per-app kustomization.yaml. Generated Secret name
 - Split firewall per-galaxy (raised in cluster-audit) — deferred post-MVP.
 - Etcd snapshot s3-target configuration — orthogonal; Phase 7 references it opportunistically but doesn't block.
 
+## Operational pitfalls
+
+Promotes findings from
+`Universe/spike/field-notes/archive/2026-05-10/infra.md:331-355,439` into
+canonical guidance. The fixes already live in code (group_vars +
+playbook post_task); the WHY belongs here.
+
+### Two-account isolation — silent etcd S3 backup failure
+
+The infra repo is a monorepo spanning two DigitalOcean accounts:
+
+| Account      | Purpose                                 | Region | Loaded by            |
+| ------------ | --------------------------------------- | ------ | -------------------- |
+| **Primary**  | Legacy (ops-backoffice-tools, ops-mgmt) | NYC3   | root `.envrc`        |
+| **Universe** | All Universe galaxies                   | FRA1   | `k3s/gxy-<g>/.envrc` |
+
+The direnv hierarchy overrides Primary creds with Universe creds when
+inside a galaxy directory. **Trap (discovered 2026-04-07):** the
+Universe Spaces key has historically drifted — `do-universe/.env.enc`
+carried `DO0036N72V…` while the actual `ops-allbuckets` key was
+`DO00QGF8PA…`. k3s **logs errors but does not crash** when its etcd
+S3 backup credentials are wrong. Snapshots silently failed for the
+entire spike Phase 0 window.
+
+**Symptom shape.** `k3s etcd-snapshot save` reports `failed to test
+for existence of bucket: Access Denied`. The misleading shape:
+`aws s3api list-buckets --endpoint-url https://fra1.digitaloceanspaces.com`
+returns **empty** (not an error) when the key belongs to a different
+account or lacks bucket access.
+
+**Pre-deploy verification.** From inside `k3s/gxy-<g>/`:
+
+```bash
+# direnv loads do-universe/.env.enc here
+aws s3 ls "s3://net-freecodecamp-universe-backups/" \
+  --endpoint-url https://fra1.digitaloceanspaces.com \
+  || echo "✗ key does not see Universe bucket"
+```
+
+If the list returns empty without an error, the credentials are
+likely Primary-account scope. Refresh `do-universe/.env.enc` before
+provisioning.
+
+### Dotted bucket names break HTTPS wildcard certs
+
+DO Spaces' SSL wildcard `*.fra1.digitaloceanspaces.com` does NOT
+match multi-label subdomains. A bucket named `net.freecodecamp.universe-backups`
+resolves to `net.freecodecamp.universe-backups.fra1.digitaloceanspaces.com`
+in virtual-hosted-style (k3s default `etcd-s3-bucket-lookup-type: auto`),
+which the wildcard cert refuses → `Access Denied` even with correct
+credentials.
+
+**Pattern.** Use dashes, not dots, when naming any DO Spaces / R2
+bucket Universe owns. Today's canonical bucket is
+`net-freecodecamp-universe-backups` (dashes). If a dotted name is
+unavoidable for legacy reasons, force path-style:
+
+```yaml
+# ansible/inventory/group_vars/gxy_<g>_k3s.yml
+server_config_yaml:
+  etcd-s3-bucket-lookup-type: "path"
+```
+
+### `extra_service_envs` lineinfile-without-regexp duplicates
+
+The k3s-ansible role (v1.1.1) `extra_service_envs` uses `lineinfile`
+without `regexp` — new lines appended, old NOT removed on value
+change. Systemd env files read the first occurrence; stale keys win.
+This is how the wrong S3 key from the prior section silently
+persisted after rotation.
+
+**Pattern abandoned.** All etcd-S3 credentials now live in
+`/etc/rancher/k3s/config.yaml` via playbook post_task using
+`lineinfile` with `regexp` — idempotent on value change. Do not
+reach for `extra_service_envs` for any credential rotation surface.
+
 ## Acknowledgments
 
 Inputs: 2026-04-21 cluster audit (`docs/sprints/2026-04-21/cluster-audit.md`),
