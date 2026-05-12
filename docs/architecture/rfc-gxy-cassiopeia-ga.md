@@ -1,37 +1,14 @@
 # RFC — gxy-cassiopeia GA Hardening
 
-**Status:** Proposed (universe-master-audit, 2026-05-10) · Owner: infra
-**Anchors:** ADR-007 (DX), ADR-009 (networking), ADR-010 (secrets), ADR-011 (security), ADR-016 (deploy proxy)
-**Supersedes:** archived `rfc-gxy-cassiopeia.md` (2026-04-30), archived `task-gxy-cassiopeia.md` (2026-04-30); also retires the still-in-tree `rfc-gxy-cassiopeia-caddyfile-poc.md` (POC, surfaced for retirement 2026-04-30).
+**Status:** Proposed (universe-master-audit, 2026-05-10) · Owner: infra **Anchors:** ADR-007 (DX), ADR-009 (networking), ADR-010 (secrets), ADR-011 (security), ADR-016 (deploy proxy) **Supersedes:** archived `rfc-gxy-cassiopeia.md` (2026-04-30), archived `task-gxy-cassiopeia.md` (2026-04-30); also retires the still-in-tree `rfc-gxy-cassiopeia-caddyfile-poc.md` (POC, surfaced for retirement 2026-04-30).
 
-> **Closeout note (2026-05-11):** The registry decouple section
-> (§B / Phase 2 migration table) is **DONE**. The `sites_yaml`
-> backend was retired in artemis @ `f115198`; Valkey is the sole
-> backend, and operator writes go through the `universe sites
-register/ls/update/rm` CLI (universe-cli v0.5.0,
-> `POST /api/site/register` and siblings). Migration step rows are
-> retained below as historical record — do not re-execute them. Live
-> operator flow now lives in
-> `docs/runbooks/01-deploy-new-constellation-site.md` §A. All other
-> RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain
-> in-scope.
+> **Closeout note (2026-05-11):** The registry decouple section (§B / Phase 2 migration table) is **DONE**. The `sites_yaml` backend was retired in artemis @ `f115198`; Valkey is the sole backend, and operator writes go through the `universe sites register/ls/update/rm` CLI (universe-cli v0.5.0, `POST /api/site/register` and siblings). Migration step rows are retained below as historical record — do not re-execute them. Live operator flow now lives in `docs/runbooks/01-deploy-new-constellation-site.md` §A. All other RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain in-scope.
 
 ## Context
 
-gxy-cassiopeia is the static-apps galaxy. caddy-s3 fronts R2 at
-`*.freecode.camp`. The deploy plane is artemis on gxy-management
-(`uploads.freecode.camp`). The caddy + R2 read-side is already live and
-SHA-pinned (see probes 02, 04). The deploy-side is live but the
-**static-apps registry** (which maps `<site-slug>` → authorized GH
-teams) is encoded as `artemis/config/sites.yaml` and embedded into the
-Helm chart at deploy-time via `--set-file` — this couples every
-staff-onboarding round-trip to operator + PR + helm. Cassiopeia
-cannot reach GA without breaking that coupling.
+gxy-cassiopeia is the static-apps galaxy. caddy-s3 fronts R2 at `*.freecode.camp`. The deploy plane is artemis on gxy-management (`uploads.freecode.camp`). The caddy + R2 read-side is already live and SHA-pinned (see probes 02, 04). The deploy-side is live but the **static-apps registry** (which maps `<site-slug>` → authorized GH teams) is encoded as `artemis/config/sites.yaml` and embedded into the Helm chart at deploy-time via `--set-file` — this couples every staff-onboarding round-trip to operator + PR + helm. Cassiopeia cannot reach GA without breaking that coupling.
 
-This RFC is the GA hardening pass. Sections A-D enumerate the work;
-sections E-F define the gates and the few open questions that need
-operator input before the cassiopeia chapter of the master flight-manual
-is authored.
+This RFC is the GA hardening pass. Sections A-D enumerate the work; sections E-F define the gates and the few open questions that need operator input before the cassiopeia chapter of the master flight-manual is authored.
 
 ## What's in / out
 
@@ -99,15 +76,11 @@ is authored.
 
 State today (probe 02):
 
-- `k3s/gxy-cassiopeia/apps/caddy/charts/caddy/` — Helm chart with Gateway API
-  HTTPRoute + Gateway + Deployment + ConfigMap + Secret + NetworkPolicy.
-- Chart `values.yaml` defaults SHA-pinned to `dev`; production overlay at
-  `values.production.yaml` pins `sha-712c6e3@sha256:e024…`.
+- `k3s/gxy-cassiopeia/apps/caddy/charts/caddy/` — Helm chart with Gateway API HTTPRoute + Gateway + Deployment + ConfigMap + Secret + NetworkPolicy.
+- Chart `values.yaml` defaults SHA-pinned to `dev`; production overlay at `values.production.yaml` pins `sha-712c6e3@sha256:e024…`.
 - R2 bucket `universe-static-apps-01`, prefix-scoped per site.
-- Caddy reads `<site>.freecode.camp/<env>` aliases via in-tree `caddy.fs.r2`
-  module (D32 absorbed `sagikazarmark/caddy-fs-s3` after upstream stalled).
-- TLS posture: CF Flexible SSL (CF-edge HTTPS, origin HTTP). No origin
-  cert at the k8s layer for this zone.
+- Caddy reads `<site>.freecode.camp/<env>` aliases via in-tree `caddy.fs.r2` module (D32 absorbed `sagikazarmark/caddy-fs-s3` after upstream stalled).
+- TLS posture: CF Flexible SSL (CF-edge HTTPS, origin HTTP). No origin cert at the k8s layer for this zone.
 
 Gaps to close at GA:
 
@@ -118,54 +91,31 @@ Gaps to close at GA:
 | caddy chart sidecar `rclone-sync`                                      | Existing manual line 99 mentions sidecar in pod (`2/2`). With D32 in-tree module the sidecar may be redundant — verify in T4 by reading `templates/deployment.yaml`; if sidecar is gone, drop the verify line. |
 | 503 fallback to previous deploy                                        | Already runbookable (`universe static promote --to <id>`). Encode in flight-manual §E smoke + "503 troubleshooting".                                                                                           |
 
-No chart edits are mandated by this RFC — the chart is GA-shaped today.
-The cassiopeia chapter encodes the operator-runnable verifier.
+No chart edits are mandated by this RFC — the chart is GA-shaped today. The cassiopeia chapter encodes the operator-runnable verifier.
 
 ## Section B — Static-apps registry: KV substrate matrix and decision (S1)
 
-The operator-coupling problem (C3) is the biggest blocker. This
-section lays out candidates, re-scores them with **vendor-neutrality
-weighted heavier** (per the standing platform tenet), and records
-the user-confirmed decision: **Valkey single-instance alongside
-artemis on gxy-management** (2026-05-10).
+The operator-coupling problem (C3) is the biggest blocker. This section lays out candidates, re-scores them with **vendor-neutrality weighted heavier** (per the standing platform tenet), and records the user-confirmed decision: **Valkey single-instance alongside artemis on gxy-management** (2026-05-10).
 
-A first-pass recommendation defaulted to `ConfigMap` on a "minimal
-diff" axis. User pushback corrected the priority order: vendor-neutral
-substrate first, "+1 small pillar" acceptable when the substrate is
-the right shape for the job. Decision rationale + dismissed
-alternatives recorded below for future readers.
+A first-pass recommendation defaulted to `ConfigMap` on a "minimal diff" axis. User pushback corrected the priority order: vendor-neutral substrate first, "+1 small pillar" acceptable when the substrate is the right shape for the job. Decision rationale + dismissed alternatives recorded below for future readers.
 
 ### Requirements
 
-R1. **Operator-free site registration** — a staff member (or
-universe-cli on their behalf) registers a new site without operator
-PR + helm + local checkout. Steady-state path: API call → registry
-mutation → live within <60s.
+R1. **Operator-free site registration** — a staff member (or universe-cli on their behalf) registers a new site without operator PR + helm + local checkout. Steady-state path: API call → registry mutation → live within \<60s.
 
-R2. **Authz preserved** — every register/deploy still authenticates
-via GH Bearer + authorizes via GH team membership (per ADR-016). The
-registry is the **source of truth** for `<site> → [team-slugs]`.
+R2. **Authz preserved** — every register/deploy still authenticates via GH Bearer + authorizes via GH team membership (per ADR-016). The registry is the **source of truth** for `<site> → [team-slugs]`.
 
-R3. **Hot-reload in artemis** — the running artemis pod picks up
-registry mutations without an operator-driven helm-upgrade.
+R3. **Hot-reload in artemis** — the running artemis pod picks up registry mutations without an operator-driven helm-upgrade.
 
-R4. **DR posture** — registry survives a cluster wipe. Restoration
-should not require operator-manual data entry.
+R4. **DR posture** — registry survives a cluster wipe. Restoration should not require operator-manual data entry.
 
-R5. **Vendor-neutral within practical limits** — Cloudflare (R2,
-edge, DNS) is already foundational and outside this audit's
-substitution scope; new vendor lock-ins are weighed against
-self-hosted alternatives. Self-hosted preferred when the
-implementation cost is comparable.
+R5. **Vendor-neutral within practical limits** — Cloudflare (R2, edge, DNS) is already foundational and outside this audit's substitution scope; new vendor lock-ins are weighed against self-hosted alternatives. Self-hosted preferred when the implementation cost is comparable.
 
-R6. **Sized for ~100 sites near-term, 10K long-term** — the registry
-is platform-team-curated; explosive growth not expected, but the
-substrate must not cap out at chart-values size.
+R6. **Sized for ~100 sites near-term, 10K long-term** — the registry is platform-team-curated; explosive growth not expected, but the substrate must not cap out at chart-values size.
 
 ### Candidate matrix (re-scored 2026-05-10)
 
-Vendor-neutrality weighted heavier than initial pass; "+1 small pillar"
-no longer auto-disqualifies a candidate.
+Vendor-neutrality weighted heavier than initial pass; "+1 small pillar" no longer auto-disqualifies a candidate.
 
 | Candidate                                 | License            | Vendor-neutral | Op-free path?                        | Hot-reload (artemis)    | Multi-writer safe (3 replicas)    | DR posture                          | New deps                                     | Verdict                                |
 | ----------------------------------------- | ------------------ | -------------- | ------------------------------------ | ----------------------- | --------------------------------- | ----------------------------------- | -------------------------------------------- | -------------------------------------- |
@@ -184,58 +134,29 @@ no longer auto-disqualifies a candidate.
 
 Rationale:
 
-1. **Vendor-neutral.** Valkey is the BSD-3 LF-stewarded fork of Redis
-   (post-Redis-Inc.-relicensing 2024). Portable to any k8s, VM, or
-   bare-metal substrate. No CF lock for control-plane state, no
-   "k8s-resource-as-database" hack.
-2. **Right tool for the shape.** Native KV: `HSET`/`HGETALL` for
-   per-site rows, `SADD` for the all-sites set, `WATCH`/`MULTI` for
-   compare-and-set, `PUBLISH` for hot-reload notification, `EXPIRE`
-   for ephemeral cache rows (e.g. GH membership cache pulled out of
-   in-process memory once we want cross-pod cache coherence).
-3. **Multi-writer safe.** All 3 artemis replicas write through one
-   Valkey — Valkey serializes commands. ConfigMap has no
-   compare-and-set; concurrent writes race.
-4. **Operator-free steady state.** Bootstrap = `just deploy gxy-management valkey`
-   followed by `just deploy gxy-management artemis` once. Steady
-   state: staff (or universe-cli on staff's behalf) calls `POST
-/api/site/register` against artemis; artemis writes Valkey;
-   `PUBLISH registry.changed <site>` fans the invalidation. No
-   operator, no PR, no helm-upgrade.
-5. **Right-sized footprint.** Single pod (~50 MiB RAM idle), single
-   PVC (~1 GiB sufficient for ~10K sites of the schema below), one
-   Service. NetworkPolicy allows only `app=artemis` pods to connect.
+1. **Vendor-neutral.** Valkey is the BSD-3 LF-stewarded fork of Redis (post-Redis-Inc.-relicensing 2024). Portable to any k8s, VM, or bare-metal substrate. No CF lock for control-plane state, no "k8s-resource-as-database" hack.
 
-   **2026-05-11 amendment** — namespace decision: deployed to its own
-   `valkey` namespace (PSS restricted) rather than co-located in
-   `artemis` (PSS baseline). Stronger workload-isolation posture for
-   the registry source-of-truth. Cross-namespace DNS:
-   `valkey.valkey.svc.cluster.local:6379`. The artemis CNP needed a
-   `*.*.svc.cluster.local` DNS L7 pattern as a result — see
-   [`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md)
-   Pattern B and `gxy-management.md §C.6` for the cutover transcript.
+1. **Right tool for the shape.** Native KV: `HSET`/`HGETALL` for per-site rows, `SADD` for the all-sites set, `WATCH`/`MULTI` for compare-and-set, `PUBLISH` for hot-reload notification, `EXPIRE` for ephemeral cache rows (e.g. GH membership cache pulled out of in-process memory once we want cross-pod cache coherence).
 
-6. **DR posture.** AOF (appendfsync everysec) + RDB snapshot every 6
-   h on PVC. Nightly RDB dump → `r2://universe-static-apps-01/_meta/registry/<date>.rdb`.
-   On a cluster wipe: reattach PVC if it survived (`pv` reclaim
-   policy `Retain`); otherwise restore latest RDB from R2 via
-   `valkey-cli --rdb` on a fresh pod, then bring artemis back.
-7. **HA bolt-on.** Async replica or Sentinel is a chart-flag away
-   when scale demands. Don't pay the cost now — single-instance is
-   sufficient for ~100 → ~10K sites with the read pattern below.
+1. **Multi-writer safe.** All 3 artemis replicas write through one Valkey — Valkey serializes commands. ConfigMap has no compare-and-set; concurrent writes race.
+
+1. **Operator-free steady state.** Bootstrap = `just deploy gxy-management valkey` followed by `just deploy gxy-management artemis` once. Steady state: staff (or universe-cli on staff's behalf) calls `POST /api/site/register` against artemis; artemis writes Valkey; `PUBLISH registry.changed <site>` fans the invalidation. No operator, no PR, no helm-upgrade.
+
+1. **Right-sized footprint.** Single pod (~50 MiB RAM idle), single PVC (~1 GiB sufficient for ~10K sites of the schema below), one Service. NetworkPolicy allows only `app=artemis` pods to connect.
+
+   **2026-05-11 amendment** — namespace decision: deployed to its own `valkey` namespace (PSS restricted) rather than co-located in `artemis` (PSS baseline). Stronger workload-isolation posture for the registry source-of-truth. Cross-namespace DNS: `valkey.valkey.svc.cluster.local:6379`. The artemis CNP needed a `*.*.svc.cluster.local` DNS L7 pattern as a result — see [`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) Pattern B and `gxy-management.md §C.6` for the cutover transcript.
+
+1. **DR posture.** AOF (appendfsync everysec) + RDB snapshot every 6 h on PVC. Nightly RDB dump → `r2://universe-static-apps-01/_meta/registry/<date>.rdb`. On a cluster wipe: reattach PVC if it survived (`pv` reclaim policy `Retain`); otherwise restore latest RDB from R2 via `valkey-cli --rdb` on a fresh pod, then bring artemis back.
+
+1. **HA bolt-on.** Async replica or Sentinel is a chart-flag away when scale demands. Don't pay the cost now — single-instance is sufficient for ~100 → ~10K sites with the read pattern below.
 
 Why not B (ConfigMap):
 
-- ConfigMap has no compare-and-set; multi-replica artemis writes
-  race. Last-write-wins under concurrent registrations.
-- Built for static config, not mutable runtime state. fsnotify
-  reload has a known race (file-renamed-into-place vs partial mount
-  refresh) and 1 MiB cap eventually bites.
+- ConfigMap has no compare-and-set; multi-replica artemis writes race. Last-write-wins under concurrent registrations.
+- Built for static config, not mutable runtime state. fsnotify reload has a known race (file-renamed-into-place vs partial mount refresh) and 1 MiB cap eventually bites.
 - Recorded as fallback if "no new pillars" hardens into a constraint.
 
-Why not F (R2 JSON), G (CF KV), H (Windmill), I (CNPG cross-galaxy),
-J (etcd direct): vendor lock or cross-coupling — see matrix verdict
-column.
+Why not F (R2 JSON), G (CF KV), H (Windmill), I (CNPG cross-galaxy), J (etcd direct): vendor lock or cross-coupling — see matrix verdict column.
 
 ### Deployment shape
 
@@ -273,14 +194,9 @@ resources:
   limits: { cpu: 500m, memory: 256Mi }
 ```
 
-Image: track `valkey/valkey:<minor>` (e.g. `8.0`) tag-and-digest
-pinned per ADR-011. SHA pin lands in `values.production.yaml` next to
-the existing artemis pattern.
+Image: track `valkey/valkey:<minor>` (e.g. `8.0`) tag-and-digest pinned per ADR-011. SHA pin lands in `values.production.yaml` next to the existing artemis pattern.
 
-Backup: a CronJob (`apps/valkey/manifests/base/rdb-backup.yaml`) runs
-daily 03:00 UTC, execs `valkey-cli BGSAVE` + uploads
-`/data/dump.rdb` → R2. R2 lifecycle: 30-day retention. Same R2 admin
-token already used by artemis (no new credential).
+Backup: a CronJob (`apps/valkey/manifests/base/rdb-backup.yaml`) runs daily 03:00 UTC, execs `valkey-cli BGSAVE` + uploads `/data/dump.rdb` → R2. R2 lifecycle: 30-day retention. Same R2 admin token already used by artemis (no new credential).
 
 ### Migration shape (no operator marathon)
 
@@ -293,11 +209,7 @@ token already used by artemis (no new credential).
 | 5. `just helm-upgrade gxy-management artemis --set env.REGISTRY_BACKEND=valkey` (no `--set-file`).                             | operator                        | artemis switches read path to Valkey; ConfigMap mount retained as fallback |
 | 6. After 24h soak: drop `--set-file` from chart values + remove `SITES_YAML_PATH` env + retire `sites.yaml` from artemis repo. | follow-up sprint (artemis repo) | artemis chart no longer references the file                                |
 
-Step 3 (and the tail of step 6) are **artemis-side code work** —
-follow-up sprint scope, not this audit. The flight-manual chapter
-encodes the **end state** (steps 4-5 only as the operator path);
-steps 1-2 belong in the cassiopeia or management chapter as one-time
-bootstrap.
+Step 3 (and the tail of step 6) are **artemis-side code work** — follow-up sprint scope, not this audit. The flight-manual chapter encodes the **end state** (steps 4-5 only as the operator path); steps 1-2 belong in the cassiopeia or management chapter as one-time bootstrap.
 
 ### Schema (Valkey)
 
@@ -329,14 +241,9 @@ PUBLISH registry.changed <slug>
 EXEC
 ```
 
-Hot-reload: artemis subscribes to `registry.changed`; on event,
-invalidates the in-process site cache row. New reads pull from
-Valkey on cache miss. Pub-sub is fire-and-forget — artemis also
-caches with a short TTL fallback (e.g. 60 s) so a missed message
-self-heals.
+Hot-reload: artemis subscribes to `registry.changed`; on event, invalidates the in-process site cache row. New reads pull from Valkey on cache miss. Pub-sub is fire-and-forget — artemis also caches with a short TTL fallback (e.g. 60 s) so a missed message self-heals.
 
-JSON over YAML for the `teams` field (encoder symmetry with API
-responses).
+JSON over YAML for the `teams` field (encoder symmetry with API responses).
 
 ### CLI surface (universe-cli, ADR-007 reuse)
 
@@ -347,9 +254,7 @@ responses).
 | `universe site update-teams <slug> --teams=…`   | caller in `staff` team      | `PATCH /api/site/{slug}`; `HSET teams …` + `PUBLISH registry.changed`                               |
 | `universe site delete <slug>`                   | caller in `staff` + confirm | `DELETE /api/site/{slug}`; `DEL site:<slug>` + `SREM sites:all <slug>` + `PUBLISH registry.changed` |
 
-The `static deploy / promote / rollback` path is unchanged from
-ADR-016 except authz now consults Valkey instead of the
-helm-embedded ConfigMap.
+The `static deploy / promote / rollback` path is unchanged from ADR-016 except authz now consults Valkey instead of the helm-embedded ConfigMap.
 
 ## Section C — Artemis service trim (S2)
 
@@ -370,22 +275,13 @@ Once the registry leaves `--set-file`, the chart simplifies:
 
 Other artemis hardening items (post-registry):
 
-- **Schema slim** — ADR-016 hints at moving from per-site nested
-  team-list to flat allowlist + env `AUTHORIZED_TEAMS`. The KV
-  decision in §B keeps the per-site nested form for now (more flexible);
-  flat-allowlist parked.
-- **`POST /api/site/register` rate limit** — reuse the per-source-IP
-  Traefik middleware already on the chart. No new infra.
-- **Audit log** — emit structured log line per registry mutation
-  (request user, action, target site). Already have stdout logs going
-  through Vector → ClickHouse pattern (when o11y reactivates per
-  ADR-015); for now, kubectl logs is fine.
+- **Schema slim** — ADR-016 hints at moving from per-site nested team-list to flat allowlist + env `AUTHORIZED_TEAMS`. The KV decision in §B keeps the per-site nested form for now (more flexible); flat-allowlist parked.
+- **`POST /api/site/register` rate limit** — reuse the per-source-IP Traefik middleware already on the chart. No new infra.
+- **Audit log** — emit structured log line per registry mutation (request user, action, target site). Already have stdout logs going through Vector → ClickHouse pattern (when o11y reactivates per ADR-015); for now, kubectl logs is fine.
 
 ## Section D — Ingress + DNS + cert (S1)
 
-Cassiopeia serves `*.freecode.camp` from R2 via caddy-s3. The user's
-locked scope item is "wildcard `*.freecode.camp` cert + DNS path
-formalized".
+Cassiopeia serves `*.freecode.camp` from R2 via caddy-s3. The user's locked scope item is "wildcard `*.freecode.camp` cert + DNS path formalized".
 
 ### TLS posture per zone (anchors for §1 of UNIVERSE.md)
 
@@ -394,27 +290,16 @@ formalized".
 | `freecode.camp`    | Flexible    | none (CF-edge HTTPS, origin HTTP) | caddy on cassiopeia · artemis on management                                    |
 | `freecodecamp.net` | Full Strict | `*.freecodecamp.net` wildcard     | windmill / argocd / zot (when reactivated) on management; future galaxy planes |
 
-The zones intentionally use different posture: `freecode.camp` is
-public static-app surface (high cardinality, wildcard origin cert
-infeasible across many subdomains, edge HTTPS sufficient);
-`freecodecamp.net` is internal-tools surface (small fixed set, origin
-cert worth carrying).
+The zones intentionally use different posture: `freecode.camp` is public static-app surface (high cardinality, wildcard origin cert infeasible across many subdomains, edge HTTPS sufficient); `freecodecamp.net` is internal-tools surface (small fixed set, origin cert worth carrying).
 
 ### DNS surface for `*.freecode.camp`
 
 Two flavors:
 
-1. **`<site>.freecode.camp`** (production). Wildcard A record to all
-   3 cassiopeia node public IPs, CF orange cloud ON. Per-site DNS
-   addition is **NOT** required — wildcard catches everything.
-2. **`<site>--preview.freecode.camp`** (preview). Same wildcard
-   covers — the `--preview` is part of the `<sitePrefix>` from
-   caddy's perspective. ADR-009 already specifies double-dash to
-   avoid wildcard-cert scope creep.
+1. **`<site>.freecode.camp`** (production). Wildcard A record to all 3 cassiopeia node public IPs, CF orange cloud ON. Per-site DNS addition is **NOT** required — wildcard catches everything.
+1. **`<site>--preview.freecode.camp`** (preview). Same wildcard covers — the `--preview` is part of the `<sitePrefix>` from caddy's perspective. ADR-009 already specifies double-dash to avoid wildcard-cert scope creep.
 
-Per `gxy-cassiopeia.md` Phase 23 today: 3 A records per production
-domain, proxy ON, SSL Flexible. No per-site DNS edit required after
-wildcard is in place.
+Per `gxy-cassiopeia.md` Phase 23 today: 3 A records per production domain, proxy ON, SSL Flexible. No per-site DNS edit required after wildcard is in place.
 
 ### Cert manager / DNS-01 issuer
 
@@ -422,26 +307,17 @@ Not deployed in tree (per probe 02). Decision today: **don't deploy**.
 
 - The `freecode.camp` zone is Flexible SSL. CF-edge cert covers public traffic.
 - Origin is HTTP — no origin cert required.
-- A DNS-01 issuer would add complexity for the `freecodecamp.net`
-  zone (wildcard origin cert) but that's an existing operator-rotated
-  cert in `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc`
-  — also no automation needed.
+- A DNS-01 issuer would add complexity for the `freecodecamp.net` zone (wildcard origin cert) but that's an existing operator-rotated cert in `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — also no automation needed.
 
-cert-manager / DNS-01 is **deferred** behind a future "we have many
-zones with origin certs" trigger. Recorded in TODO-park.
+cert-manager / DNS-01 is **deferred** behind a future "we have many zones with origin certs" trigger. Recorded in TODO-park.
 
 ### Origin allow-list (gxy-static-k7d.14, parked)
 
-Today: DO Cloud Firewall accepts 80/443 from 0.0.0.0/0. Only CF WAF
-gates origin hits. The "only allow CF edge IPs" cron + manifest is
-parked. Document the gap in flight-manual §D and link to TODO-park.
-Not GA-blocking — origin reveals galaxy IPs but everything serves
-through CF.
+Today: DO Cloud Firewall accepts 80/443 from 0.0.0.0/0. Only CF WAF gates origin hits. The "only allow CF edge IPs" cron + manifest is parked. Document the gap in flight-manual §D and link to TODO-park. Not GA-blocking — origin reveals galaxy IPs but everything serves through CF.
 
 ## Section E — Acceptance gates + smoke
 
-Cassiopeia GA = all of the following pass on a fresh
-back-to-back idempotent rerun of the cassiopeia flight-manual chapter:
+Cassiopeia GA = all of the following pass on a fresh back-to-back idempotent rerun of the cassiopeia flight-manual chapter:
 
 | Gate | Description                                                                                        | Command anchor                                                                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -451,18 +327,14 @@ back-to-back idempotent rerun of the cassiopeia flight-manual chapter:
 | G4   | DNS resolves `*.freecode.camp` to 3 cassiopeia node IPs                                            | `dig +short test.freecode.camp` matches `doctl droplet list` output                                                                                   |
 | G5   | Valkey running in artemis ns with persistence + AUTH                                               | `kubectl -n artemis get pods,svc,pvc -l app=valkey`; `valkey-cli AUTH … && valkey-cli PING` returns `PONG`                                            |
 | G6   | artemis on gxy-management with `REGISTRY_BACKEND=valkey` (no `--set-file`)                         | `helm get values -n artemis artemis` shows no `sites:` key; `kubectl -n artemis exec deploy/artemis -- env \| grep REGISTRY_BACKEND` reports `valkey` |
-| G7   | `universe site register test --teams=staff` succeeds without operator action                       | CLI exits 0; `GET /api/sites` includes `test`; `valkey-cli SMEMBERS sites:all` includes `test`                                                        |
-| G8   | E2E deploy → preview → promote → production through artemis                                        | `just phase5-smoke` (existing artemis post-deploy smoke harness)                                                                                      |
+| G7   | `universe sites register test --team staff` succeeds without operator action                       | CLI exits 0; `GET /api/sites` includes `test`; `valkey-cli SMEMBERS sites:all` includes `test`                                                        |
+| G8   | E2E deploy → preview → promote → production through artemis                                        | `just artemis-postdeploy-check` (replaces retired `phase5-smoke` per 2026-04-27 refactor `20da6067`)                                                  |
 | G9   | Registry survives `kubectl rollout restart deployment -n artemis artemis`                          | `GET /api/sites` returns same set; Valkey pod untouched (different release/sts)                                                                       |
 | G10  | Registry survives Valkey pod restart (PVC reattach)                                                | `kubectl -n artemis delete pod -l app=valkey`; new pod replays AOF; `GET /api/sites` matches                                                          |
 | G11  | Nightly RDB backup lands in R2                                                                     | `aws s3 ls s3://universe-static-apps-01/_meta/registry/ --endpoint=$R2` shows `<date>.rdb`                                                            |
 | G12  | Idempotency — operator runs the cassiopeia chapter top-to-bottom **twice** with no divergent state | flight-manual §E reruns clean                                                                                                                         |
 
-G12 is the single most-important gate for the user's stated
-constraint ("I will run every step of it to check if the manual is
-idempotent"). Every section in the cassiopeia chapter must include a
-"skip-if-already-done" guard (e.g. `helm get -n caddy caddy >/dev/null
-2>&1 || just helm-upgrade gxy-cassiopeia caddy`).
+G12 is the single most-important gate for the user's stated constraint ("I will run every step of it to check if the manual is idempotent"). Every section in the cassiopeia chapter must include a "skip-if-already-done" guard (e.g. `helm get -n caddy caddy >/dev/null 2>&1 || just helm-upgrade gxy-cassiopeia caddy`).
 
 ## Section F — Open questions for user
 
@@ -477,26 +349,79 @@ Narrow set; only the items that block flight-manual authoring.
 | F5  | Schema in Valkey                                                                                                   | Default: hash-per-site + `sites:all` index set; `teams` field is JSON-encoded array.         |
 | F6  | When does the cassiopeia chapter rehearse against a **live cluster** (vs `--dry-run` only)? Operator-driven (you). | Document both paths; operator chooses.                                                       |
 
+## Section G — Artemis staleness mitigations (post-GA UX + test backfill, S2)
+
+### Context
+
+Probed 2026-05-12 against `test.freecode.camp` from `~/DEV/fCC-U/test-universe/`. User reports of "deploy succeeded but site serves old content" investigated end-to-end. Empirical evidence, hypothesis refutation matrix, and probe transcripts live in `.scratchpad/dossier/closeout/_archive/phase-2-artemis-staleness/AUDIT.md` (closes after this RFC merges).
+
+Headline outcomes:
+
+- **Cloudflare cache (initially top suspect): refuted.** `cf-cache-status: DYNAMIC` on 6 of 6 probes across 2 slugs / 6 CF colos. No `age:`, no origin-emitted `cache-control`. CF zone-default behavior on `freecode.camp` does NOT cache HTML.
+- **Caddy `r2_alias cache_ttl 15s`: not user-visible.** Zero retries needed across ~14 probes; alias swaps observed immediately. Likely per-pod cache + 3-replica routing absorbs the window in practice.
+- **Bare `universe static promote` is racy by design.** `sitePromote` reads preview alias body, writes to production. No CAS, no `--deploy-id` pin server-side. CLI exposes `--from <id>` as a workaround that routes to `siteRollback` (atomic single-PUT), but the default flow + the post-preview hint omit it — operators are nudged into the racy path. The empirical signal: a `deploy → bare promote` sequence silently 404'd `/probe-a.html` from prod between two consecutive promotes, even though the operator never said "delete this".
+- **`universe static deploy --promote` leaves preview alias untouched.** `finalize(mode: production)` writes only the production alias key. Pattern-2 operators end up with a divergent preview that never converges until a subsequent non-`--promote` deploy. Not surfaced anywhere — no CLI hint, no doc warning.
+- **CF rewrites HTML response bodies**, appending `cdn-cgi/challenge-platform/scripts/jsd/main.js` before `</body>` for bot-management telemetry. Confirmed on both `hello-universe` and `test`. Breaks edge-side SRI / hash checks if operators rely on byte-identical content.
+
+### Proposed fixes per layer
+
+Rollout phase ordering: cheapest + lowest risk first. No layer requires a deploy to ship Phase 1.
+
+| Phase | Layer           | Owning repo                    | Change                                                                                                                                                                                                                                                           | Closes        |
+| ----- | --------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| 1     | universe-cli    | `fCC-U/universe-cli`           | `universe static promote` (no flag) prints a `WARN` envelope: `"You are about to promote deployId=X, which is the current preview alias. To pin a specific deploy, use --from <id>."` Pre-promote echoes the preview alias body so operator can confirm.         | B2 default UX |
+| 1     | universe-cli    | `fCC-U/universe-cli`           | Post-preview-deploy hint in `commands/deploy.ts:340-342` updated from `"Next: universe static promote"` to `"Next: universe static promote --from <deployId>"` interpolating the just-deployed id.                                                               | B2 default UX |
+| 1     | universe-cli    | `fCC-U/universe-cli`           | Post-`deploy --promote` output adds: `"Preview alias unchanged (still <previousDeployId>)."` Surfaces B6 divergence directly to the operator at the moment of the divergent write.                                                                               | B6            |
+| 2     | artemis         | `fCC/artemis`                  | Integration tests: 5 new tests per §G.Verification below.                                                                                                                                                                                                        | B4a-e         |
+| 3     | artemis         | `fCC/artemis`                  | Optional follow-up — extend `POST /api/site/{site}/promote` to accept `{deployId?: string, expectedCurrent?: string}`. When `deployId` set, write directly. When `expectedCurrent` set, refuse on body mismatch (CAS). Once landed, deprecate bare-body promote. | B2 service    |
+| Defer | Caddy chart     | `fCC/infra` (this repo)        | Optional belt-and-suspenders: `header Cache-Control "no-cache, must-revalidate"` on HTML routes in `k3s/gxy-cassiopeia/apps/caddy/charts/caddy/templates/configmap.yaml`. Defensive only; CF zone-default already protects us today.                             | B1 future     |
+| Defer | Cloudflare zone | dashboard (no terraform today) | Audit CF zone settings for `freecode.camp`: confirm no Cache Rule / Page Rule caches HTML; verify Bot Fight Mode is the expected source of the JS injection (B5); decide whether to leave injection on or scope it.                                              | B1 future, B5 |
+
+Phase 1 (CLI) is the substantive fix for the live B2 reports. Ships in the next `@freecodecamp/universe-cli` patch release. Operator-visible output change only; no API contract change.
+
+Phase 2 (test backfill) closes the regression-detection gap exposed by the dossier. Tests live in the artemis repo's existing `internal/integration/` suite — additive, doesn't change service behavior.
+
+Phase 3 is genuine API surface work in artemis (Go). Defer until Phase 1 telemetry shows whether the CLI-side warnings are sufficient or whether server-side CAS is needed.
+
+### Verification — 5 new artemis integration tests
+
+Surface-level grep of `internal/integration/` plus full read confirms the existing suite covers init → upload → finalize(preview) → preview poll → promote → prod poll → list, but **never exercises `finalize(mode: production)`** and **never asserts R2 alias body content directly**. The 5 new tests close that gap:
+
+| Test                            | Asserts                                                                                                                                                                   | Closes      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `TestAliasBodyRoundTrip`        | After `finalize(preview)` and `finalize(production)`, GET the R2 key `<site>.freecode.camp/{preview,production}` directly and assert body == returned deployId.           | B4a         |
+| `TestDeployPromoteSkipsPreview` | `finalize(mode: production)` on a fresh init; GET `<site>.freecode.camp/preview` key and assert NotFound OR unchanged from prior baseline. Cements B6 contract.           | B4b, B6     |
+| `TestPromoteRace`               | Two independent init+upload+finalize(preview) calls back-to-back; bare promote; assert prod alias body == **second** init's deployId, NOT first. Documents race contract. | B4c, B2     |
+| `TestSubtractivePromote`        | `finalize(preview)` with file F → `finalize(production)`; second `finalize(preview)` without F; bare promote; assert GET `/F` on prod URL → 404 + body-marker absent.     | B4d, B2     |
+| `TestResponseCacheControl`      | GET prod + preview URLs; assert response `Cache-Control` matches the contract (today: absent; once Caddy/artemis ship explicit headers, the expected value).              | B4e, B1, B5 |
+
+Three of the five (`TestAliasBodyRoundTrip`, `TestDeployPromoteSkipsPreview`, `TestSubtractivePromote`) require R2 read access in the test environment. The existing suite only carries `GH_TOKEN`. Two options:
+
+1. Add `R2_ENDPOINT` + `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` env vars (read-only key, same one Caddy uses — already in sops at `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`).
+1. Shell out to `rclone cat` using the operator's local `r2-gxy` remote. Uglier, less portable, but no test-env credential growth.
+
+Option 1 is cleaner. Implementation deferred to the artemis-side sprint that lands these tests.
+
+### Acceptance
+
+Section G does not gate cassiopeia GA closure (the existing G1-G12 table covers GA). It documents post-GA UX and test work spawned by the 2026-05-12 staleness investigation. Closes when:
+
+1. Phase 1 CLI changes ship in `@freecodecamp/universe-cli` (next patch).
+1. Phase 2 tests land in `fCC/artemis` `internal/integration/` and pass on the next `just artemis-postdeploy-check` run.
+1. Phase 3 service work is either landed OR explicitly parked with a re-evaluation trigger (e.g. "Phase 1 telemetry shows continued B2 reports after 2 sprints").
+
+Phase G3 closure is independent of cassiopeia GA — the RFC remains "closed" once G1-G12 land; G is a tracking section for the staleness sub-initiative.
+
 ## Acceptance: when does this RFC close?
 
 Closes when:
 
-1. The cassiopeia flight-manual chapter (T4) lands and rehearses
-   green twice on the operator's box (G12).
-2. The valkey helm release lands at
-   `k3s/gxy-management/apps/valkey/` with persistence + AUTH +
-   NetworkPolicy.
-3. The artemis chart drops `--set-file sites=...` and adds
-   `VALKEY_ADDR` / `VALKEY_PASSWORD` / `REGISTRY_BACKEND=valkey`
-   plumbing. Follow-up sprint deliverable in the artemis repo.
-4. The artemis service ships `POST /api/site/register` and the
-   Valkey-backed registry read path. Follow-up sprint deliverable.
+1. The cassiopeia flight-manual chapter (T4) lands and rehearses green twice on the operator's box (G12).
+1. The valkey helm release lands at `k3s/gxy-management/apps/valkey/` with persistence + AUTH + NetworkPolicy.
+1. The artemis chart drops `--set-file sites=...` and adds `VALKEY_ADDR` / `VALKEY_PASSWORD` / `REGISTRY_BACKEND=valkey` plumbing. Follow-up sprint deliverable in the artemis repo.
+1. The artemis service ships `POST /api/site/register` and the Valkey-backed registry read path. Follow-up sprint deliverable.
 
-Items 3 and 4 are **planning** scope of this RFC; the **work** is a
-post-audit sprint. Item 2 (valkey chart bring-up) is in the operator
-path of the cassiopeia / management flight-manual chapter. The
-cassiopeia chapter encodes the END-STATE operator path — it links to
-this RFC for the design and the open-Qs status table.
+Items 3 and 4 are **planning** scope of this RFC; the **work** is a post-audit sprint. Item 2 (valkey chart bring-up) is in the operator path of the cassiopeia / management flight-manual chapter. The cassiopeia chapter encodes the END-STATE operator path — it links to this RFC for the design and the open-Qs status table.
 
 ## Out of scope (deferred to post-GA, recorded so they don't surprise)
 
@@ -506,8 +431,7 @@ this RFC for the design and the open-Qs status table.
 - Supply-chain pipeline reactivation (cosign + Grype/Trivy + Syft)
 - cert-manager / DNS-01 issuer
 - gxy-cassiopeia Hetzner pivot (post-M5)
-- Cilium Gateway eval for cassiopeia (Traefik gatewayClassName stays
-  primary)
+- Cilium Gateway eval for cassiopeia (Traefik gatewayClassName stays primary)
 
 ## Cites
 
