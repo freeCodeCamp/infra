@@ -1,48 +1,30 @@
 # Traefik on k3s with hostNetwork — pitfalls and patterns
 
-Operator-runnable reference for the Traefik DaemonSet that every
-Universe galaxy uses for `:80`/`:443` ingress. Promotes operational
-findings from the archived field-notes
-(`Universe/spike/field-notes/archive/2026-05-10/infra.md`) into
-canonical guidance — the WHY behind values that already live in
-chart code.
+Operator-runnable reference for the Traefik DaemonSet that every Universe galaxy uses for `:80`/`:443` ingress. Promotes operational findings from the archived field-notes (`Universe/.archive/infra/`) into canonical guidance — the WHY behind values that already live in chart code.
 
-> **Read first:** [ADR-009 §Ingress](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/009-networking-domains.md)
-> for the Traefik-DaemonSet-over-cloud-LB rationale.
+> **Read first:** [ADR-009 §Ingress](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/009-networking-domains.md) for the Traefik-DaemonSet-over-cloud-LB rationale.
 
 ## Why hostNetwork?
 
-ADR-009 chose Traefik DaemonSet on host network ports `:80`/`:443`
-over a cloud LoadBalancer. The trade-off: no DO LB cost (~$12/mo per
-galaxy), DNS round-robin via Cloudflare. Cost: every Traefik gotcha
-below.
+ADR-009 chose Traefik DaemonSet on host network ports `:80`/`:443` over a cloud LoadBalancer. The trade-off: no DO LB cost (~$12/mo per galaxy), DNS round-robin via Cloudflare. Cost: every Traefik gotcha below.
 
 ## Pitfall 1 — `HelmChartConfig` must land BEFORE k3s starts
 
-k3s reads `/var/lib/rancher/k3s/server/manifests/` on startup. If
-`traefik-config.yaml` (HelmChartConfig) is copied **after** k3s
-starts, Traefik installs with defaults and silently runs with the
-wrong config. Restart is not enough — the HelmChartConfig is consumed
-on the install pass.
+k3s reads `/var/lib/rancher/k3s/server/manifests/` on startup. If `traefik-config.yaml` (HelmChartConfig) is copied **after** k3s starts, Traefik installs with defaults and silently runs with the wrong config. Restart is not enough — the HelmChartConfig is consumed on the install pass.
 
-**Pattern.** The bootstrap play copies the Traefik config in Play 2
-`pre_tasks`, BEFORE the k3s_server role runs in Play 3.
+**Pattern.** The bootstrap play copies the Traefik config in Play 2 `pre_tasks`, BEFORE the k3s_server role runs in Play 3.
 
 ## Pitfall 2 — `updateStrategy`, not `rollingUpdate`
 
-The Traefik chart renamed the top-level update key. Using the legacy
-`rollingUpdate` key is silently ignored; the chart's default
-`maxUnavailable: 0` then triggers a render error:
+The Traefik chart renamed the top-level update key. Using the legacy `rollingUpdate` key is silently ignored; the chart's default `maxUnavailable: 0` then triggers a render error:
 
 ```
 maxUnavailable should be greater than 0 when using hostNetwork
 ```
 
-DaemonSets with `hostNetwork: true` cannot have `maxUnavailable: 0`
-(no overlap possible on host ports).
+DaemonSets with `hostNetwork: true` cannot have `maxUnavailable: 0` (no overlap possible on host ports).
 
-**Pattern.** Set both keys to their non-zero variants — DaemonSet
-cannot have both non-zero:
+**Pattern.** Set both keys to their non-zero variants — DaemonSet cannot have both non-zero:
 
 ```yaml
 deployment:
@@ -56,10 +38,7 @@ updateStrategy:
 
 ## Pitfall 3 — `runAsUser: 0` required for `:80`/`:443`
 
-containerd does not (yet) ship ambient capabilities ([KEP-2763](https://github.com/kubernetes/enhancements/issues/2763));
-`sysctl net.ipv4.ip_unprivileged_port_start` is forbidden when
-`hostNetwork: true`. The only way to bind `:80`/`:443` from inside a
-Traefik DaemonSet pod today is `runAsUser: 0`.
+containerd does not (yet) ship ambient capabilities ([KEP-2763](https://github.com/kubernetes/enhancements/issues/2763)); `sysctl net.ipv4.ip_unprivileged_port_start` is forbidden when `hostNetwork: true`. The only way to bind `:80`/`:443` from inside a Traefik DaemonSet pod today is `runAsUser: 0`.
 
 **Pattern.** Keep capabilities tight despite running as root:
 
@@ -79,17 +58,11 @@ securityContext:
   readOnlyRootFilesystem: true
 ```
 
-Universe galaxies maintain PSS `baseline` (not `restricted`) on
-`kube-system` for this reason — `restricted` rejects `runAsUser: 0`.
+Universe galaxies maintain PSS `baseline` (not `restricted`) on `kube-system` for this reason — `restricted` rejects `runAsUser: 0`.
 
 ## Pitfall 4 — Gateway listener port MUST match Traefik entrypoint
 
-When charts use Gateway API (HTTPRoute / Gateway resources) **against
-the same Traefik DaemonSet**, the `Gateway.spec.listeners[].port`
-must equal Traefik's entrypoint port — i.e. `80` for the `web`
-entrypoint, `443` for `websecure`. Mismatch causes silent routing
-failure: the Gateway accepts the listener, the HTTPRoute attaches,
-no requests reach the backend.
+When charts use Gateway API (HTTPRoute / Gateway resources) **against the same Traefik DaemonSet**, the `Gateway.spec.listeners[].port` must equal Traefik's entrypoint port — i.e. `80` for the `web` entrypoint, `443` for `websecure`. Mismatch causes silent routing failure: the Gateway accepts the listener, the HTTPRoute attaches, no requests reach the backend.
 
 **Pattern.** Mirror Traefik's hostNetwork ports verbatim:
 
@@ -110,21 +83,13 @@ spec:
           from: Same
 ```
 
-Adding `:443` requires CF zone in `Full (Strict)`, an origin certificate,
-and a chart-owned `Secret` carrying the cert. The
-`docs/architecture/adr-drift-2026-05-10.md` row covering this is the
-authoritative source on which galaxies are on which SSL mode today.
+Adding `:443` requires CF zone in `Full (Strict)`, an origin certificate, and a chart-owned `Secret` carrying the cert. The `docs/architecture/adr-drift-2026-05-10.md` row covering this is the authoritative source on which galaxies are on which SSL mode today.
 
 ## Pitfall 5 — Gateway parentRef must point at an in-namespace Gateway
 
-`HTTPRoute.spec.parentRefs` referencing `traefik/kube-system` does
-NOT work — k3s' Traefik DaemonSet is an **Ingress provider**, not a
-Gateway. The reference goes nowhere; the HTTPRoute is dangling, and
-Traefik 404s every request.
+`HTTPRoute.spec.parentRefs` referencing `traefik/kube-system` does NOT work — k3s' Traefik DaemonSet is an **Ingress provider**, not a Gateway. The reference goes nowhere; the HTTPRoute is dangling, and Traefik 404s every request.
 
-**Pattern.** Each chart owns its own `Gateway` resource in the chart's
-release namespace, and `HTTPRoute.parentRefs` points at that Gateway
-(same namespace).
+**Pattern.** Each chart owns its own `Gateway` resource in the chart's release namespace, and `HTTPRoute.parentRefs` points at that Gateway (same namespace).
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -146,8 +111,7 @@ Reference charts:
 
 ## Pitfall 6 — Gateway API CRDs are bundled by k3s
 
-The k3s-bundled `traefik-crd` Helm chart **ships standard Gateway API
-CRDs**. Do NOT `kubectl apply -f gateway-api/...` manually:
+The k3s-bundled `traefik-crd` Helm chart **ships standard Gateway API CRDs**. Do NOT `kubectl apply -f gateway-api/...` manually:
 
 ```
 helm-install-traefik-crd CrashLoopBackOff:
@@ -157,9 +121,7 @@ helm-install-traefik-crd CrashLoopBackOff:
 
 Helm refuses to adopt CRDs without its labels.
 
-**Pattern.** Trust the bundle. If experimental CRDs are needed,
-annotate the existing chart as unmanaged first; never `kubectl apply`
-unowned CRDs over Helm-owned ones.
+**Pattern.** Trust the bundle. If experimental CRDs are needed, annotate the existing chart as unmanaged first; never `kubectl apply` unowned CRDs over Helm-owned ones.
 
 Source: [k3s discussion #13463](https://github.com/k3s-io/k3s/discussions/13463).
 
@@ -194,15 +156,8 @@ Hitting "missing managed-by" on a CRD?
 
 ## Cross-refs
 
-- [`docs/infra-guides/chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md)
-  point 5 — CF zone SSL mode gate.
-- [`docs/infra-guides/cilium-cnp.md`](./cilium-cnp.md) — when adding a
-  CNP to a chart that uses Traefik hostNetwork, ingress must allow
-  `fromEntities: [host]` (Cilium identifies hostNetwork pods as the
-  `host` entity).
-- [`docs/flight-manuals/UNIVERSE.md`](../flight-manuals/UNIVERSE.md) §3.2
-  — new-galaxy pre-flight file list.
+- [`docs/infra-guides/chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) point 5 — CF zone SSL mode gate.
+- [`docs/infra-guides/cilium-cnp.md`](./cilium-cnp.md) — when adding a CNP to a chart that uses Traefik hostNetwork, ingress must allow `fromEntities: [host]` (Cilium identifies hostNetwork pods as the `host` entity).
+- [`docs/flight-manuals/UNIVERSE.md`](../flight-manuals/UNIVERSE.md) §3.2 — new-galaxy pre-flight file list.
 - ADR-009 §Ingress — DaemonSet-over-LB rationale.
-- `Universe/spike/field-notes/archive/2026-05-10/infra.md` lines 444-448 +
-  800-815 — historical record of the four hostNetwork gotchas (T32
-  Woodpecker stamp 2, 2026-04-20).
+- `Universe/.archive/infra/2026-04-20-pitfalls-reference.md` + `Universe/.archive/infra/2026-04-20-woodpecker-live.md` — historical record of the four hostNetwork gotchas (T32 Woodpecker stamp 2, 2026-04-20).

@@ -1,23 +1,10 @@
 # RFC: Secrets Layout — Two-Scope Convention + Shared Wildcard Cert
 
-**Date:** 2026-04-22
-**Status:** Accepted (implemented 2026-04-22)
-**Target Release:** Pre-#22 (rename exec gate)
-**Author:** Infra team
-**Related:** ADR-003 (Universe topology), ADR-011 (admin plane + secrets),
-ADR-012 (DR — parked)
-**Gates:** sprint task #22 (gxy-mgmt → gxy-management reprovision)
+**Date:** 2026-04-22 **Status:** Accepted (implemented 2026-04-22) **Target Release:** Pre-#22 (rename exec gate) **Author:** Infra team **Related:** ADR-003 (Universe topology), ADR-011 (admin plane + secrets), ADR-012 (DR — parked) **Gates:** sprint task #22 (gxy-mgmt → gxy-management reprovision)
 
 ## Summary
 
-Formalize `infra-secrets` layout into two explicit scopes — platform-wide
-(`<app>/`, `global/`) and cluster-local (`k3s/<cluster>/`). Deduplicate the
-`*.freecodecamp.net` Cloudflare Origin wildcard into a single canonical
-source at `global/tls/<zone>.{crt,key}.enc`. Extend `just deploy` with a
-zone-fallback probe so apps that need the wildcard don't each carry a
-copy. Backfill missing `.enc` assets flagged during the 2026-04-21 audit
-(wooodpecker TLS, Windmill backup S3). Sync all flight-manuals + the
-rename runbook + infra-secrets README to match.
+Formalize `infra-secrets` layout into two explicit scopes — platform-wide (`<app>/`, `global/`) and cluster-local (`k3s/<cluster>/`). Deduplicate the `*.freecodecamp.net` Cloudflare Origin wildcard into a single canonical source at `global/tls/<zone>.{crt,key}.enc`. Extend `just deploy` with a zone-fallback probe so apps that need the wildcard don't each carry a copy. Backfill missing `.enc` assets flagged during the 2026-04-21 audit (wooodpecker TLS, Windmill backup S3). Sync all flight-manuals + the rename runbook + infra-secrets README to match.
 
 Out of scope: legacy retirement of `appsmith/` + `outline/` + `docker/`
 
@@ -27,22 +14,11 @@ Out of scope: legacy retirement of `appsmith/` + `outline/` + `docker/`
 
 The 2026-04-21 cluster audit surfaced drift that blocks task #22:
 
-- Wildcard `*.freecodecamp.net` origin cert is encrypted **three times**
-  on gxy-management (argocd / windmill / zot pairs), once on
-  gxy-launchbase **manifest only — no `.enc` source file exists**, and
-  zero times on gxy-static + gxy-cassiopeia even though they serve
-  `freecode.camp` (different zone).
-- `k3s/gxy-launchbase/woodpecker.tls.{crt,key}.enc` is MISSING from
-  `infra-secrets` despite `woodpecker-tls-cloudflare` Secret running in
-  cluster for 27h+. Source-of-truth broken.
-- `k3s/gxy-management/windmill-backup.secrets.env.enc` is MISSING. Only
-  `.sample` stub. `backup-cronjob.yaml` commented out in kustomization
-  with "TODO re-enable". Blocks #22 step-1 (pre-teardown backup).
-- Rename runbook §Preconditions names `.enc` files that don't exist —
-  operator misread risk during live exec.
-- Classification confusion: top-level `argocd/` / `windmill/` / `zot/`
-  (Universe platform-wide, reserved) was nearly misclassified as legacy
-  during audit. Need explicit documented convention.
+- Wildcard `*.freecodecamp.net` origin cert is encrypted **three times** on gxy-management (argocd / windmill / zot pairs), once on gxy-launchbase **manifest only — no `.enc` source file exists**, and zero times on gxy-static + gxy-cassiopeia even though they serve `freecode.camp` (different zone).
+- `k3s/gxy-launchbase/woodpecker.tls.{crt,key}.enc` is MISSING from `infra-secrets` despite `woodpecker-tls-cloudflare` Secret running in cluster for 27h+. Source-of-truth broken.
+- `k3s/gxy-management/windmill-backup.secrets.env.enc` is MISSING. Only `.sample` stub. `backup-cronjob.yaml` commented out in kustomization with "TODO re-enable". Blocks #22 step-1 (pre-teardown backup).
+- Rename runbook §Preconditions names `.enc` files that don't exist — operator misread risk during live exec.
+- Classification confusion: top-level `argocd/` / `windmill/` / `zot/` (Universe platform-wide, reserved) was nearly misclassified as legacy during audit. Need explicit documented convention.
 
 ## Current state (verified 2026-04-21)
 
@@ -79,8 +55,7 @@ kubectl apply -k apps/<app>/manifests/base/
 trap cleanup decrypted files on exit
 ```
 
-`just helm-upgrade <cluster> <app>` similarly probes
-`infra-secrets/k3s/<cluster>/<app>.values.yaml.enc`.
+`just helm-upgrade <cluster> <app>` similarly probes `infra-secrets/k3s/<cluster>/<app>.values.yaml.enc`.
 
 ### Drift matrix
 
@@ -114,8 +89,7 @@ trap cleanup decrypted files on exit
 
 ### Zone mapping
 
-Each cluster declares its default TLS zone via an **unencrypted** single-line
-marker file:
+Each cluster declares its default TLS zone via an **unencrypted** single-line marker file:
 
 ```
 k3s/<cluster>/cluster.tls.zone       # contents: `freecodecamp-net` or `freecode-camp`
@@ -144,9 +118,7 @@ else:
     skip TLS stage (no override + no zone → no TLS on this app)
 ```
 
-No change to per-app kustomization.yaml. Generated Secret name
-(`<app>-tls-cloudflare`) unchanged. Ephemeral decrypt path
-(`secrets/tls.{crt,key}`) unchanged.
+No change to per-app kustomization.yaml. Generated Secret name (`<app>-tls-cloudflare`) unchanged. Ephemeral decrypt path (`secrets/tls.{crt,key}`) unchanged.
 
 ## Decision Index
 
@@ -205,10 +177,7 @@ No change to per-app kustomization.yaml. Generated Secret name
 
 ## Operational pitfalls
 
-Promotes findings from
-`Universe/spike/field-notes/archive/2026-05-10/infra.md:331-355,439` into
-canonical guidance. The fixes already live in code (group_vars +
-playbook post_task); the WHY belongs here.
+Promotes findings from `Universe/.archive/infra/2026-04-25-secrets-architecture.md` + `Universe/.archive/infra/2026-04-20-pitfalls-reference.md` into canonical guidance. The fixes already live in code (group_vars + playbook post_task); the WHY belongs here.
 
 ### Two-account isolation — silent etcd S3 backup failure
 
@@ -219,19 +188,9 @@ The infra repo is a monorepo spanning two DigitalOcean accounts:
 | **Primary**  | Legacy (ops-backoffice-tools, ops-mgmt) | NYC3   | root `.envrc`        |
 | **Universe** | All Universe galaxies                   | FRA1   | `k3s/gxy-<g>/.envrc` |
 
-The direnv hierarchy overrides Primary creds with Universe creds when
-inside a galaxy directory. **Trap (discovered 2026-04-07):** the
-Universe Spaces key has historically drifted — `do-universe/.env.enc`
-carried `DO0036N72V…` while the actual `ops-allbuckets` key was
-`DO00QGF8PA…`. k3s **logs errors but does not crash** when its etcd
-S3 backup credentials are wrong. Snapshots silently failed for the
-entire spike Phase 0 window.
+The direnv hierarchy overrides Primary creds with Universe creds when inside a galaxy directory. **Trap (discovered 2026-04-07):** the Universe Spaces key has historically drifted — `do-universe/.env.enc` carried `DO0036N72V…` while the actual `ops-allbuckets` key was `DO00QGF8PA…`. k3s **logs errors but does not crash** when its etcd S3 backup credentials are wrong. Snapshots silently failed for the entire spike Phase 0 window.
 
-**Symptom shape.** `k3s etcd-snapshot save` reports `failed to test
-for existence of bucket: Access Denied`. The misleading shape:
-`aws s3api list-buckets --endpoint-url https://fra1.digitaloceanspaces.com`
-returns **empty** (not an error) when the key belongs to a different
-account or lacks bucket access.
+**Symptom shape.** `k3s etcd-snapshot save` reports `failed to test for existence of bucket: Access Denied`. The misleading shape: `aws s3api list-buckets --endpoint-url https://fra1.digitaloceanspaces.com` returns **empty** (not an error) when the key belongs to a different account or lacks bucket access.
 
 **Pre-deploy verification.** From inside `k3s/gxy-<g>/`:
 
@@ -242,23 +201,13 @@ aws s3 ls "s3://net-freecodecamp-universe-backups/" \
   || echo "✗ key does not see Universe bucket"
 ```
 
-If the list returns empty without an error, the credentials are
-likely Primary-account scope. Refresh `do-universe/.env.enc` before
-provisioning.
+If the list returns empty without an error, the credentials are likely Primary-account scope. Refresh `do-universe/.env.enc` before provisioning.
 
 ### Dotted bucket names break HTTPS wildcard certs
 
-DO Spaces' SSL wildcard `*.fra1.digitaloceanspaces.com` does NOT
-match multi-label subdomains. A bucket named `net.freecodecamp.universe-backups`
-resolves to `net.freecodecamp.universe-backups.fra1.digitaloceanspaces.com`
-in virtual-hosted-style (k3s default `etcd-s3-bucket-lookup-type: auto`),
-which the wildcard cert refuses → `Access Denied` even with correct
-credentials.
+DO Spaces' SSL wildcard `*.fra1.digitaloceanspaces.com` does NOT match multi-label subdomains. A bucket named `net.freecodecamp.universe-backups` resolves to `net.freecodecamp.universe-backups.fra1.digitaloceanspaces.com` in virtual-hosted-style (k3s default `etcd-s3-bucket-lookup-type: auto`), which the wildcard cert refuses → `Access Denied` even with correct credentials.
 
-**Pattern.** Use dashes, not dots, when naming any DO Spaces / R2
-bucket Universe owns. Today's canonical bucket is
-`net-freecodecamp-universe-backups` (dashes). If a dotted name is
-unavoidable for legacy reasons, force path-style:
+**Pattern.** Use dashes, not dots, when naming any DO Spaces / R2 bucket Universe owns. Today's canonical bucket is `net-freecodecamp-universe-backups` (dashes). If a dotted name is unavoidable for legacy reasons, force path-style:
 
 ```yaml
 # ansible/inventory/group_vars/gxy_<g>_k3s.yml
@@ -268,20 +217,10 @@ server_config_yaml:
 
 ### `extra_service_envs` lineinfile-without-regexp duplicates
 
-The k3s-ansible role (v1.1.1) `extra_service_envs` uses `lineinfile`
-without `regexp` — new lines appended, old NOT removed on value
-change. Systemd env files read the first occurrence; stale keys win.
-This is how the wrong S3 key from the prior section silently
-persisted after rotation.
+The k3s-ansible role (v1.1.1) `extra_service_envs` uses `lineinfile` without `regexp` — new lines appended, old NOT removed on value change. Systemd env files read the first occurrence; stale keys win. This is how the wrong S3 key from the prior section silently persisted after rotation.
 
-**Pattern abandoned.** All etcd-S3 credentials now live in
-`/etc/rancher/k3s/config.yaml` via playbook post_task using
-`lineinfile` with `regexp` — idempotent on value change. Do not
-reach for `extra_service_envs` for any credential rotation surface.
+**Pattern abandoned.** All etcd-S3 credentials now live in `/etc/rancher/k3s/config.yaml` via playbook post_task using `lineinfile` with `regexp` — idempotent on value change. Do not reach for `extra_service_envs` for any credential rotation surface.
 
 ## Acknowledgments
 
-Inputs: 2026-04-21 cluster audit (`docs/sprints/2026-04-21/cluster-audit.md`),
-HANDOFF naming-convention table, infra-secrets README §Directory Structure,
-`just deploy` + `just helm-upgrade` recipes, runtime kubectl inspection of
-gxy-management + gxy-launchbase clusters.
+Inputs: 2026-04-21 cluster audit (`docs/sprints/2026-04-21/cluster-audit.md`), HANDOFF naming-convention table, infra-secrets README §Directory Structure, `just deploy` + `just helm-upgrade` recipes, runtime kubectl inspection of gxy-management + gxy-launchbase clusters.

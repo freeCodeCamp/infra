@@ -1,9 +1,6 @@
 # Flight Manual — gxy-management
 
-Control-plane galaxy. Today: Windmill (live), artemis (live, deploy
-proxy), Valkey (registry KV substrate). ArgoCD + Zot + Atlantis are
-**parked** — chart on disk, deploy frozen pending ADR-005 reactivation
-trigger.
+Control-plane galaxy. Today: Windmill (live), artemis (live, deploy proxy), Valkey (registry KV substrate). ArgoCD + Zot + Atlantis are **parked** — chart on disk, deploy frozen pending ADR-005 reactivation trigger.
 
 | Field             | Value                                                           |
 | ----------------- | --------------------------------------------------------------- |
@@ -15,19 +12,13 @@ trigger.
 | TLS posture       | Mixed: `freecodecamp.net` Full Strict; `freecode.camp` Flexible |
 | Last rehearsed    | 2026-05-10 (post universe-master-audit)                         |
 
-> **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2
-> secrets, §3 shared infra. Not repeated here.
+> **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2 secrets, §3 shared infra. Not repeated here.
 >
-> **Working-directory rule (HARD):** `cd k3s/gxy-management/` before any
-> cluster-touching recipe. Each section repeats the `cd`.
+> **Working-directory rule (HARD):** `cd k3s/gxy-management/` before any cluster-touching recipe. Each section repeats the `cd`.
 >
-> **Idempotency:** every state-changing step has a "skip-if-already-done"
-> guard. Re-run any section in isolation and the second run is a no-op.
+> **Idempotency:** every state-changing step has a "skip-if-already-done" guard. Re-run any section in isolation and the second run is a no-op.
 
-This chapter feeds the cassiopeia GA design at
-[`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md)
-(Valkey substrate, artemis registry decouple). The cassiopeia chapter
-links here for the deploy-side bring-up.
+This chapter feeds the cassiopeia GA design at [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md) (Valkey substrate, artemis registry decouple). The cassiopeia chapter links here for the deploy-side bring-up.
 
 ## §A — k3s bootstrap
 
@@ -37,13 +28,10 @@ links here for the deploy-side bring-up.
 
 - `windmill.values.yaml.enc` — sops overlay for windmill chart
 - `windmill-backup.secrets.env.enc` — DO Spaces creds for daily pg_dump
-- `artemis.values.yaml.enc` — sops overlay for artemis chart (R2 admin
-  creds, GH OAuth client id, JWT signing key)
+- `artemis.values.yaml.enc` — sops overlay for artemis chart (R2 admin creds, GH OAuth client id, JWT signing key)
 - `valkey.values.yaml.enc` — sops overlay for valkey chart (AUTH password)
 
-`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin
-wildcard for the `freecodecamp.net` zone (windmill / future argocd /
-future zot reuse).
+`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard for the `freecodecamp.net` zone (windmill / future argocd / future zot reuse).
 
 ```bash
 cd ~/DEV/fCC/infra
@@ -52,12 +40,7 @@ just secret-verify-all
 
 ### A.2 DigitalOcean infrastructure (one-time, ClickOps)
 
-3× `s-8vcpu-16gb-amd` in FRA1, named `gxy-vm-management-k3s-{1,2,3}`,
-tag `gxy-management-k3s`, image Ubuntu 24.04, VPC `universe-vpc-fra1`,
-cloud-init `cloud-init/basic.yml`. Cloud Firewall: create
-`gxy-fw-fra1` (or attach tag if it already exists). VPC rules
-(source `10.110.0.0/20`): `2379-2380, 4240, 4244, 5001, 6443, 8472,
-10250`. Public rules: `22/TCP, 80/TCP, 443/TCP`.
+3× `s-8vcpu-16gb-amd` in FRA1, named `gxy-vm-management-k3s-{1,2,3}`, tag `gxy-management-k3s`, image Ubuntu 24.04, VPC `universe-vpc-fra1`, cloud-init `cloud-init/basic.yml`. Cloud Firewall: create `gxy-fw-fra1` (or attach tag if it already exists). VPC rules (source `10.110.0.0/20`): `2379-2380, 4240, 4244, 5001, 6443, 8472, 10250`. Public rules: `22/TCP, 80/TCP, 443/TCP`.
 
 Idempotency:
 
@@ -67,9 +50,7 @@ test "$(doctl compute droplet list --tag-name gxy-management-k3s --format ID --n
   || echo "↻ provision via DO dashboard"
 ```
 
-DO Spaces bucket `net-freecodecamp-universe-backups` in FRA1
-(per `UNIVERSE.md §3`). Single bucket, prefix-scoped per use
-(`etcd/<galaxy>/`, `windmill/<galaxy>/`).
+DO Spaces bucket `net-freecodecamp-universe-backups` in FRA1 (per `UNIVERSE.md §3`). Single bucket, prefix-scoped per use (`etcd/<galaxy>/`, `windmill/<galaxy>/`).
 
 ### A.3 Tailscale + cluster bootstrap
 
@@ -82,8 +63,7 @@ cd k3s/gxy-management
 just play k3s--bootstrap gxy_management_k3s
 ```
 
-`k3s--bootstrap` runs validate → prerequisites → k3s deploy → Cilium →
-verify + kubeconfig. Idempotent.
+`k3s--bootstrap` runs validate → prerequisites → k3s deploy → Cilium → verify + kubeconfig. Idempotent.
 
 ### A.4 Verify
 
@@ -119,8 +99,7 @@ helm get values -n windmill windmill >/dev/null 2>&1 \
 just deploy gxy-management windmill
 ```
 
-`just deploy` decrypts the sops overlay + applies kustomize manifests
-(Gateway, HTTPRoute, TLS secret) on top of the helm release.
+`just deploy` decrypts the sops overlay + applies kustomize manifests (Gateway, HTTPRoute, TLS secret) on top of the helm release.
 
 ### B.2 Verify
 
@@ -143,27 +122,18 @@ kubectl get svc -n kube-system traefik
 
 ### B.3 Restore Windmill state (REBUILD ONLY)
 
-Skip on fresh install. Only applies when this chapter is replayed to
-rebuild an existing cluster — the bundled PostgreSQL comes up empty
-after B.1, so the pre-teardown `pg_dumpall` must be loaded before end
-users hit the UI.
+Skip on fresh install. Only applies when this chapter is replayed to rebuild an existing cluster — the bundled PostgreSQL comes up empty after B.1, so the pre-teardown `pg_dumpall` must be loaded before end users hit the UI.
 
 For a rebuild, do this BEFORE §D DNS cutover.
 
 #### B.3.1 Preconditions
 
-- Pre-teardown pg_dump exists at
-  `k3s/gxy-management/.backups/windmill-<ts>.sql.gz` (run
-  `just windmill-backup gxy-management` before teardown)
-  OR S3 copy at
-  `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
+- Pre-teardown pg_dump exists at `k3s/gxy-management/.backups/windmill-<ts>.sql.gz` (run `just windmill-backup gxy-management` before teardown) OR S3 copy at `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
 - `windmill-postgresql-0` pod Running (B.2 green).
 
 #### B.3.2 Quiesce Windmill app + worker pods
 
-The bundled PostgreSQL refuses `DROP DATABASE windmill` while app
-holds connections (~35 sessions per deploy). Scale Windmill
-deployments to zero first; leave the StatefulSet up.
+The bundled PostgreSQL refuses `DROP DATABASE windmill` while app holds connections (~35 sessions per deploy). Scale Windmill deployments to zero first; leave the StatefulSet up.
 
 ```bash
 cd ~/DEV/fCC/infra/k3s/gxy-management
@@ -198,10 +168,7 @@ kubectl exec -n windmill "${PG_POD}" -- bash -c \
   "gunzip -c /tmp/$(basename $DUMP) | psql -U postgres"
 ```
 
-Expected noise: `NOTICE` / `ERROR: role "postgres" already exists` and
-similar — harmless (`pg_dumpall --clean --if-exists` emits idempotent
-DROP statements that race with the bootstrapped `postgres` super-role).
-Constraint violations on `INSERT` are real errors.
+Expected noise: `NOTICE` / `ERROR: role "postgres" already exists` and similar — harmless (`pg_dumpall --clean --if-exists` emits idempotent DROP statements that race with the bootstrapped `postgres` super-role). Constraint violations on `INSERT` are real errors.
 
 #### B.3.4 Scale back + verify
 
@@ -234,27 +201,17 @@ wmill sync pull --workspace platform --yes
 
 ### B.4 CNPG migration (parked)
 
-The bundled PostgreSQL is single-instance, no replication, no WAL
-archiving. CNPG migration (P0-05 in prior audit) is parked behind the
-gxy-backoffice provisioning trigger. Tracked in `TODO-park §"CNPG
-migration for Windmill"`.
+The bundled PostgreSQL is single-instance, no replication, no WAL archiving. CNPG migration (P0-05 in prior audit) is parked behind the gxy-backoffice provisioning trigger. Tracked in `TODO-park §"CNPG migration for Windmill"`.
 
 ## §C — Valkey (registry KV substrate)
 
-Per [RFC §B](../architecture/rfc-gxy-cassiopeia-ga.md#section-b-static-apps-registry-kv-substrate-matrix-and-decision-s1):
-single-instance Valkey in its own namespace, AOF on PVC, ClusterIP
-locked to artemis pods via NetworkPolicy. Cross-namespace DNS:
-`valkey.valkey.svc.cluster.local:6379`.
+Per [RFC §B](../architecture/rfc-gxy-cassiopeia-ga.md#section-b-static-apps-registry-kv-substrate-matrix-and-decision-s1): single-instance Valkey in its own namespace, AOF on PVC, ClusterIP locked to artemis pods via NetworkPolicy. Cross-namespace DNS: `valkey.valkey.svc.cluster.local:6379`.
 
-> **Bring-up gate:** §C runs **before** §D — artemis depends on
-> Valkey reachable + populated when `REGISTRY_BACKEND=valkey` is
-> set on the artemis chart.
+> **Bring-up gate:** §C runs **before** §D — artemis depends on Valkey reachable + populated when `REGISTRY_BACKEND=valkey` is set on the artemis chart.
 
 ### C.1 Mint the sops envelope (once per cluster lifetime)
 
-Skip if `$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc`
-already exists. Re-mint only if rotating the password (which forces
-a Valkey pod restart — see C.5 rotation runbook).
+Skip if `$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc` already exists. Re-mint only if rotating the password (which forces a Valkey pod restart — see C.5 rotation runbook).
 
 ```bash
 # 1. Generate AUTH password (64 hex chars).
@@ -296,13 +253,7 @@ helm -n valkey list -q | grep -q '^valkey$' \
   || just deploy gxy-management valkey
 ```
 
-The `just deploy` recipe auto-decrypts the sops envelope at
-`$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc` (with the
-required `--input-type yaml --output-type yaml` flags — see
-`docs/runbooks/04-secrets-decrypt.md`) into a per-invocation
-tempfile and appends `--values $TMP` to the helm chain. The
-decrypted file lives only inside the recipe's shell scope and is
-unlinked on shell exit (trap).
+The `just deploy` recipe auto-decrypts the sops envelope at `$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc` (with the required `--input-type yaml --output-type yaml` flags — see `docs/runbooks/04-secrets-decrypt.md`) into a per-invocation tempfile and appends `--values $TMP` to the helm chain. The decrypted file lives only inside the recipe's shell scope and is unlinked on shell exit (trap).
 
 ### C.3 Verify
 
@@ -334,10 +285,7 @@ kubectl -n valkey exec sts/valkey -- sh -c \
 
 ### C.4 Sites import (one-shot, cutover step)
 
-Pre-populates Valkey with the 11-site canonical registry derived
-from R2 (`rclone ls r2-gxy:universe-static-apps-01 | rg production`).
-Run **before** the artemis cutover in §D so the moment artemis flips
-to `REGISTRY_BACKEND=valkey` no `*.freecode.camp` request 404s.
+Pre-populates Valkey with the 11-site canonical registry derived from R2 (`rclone ls r2-gxy:universe-static-apps-01 | rg production`). Run **before** the artemis cutover in §D so the moment artemis flips to `REGISTRY_BACKEND=valkey` no `*.freecode.camp` request 404s.
 
 Skip if `SMEMBERS sites:all` already returns 11 entries.
 
@@ -361,21 +309,11 @@ kubectl -n valkey exec sts/valkey -- sh -c \
 
 ### C.5 Backups (deferred — post-GA)
 
-Nightly RDB → R2 mirror is **not** part of the v0.1 chart. Tracked as
-post-GA scope in the cassiopeia GA RFC. Until then, Valkey AOF on the
-local-path PVC is the sole durability layer; an unscheduled node loss
-on the gxy-management node forfeits up to 1s of writes (`appendfsync
-everysec`). Acceptable for the 11-site / write-bursty-by-staff
-workload; revisit if write rate grows.
+Nightly RDB → R2 mirror is **not** part of the v0.1 chart. Tracked as post-GA scope in the cassiopeia GA RFC. Until then, Valkey AOF on the local-path PVC is the sole durability layer; an unscheduled node loss on the gxy-management node forfeits up to 1s of writes (`appendfsync everysec`). Acceptable for the 11-site / write-bursty-by-staff workload; revisit if write rate grows.
 
 ### C.6 Cutover smoke gate G13 — 2026-05-11
 
-Closes the cassiopeia registry cutover phase (P7) plus G12 idempotency
-rehearsal. Run by mrugesh from a laptop hitting
-`https://uploads.freecode.camp` after Phase 5 deploy of artemis chart
-0.2.0 / image `sha256:f61f2b…`. Both rounds produced identical output
-(modulo per-call `created_at` / `updated_at` timestamps stamped by
-artemis at write time).
+Closes the cassiopeia registry cutover phase (P7) plus G12 idempotency rehearsal. Run by mrugesh from a laptop hitting `https://uploads.freecode.camp` after Phase 5 deploy of artemis chart 0.2.0 / image `sha256:f61f2b…`. Both rounds produced identical output (modulo per-call `created_at` / `updated_at` timestamps stamped by artemis at write time).
 
 Pre-state — `/api/sites` returns the 11 canonical slugs:
 
@@ -438,38 +376,15 @@ $ universe sites ls --json | jq '.count, ([.sites[].slug] | any(. == "smoke-test
 false
 ```
 
-Identical output between rounds (modulo timestamps) → V3 idempotency
-holds end-to-end. G13 closed; G12 closed in same evidence trail.
+Identical output between rounds (modulo timestamps) → V3 idempotency holds end-to-end. G13 closed; G12 closed in same evidence trail.
 
-Side-finding (now closed): the artemis CiliumNetworkPolicy initially
-omitted in-cluster DNS L7 patterns. Cilium DNS proxy filtered the
-`valkey.valkey.svc.cluster.local` query, returning a malformed
-response that Go's resolver surfaced as `server misbehaving`. The new
-artemis pod CrashLoopBackOff'd on startup; old pods kept serving
-(RollingUpdate). Resolved by adding `matchName:
-valkey.valkey.svc.cluster.local` plus `matchPattern:
-*.*.svc.cluster.local` to the L7 rules (`*` doesn't cross dots in
-Cilium pattern semantics). Two follow-up commits during cutover:
-`fix(artemis): allow cluster.local DNS in CNP` (insufficient — single-
-label wildcard) and `fix(artemis): CNP DNS pattern crosses dots`
-(closed it).
+Side-finding (now closed): the artemis CiliumNetworkPolicy initially omitted in-cluster DNS L7 patterns. Cilium DNS proxy filtered the `valkey.valkey.svc.cluster.local` query, returning a malformed response that Go's resolver surfaced as `server misbehaving`. The new artemis pod CrashLoopBackOff'd on startup; old pods kept serving (RollingUpdate). Resolved by adding `matchName: valkey.valkey.svc.cluster.local` plus `matchPattern: *.*.svc.cluster.local` to the L7 rules (`*` doesn't cross dots in Cilium pattern semantics). Two follow-up commits during cutover: `fix(artemis): allow cluster.local DNS in CNP` (insufficient — single- label wildcard) and `fix(artemis): CNP DNS pattern crosses dots` (closed it).
 
-The trap had bitten before — woodpecker forge list on gxy-launchbase
-on 2026-04-07 with the same `server misbehaving` shape on a
-cross-namespace Postgres lookup. That history was captured in the
-archived field-notes (`Universe/spike/field-notes/archive/2026-05-10/infra.md`)
-but never promoted to canonical guidance, so the artemis chart
-re-discovered it from scratch. Promoted now to
-[`docs/infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) —
-read before adding any cross-namespace egress to a CNP'd pillar.
+The trap had bitten before — woodpecker forge list on gxy-launchbase on 2026-04-07 with the same `server misbehaving` shape on a cross-namespace Postgres lookup. That history was captured in the archived field-notes (`Universe/.archive/infra/2026-04-20-pitfalls-reference.md` + `Universe/.archive/infra/2026-04-20-operational-findings.md`) but never promoted to canonical guidance, so the artemis chart re-discovered it from scratch. Promoted now to [`docs/infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) — read before adding any cross-namespace egress to a CNP'd pillar.
 
 ## §D — Artemis (deploy proxy)
 
-Public surface `https://uploads.freecode.camp` (NOT
-`*.freecodecamp.net` — Universe domain, Flexible SSL). Auth: GitHub
-OAuth Bearer + deploy-session JWT. RUN-residency clean: image pulls
-from `ghcr.io/freecodecamp/artemis` direct; never via the zot mirror
-co-located on this galaxy (chicken-egg on cluster wipe).
+Public surface `https://uploads.freecode.camp` (NOT `*.freecodecamp.net` — Universe domain, Flexible SSL). Auth: GitHub OAuth Bearer + deploy-session JWT. RUN-residency clean: image pulls from `ghcr.io/freecodecamp/artemis` direct; never via the zot mirror co-located on this galaxy (chicken-egg on cluster wipe).
 
 ### D.1 Preconditions (one-time per cluster)
 
@@ -495,18 +410,13 @@ helm get values -n artemis artemis >/dev/null 2>&1 \
 just deploy gxy-management artemis
 ```
 
-The recipe layers chart values → production overlay → sops sealed
-overlay. Post-cutover (artemis @ `f115198`, 2026-05-10) the chart no
-longer mounts a sites ConfigMap; the sites map lives in Valkey (§C)
-exclusively. The chart sets:
+The recipe layers chart values → production overlay → sops sealed overlay. Post-cutover (artemis @ `f115198`, 2026-05-10) the chart no longer mounts a sites ConfigMap; the sites map lives in Valkey (§C) exclusively. The chart sets:
 
 - `VALKEY_ADDR=valkey.valkey.svc.cluster.local:6379`
 - `VALKEY_PASSWORD` from sops overlay
 - `REGISTRY_AUTHZ_TEAM=staff` (gate on registry-write endpoints)
 
-`REGISTRY_BACKEND` is no longer wired — the `sites_yaml` backend was
-retired alongside the Valkey cutover and there is now exactly one
-read path.
+`REGISTRY_BACKEND` is no longer wired — the `sites_yaml` backend was retired alongside the Valkey cutover and there is now exactly one read path.
 
 ### D.3 Verify
 
@@ -529,26 +439,15 @@ just artemis-postdeploy-check
 just phase5-smoke
 ```
 
-E2E flow: init → upload → finalize (preview) → preview curl →
-promote → prod curl. Marker-content match on both surfaces. Trap
-rolls back to the prior production deploy on exit (success OR
-failure). Exit 0 = green.
+E2E flow: init → upload → finalize (preview) → preview curl → promote → prod curl. Marker-content match on both surfaces. Trap rolls back to the prior production deploy on exit (success OR failure). Exit 0 = green.
 
 ### D.5 Cluster-wipe rebuild rehearsal (operational invariant)
 
-When rehearsing a galaxy rebuild from scratch, **run with zot
-unreachable**. Artemis must come up green from a cold cluster with
-zero zot dependency in the image-pull path. If artemis fails to pull
-its image without zot, RUN-residency is broken — fix the chart before
-claiming the rebuild green.
+When rehearsing a galaxy rebuild from scratch, **run with zot unreachable**. Artemis must come up green from a cold cluster with zero zot dependency in the image-pull path. If artemis fails to pull its image without zot, RUN-residency is broken — fix the chart before claiming the rebuild green.
 
 ## §E — Parked apps (DO NOT DEPLOY)
 
-ArgoCD, Zot, Atlantis chart artifacts live on disk in
-`k3s/gxy-management/apps/{argocd,zot}/` (Atlantis is not yet on disk).
-**Do not run** `just helm-upgrade gxy-management {argocd,zot}` — it
-will succeed and create cluster state that contradicts the parked
-status in ADR-005.
+ArgoCD, Zot, Atlantis chart artifacts live on disk in `k3s/gxy-management/apps/{argocd,zot}/` (Atlantis is not yet on disk). **Do not run** `just helm-upgrade gxy-management {argocd,zot}` — it will succeed and create cluster state that contradicts the parked status in ADR-005.
 
 | App      | Status                                    | Reactivation gate                                                                   |
 | -------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -619,8 +518,7 @@ cd ~/DEV/fCC/infra
 just windmill-backup gxy-management
 ```
 
-Saves to `k3s/gxy-management/.backups/`. Run before any helm-upgrade,
-teardown, or PG change.
+Saves to `k3s/gxy-management/.backups/`. Run before any helm-upgrade, teardown, or PG change.
 
 ### G.2 Restore Windmill PG
 
@@ -628,19 +526,9 @@ See B.3 above.
 
 ### G.3 Restore Valkey from R2 RDB mirror — DEFERRED (post-GA)
 
-> The R2 mirror CronJob is not yet running (see §C.5). Until it
-> ships, the only recovery path on Valkey data loss is the AOF on
-> the local-path PVC. Worst case (PVC loss + no nightly mirror):
-> rerun `apps/valkey/scripts/import-sites.sh` to re-seed the 11-site
-> registry, then accept that any sites registered after the seed
-> import are lost and must be re-`universe sites register`'d by
-> staff.
+> The R2 mirror CronJob is not yet running (see §C.5). Until it ships, the only recovery path on Valkey data loss is the AOF on the local-path PVC. Worst case (PVC loss + no nightly mirror): rerun `apps/valkey/scripts/import-sites.sh` to re-seed the 11-site registry, then accept that any sites registered after the seed import are lost and must be re-`universe sites register`'d by staff.
 >
-> When G.3 reactivates, the recipe will read from
-> `r2://universe-static-apps-01/_meta/registry/<date>.rdb`, copy
-> into the Valkey pod under `-n valkey`, and decrypt the password
-> from `secretEnv.VALKEY_PASSWORD` in the sops envelope (NOT
-> `auth.password` — schema in C.1).
+> When G.3 reactivates, the recipe will read from `r2://universe-static-apps-01/_meta/registry/<date>.rdb`, copy into the Valkey pod under `-n valkey`, and decrypt the password from `secretEnv.VALKEY_PASSWORD` in the sops envelope (NOT `auth.password` — schema in C.1).
 
 ### G.4 Restore etcd from S3
 
@@ -658,21 +546,15 @@ k3s server \
   --cluster-reset-restore-path=s3://net-freecodecamp-universe-backups/etcd/gxy-management/SNAPSHOT_NAME
 ```
 
-Then rejoin the other nodes. See
-<https://docs.k3s.io/datastore/backup-restore>.
+Then rejoin the other nodes. See <https://docs.k3s.io/datastore/backup-restore>.
 
 ## §H — Windmill IaC (CLI sync, separate repo)
 
-Windmill CE has no Git Sync. Scripts/flows/apps managed via `wmill`
-CLI in dedicated repo `~/DEV/fCC-U/windmill`. Critical warnings:
+Windmill CE has no Git Sync. Scripts/flows/apps managed via `wmill` CLI in dedicated repo `~/DEV/fCC-U/windmill`. Critical warnings:
 
-- **NEVER `wmill sync push` from the wrong directory.** "No wmill.yaml
-  found" = wrong dir; without config, push sees empty local state and
-  deletes everything remote.
-- **ALWAYS decrypt resources before push, re-encrypt after.** Pushing
-  encrypted ciphertext stores `ENC[AES256_GCM,...]` as literal values.
-- **ALWAYS use `--dry-run` first.** Verify changes show `+`/`~`, not
-  unexpected `-`.
+- **NEVER `wmill sync push` from the wrong directory.** "No wmill.yaml found" = wrong dir; without config, push sees empty local state and deletes everything remote.
+- **ALWAYS decrypt resources before push, re-encrypt after.** Pushing encrypted ciphertext stores `ENC[AES256_GCM,...]` as literal values.
+- **ALWAYS use `--dry-run` first.** Verify changes show `+`/`~`, not unexpected `-`.
 
 ```bash
 cd ~/DEV/fCC-U/windmill
@@ -710,21 +592,17 @@ just artemis-postdeploy-check
 just phase5-smoke
 ```
 
-Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from
-RFC §E):
+Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from RFC §E):
 
 - **G5** Valkey running with persistence + AUTH (§C.2).
 - **G6** artemis on Valkey-only registry (no `--set-file`, no `REGISTRY_BACKEND` env; §D.2).
-- **G9** Registry survives `kubectl rollout restart deploy/artemis` —
-  pod restarts; sites enum unchanged.
-- **G10** Registry survives `kubectl delete pod -l app=valkey` — PVC
-  reattach + AOF replay; sites enum unchanged.
+- **G9** Registry survives `kubectl rollout restart deploy/artemis` — pod restarts; sites enum unchanged.
+- **G10** Registry survives `kubectl delete pod -l app=valkey` — PVC reattach + AOF replay; sites enum unchanged.
 - **G11** Nightly RDB lands in R2 (§C.4 manual trigger validates).
 
 ## §J — Teardown
 
-Destructive. Run an ad-hoc Windmill backup (G.1) and a Valkey
-manual-trigger RDB upload (§C.4) before teardown.
+Destructive. Run an ad-hoc Windmill backup (G.1) and a Valkey manual-trigger RDB upload (§C.4) before teardown.
 
 ### Cluster only (preserves VMs)
 
@@ -743,5 +621,4 @@ doctl compute droplet delete \
   --force
 ```
 
-VPC, firewall, DO Spaces, R2 buckets persist (shared infra — see
-`UNIVERSE.md §3`).
+VPC, firewall, DO Spaces, R2 buckets persist (shared infra — see `UNIVERSE.md §3`).

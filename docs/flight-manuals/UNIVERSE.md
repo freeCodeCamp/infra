@@ -1,8 +1,6 @@
 # Flight Manual — UNIVERSE (shared phases)
 
-Cross-galaxy steps that apply to every cluster. Read this before any
-per-galaxy chapter. Each per-galaxy chapter assumes §0–§2 already
-ran; chapters do not repeat them.
+Cross-galaxy steps that apply to every cluster. Read this before any per-galaxy chapter. Each per-galaxy chapter assumes §0–§2 already ran; chapters do not repeat them.
 
 | §    | What                                                  |
 | ---- | ----------------------------------------------------- |
@@ -16,18 +14,15 @@ ran; chapters do not repeat them.
 | §99  | Cross-galaxy smoke (post-bring-up)                    |
 | §100 | Teardown (reverse order, rarely run)                  |
 
-> **Working-directory rule (HARD):** every cluster-touching `just`
-> recipe MUST run from `k3s/<galaxy>/` so direnv loads the right DO
-> token + `KUBECONFIG`. Repo-root invocation hits the wrong cluster
-> or fails silently. Per-galaxy chapters repeat this above each
-> recipe.
+> **Early Access (2026-05-12):** the canonical platform-EA declaration is `~/DEV/fCC-U/Universe/decisions/018-early-access-baseline.md` (ADR-018). It defines the live-for-staff scope, the parked Phase-2 list with per-workload gating triggers, and the next sequencing: **static-finish → auth → o11y → later**. This flight manual covers operational procedures; ADR-018 covers strategic intent. Operational journals consolidated in `~/DEV/fCC-U/Universe/.archive/INDEX.md`.
+
+> **Working-directory rule (HARD):** every cluster-touching `just` recipe MUST run from `k3s/<galaxy>/` so direnv loads the right DO token + `KUBECONFIG`. Repo-root invocation hits the wrong cluster or fails silently. Per-galaxy chapters repeat this above each recipe.
 
 ## §0 — Prerequisites
 
 ### §0.1 Host tools
 
-Pinned versions live in `infra/docs/flight-manuals/00-index.md
-§"Lifecycle calendar"`. Operator floor:
+Pinned versions live in `infra/docs/flight-manuals/00-index.md §"Lifecycle calendar"`. Operator floor:
 
 | Tool        | Floor            | Why                                                  |
 | ----------- | ---------------- | ---------------------------------------------------- |
@@ -55,14 +50,10 @@ Idempotent — installs/refreshes ansible deps into the repo's venv.
 
 Repo `.envrc` hierarchy loads:
 
-- root `.envrc` → `$SECRETS_DIR/global/.env.enc` (org-wide tokens:
-  `DIGITALOCEAN_TOKEN_ORG`, CF tokens, GHCR PAT, etc.).
-- `k3s/<galaxy>/.envrc` → sources root, loads
-  `$SECRETS_DIR/do-universe/.env.enc` (DO Universe-scoped token),
-  exports `KUBECONFIG=$(expand_path .kubeconfig.yaml)`.
+- root `.envrc` → `$SECRETS_DIR/global/.env.enc` (org-wide tokens: `DIGITALOCEAN_TOKEN_ORG`, CF tokens, GHCR PAT, etc.).
+- `k3s/<galaxy>/.envrc` → sources root, loads `$SECRETS_DIR/do-universe/.env.enc` (DO Universe-scoped token), exports `KUBECONFIG=$(expand_path .kubeconfig.yaml)`.
 
-`SECRETS_DIR=../infra-secrets` is the **only** supported layout. Any
-other path breaks direnv loading.
+`SECRETS_DIR=../infra-secrets` is the **only** supported layout. Any other path breaks direnv loading.
 
 ```bash
 direnv allow .
@@ -78,8 +69,7 @@ test -f ~/.config/sops/age/keys.txt && echo "✓ age key present" \
   || (echo "✗ age key missing"; exit 1)
 ```
 
-Per RFC `infra/docs/architecture/rfc-secrets-layout.md` §"D5: single
-org key"; key distribution is operator-side, not in any repo.
+Per RFC `infra/docs/architecture/rfc-secrets-layout.md` §"D5: single org key"; key distribution is operator-side, not in any repo.
 
 ## §1 — DNS + Cloudflare baseline
 
@@ -91,8 +81,7 @@ org key"; key distribution is operator-side, not in any repo.
 | `freecodecamp.org` | Public app (separate fCC scope; not Universe)             | n/a         | n/a                           |
 | `freecode.camp`    | Static-apps surface (cassiopeia + artemis `uploads.…`)    | Flexible    | none (CF→origin HTTP)         |
 
-Per ADR-009 §"Domains" (with the audit-resolved cassiopeia
-re-routing per `docs/architecture/adr-drift-2026-05-10.md`).
+Per ADR-009 §"Domains" (with the audit-resolved cassiopeia re-routing per `docs/architecture/adr-drift-2026-05-10.md`).
 
 ### §1.2 Per-galaxy DNS records
 
@@ -112,9 +101,7 @@ Operator-side token with:
 - `Zone.Cache Purge:Purge` on the three zones
 - (R2 admin token is a separate object-storage token — see §3)
 
-Stored encrypted at `infra-secrets/global/.env.enc` (key
-`CLOUDFLARE_API_TOKEN`). Rotation cadence: annual minimum, per
-ADR-011.
+Stored encrypted at `infra-secrets/global/.env.enc` (key `CLOUDFLARE_API_TOKEN`). Rotation cadence: annual minimum, per ADR-011.
 
 ## §2 — infra-secrets bootstrap
 
@@ -144,10 +131,7 @@ k3s/
     r2-ro.env.enc                   # bucket-scoped ro key pair
 ```
 
-Authoritative spec: `infra/docs/architecture/rfc-secrets-layout.md`.
-Decryption gotchas: `infra/docs/runbooks/04-secrets-decrypt.md`
-(notably: sops auto-detect routes `.enc` to JSON parser — explicit
-`--input-type dotenv --output-type dotenv` required for `*.env.enc`).
+Authoritative spec: `infra/docs/architecture/rfc-secrets-layout.md`. Decryption gotchas: `infra/docs/runbooks/04-secrets-decrypt.md` (notably: sops auto-detect routes `.enc` to JSON parser — explicit `--input-type dotenv --output-type dotenv` required for `*.env.enc`).
 
 ### §2.2 Verify all secrets decrypt
 
@@ -156,14 +140,11 @@ cd ~/DEV/fCC/infra
 just secret-verify-all
 ```
 
-Idempotent. Reports any envelope that fails to decrypt with the
-operator's age key. Hard-fails before any galaxy bring-up so
-`just deploy` later cannot eat a half-decrypted overlay.
+Idempotent. Reports any envelope that fails to decrypt with the operator's age key. Hard-fails before any galaxy bring-up so `just deploy` later cannot eat a half-decrypted overlay.
 
 ## §3 — Shared infrastructure (not cluster-scoped)
 
-These resources live above any single galaxy. Provisioned once,
-referenced by every cluster.
+These resources live above any single galaxy. Provisioned once, referenced by every cluster.
 
 | Resource                      | Identifier                                       | Purpose                                                         |
 | ----------------------------- | ------------------------------------------------ | --------------------------------------------------------------- |
@@ -176,17 +157,11 @@ referenced by every cluster.
 | Tailscale tailnet             | freeCodeCamp tailnet                             | SSH + kubectl on platform-team nodes (under review per ADR-009) |
 | GHCR pull tokens              | implicit via `ghcr.io` direct anon-pull or PAT   | platform pillars pull images direct from GHCR (no zot mirror)   |
 
-R2 bucket DR posture: versioning enabled; per-prefix retention is
-informal today (R2 lifecycle GC for orphan deploy bytes is parked
-per RFC §"Out of scope").
+R2 bucket DR posture: versioning enabled; per-prefix retention is informal today (R2 lifecycle GC for orphan deploy bytes is parked per RFC §"Out of scope").
 
 ### §3.1 — DO Cloud Firewall required ports
 
-`gxy-fw-fra1` is bound to tags `gxy-management-k3s,gxy-launchbase-k3s,
-gxy-cassiopeia-k3s` (orphan `gxy-static-k3s` tag retained but harmless).
-Every galaxy MUST have these ports open before bootstrap — missing
-etcd ports historically caused silent cluster failures (k3s
-"activating" forever).
+`gxy-fw-fra1` is bound to tags `gxy-management-k3s,gxy-launchbase-k3s, gxy-cassiopeia-k3s` (orphan `gxy-static-k3s` tag retained but harmless). Every galaxy MUST have these ports open before bootstrap — missing etcd ports historically caused silent cluster failures (k3s "activating" forever).
 
 VPC-only (source `10.110.0.0/20`):
 
@@ -208,18 +183,11 @@ Public (source `0.0.0.0/0`):
 | 80   | TCP      | HTTP (Traefik ingress)       |
 | 443  | TCP      | HTTPS (Traefik ingress)      |
 
-**Trap:** the DO cloud firewall is separate from host UFW. The
-k3s-ansible prereq role opens UFW; it does NOT touch the cloud
-firewall. Both layers must be configured. Verify attachment after
-provisioning — `droplet_ids` / `tags` empty on the firewall means
-the firewall exists in name only.
+**Trap:** the DO cloud firewall is separate from host UFW. The k3s-ansible prereq role opens UFW; it does NOT touch the cloud firewall. Both layers must be configured. Verify attachment after provisioning — `droplet_ids` / `tags` empty on the firewall means the firewall exists in name only.
 
 ### §3.2 — New-galaxy pre-flight files
 
-A fresh galaxy needs these files committed in this repo **before**
-the first `play-k3s--bootstrap` run. Group_vars alone is
-insufficient — the playbook hard-codes paths to every file listed
-below. Copy from a sibling galaxy and adjust only the pod CIDR.
+A fresh galaxy needs these files committed in this repo **before** the first `play-k3s--bootstrap` run. Group_vars alone is insufficient — the playbook hard-codes paths to every file listed below. Copy from a sibling galaxy and adjust only the pod CIDR.
 
 | File                                           | Purpose                                                         |
 | ---------------------------------------------- | --------------------------------------------------------------- |
@@ -238,13 +206,11 @@ test -n "${DO_API_TOKEN:-}"        # direnv loaded the right token
 direnv exec k3s/gxy-<g> env | grep -E 'DIGITALOCEAN_TOKEN|KUBECONFIG'
 ```
 
-DO inventory plugin resolves to empty without `DO_API_TOKEN`; Tailscale
-plays silent-fail in that state. Hard-gate before running anything.
+DO inventory plugin resolves to empty without `DO_API_TOKEN`; Tailscale plays silent-fail in that state. Hard-gate before running anything.
 
 ## §4 — Lifecycle calendar (cross-cluster pins)
 
-Third-party pins with EOL windows. Roll-forward is an explicit
-backlog item — never automatic.
+Third-party pins with EOL windows. Roll-forward is an explicit backlog item — never automatic.
 
 | Component                 | Current pin               | EOL / stale-after        | Action window   | Notes                                                                 |
 | ------------------------- | ------------------------- | ------------------------ | --------------- | --------------------------------------------------------------------- |
@@ -254,13 +220,11 @@ backlog item — never automatic.
 | Cilium                    | chart default (1.19 line) | 3-minor community window | on minor bump   | All galaxies. MTU/devices pin must persist; bump behind feature gate. |
 | Valkey                    | (added with RFC §B)       | LF community             | on minor bump   | gxy-management. Single-instance; bolt on Sentinel later.              |
 
-When a pin crosses its action window, file an entry in the active
-sprint dossier (or `infra/.scratchpad/sprints/...`).
+When a pin crosses its action window, file an entry in the active sprint dossier (or `infra/.scratchpad/sprints/...`).
 
 ## §99 — Cross-galaxy smoke (post-bring-up)
 
-Run after all 3 galaxy chapters have been rehearsed end-to-end on a
-fresh cluster set. Confirms cross-galaxy seams hold.
+Run after all 3 galaxy chapters have been rehearsed end-to-end on a fresh cluster set. Confirms cross-galaxy seams hold.
 
 ```bash
 cd ~/DEV/fCC/infra
@@ -280,14 +244,11 @@ just phase5-smoke
 just r2-bucket-verify universe-static-apps-01
 ```
 
-Smoke success = `phase5-smoke` exits 0 (deploys to `test.freecode.camp`,
-curls 200, rolls back).
+Smoke success = `phase5-smoke` exits 0 (deploys to `test.freecode.camp`, curls 200, rolls back).
 
 ## §100 — Teardown (reverse rebuild order)
 
-Destructive. Confirm DNS is flipped before tearing down a galaxy or
-live traffic 5xxs. Reverse the rebuild order (cassiopeia → launchbase →
-management) so dependent planes go down first.
+Destructive. Confirm DNS is flipped before tearing down a galaxy or live traffic 5xxs. Reverse the rebuild order (cassiopeia → launchbase → management) so dependent planes go down first.
 
 | Step | What                                                                                            | Anchor                 |
 | ---- | ----------------------------------------------------------------------------------------------- | ---------------------- |
@@ -298,5 +259,4 @@ management) so dependent planes go down first.
 | 5    | (Optional) delete droplets — `doctl compute droplet delete --tag-name gxy-<galaxy>-k3s --force` | per-galaxy §G          |
 | 6    | Shared infra (VPC, firewall, R2, Spaces) — preserve unless full-platform retire                 | this file §3           |
 
-R2 bucket state survives all of the above (the buckets are the
-source of truth — clusters only serve them).
+R2 bucket state survives all of the above (the buckets are the source of truth — clusters only serve them).
