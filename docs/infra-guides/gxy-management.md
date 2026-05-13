@@ -29,7 +29,7 @@ kubectl get nodes
 ## Deploy
 
 ```bash
-just play k3s--bootstrap gxy_management_k3s
+just bootstrap k3s--bootstrap gxy_management_k3s
 ```
 
 ## Deployment Runbook
@@ -39,14 +39,14 @@ just play k3s--bootstrap gxy_management_k3s
 1. Create 3x DO droplets (s-8vcpu-16gb-amd) in FRA1 -- attach to VPC, configure firewall (80, 443, 6443 from VPC, 22 from Tailscale)
 2. Create DO Spaces bucket `net-freecodecamp-universe-backups` in FRA1 (etcd snapshots)
 3. Create DO Spaces bucket `net.freecodecamp.universe-registry` in FRA1 (Zot images)
-4. Install Tailscale: `just play tailscale--0-install gxy_management_k3s` then `just play tailscale--1b-up-with-ssh gxy_management_k3s`
+4. Install Tailscale: `just bootstrap tailscale--0-install gxy_management_k3s` then `just bootstrap tailscale--1b-up-with-ssh gxy_management_k3s`
 5. Create Cloudflare origin certificate for `*.freecodecamp.net` (15-year, RSA)
 6. Populate app secrets in infra-secrets repo (see samples in each app directory)
 
 ### K3s Bootstrap
 
 ```bash
-just play k3s--bootstrap gxy_management_k3s
+just bootstrap k3s--bootstrap gxy_management_k3s
 ```
 
 Deploys k3s HA cluster with Cilium CNI, Traefik ingress, etcd S3 backups, and fetches kubeconfig.
@@ -56,9 +56,9 @@ Deploys k3s HA cluster with Cilium CNI, Traefik ingress, etcd S3 backups, and fe
 After playbook completes:
 
 ```bash
-just helm-upgrade gxy-management argocd
-just helm-upgrade gxy-management windmill
-just helm-upgrade gxy-management zot   # deferred — Phase 1
+just release gxy-management argocd
+just release gxy-management windmill
+just release gxy-management zot   # deferred — Phase 1
 ```
 
 Release names match the app directory names. The recipe reads the chart repo URL from `charts/<chart>/repo` and the values from `charts/<chart>/values.yaml`. When no repo file exists, the chart is installed from the local directory.
@@ -66,9 +66,9 @@ Release names match the app directory names. The recipe reads the chart repo URL
 ### App Secrets and Manifests
 
 ```bash
-just deploy gxy-management argocd
-just deploy gxy-management windmill
-just deploy gxy-management zot        # deferred — Phase 1
+just release gxy-management argocd
+just release gxy-management windmill
+just release gxy-management zot        # deferred — Phase 1
 ```
 
 ### Post-deployment (ClickOps)

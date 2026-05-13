@@ -21,7 +21,7 @@ kubectl get nodes
 Everything is managed by a single Ansible playbook (8 plays):
 
 ```bash
-just play k3s--ops-mgmt mgmt_k3s
+just bootstrap k3s--ops-mgmt mgmt_k3s
 ```
 
 The playbook handles: k3s install, security hardening (secrets-encryption, PSS, audit logging),
@@ -35,7 +35,7 @@ Prerequisites: VM provisioned with Tailscale installed, secrets populated in inf
 After first run, the DO firewall restricts SSH to Tailscale only. Re-run via Tailscale IP:
 
 ```bash
-just play k3s--ops-mgmt mgmt_k3s -e ansible_host=<tailscale_ip>
+just bootstrap k3s--ops-mgmt mgmt_k3s -e ansible_host=<tailscale_ip>
 ```
 
 ## Disaster Recovery

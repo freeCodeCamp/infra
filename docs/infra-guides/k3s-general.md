@@ -95,15 +95,15 @@ k3s/
 
 ```bash
 # Deploy tools cluster
-just play k3s--cluster tools_k3s
+just bootstrap k3s--cluster tools_k3s
 
 # Longhorn storage (tools)
-just play k3s--longhorn tools_k3s
+just bootstrap k3s--longhorn tools_k3s
 
 # Deploy any Universe galaxy (k3s + Cilium + Tailscale)
-just play k3s--bootstrap gxy_management_k3s
-just play k3s--bootstrap gxy_launchbase_k3s
-just play k3s--bootstrap gxy_cassiopeia_k3s
+just bootstrap k3s--bootstrap gxy_management_k3s
+just bootstrap k3s--bootstrap gxy_launchbase_k3s
+just bootstrap k3s--bootstrap gxy_cassiopeia_k3s
 ```
 
 ---
@@ -156,7 +156,7 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ### Update Apps
 
 ```bash
-just deploy <cluster> <app>
+just release <cluster> <app>
 ```
 
 ---

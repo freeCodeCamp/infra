@@ -64,14 +64,14 @@ This repo owns:
 - root `.envrc` → loads `$SECRETS_DIR/global/.env.enc` (org-wide tokens)
 - `k3s/<galaxy>/.envrc` → sources root, loads `$SECRETS_DIR/do-universe/.env.enc` (DO Universe token), exports `KUBECONFIG=$(expand_path .kubeconfig.yaml)`
 
-Run `just deploy …` from repo root → wrong DO token, no `KUBECONFIG`, helm/kubectl hit wrong cluster or fail. Always:
+Run `just release …` from repo root → wrong DO token, no `KUBECONFIG`, helm/kubectl hit wrong cluster or fail. Always:
 
 ```
 cd k3s/<galaxy>/
 just <recipe>
 ```
 
-Recipes that don't touch a cluster (e.g. `just play <playbook>` against ansible inventory) may run from repo root.
+Recipes that don't touch a cluster (e.g. `just bootstrap <playbook>` against ansible inventory) may run from repo root.
 
 ## infra-secrets coupling
 
@@ -121,5 +121,5 @@ Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-bac
 
 ## Non-obvious conventions
 
-- Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `helm-upgrade` installs from local chart dir.
-- `just play` prepends `play-` + appends `.yml` to playbook arg.
+- Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `just release` falls back to the local chart dir.
+- `just bootstrap` prepends `play-` + appends `.yml` to playbook arg.

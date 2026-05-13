@@ -161,7 +161,7 @@ Once all preconditions land:
 
 ```bash
 cd ~/DEV/fCC/infra
-just deploy gxy-management artemis
+just release gxy-management artemis
 ```
 
 The generic `deploy` recipe smart-dispatches on `apps/<app>/`:
@@ -196,7 +196,7 @@ Exit 0 on green.
 
 | What rotates                         | Recipe                                                                                                                         |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just deploy gxy-management artemis`                                 |
+| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just release gxy-management artemis`                                 |
 | CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch                   |
 | sites registry entries               | `universe sites register/update/rm <slug> …` (staff-gated; live in seconds via `registry.changed` pub-sub, ≤60 s TTL fallback) |
 | Image tag                            | see [§Image update](#image-update-deploy-new-artemis-sha) — full procedure                                                     |
@@ -266,7 +266,7 @@ Operator pushes.
 ### 6. Deploy + watch rollout
 
 ```bash
-just deploy gxy-management artemis
+just release gxy-management artemis
 kubectl -n artemis rollout status deploy/artemis --timeout=180s
 ```
 
@@ -283,7 +283,7 @@ serves init/upload/finalize/promote correctly against R2 + GH OAuth.
 
 ### Rollback
 
-Revert the `values.production.yaml` commit and re-run `just deploy
+Revert the `values.production.yaml` commit and re-run `just release
 gxy-management artemis`. Image is digest-pinned so rollback is
 deterministic. No DB / state migration on artemis (stateless svc
 over R2).

@@ -41,7 +41,7 @@ Pinned versions live in `infra/docs/flight-manuals/00-index.md §"Lifecycle cale
 
 ```bash
 cd ~/DEV/fCC/infra
-just ansible-install
+just bootstrap-tools
 ```
 
 Idempotent — installs/refreshes ansible deps into the repo's venv.
@@ -137,10 +137,10 @@ Authoritative spec: `infra/docs/architecture/rfc-secrets-layout.md`. Decryption 
 
 ```bash
 cd ~/DEV/fCC/infra
-just secret-verify-all
+just verify-secrets
 ```
 
-Idempotent. Reports any envelope that fails to decrypt with the operator's age key. Hard-fails before any galaxy bring-up so `just deploy` later cannot eat a half-decrypted overlay.
+Idempotent. Reports any envelope that fails to decrypt with the operator's age key. Hard-fails before any galaxy bring-up so `just release` later cannot eat a half-decrypted overlay.
 
 ## §3 — Shared infrastructure (not cluster-scoped)
 
@@ -199,7 +199,7 @@ A fresh galaxy needs these files committed in this repo **before** the first `pl
 | `k3s/<g>/.gitignore`                           | excludes `.kubeconfig.yaml` + local backups                     |
 | `ansible/inventory/group_vars/gxy_<g>_k3s.yml` | group vars — VPC CIDR, pod CIDR, Cilium cluster id, tags        |
 
-**Pre-flight gates** (must all pass before `just play k3s--bootstrap`):
+**Pre-flight gates** (must all pass before `just bootstrap k3s--bootstrap`):
 
 ```bash
 test -n "${DO_API_TOKEN:-}"        # direnv loaded the right token
@@ -237,11 +237,11 @@ done
 
 # 2. Static-apps end-to-end through artemis (gxy-management) → R2 → caddy (cassiopeia).
 cd ~/DEV/fCC/infra
-just artemis-postdeploy-check
+just verify-artemis
 just phase5-smoke
 
 # 3. R2 bucket integrity (rw + ro keys both work).
-just r2-bucket-verify universe-static-apps-01
+just verify-r2 universe-static-apps-01
 ```
 
 Smoke success = `phase5-smoke` exits 0 (deploys to `test.freecode.camp`, curls 200, rolls back).
@@ -253,9 +253,9 @@ Destructive. Confirm DNS is flipped before tearing down a galaxy or live traffic
 | Step | What                                                                                            | Anchor                 |
 | ---- | ----------------------------------------------------------------------------------------------- | ---------------------- |
 | 1    | Flip CF DNS off cassiopeia public records (or move CF status to "under maintenance")            | CF dashboard           |
-| 2    | `just play k3s--teardown gxy_cassiopeia_k3s`                                                    | `gxy-cassiopeia.md §G` |
-| 3    | `just play k3s--teardown gxy_launchbase_k3s`                                                    | `gxy-launchbase.md §G` |
-| 4    | `just play k3s--teardown gxy_management_k3s`                                                    | `gxy-management.md §G` |
+| 2    | `just bootstrap k3s--teardown gxy_cassiopeia_k3s`                                                    | `gxy-cassiopeia.md §G` |
+| 3    | `just bootstrap k3s--teardown gxy_launchbase_k3s`                                                    | `gxy-launchbase.md §G` |
+| 4    | `just bootstrap k3s--teardown gxy_management_k3s`                                                    | `gxy-management.md §G` |
 | 5    | (Optional) delete droplets — `doctl compute droplet delete --tag-name gxy-<galaxy>-k3s --force` | per-galaxy §G          |
 | 6    | Shared infra (VPC, firewall, R2, Spaces) — preserve unless full-platform retire                 | this file §3           |
 

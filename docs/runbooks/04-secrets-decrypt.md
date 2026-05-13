@@ -37,7 +37,7 @@ sops decrypt --input-type dotenv --output-type dotenv \
 Justfile recipe equivalent (read-only, prints to stdout):
 
 ```bash
-just secret-view <name>
+just inspect-secret <name>
 ```
 
 ### 2. Helm value overlays (`*.values.yaml.enc`)

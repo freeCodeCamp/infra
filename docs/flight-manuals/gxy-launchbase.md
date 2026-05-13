@@ -45,7 +45,7 @@ wildcard reused if any future ingress lands on this galaxy on the
 
 ```bash
 cd ~/DEV/fCC/infra
-just secret-verify-all
+just verify-secrets
 ```
 
 ### A.2 DigitalOcean infrastructure
@@ -67,11 +67,11 @@ test "$(doctl compute droplet list --tag-name gxy-launchbase-k3s --format ID --n
 
 ```bash
 cd ~/DEV/fCC/infra
-just play tailscale--0-install gxy_launchbase_k3s
-just play tailscale--1b-up-with-ssh gxy_launchbase_k3s
+just bootstrap tailscale--0-install gxy_launchbase_k3s
+just bootstrap tailscale--1b-up-with-ssh gxy_launchbase_k3s
 
 cd k3s/gxy-launchbase
-just play k3s--bootstrap gxy_launchbase_k3s
+just bootstrap k3s--bootstrap gxy_launchbase_k3s
 ```
 
 Per-galaxy config in
@@ -102,7 +102,7 @@ cd ~/DEV/fCC/infra
 
 helm get values -n cnpg-system cnpg-system >/dev/null 2>&1 \
   && echo "✓ cnpg-system release present" \
-  || just helm-upgrade gxy-launchbase cnpg-system
+  || just release gxy-launchbase cnpg-system
 ```
 
 Chart at `k3s/gxy-launchbase/apps/cnpg-system/charts/`. Cluster-scoped:
@@ -118,7 +118,7 @@ export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 kubectl get pods -n cnpg-system
 # cnpg-controller-manager Running
 
-just crds-grep gxy-launchbase cnpg
+just inspect-crds gxy-launchbase cnpg
 # postgresql.cnpg.io CRDs present (Cluster, ScheduledBackup, etc.)
 ```
 
@@ -169,14 +169,14 @@ in tree).
 
 ```bash
 cd ~/DEV/fCC/infra
-just play k3s--teardown gxy_launchbase_k3s
+just bootstrap k3s--teardown gxy_launchbase_k3s
 ```
 
 ### Full teardown (VMs too)
 
 ```bash
 cd ~/DEV/fCC/infra
-just play k3s--teardown gxy_launchbase_k3s
+just bootstrap k3s--teardown gxy_launchbase_k3s
 doctl compute droplet delete \
   gxy-vm-launchbase-k3s-1 gxy-vm-launchbase-k3s-2 gxy-vm-launchbase-k3s-3 \
   --force

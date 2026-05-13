@@ -46,7 +46,7 @@ All apps use Kustomize:
 
 ```bash
 # Deploy (decrypts secrets + TLS, applies, cleans up)
-just deploy ops-backoffice-tools <app>
+just release ops-backoffice-tools <app>
 
 # Check
 kubectl get all -n <app>

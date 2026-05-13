@@ -85,7 +85,7 @@ git commit -m "chore(artemis): rotate R2 admin key"
 
 ```bash
 cd ~/DEV/fCC/infra
-just deploy gxy-management artemis
+just release gxy-management artemis
 direnv exec ~/DEV/fCC/infra/k3s/gxy-management \
   kubectl -n artemis rollout status deploy/artemis --timeout=180s
 ```
@@ -94,7 +94,7 @@ direnv exec ~/DEV/fCC/infra/k3s/gxy-management \
 
 ```bash
 curl -fsS https://uploads.freecode.camp/healthz                           # 200
-just artemis-postdeploy-check                                             # E2E green
+just verify-artemis                                             # E2E green
 ```
 
 See [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md)
@@ -144,7 +144,7 @@ git commit -m "chore(caddy): rotate R2 ro key"
 
 ```bash
 cd ~/DEV/fCC/infra
-just helm-upgrade gxy-cassiopeia caddy
+just release gxy-cassiopeia caddy
 direnv exec ~/DEV/fCC/infra/k3s/gxy-cassiopeia \
   kubectl -n caddy rollout restart deploy/caddy
 direnv exec ~/DEV/fCC/infra/k3s/gxy-cassiopeia \

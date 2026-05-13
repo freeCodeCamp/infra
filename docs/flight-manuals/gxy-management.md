@@ -35,7 +35,7 @@ This chapter feeds the cassiopeia GA design at [`../architecture/rfc-gxy-cassiop
 
 ```bash
 cd ~/DEV/fCC/infra
-just secret-verify-all
+just verify-secrets
 ```
 
 ### A.2 DigitalOcean infrastructure (one-time, ClickOps)
@@ -56,11 +56,11 @@ DO Spaces bucket `net-freecodecamp-universe-backups` in FRA1 (per `UNIVERSE.md �
 
 ```bash
 cd ~/DEV/fCC/infra
-just play tailscale--0-install gxy_management_k3s
-just play tailscale--1b-up-with-ssh gxy_management_k3s
+just bootstrap tailscale--0-install gxy_management_k3s
+just bootstrap tailscale--1b-up-with-ssh gxy_management_k3s
 
 cd k3s/gxy-management
-just play k3s--bootstrap gxy_management_k3s
+just bootstrap k3s--bootstrap gxy_management_k3s
 ```
 
 `k3s--bootstrap` runs validate → prerequisites → k3s deploy → Cilium → verify + kubeconfig. Idempotent.
@@ -94,12 +94,12 @@ cd ~/DEV/fCC/infra
 # Skip if release already healthy.
 helm get values -n windmill windmill >/dev/null 2>&1 \
   && echo "✓ windmill release present" \
-  || just helm-upgrade gxy-management windmill
+  || just release gxy-management windmill
 
-just deploy gxy-management windmill
+just release gxy-management windmill
 ```
 
-`just deploy` decrypts the sops overlay + applies kustomize manifests (Gateway, HTTPRoute, TLS secret) on top of the helm release.
+`just release` decrypts the sops overlay + applies kustomize manifests (Gateway, HTTPRoute, TLS secret) on top of the helm release.
 
 ### B.2 Verify
 
@@ -128,7 +128,7 @@ For a rebuild, do this BEFORE §D DNS cutover.
 
 #### B.3.1 Preconditions
 
-- Pre-teardown pg_dump exists at `k3s/gxy-management/.backups/windmill-<ts>.sql.gz` (run `just windmill-backup gxy-management` before teardown) OR S3 copy at `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
+- Pre-teardown pg_dump exists at `k3s/gxy-management/.backups/windmill-<ts>.sql.gz` (run `just backup-windmill gxy-management` before teardown) OR S3 copy at `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
 - `windmill-postgresql-0` pod Running (B.2 green).
 
 #### B.3.2 Quiesce Windmill app + worker pods
@@ -250,10 +250,10 @@ export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 # skip-if-already-deployed guard
 helm -n valkey list -q | grep -q '^valkey$' \
   && echo "✓ valkey release present" \
-  || just deploy gxy-management valkey
+  || just release gxy-management valkey
 ```
 
-The `just deploy` recipe auto-decrypts the sops envelope at `$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc` (with the required `--input-type yaml --output-type yaml` flags — see `docs/runbooks/04-secrets-decrypt.md`) into a per-invocation tempfile and appends `--values $TMP` to the helm chain. The decrypted file lives only inside the recipe's shell scope and is unlinked on shell exit (trap).
+The `just release` recipe auto-decrypts the sops envelope at `$SECRETS_DIR/k3s/gxy-management/valkey.values.yaml.enc` (with the required `--input-type yaml --output-type yaml` flags — see `docs/runbooks/04-secrets-decrypt.md`) into a per-invocation tempfile and appends `--values $TMP` to the helm chain. The decrypted file lives only inside the recipe's shell scope and is unlinked on shell exit (trap).
 
 ### C.3 Verify
 
@@ -407,7 +407,7 @@ helm get values -n artemis artemis >/dev/null 2>&1 \
   && echo "✓ artemis release present" \
   || true
 
-just deploy gxy-management artemis
+just release gxy-management artemis
 ```
 
 The recipe layers chart values → production overlay → sops sealed overlay. Post-cutover (artemis @ `f115198`, 2026-05-10) the chart no longer mounts a sites ConfigMap; the sites map lives in Valkey (§C) exclusively. The chart sets:
@@ -435,7 +435,7 @@ curl -fsS https://uploads.freecode.camp/healthz
 
 ```bash
 cd ~/DEV/fCC/infra
-just artemis-postdeploy-check
+just verify-artemis
 just phase5-smoke
 ```
 
@@ -447,7 +447,7 @@ When rehearsing a galaxy rebuild from scratch, **run with zot unreachable**. Art
 
 ## §E — Parked apps (DO NOT DEPLOY)
 
-ArgoCD, Zot, Atlantis chart artifacts live on disk in `k3s/gxy-management/apps/{argocd,zot}/` (Atlantis is not yet on disk). **Do not run** `just helm-upgrade gxy-management {argocd,zot}` — it will succeed and create cluster state that contradicts the parked status in ADR-005.
+ArgoCD, Zot, Atlantis chart artifacts live on disk in `k3s/gxy-management/apps/{argocd,zot}/` (Atlantis is not yet on disk). **Do not run** `just release gxy-management {argocd,zot}` — it will succeed and create cluster state that contradicts the parked status in ADR-005.
 
 | App      | Status                                    | Reactivation gate                                                                   |
 | -------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -508,14 +508,14 @@ curl -fsS https://uploads.freecode.camp/healthz
 | Valkey (registry) | **Deferred — post-GA** (see §C.5)                  | not yet running             | future: `r2://universe-static-apps-01/_meta/registry/<date>.rdb`  | post-GA scope        |
 | ArgoCD            | not backed up — state in git                       | n/a                         | n/a                                                               | re-deploy from git   |
 | Zot (parked)      | not backed up                                      | n/a                         | DO Spaces (when reactivated)                                      | n/a                  |
-| Helm releases     | not backed up — chart values are source of truth   | n/a                         | infra repo                                                        | `just helm-upgrade`  |
-| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                         | infra-secrets repo                                                | `just deploy`        |
+| Helm releases     | not backed up — chart values are source of truth   | n/a                         | infra repo                                                        | `just release`  |
+| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                         | infra-secrets repo                                                | `just release`        |
 
 ### G.1 Ad-hoc Windmill backup (before maintenance)
 
 ```bash
 cd ~/DEV/fCC/infra
-just windmill-backup gxy-management
+just backup-windmill gxy-management
 ```
 
 Saves to `k3s/gxy-management/.backups/`. Run before any helm-upgrade, teardown, or PG change.
@@ -586,7 +586,7 @@ cd ~/DEV/fCC/infra
 curl -fsSI https://test.freecode.camp/ | head -5
 
 # artemis healthy + sites enumeration.
-just artemis-postdeploy-check
+just verify-artemis
 
 # Static apps deploy E2E (deploys to test, curls cassiopeia, rolls back).
 just phase5-smoke
@@ -608,14 +608,14 @@ Destructive. Run an ad-hoc Windmill backup (G.1) and a Valkey manual-trigger RDB
 
 ```bash
 cd ~/DEV/fCC/infra
-just play k3s--teardown gxy_management_k3s
+just bootstrap k3s--teardown gxy_management_k3s
 ```
 
 ### Full teardown (VMs too)
 
 ```bash
 cd ~/DEV/fCC/infra
-just play k3s--teardown gxy_management_k3s
+just bootstrap k3s--teardown gxy_management_k3s
 doctl compute droplet delete \
   gxy-vm-management-k3s-1 gxy-vm-management-k3s-2 gxy-vm-management-k3s-3 \
   --force

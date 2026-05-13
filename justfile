@@ -3,65 +3,77 @@ set shell := ["bash", "-cu"]
 secrets_dir := env("SECRETS_DIR", justfile_directory() + "/../infra-secrets")
 crds_schema := 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 
+# ---------------------------------------------------------------------------
+# Recipes are organized by operator-lifecycle stage. `just --list` reads
+# top-to-bottom as the actual workflow:
+#
+#   provision  → D0 cloud resources (Terraform)
+#   bootstrap  → D0 node OS + k3s install (Ansible)
+#   release    → D1/D2 chart push to a cluster (helm + kustomize, smart-dispatched)
+#   configure  → D1/D2 mutation outside chart-release surface (secrets, registry, external SaaS, local creds)
+#   verify     → D2 read-only health probes (cluster, image, manifest, smoke E2E)
+#   test       → D2 active test suites (loadtest, contract tests)
+#   inspect    → D2 read-only deep dives (secrets, crds, terraform state, field-notes)
+#   backup     → D2 state extraction (pg_dump, etc.)
+#   build      → D2 image production (rare for ops)
+#   destroy    → DN destructive reset / teardown
+# ---------------------------------------------------------------------------
+
 # Show available recipes
 default:
     @just --list
 
-# ---------------------------------------------------------------------------
-# Secrets (sops + age — stored in infra-secrets private repo)
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# provision — D0 cloud (Terraform)
+# ===========================================================================
 
-# View a decrypted secret (auto-detects format from extension)
-[group('secrets')]
-secret-view name:
+# Run terraform on one or all workspaces. Examples:
+#   just provision plan all
+#   just provision apply gxy-management
+[group('provision')]
+provision cmd workspace="all":
     #!/usr/bin/env bash
     set -eu
-    FILE=$(find "{{ secrets_dir }}/{{ name }}" -name '*.enc' -type f | head -1)
-    [ -f "$FILE" ] || { echo "Error: no .enc file in {{ secrets_dir }}/{{ name }}/"; exit 1; }
-    case "$FILE" in
-      *.env.enc)            sops -d --input-type dotenv --output-type dotenv "$FILE" ;;
-      *.yaml.enc|*.yml.enc) sops -d --input-type yaml --output-type yaml "$FILE" ;;
-      *)                    sops -d "$FILE" ;;
-    esac
+    if [ "{{ workspace }}" = "all" ]; then
+      for ws in $(find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort); do
+        echo "==> $ws: terraform {{ cmd }}"
+        terraform -chdir=$ws {{ cmd }}
+      done
+    else
+      ws="terraform/{{ workspace }}"
+      [ -d "$ws" ] || { echo "Error: $ws not found"; exit 1; }
+      terraform -chdir=$ws {{ cmd }}
+    fi
 
-# Edit a secret in $EDITOR
-[group('secrets')]
-secret-edit name:
-    sops "{{ secrets_dir }}/{{ name }}/.env.enc"
+# ===========================================================================
+# bootstrap — D0 node (Ansible)
+# ===========================================================================
 
-# Verify all encrypted secrets are readable
-[group('secrets')]
-secret-verify-all:
+# Run any ansible playbook (logs to ansible/.ansible/logs/).
+# Example: just bootstrap k3s--install gxy_management_k3s
+[group('bootstrap')]
+[positional-arguments]
+bootstrap playbook host *args:
     #!/usr/bin/env bash
     set -eu
-    for f in $(find "{{ secrets_dir }}" -name '*.enc' -type f | sort); do
-      echo -n "$f: "
-      case "$f" in
-        *.env.enc)            sops -d --input-type dotenv --output-type dotenv "$f" > /dev/null 2>&1 ;;
-        *.yaml.enc|*.yml.enc) sops -d --input-type yaml --output-type yaml "$f" > /dev/null 2>&1 ;;
-        *)                    sops -d "$f" > /dev/null 2>&1 ;;
-      esac && echo "OK" || echo "FAILED"
-    done
+    mkdir -p ansible/.ansible/logs
+    LOGFILE="$(pwd)/ansible/.ansible/logs/$(date +%Y%m%d-%H%M%S)-{{ playbook }}.log"
+    cd ansible && uv run ansible-playbook -i inventory/digitalocean.yml play-{{ playbook }}.yml \
+      -e variable_host={{ host }} {{ args }} 2>&1 | tee "$LOGFILE"
+    echo "Log: $LOGFILE"
 
-# ---------------------------------------------------------------------------
-# K8s / K3s
-# ---------------------------------------------------------------------------
+# Install ansible dependencies (one-time on operator laptop)
+[group('bootstrap')]
+bootstrap-tools:
+    cd ansible && uv sync && uv run ansible-galaxy install -r requirements.yml
 
-# Decrypt kubeconfig from infra-secrets (run once after clone)
-[group('k3s')]
-kubeconfig-sync cluster:
-    #!/usr/bin/env bash
-    set -eu
-    SRC="{{ secrets_dir }}/k3s/{{ cluster }}/kubeconfig.yaml.enc"
-    DST="k3s/{{ cluster }}/.kubeconfig.yaml"
-    [ -f "$SRC" ] || { echo "Error: $SRC not found (cluster not yet bootstrapped?)"; exit 1; }
-    umask 077
-    sops -d --input-type yaml --output-type yaml "$SRC" > "$DST"
-    chmod 600 "$DST"
-    echo "Synced kubeconfig → $DST"
+# ===========================================================================
+# release — D1/D2 chart push to cluster (helm + kustomize, smart-dispatched)
+# ===========================================================================
 
-# Deploy or upgrade an app — single high-level verb. Smart-dispatches
-# on what `apps/<app>/` contains:
+# Release an app to a cluster — single high-level verb covering both fresh
+# install and version upgrade (helm semantics: `helm upgrade --install`).
+# Smart-dispatches on what `apps/<app>/` contains:
 #
 #   apps/<app>/charts/<chart>/  → helm upgrade --install (with values
 #                                  layering: chart defaults < production
@@ -78,12 +90,12 @@ kubeconfig-sync cluster:
 # `--set-file` knobs the chart needs from operator-local data).
 #
 # Examples:
-#   just deploy gxy-management windmill   → helm + kustomize
-#   just deploy gxy-cassiopeia caddy      → helm only
-#   just deploy gxy-management artemis    → helm only
-#   just deploy ops-backoffice-tools outline → kustomize only
-[group('k3s')]
-deploy cluster app:
+#   just release gxy-management windmill   → helm + kustomize
+#   just release gxy-cassiopeia caddy      → helm only
+#   just release gxy-management artemis    → helm only
+#   just release ops-backoffice-tools outline → kustomize only
+[group('release')]
+release cluster app:
     #!/usr/bin/env bash
     set -eu
     APP_DIR="k3s/{{ cluster }}/apps/{{ app }}"
@@ -171,56 +183,99 @@ deploy cluster app:
       ( cd k3s/{{ cluster }} && kubectl apply -k apps/{{ app }}/manifests/base/ )
     fi
 
-    echo "Deployed {{ app }} to {{ cluster }}"
+    echo "Released {{ app }} to {{ cluster }}"
 
-# Install or upgrade a Helm chart (overlays secret values from infra-secrets if present)
-[group('k3s')]
-helm-upgrade cluster app:
+# ===========================================================================
+# configure — D1/D2 mutation outside chart-release surface
+# ===========================================================================
+
+# Decrypt kubeconfig from infra-secrets to k3s/<cluster>/.kubeconfig.yaml.
+# Run once per cluster after clone.
+[group('configure')]
+configure-kubeconfig cluster:
     #!/usr/bin/env bash
     set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    CHART_DIR=$(find "apps/{{ app }}/charts" -maxdepth 1 -mindepth 1 -type d | head -1)
-    [ -d "$CHART_DIR" ] || { echo "Error: no chart dir in apps/{{ app }}/charts/"; exit 1; }
-    CHART_NAME=$(basename "$CHART_DIR")
-    VALUES="$CHART_DIR/values.yaml"
-    [ -f "$VALUES" ] || { echo "Error: $VALUES not found"; exit 1; }
-    HELM_ARGS="-f $VALUES"
-    CLEANUP=""
-    # Optional production overlay at apps/<app>/values.production.yaml —
-    # loaded between chart defaults and sops secret overlay so values flow:
-    # chart defaults  <  production overlay  <  encrypted secret overlay.
-    PROD_OVERLAY="apps/{{ app }}/values.production.yaml"
-    if [ -f "$PROD_OVERLAY" ]; then
-      HELM_ARGS="$HELM_ARGS -f $PROD_OVERLAY"
-    fi
-    SECRET_VALUES="{{ secrets_dir }}/k3s/{{ cluster }}/{{ app }}.values.yaml.enc"
-    if [ -f "$SECRET_VALUES" ]; then
-      TMPVALS=$(mktemp)
-      sops -d --input-type yaml --output-type yaml "$SECRET_VALUES" > "$TMPVALS"
-      HELM_ARGS="$HELM_ARGS -f $TMPVALS"
-      CLEANUP="$TMPVALS"
-      trap "rm -f $CLEANUP" EXIT
-    fi
+    SRC="{{ secrets_dir }}/k3s/{{ cluster }}/kubeconfig.yaml.enc"
+    DST="k3s/{{ cluster }}/.kubeconfig.yaml"
+    [ -f "$SRC" ] || { echo "Error: $SRC not found (cluster not yet bootstrapped?)"; exit 1; }
+    umask 077
+    sops -d --input-type yaml --output-type yaml "$SRC" > "$DST"
+    chmod 600 "$DST"
+    echo "Synced kubeconfig → $DST"
 
-    REPO_FILE="$CHART_DIR/repo"
-    if [ -f "$REPO_FILE" ]; then
-      REPO_URL=$(cat "$REPO_FILE")
-      echo "Installing {{ app }} (chart: $CHART_NAME) from $REPO_URL"
-      helm upgrade --install {{ app }} "$CHART_NAME" \
-        --repo "$REPO_URL" \
-        -n {{ app }} --create-namespace \
-        $HELM_ARGS
-    else
-      echo "Installing {{ app }} (chart: $CHART_NAME) from local directory"
-      helm upgrade --install {{ app }} "$CHART_DIR" \
-        -n {{ app }} --create-namespace \
-        $HELM_ARGS
-    fi
+# Edit a sops-encrypted secret envelope in $EDITOR.
+[group('configure')]
+configure-secret name:
+    sops "{{ secrets_dir }}/{{ name }}/.env.enc"
 
-# Show app namespace status (deploys, sts, pods, secrets, recent warnings)
-[group('k3s')]
-app-status cluster app:
+# Mint per-site Cloudflare R2 credentials and register them as Woodpecker
+# repo-scoped secrets via the Windmill flow at
+# `f/static/provision_site_r2_credentials`. Idempotent — re-running rotates
+# the token. T11 (sprint 2026-04-21) + D22 (Woodpecker repo-scope) +
+# D33 amended ×2 + D40 (Woodpecker is sole persistence surface).
+# Requires WINDMILL_REPO (defaults to ../fCC-U/windmill).
+[group('configure')]
+configure-constellation SITE="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ SITE }}" ]; then
+      echo "Usage: just configure-constellation <site>" >&2
+      echo "  <site>: lowercase alphanumeric + hyphens, 1-32 chars" >&2
+      exit 2
+    fi
+    WINDMILL_REPO="${WINDMILL_REPO:-../fCC-U/windmill}"
+    if [ ! -d "${WINDMILL_REPO}/workspaces/platform" ]; then
+      echo "Error: Windmill repo not found at ${WINDMILL_REPO}." >&2
+      echo "Override with WINDMILL_REPO=/abs/path/to/windmill" >&2
+      exit 1
+    fi
+    cd "${WINDMILL_REPO}/workspaces/platform"
+    echo "Registering constellation {{ SITE }} via Windmill flow..."
+    bunx wmill script run f/static/provision_site_r2_credentials \
+      -d '{"site":"{{ SITE }}"}'
+
+# Apply declarative Cloudflare Notifications from cloudflare/notifications.yaml.
+# Use --dry-run to preview without writing.
+[group('configure')]
+configure-cf-notifications *args:
+    scripts/cf-notifications-apply.sh {{ args }}
+
+# Apply declarative Uptime Robot monitors from uptime-robot/monitors.yaml.
+# Use --dry-run to preview without writing.
+[group('configure')]
+configure-uptime-robot *args:
+    scripts/uptime-robot-apply.sh {{ args }}
+
+# Trim aged journal entries from a field-notes file into
+# `journal-archive/YYYY-MM.md` siblings. Default cutoff 30 days.
+# Run from a clean working tree — emits a cross-repo diff in Universe.
+[group('configure')]
+configure-field-notes-trim area="infra" age="30":
+    python3 scripts/trim-field-notes.py \
+        ../Universe/spike/field-notes/{{area}}.md \
+        --age-days {{age}}
+
+# ===========================================================================
+# verify — D2 read-only health probes
+# ===========================================================================
+
+# Verify all encrypted secrets are decryptable with the operator's age key.
+[group('verify')]
+verify-secrets:
+    #!/usr/bin/env bash
+    set -eu
+    for f in $(find "{{ secrets_dir }}" -name '*.enc' -type f | sort); do
+      echo -n "$f: "
+      case "$f" in
+        *.env.enc)            sops -d --input-type dotenv --output-type dotenv "$f" > /dev/null 2>&1 ;;
+        *.yaml.enc|*.yml.enc) sops -d --input-type yaml --output-type yaml "$f" > /dev/null 2>&1 ;;
+        *)                    sops -d "$f" > /dev/null 2>&1 ;;
+      esac && echo "OK" || echo "FAILED"
+    done
+
+# Show app namespace status (deploys, sts, pods, secrets, recent warnings).
+[group('verify')]
+verify-app cluster app:
     #!/usr/bin/env bash
     set -eu
     cd k3s/{{ cluster }}
@@ -240,9 +295,9 @@ app-status cluster app:
     echo "--- recent warning events ---"
     kubectl -n "$NS" get events --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -10 || true
 
-# Wait for a CNPG Cluster CR to become Ready (default 5m)
-[group('k3s')]
-cnpg-wait cluster namespace name timeout="5m":
+# Wait for a CNPG Cluster CR to become Ready (default 5m).
+[group('verify')]
+verify-cnpg cluster namespace name timeout="5m":
     #!/usr/bin/env bash
     set -eu
     cd k3s/{{ cluster }}
@@ -254,69 +309,9 @@ cnpg-wait cluster namespace name timeout="5m":
     echo "--- pods ---"
     kubectl -n {{ namespace }} get pods -l cnpg.io/cluster={{ name }} -o wide
 
-# Reset a CNPG Cluster: delete the CR, all PVCs, and pods. DESTRUCTIVE.
-# After reset, re-run `just deploy {{cluster}} {{app}}` to recreate.
-[group('k3s')]
-cnpg-reset cluster namespace name:
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    echo "Deleting CNPG Cluster {{ namespace }}/{{ name }} ..."
-    kubectl -n {{ namespace }} delete cluster/{{ name }} --ignore-not-found
-    echo "Waiting for cluster pods to terminate ..."
-    kubectl -n {{ namespace }} wait --for=delete pod -l cnpg.io/cluster={{ name }} --timeout=120s 2>/dev/null || true
-    echo "Deleting PVCs for {{ name }} ..."
-    kubectl -n {{ namespace }} delete pvc -l cnpg.io/cluster={{ name }} --ignore-not-found
-    kubectl -n {{ namespace }} get pvc -o name | grep -E "{{ name }}-[0-9]+$" | xargs -r kubectl -n {{ namespace }} delete --ignore-not-found
-    echo 'Done. Re-run "just deploy {{ cluster }} <app>" to recreate.'
-
-# Show installed CRDs filtered by group (e.g. cnpg, gateway)
-[group('k3s')]
-crds-grep cluster filter:
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    kubectl get crd | grep -i {{ filter }}
-
-# Ad-hoc Windmill PostgreSQL backup (local file).
-#
-# Dumps pg_dumpall INSIDE the pod to a temp file (so the dump finishes
-# before we pull it) and only then copies it down via `kubectl cp`. This
-# avoids a known failure mode where a streaming `kubectl exec ... | gzip
-# > file.sql.gz` silently truncates mid-dump if the exec connection is
-# interrupted — the gzip closes cleanly, the file looks fine, but the
-# trailing DDL (triggers, ACLs) is missing. Seen during the 2026-04-22
-# gxy-mgmt rename dogfood. Always validate with the "PostgreSQL database
-# cluster dump complete" sentinel before trusting the artefact.
-[group('k3s')]
-windmill-backup cluster:
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    mkdir -p .backups
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    FILENAME="windmill-${TIMESTAMP}.sql.gz"
-    PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
-    [ -n "${PG_POD}" ] || { echo "Error: no PostgreSQL pod found in windmill namespace"; exit 1; }
-    echo "Backing up Windmill PostgreSQL from ${PG_POD}..."
-    REMOTE="/tmp/${FILENAME}"
-    kubectl exec -n windmill "${PG_POD}" -- bash -c "PGPASSWORD=\"\${POSTGRES_PASSWORD}\" pg_dumpall -U postgres --clean --if-exists | gzip > ${REMOTE}"
-    kubectl exec -n windmill "${PG_POD}" -- bash -c "gunzip -c ${REMOTE} | tail -1" | grep -q 'PostgreSQL database cluster dump complete' \
-      || { echo "Error: in-pod dump missing completion sentinel — aborting"; exit 1; }
-    kubectl cp "windmill/${PG_POD}:${REMOTE}" ".backups/${FILENAME}"
-    kubectl exec -n windmill "${PG_POD}" -- rm -f "${REMOTE}"
-    FILESIZE=$(stat -f%z ".backups/${FILENAME}" 2>/dev/null || stat -c%s ".backups/${FILENAME}")
-    [ "${FILESIZE}" -gt 100 ] || { echo "Error: backup file too small (${FILESIZE} bytes) — likely empty dump"; exit 1; }
-    gunzip -c ".backups/${FILENAME}" | tail -1 | grep -q 'PostgreSQL database cluster dump complete' \
-      || { echo "Error: copied backup missing completion sentinel — aborting"; rm -f ".backups/${FILENAME}"; exit 1; }
-    echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
-
-# Validate K8s manifests with kubeconform
-[group('k3s')]
-k8s-validate version="1.32.0":
+# Validate K8s manifests with kubeconform.
+[group('verify')]
+verify-manifests version="1.32.0":
     kubeconform \
       -summary \
       -output text \
@@ -338,121 +333,17 @@ k8s-validate version="1.32.0":
       -ignore-filename-pattern 'dashboards/' \
       k3s/ k8s/
 
-# ---------------------------------------------------------------------------
-# Ansible
-# ---------------------------------------------------------------------------
-
-# Run any ansible playbook (logs to ansible/.ansible/logs/)
-[group('ansible')]
-[positional-arguments]
-play playbook host *args:
-    #!/usr/bin/env bash
-    set -eu
-    mkdir -p ansible/.ansible/logs
-    LOGFILE="$(pwd)/ansible/.ansible/logs/$(date +%Y%m%d-%H%M%S)-{{ playbook }}.log"
-    cd ansible && uv run ansible-playbook -i inventory/digitalocean.yml play-{{ playbook }}.yml \
-      -e variable_host={{ host }} {{ args }} 2>&1 | tee "$LOGFILE"
-    echo "Log: $LOGFILE"
-
-# Install ansible dependencies
-[group('ansible')]
-ansible-install:
-    cd ansible && uv sync && uv run ansible-galaxy install -r requirements.yml
-
-# ---------------------------------------------------------------------------
-# Terraform
-# ---------------------------------------------------------------------------
-
-# Run terraform on one or all workspaces
-[group('terraform')]
-tf cmd workspace="all":
-    #!/usr/bin/env bash
-    set -eu
-    if [ "{{ workspace }}" = "all" ]; then
-      for ws in $(find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort); do
-        echo "==> $ws: terraform {{ cmd }}"
-        terraform -chdir=$ws {{ cmd }}
-      done
-    else
-      ws="terraform/{{ workspace }}"
-      [ -d "$ws" ] || { echo "Error: $ws not found"; exit 1; }
-      terraform -chdir=$ws {{ cmd }}
-    fi
-
-# List terraform workspaces
-[group('terraform')]
-tf-list:
-    @find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort
-
-# ---------------------------------------------------------------------------
-# Storage (R2 buckets, access keys)
-# ---------------------------------------------------------------------------
-
-# Verify an R2 bucket is provisioned correctly (exists, rw/ro keys work, ro cannot write).
-# Reads credentials from infra-secrets/<bucket-cluster>/r2-{rw,ro}.env.enc via sops.
-[group('storage')]
-r2-bucket-verify bucket:
+# Verify an R2 bucket is provisioned correctly (exists, rw/ro keys work, ro
+# cannot write). Reads credentials from
+# infra-secrets/<bucket-cluster>/r2-{rw,ro}.env.enc via sops.
+[group('verify')]
+verify-r2 bucket:
     scripts/r2-bucket-verify.sh {{ bucket }}
 
-# ---------------------------------------------------------------------------
-# Constellations (per-site static-app provisioning)
-# ---------------------------------------------------------------------------
-
-# Mint per-site Cloudflare R2 credentials and register them as Woodpecker
-# repo-scoped secrets via the Windmill flow at
-# `f/static/provision_site_r2_credentials`. Idempotent — re-running rotates
-# the token. T11 (sprint 2026-04-21) + D22 (Woodpecker repo-scope) +
-# D33 amended ×2 + D40 (Woodpecker is sole persistence surface).
-# Requires WINDMILL_REPO (defaults to ../fCC-U/windmill).
-[group('constellations')]
-constellation-register SITE="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ SITE }}" ]; then
-      echo "Usage: just constellation-register <site>" >&2
-      echo "  <site>: lowercase alphanumeric + hyphens, 1-32 chars" >&2
-      exit 2
-    fi
-    WINDMILL_REPO="${WINDMILL_REPO:-../fCC-U/windmill}"
-    if [ ! -d "${WINDMILL_REPO}/workspaces/platform" ]; then
-      echo "Error: Windmill repo not found at ${WINDMILL_REPO}." >&2
-      echo "Override with WINDMILL_REPO=/abs/path/to/windmill" >&2
-      exit 1
-    fi
-    cd "${WINDMILL_REPO}/workspaces/platform"
-    echo "Registering constellation {{ SITE }} via Windmill flow..."
-    bunx wmill script run f/static/provision_site_r2_credentials \
-      -d '{"site":"{{ SITE }}"}'
-
-# Static contract test for `constellation-register` recipe.
-[group('constellations')]
-constellation-register-test:
-    bash scripts/tests/constellation-register.sh
-
-# ---------------------------------------------------------------------------
-# Monitoring (Cloudflare Notifications + Uptime Robot)
-# ---------------------------------------------------------------------------
-
-# Apply declarative Cloudflare Notifications from cloudflare/notifications.yaml.
-# Use --dry-run to preview without writing.
-[group('monitoring')]
-cf-notifications-apply *args:
-    scripts/cf-notifications-apply.sh {{ args }}
-
-# Apply declarative Uptime Robot monitors from uptime-robot/monitors.yaml.
-# Use --dry-run to preview without writing.
-[group('monitoring')]
-uptime-robot-apply *args:
-    scripts/uptime-robot-apply.sh {{ args }}
-
-# ---------------------------------------------------------------------------
-# Artemis — post-deploy verification + load testing
-# ---------------------------------------------------------------------------
-#
-# Source of truth for E2E correctness lives in the artemis repo at
-# `internal/integration/` (build-tagged Go suite, `make integration`).
-# This recipe is a thin wrapper that points the suite at a deployed
-# artemis. See `docs/runbooks/artemis-postdeploy-check.md`.
+# Artemis post-deploy E2E. Source of truth for E2E correctness lives in the
+# artemis repo at `internal/integration/` (build-tagged Go suite, `make
+# integration`). This recipe is a thin wrapper that points the suite at a
+# deployed artemis. See `docs/runbooks/03-artemis-postdeploy-check.md`.
 #
 # Required env (or fall through to defaults):
 #   ARTEMIS_URL    default https://uploads.freecode.camp
@@ -460,8 +351,8 @@ uptime-robot-apply *args:
 #   GH_TOKEN       default `gh auth token`
 #   SITE           default test
 #   ROOT_DOMAIN    default freecode.camp
-[group('artemis')]
-artemis-postdeploy-check:
+[group('verify')]
+verify-artemis:
     #!/usr/bin/env bash
     set -euo pipefail
     : "${ARTEMIS_URL:=https://uploads.freecode.camp}"
@@ -492,6 +383,25 @@ artemis-postdeploy-check:
       SITE="$SITE" ROOT_DOMAIN="$ROOT_DOMAIN" \
       make integration
 
+# Verify the locally-built caddy-s3 image lists both in-tree modules AND does
+# NOT list the third-party caddy.fs.s3 (D32 — no third-party Caddy plugins).
+# Runs the image under emulation since the host is usually arm64.
+[group('verify')]
+verify-caddy-s3:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TAG="dev-$(git rev-parse --short HEAD)"
+    IMG="ghcr.io/freecodecamp/caddy-s3:${TAG}"
+    MODULES=$(docker run --rm --platform linux/amd64 "${IMG}" caddy list-modules)
+    echo "${MODULES}" | grep -q '^http.handlers.r2_alias$' || { echo "FAIL: http.handlers.r2_alias not listed"; exit 1; }
+    echo "${MODULES}" | grep -q '^caddy.fs.r2$' || { echo "FAIL: caddy.fs.r2 not listed"; exit 1; }
+    ! echo "${MODULES}" | grep -q '^caddy.fs.s3$' || { echo "FAIL: caddy.fs.s3 present (D32 violated)"; exit 1; }
+    echo "OK: http.handlers.r2_alias + caddy.fs.r2 present; caddy.fs.s3 absent"
+
+# ===========================================================================
+# test — D2 active test suites
+# ===========================================================================
+
 # k6 load test — pick a scenario from `loadtest/scenarios/`.
 #
 # Scenarios:
@@ -501,8 +411,8 @@ artemis-postdeploy-check:
 #   artemis-deploy      sustained init+upload+finalize bursts (write-heavy)
 #
 # Required env: see `loadtest/README.md` per scenario.
-[group('loadtest')]
-loadtest scenario:
+[group('test')]
+test-loadtest scenario:
     #!/usr/bin/env bash
     set -euo pipefail
     SCRIPT="loadtest/scenarios/{{ scenario }}.js"
@@ -518,9 +428,98 @@ loadtest scenario:
     fi
     k6 run "$SCRIPT"
 
-# ---------------------------------------------------------------------------
-# Docker images (caddy-s3 — in-tree r2alias module via xcaddy)
-# ---------------------------------------------------------------------------
+# Static contract test for `configure-constellation` recipe.
+[group('test')]
+test-constellation:
+    bash scripts/tests/constellation-register.sh
+
+# ===========================================================================
+# inspect — D2 read-only deep dives
+# ===========================================================================
+
+# View a decrypted secret (auto-detects format from extension).
+[group('inspect')]
+inspect-secret name:
+    #!/usr/bin/env bash
+    set -eu
+    FILE=$(find "{{ secrets_dir }}/{{ name }}" -name '*.enc' -type f | head -1)
+    [ -f "$FILE" ] || { echo "Error: no .enc file in {{ secrets_dir }}/{{ name }}/"; exit 1; }
+    case "$FILE" in
+      *.env.enc)            sops -d --input-type dotenv --output-type dotenv "$FILE" ;;
+      *.yaml.enc|*.yml.enc) sops -d --input-type yaml --output-type yaml "$FILE" ;;
+      *)                    sops -d "$FILE" ;;
+    esac
+
+# Show installed CRDs filtered by group (e.g. cnpg, gateway).
+[group('inspect')]
+inspect-crds cluster filter:
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{ cluster }}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    kubectl get crd | grep -i {{ filter }}
+
+# List terraform workspaces.
+[group('inspect')]
+inspect-tf:
+    @find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort
+
+# List canonical journal entries (### YYYY-MM-DD —) in a field-notes file
+# with their ages in days. Useful before running `configure-field-notes-trim`.
+[group('inspect')]
+inspect-field-notes area="infra":
+    python3 scripts/trim-field-notes.py \
+        ../Universe/spike/field-notes/{{area}}.md --list
+
+# Dry-run: show which dated journal entries would be archived by
+# `configure-field-notes-trim`. Default cutoff 30 days. Override with `age=N`.
+[group('inspect')]
+inspect-field-notes-trim area="infra" age="30":
+    python3 scripts/trim-field-notes.py \
+        ../Universe/spike/field-notes/{{area}}.md \
+        --age-days {{age}} --dry-run
+
+# ===========================================================================
+# backup — D2 state extraction
+# ===========================================================================
+
+# Ad-hoc Windmill PostgreSQL backup (local file).
+#
+# Dumps pg_dumpall INSIDE the pod to a temp file (so the dump finishes
+# before we pull it) and only then copies it down via `kubectl cp`. This
+# avoids a known failure mode where a streaming `kubectl exec ... | gzip
+# > file.sql.gz` silently truncates mid-dump if the exec connection is
+# interrupted — the gzip closes cleanly, the file looks fine, but the
+# trailing DDL (triggers, ACLs) is missing. Seen during the 2026-04-22
+# gxy-mgmt rename dogfood. Always validate with the "PostgreSQL database
+# cluster dump complete" sentinel before trusting the artefact.
+[group('backup')]
+backup-windmill cluster:
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{ cluster }}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    mkdir -p .backups
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    FILENAME="windmill-${TIMESTAMP}.sql.gz"
+    PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
+    [ -n "${PG_POD}" ] || { echo "Error: no PostgreSQL pod found in windmill namespace"; exit 1; }
+    echo "Backing up Windmill PostgreSQL from ${PG_POD}..."
+    REMOTE="/tmp/${FILENAME}"
+    kubectl exec -n windmill "${PG_POD}" -- bash -c "PGPASSWORD=\"\${POSTGRES_PASSWORD}\" pg_dumpall -U postgres --clean --if-exists | gzip > ${REMOTE}"
+    kubectl exec -n windmill "${PG_POD}" -- bash -c "gunzip -c ${REMOTE} | tail -1" | grep -q 'PostgreSQL database cluster dump complete' \
+      || { echo "Error: in-pod dump missing completion sentinel — aborting"; exit 1; }
+    kubectl cp "windmill/${PG_POD}:${REMOTE}" ".backups/${FILENAME}"
+    kubectl exec -n windmill "${PG_POD}" -- rm -f "${REMOTE}"
+    FILESIZE=$(stat -f%z ".backups/${FILENAME}" 2>/dev/null || stat -c%s ".backups/${FILENAME}")
+    [ "${FILESIZE}" -gt 100 ] || { echo "Error: backup file too small (${FILESIZE} bytes) — likely empty dump"; exit 1; }
+    gunzip -c ".backups/${FILENAME}" | tail -1 | grep -q 'PostgreSQL database cluster dump complete' \
+      || { echo "Error: copied backup missing completion sentinel — aborting"; rm -f ".backups/${FILENAME}"; exit 1; }
+    echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
+
+# ===========================================================================
+# build — D2 image production
+# ===========================================================================
 
 # Build the caddy-s3 image locally and tag with dev-<sha>. Platform pinned to
 # linux/amd64 — DO droplets run on AMD64, and buildx defaults to the host
@@ -528,8 +527,8 @@ loadtest scenario:
 # GitHub Actions (`.github/workflows/docker--caddy-s3.yml`) builds the
 # canonical `ghcr.io/freecodecamp/caddy-s3:{sha}` tag on push (build-
 # residency principle: platform pillars build outside Universe).
-[group('docker')]
-caddy-s3-build:
+[group('build')]
+build-caddy-s3:
     #!/usr/bin/env bash
     set -euo pipefail
     TAG="dev-$(git rev-parse --short HEAD)"
@@ -540,45 +539,23 @@ caddy-s3-build:
         docker/images/caddy-s3/
     echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
 
-# Verify the built image lists both in-tree modules AND does NOT list the
-# third-party caddy.fs.s3 (D32 — no third-party Caddy plugins). Runs the image
-# under emulation since the host is usually arm64.
-[group('docker')]
-caddy-s3-verify:
+# ===========================================================================
+# destroy — DN destructive reset / teardown
+# ===========================================================================
+
+# Reset a CNPG Cluster: delete the CR, all PVCs, and pods. DESTRUCTIVE.
+# After reset, re-run `just release {{cluster}} {{app}}` to recreate.
+[group('destroy')]
+destroy-cnpg cluster namespace name:
     #!/usr/bin/env bash
-    set -euo pipefail
-    TAG="dev-$(git rev-parse --short HEAD)"
-    IMG="ghcr.io/freecodecamp/caddy-s3:${TAG}"
-    MODULES=$(docker run --rm --platform linux/amd64 "${IMG}" caddy list-modules)
-    echo "${MODULES}" | grep -q '^http.handlers.r2_alias$' || { echo "FAIL: http.handlers.r2_alias not listed"; exit 1; }
-    echo "${MODULES}" | grep -q '^caddy.fs.r2$' || { echo "FAIL: caddy.fs.r2 not listed"; exit 1; }
-    ! echo "${MODULES}" | grep -q '^caddy.fs.s3$' || { echo "FAIL: caddy.fs.s3 present (D32 violated)"; exit 1; }
-    echo "OK: http.handlers.r2_alias + caddy.fs.r2 present; caddy.fs.s3 absent"
-
-# ---------------------------------------------------------------------------
-# Docs maintenance
-# ---------------------------------------------------------------------------
-
-# List canonical journal entries (### YYYY-MM-DD —) in a field-notes file with
-# their ages in days. Read-only; useful before running field-notes-trim.
-[group('docs')]
-field-notes-list area="infra":
-    python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{area}}.md --list
-
-# Dry-run: show which dated journal entries would be archived. Default cutoff
-# 30 days. Override with `age=N`.
-[group('docs')]
-field-notes-trim-plan area="infra" age="30":
-    python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{area}}.md \
-        --age-days {{age}} --dry-run
-
-# Apply: archive dated journal entries older than `age` days into
-# `journal-archive/YYYY-MM.md` siblings of the field-notes file. Idempotent.
-# Run from a clean working tree — emits a cross-repo diff in Universe.
-[group('docs')]
-field-notes-trim area="infra" age="30":
-    python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{area}}.md \
-        --age-days {{age}}
+    set -eu
+    cd k3s/{{ cluster }}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    echo "Deleting CNPG Cluster {{ namespace }}/{{ name }} ..."
+    kubectl -n {{ namespace }} delete cluster/{{ name }} --ignore-not-found
+    echo "Waiting for cluster pods to terminate ..."
+    kubectl -n {{ namespace }} wait --for=delete pod -l cnpg.io/cluster={{ name }} --timeout=120s 2>/dev/null || true
+    echo "Deleting PVCs for {{ name }} ..."
+    kubectl -n {{ namespace }} delete pvc -l cnpg.io/cluster={{ name }} --ignore-not-found
+    kubectl -n {{ namespace }} get pvc -o name | grep -E "{{ name }}-[0-9]+$" | xargs -r kubectl -n {{ namespace }} delete --ignore-not-found
+    echo 'Done. Re-run "just release {{ cluster }} <app>" to recreate.'

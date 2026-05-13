@@ -4,7 +4,7 @@
 
 ## Summary
 
-Formalize `infra-secrets` layout into two explicit scopes — platform-wide (`<app>/`, `global/`) and cluster-local (`k3s/<cluster>/`). Deduplicate the `*.freecodecamp.net` Cloudflare Origin wildcard into a single canonical source at `global/tls/<zone>.{crt,key}.enc`. Extend `just deploy` with a zone-fallback probe so apps that need the wildcard don't each carry a copy. Backfill missing `.enc` assets flagged during the 2026-04-21 audit (wooodpecker TLS, Windmill backup S3). Sync all flight-manuals + the rename runbook + infra-secrets README to match.
+Formalize `infra-secrets` layout into two explicit scopes — platform-wide (`<app>/`, `global/`) and cluster-local (`k3s/<cluster>/`). Deduplicate the `*.freecodecamp.net` Cloudflare Origin wildcard into a single canonical source at `global/tls/<zone>.{crt,key}.enc`. Extend `just release` with a zone-fallback probe so apps that need the wildcard don't each carry a copy. Backfill missing `.enc` assets flagged during the 2026-04-21 audit (wooodpecker TLS, Windmill backup S3). Sync all flight-manuals + the rename runbook + infra-secrets README to match.
 
 Out of scope: legacy retirement of `appsmith/` + `outline/` + `docker/`
 
@@ -45,7 +45,7 @@ k3s/<cluster>/kubeconfig.yaml.enc           # encrypted kubeconfig
 scratchpad/                      # dev scratch
 ```
 
-### Deploy pipeline (existing `just deploy <cluster> <app>`)
+### Deploy pipeline (existing `just release <cluster> <app>`)
 
 ```
 for suffix in '.secrets.env.enc' '.tls.crt.enc' '.tls.key.enc' '-backup.secrets.env.enc':
@@ -55,7 +55,7 @@ kubectl apply -k apps/<app>/manifests/base/
 trap cleanup decrypted files on exit
 ```
 
-`just helm-upgrade <cluster> <app>` similarly probes `infra-secrets/k3s/<cluster>/<app>.values.yaml.enc`.
+`just release <cluster> <app>` similarly probes `infra-secrets/k3s/<cluster>/<app>.values.yaml.enc`.
 
 ### Drift matrix
 
@@ -102,10 +102,10 @@ k3s/<cluster>/cluster.tls.zone       # contents: `freecodecamp-net` or `freecode
 | gxy-static     | `freecode-camp`    | `global/tls/freecode-camp.{crt,key}.enc` (added Phase 2) |
 | gxy-cassiopeia | `freecode-camp`    | `global/tls/freecode-camp.{crt,key}.enc` (added Phase 2) |
 
-### Extended `just deploy` probe order
+### Extended `just release` probe order
 
 ```
-# TLS resolution for `just deploy <cluster> <app>`:
+# TLS resolution for `just release <cluster> <app>`:
 if k3s/<cluster>/<app>.tls.crt.enc exists:
     use per-app override
 elif k3s/<cluster>/cluster.tls.zone exists:
@@ -138,16 +138,16 @@ No change to per-app kustomization.yaml. Generated Secret name (`<app>-tls-cloud
 | Phase | Action                                                                                                                                                                                                                                                                                                       | Scope                                         | Rollback                                                                                      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | 1     | This RFC + operator tick of Decision Index                                                                                                                                                                                                                                                                   | Docs only                                     | Discard RFC                                                                                   |
-| 2     | Create `global/tls/freecodecamp-net.{crt,key}.enc` (from existing `windmill.tls.*.enc` decrypt). Add `cluster.tls.zone` markers. Backfill `k3s/gxy-launchbase/woodpecker.tls.*.enc` + `k3s/gxy-management/windmill-backup.secrets.env.enc`. Validate via `just secret-verify-all`.                           | infra-secrets only (no live impact)           | `git revert` in infra-secrets                                                                 |
-| 3     | Extend `just deploy` recipe with zone-fallback probe. Local dry-run (decrypt + cleanup trap) against every (cluster, app) pair.                                                                                                                                                                              | infra repo only (justfile)                    | `git revert` in infra                                                                         |
-| 4     | Live reconcile: `just deploy gxy-management windmill` (expect no-diff or cert-secret update). Repeat argocd. Repeat `just deploy gxy-launchbase woodpecker`.                                                                                                                                                 | Live clusters — idempotent kubectl apply      | `kubectl apply -k` with old secret contents (tls unchanged on rotation; nothing to roll back) |
-| 5     | Delete `k3s/gxy-management/{argocd,windmill,zot}.tls.{crt,key}.enc` once Phase 4 green. Clean disk residue `apps/<app>/manifests/base/secrets/tls.{crt,key}`. Uncomment `backup-cronjob.yaml` + `windmill-backup-s3` secretGenerator in windmill kustomization; `just deploy gxy-management windmill` again. | infra-secrets + infra repos                   | Restore deleted .enc from prior commit                                                        |
+| 2     | Create `global/tls/freecodecamp-net.{crt,key}.enc` (from existing `windmill.tls.*.enc` decrypt). Add `cluster.tls.zone` markers. Backfill `k3s/gxy-launchbase/woodpecker.tls.*.enc` + `k3s/gxy-management/windmill-backup.secrets.env.enc`. Validate via `just verify-secrets`.                           | infra-secrets only (no live impact)           | `git revert` in infra-secrets                                                                 |
+| 3     | Extend `just release` recipe with zone-fallback probe. Local dry-run (decrypt + cleanup trap) against every (cluster, app) pair.                                                                                                                                                                              | infra repo only (justfile)                    | `git revert` in infra                                                                         |
+| 4     | Live reconcile: `just release gxy-management windmill` (expect no-diff or cert-secret update). Repeat argocd. Repeat `just release gxy-launchbase woodpecker`.                                                                                                                                                 | Live clusters — idempotent kubectl apply      | `kubectl apply -k` with old secret contents (tls unchanged on rotation; nothing to roll back) |
+| 5     | Delete `k3s/gxy-management/{argocd,windmill,zot}.tls.{crt,key}.enc` once Phase 4 green. Clean disk residue `apps/<app>/manifests/base/secrets/tls.{crt,key}`. Uncomment `backup-cronjob.yaml` + `windmill-backup-s3` secretGenerator in windmill kustomization; `just release gxy-management windmill` again. | infra-secrets + infra repos                   | Restore deleted .enc from prior commit                                                        |
 | 6     | Docs sync: infra-secrets/README.md (two-scope table), all 6 flight-manuals §Pre-flight, `00-index.md`, runbook §Preconditions + §Touchpoints.                                                                                                                                                                | Docs only                                     | `git revert`                                                                                  |
-| 7     | Run Windmill backup via restored CronJob (or `just windmill-backup gxy-management` if cron cadence too slow). Confirm pg_dump lands in configured S3 target. Capture fresh `.backups/windmill-<ts>.sql.gz` if justfile backup.                                                                               | Live gxy-management — read-only DB + write S3 | Backup is additive; no rollback needed                                                        |
+| 7     | Run Windmill backup via restored CronJob (or `just backup-windmill gxy-management` if cron cadence too slow). Confirm pg_dump lands in configured S3 target. Capture fresh `.backups/windmill-<ts>.sql.gz` if justfile backup.                                                                               | Live gxy-management — read-only DB + write S3 | Backup is additive; no rollback needed                                                        |
 
 ## Exit criteria
 
-- [ ] `just secret-verify-all` exits 0 across repo.
+- [ ] `just verify-secrets` exits 0 across repo.
 - [ ] `rtk grep -rn 'cloudflare-origin' infra-secrets/` → 0 matches (new convention uses `<zone>.{crt,key}.enc`).
 - [ ] Three `k3s/gxy-management/{argocd,windmill,zot}.tls.*.enc` files deleted from infra-secrets HEAD.
 - [ ] `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` present + decrypts.
@@ -223,4 +223,4 @@ The k3s-ansible role (v1.1.1) `extra_service_envs` uses `lineinfile` without `re
 
 ## Acknowledgments
 
-Inputs: 2026-04-21 cluster audit (`docs/sprints/2026-04-21/cluster-audit.md`), HANDOFF naming-convention table, infra-secrets README §Directory Structure, `just deploy` + `just helm-upgrade` recipes, runtime kubectl inspection of gxy-management + gxy-launchbase clusters.
+Inputs: 2026-04-21 cluster audit (`docs/sprints/2026-04-21/cluster-audit.md`), HANDOFF naming-convention table, infra-secrets README §Directory Structure, `just release` + `just release` recipes, runtime kubectl inspection of gxy-management + gxy-launchbase clusters.

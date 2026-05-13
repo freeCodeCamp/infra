@@ -11,7 +11,7 @@ how to wire and trigger the suite from the infra repo.
 
 ## When to run
 
-- Immediately after `just deploy gxy-management artemis`
+- Immediately after `just release gxy-management artemis`
 - After caddy-s3 chart bump on `gxy-cassiopeia`
 - After any `universe sites register/update` against a smoke-eligible slug (validates authz wiring)
 - After secrets rotation (R2 keys, JWT signing key, GH OAuth)
@@ -32,7 +32,7 @@ how to wire and trigger the suite from the infra repo.
 
 ```sh
 cd /Users/mrugesh/DEV/fCC/infra
-just artemis-postdeploy-check
+just verify-artemis
 ```
 
 That's it. The recipe:
@@ -61,7 +61,7 @@ Example targeting a staging artemis:
 ```sh
 ARTEMIS_URL=https://uploads.staging.freecode.camp \
   SITE=test ROOT_DOMAIN=staging.freecode.camp \
-  just artemis-postdeploy-check
+  just verify-artemis
 ```
 
 ## What the suite covers

@@ -35,19 +35,19 @@ read it before deviating from any step.
 ### A.1 Pre-flight
 
 `UNIVERSE.md §0` already covers tool versions, age key, infra-secrets
-mount, and `just secret-verify-all`. Cassiopeia-specific files:
+mount, and `just verify-secrets`. Cassiopeia-specific files:
 
 - `infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc` — sops
   overlay carrying R2 credentials (`endpoint`, `accessKeyId`,
   `secretAccessKey`).
 - `infra-secrets/k3s/gxy-cassiopeia/r2-rw.env.enc` +
-  `r2-ro.env.enc` — bucket-scoped key pair for `just r2-bucket-verify`.
+  `r2-ro.env.enc` — bucket-scoped key pair for `just verify-r2`.
 
 Verify before proceeding:
 
 ```bash
 cd ~/DEV/fCC/infra
-just secret-verify-all
+just verify-secrets
 ```
 
 ### A.2 DigitalOcean infrastructure (one-time, ClickOps)
@@ -72,11 +72,11 @@ OpenTofu codification is parked per ADR-002 drift report.
 ```bash
 cd ~/DEV/fCC/infra
 
-just play tailscale--0-install gxy_cassiopeia_k3s
-just play tailscale--1b-up-with-ssh gxy_cassiopeia_k3s
+just bootstrap tailscale--0-install gxy_cassiopeia_k3s
+just bootstrap tailscale--1b-up-with-ssh gxy_cassiopeia_k3s
 
 cd k3s/gxy-cassiopeia
-just play k3s--bootstrap gxy_cassiopeia_k3s
+just bootstrap k3s--bootstrap gxy_cassiopeia_k3s
 ```
 
 `k3s--bootstrap` is idempotent: it's a sequence of validate →
@@ -121,7 +121,7 @@ if [ "$LIVE" = "$PINNED" ]; then
   echo "✓ caddy already at $PINNED, skipping"
 else
   cd ~/DEV/fCC/infra
-  just helm-upgrade gxy-cassiopeia caddy
+  just release gxy-cassiopeia caddy
 fi
 ```
 
@@ -136,7 +136,7 @@ through zot for chicken-egg avoidance).
 
 ```bash
 cd ~/DEV/fCC/infra
-just r2-bucket-verify universe-static-apps-01
+just verify-r2 universe-static-apps-01
 # Asserts: rw key writes, ro key cannot write, both can read.
 # Idempotent — touches a temp key it cleans up.
 ```
@@ -309,7 +309,7 @@ at gxy-management:
 
 ```bash
 cd ~/DEV/fCC/infra
-just artemis-postdeploy-check        # auth + sites/list + 200 on uploads.freecode.camp/healthz
+just verify-artemis        # auth + sites/list + 200 on uploads.freecode.camp/healthz
 just phase5-smoke                    # init → upload → finalize (preview) → preview curl → promote → prod curl
 ```
 
@@ -396,14 +396,14 @@ teardown, otherwise live traffic 5xxs.
 
 ```bash
 cd ~/DEV/fCC/infra
-just play k3s--teardown gxy_cassiopeia_k3s
+just bootstrap k3s--teardown gxy_cassiopeia_k3s
 ```
 
 ### Full teardown (VMs too)
 
 ```bash
 cd ~/DEV/fCC/infra
-just play k3s--teardown gxy_cassiopeia_k3s
+just bootstrap k3s--teardown gxy_cassiopeia_k3s
 doctl compute droplet delete \
   gxy-vm-cassiopeia-k3s-1 gxy-vm-cassiopeia-k3s-2 gxy-vm-cassiopeia-k3s-3 \
   --force

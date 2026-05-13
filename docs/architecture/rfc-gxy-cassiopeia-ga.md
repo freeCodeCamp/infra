@@ -31,7 +31,7 @@ This RFC is the GA hardening pass. Sections A-D enumerate the work; sections E-F
                     ▼                                                            ▼
         ┌─────────────────────────────────────────────────┐         ┌─────────────────────┐
         │  artemis  (gxy-management/uploads.freecode.camp)│         │  one-time bootstrap │
-        │  ┌───────────────────────────────────────────┐  │         │  just helm-upgrade  │
+        │  ┌───────────────────────────────────────────┐  │         │  just release  │
         │  │  POST /api/site/register                  │  │         │   gxy-management    │
         │  │  POST /api/deploy/{init|upload|finalize}  │  │         │   artemis           │
         │  │  POST /api/site/<site>/promote            │  │         │  (no --set-file)    │
@@ -140,7 +140,7 @@ Rationale:
 
 1. **Multi-writer safe.** All 3 artemis replicas write through one Valkey — Valkey serializes commands. ConfigMap has no compare-and-set; concurrent writes race.
 
-1. **Operator-free steady state.** Bootstrap = `just deploy gxy-management valkey` followed by `just deploy gxy-management artemis` once. Steady state: staff (or universe-cli on staff's behalf) calls `POST /api/site/register` against artemis; artemis writes Valkey; `PUBLISH registry.changed <site>` fans the invalidation. No operator, no PR, no helm-upgrade.
+1. **Operator-free steady state.** Bootstrap = `just release gxy-management valkey` followed by `just release gxy-management artemis` once. Steady state: staff (or universe-cli on staff's behalf) calls `POST /api/site/register` against artemis; artemis writes Valkey; `PUBLISH registry.changed <site>` fans the invalidation. No operator, no PR, no helm-upgrade.
 
 1. **Right-sized footprint.** Single pod (~50 MiB RAM idle), single PVC (~1 GiB sufficient for ~10K sites of the schema below), one Service. NetworkPolicy allows only `app=artemis` pods to connect.
 
@@ -203,10 +203,10 @@ Backup: a CronJob (`apps/valkey/manifests/base/rdb-backup.yaml`) runs daily 03:0
 | Step                                                                                                                           | Who                             | Effect                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- | -------------------------------------------------------------------------- |
 | 1. Mint `infra-secrets/k3s/gxy-management/valkey.values.yaml.enc` with `auth.password`.                                        | operator                        | one-time secret seed                                                       |
-| 2. `cd k3s/gxy-management && just deploy valkey`                                                                               | operator                        | helm install valkey + manifests; PVC bound; pod Ready                      |
+| 2. `cd k3s/gxy-management && just release valkey`                                                                               | operator                        | helm install valkey + manifests; PVC bound; pod Ready                      |
 | 3. Bump artemis image to a build that supports `REGISTRY_BACKEND=valkey` (defaults: `REGISTRY_BACKEND=sites_yaml`).            | follow-up sprint (artemis repo) | artemis with both backends compiled in                                     |
 | 4. Run one-shot `just artemis-registry-import sites.yaml` (in-cluster Job): reads `/etc/artemis/sites.yaml`, writes to Valkey. | operator                        | content migrated; `HLEN sites` matches source                              |
-| 5. `just helm-upgrade gxy-management artemis --set env.REGISTRY_BACKEND=valkey` (no `--set-file`).                             | operator                        | artemis switches read path to Valkey; ConfigMap mount retained as fallback |
+| 5. `just release gxy-management artemis --set env.REGISTRY_BACKEND=valkey` (no `--set-file`).                             | operator                        | artemis switches read path to Valkey; ConfigMap mount retained as fallback |
 | 6. After 24h soak: drop `--set-file` from chart values + remove `SITES_YAML_PATH` env + retire `sites.yaml` from artemis repo. | follow-up sprint (artemis repo) | artemis chart no longer references the file                                |
 
 Step 3 (and the tail of step 6) are **artemis-side code work** — follow-up sprint scope, not this audit. The flight-manual chapter encodes the **end state** (steps 4-5 only as the operator path); steps 1-2 belong in the cassiopeia or management chapter as one-time bootstrap.
@@ -323,18 +323,18 @@ Cassiopeia GA = all of the following pass on a fresh back-to-back idempotent rer
 | ---- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | G1   | k3s + Cilium green                                                                                 | `kubectl get nodes -o wide` + `cilium-health status`                                                                                                  |
 | G2   | caddy-s3 chart deployed and pods 3/3 Running with Gateway Programmed                               | `kubectl get pods,gateway,httproute -n caddy`                                                                                                         |
-| G3   | R2 bucket reachable from caddy with read-only key                                                  | `just r2-bucket-verify universe-static-apps-01`                                                                                                       |
+| G3   | R2 bucket reachable from caddy with read-only key                                                  | `just verify-r2 universe-static-apps-01`                                                                                                       |
 | G4   | DNS resolves `*.freecode.camp` to 3 cassiopeia node IPs                                            | `dig +short test.freecode.camp` matches `doctl droplet list` output                                                                                   |
 | G5   | Valkey running in artemis ns with persistence + AUTH                                               | `kubectl -n artemis get pods,svc,pvc -l app=valkey`; `valkey-cli AUTH … && valkey-cli PING` returns `PONG`                                            |
 | G6   | artemis on gxy-management with `REGISTRY_BACKEND=valkey` (no `--set-file`)                         | `helm get values -n artemis artemis` shows no `sites:` key; `kubectl -n artemis exec deploy/artemis -- env \| grep REGISTRY_BACKEND` reports `valkey` |
 | G7   | `universe sites register test --team staff` succeeds without operator action                       | CLI exits 0; `GET /api/sites` includes `test`; `valkey-cli SMEMBERS sites:all` includes `test`                                                        |
-| G8   | E2E deploy → preview → promote → production through artemis                                        | `just artemis-postdeploy-check` (replaces retired `phase5-smoke` per 2026-04-27 refactor `20da6067`)                                                  |
+| G8   | E2E deploy → preview → promote → production through artemis                                        | `just verify-artemis` (replaces retired `phase5-smoke` per 2026-04-27 refactor `20da6067`)                                                  |
 | G9   | Registry survives `kubectl rollout restart deployment -n artemis artemis`                          | `GET /api/sites` returns same set; Valkey pod untouched (different release/sts)                                                                       |
 | G10  | Registry survives Valkey pod restart (PVC reattach)                                                | `kubectl -n artemis delete pod -l app=valkey`; new pod replays AOF; `GET /api/sites` matches                                                          |
 | G11  | Nightly RDB backup lands in R2                                                                     | `aws s3 ls s3://universe-static-apps-01/_meta/registry/ --endpoint=$R2` shows `<date>.rdb`                                                            |
 | G12  | Idempotency — operator runs the cassiopeia chapter top-to-bottom **twice** with no divergent state | flight-manual §E reruns clean                                                                                                                         |
 
-G12 is the single most-important gate for the user's stated constraint ("I will run every step of it to check if the manual is idempotent"). Every section in the cassiopeia chapter must include a "skip-if-already-done" guard (e.g. `helm get -n caddy caddy >/dev/null 2>&1 || just helm-upgrade gxy-cassiopeia caddy`).
+G12 is the single most-important gate for the user's stated constraint ("I will run every step of it to check if the manual is idempotent"). Every section in the cassiopeia chapter must include a "skip-if-already-done" guard (e.g. `helm get -n caddy caddy >/dev/null 2>&1 || just release gxy-cassiopeia caddy`).
 
 ## Section F — Open questions for user
 
@@ -416,7 +416,7 @@ Option 1 is cleaner. Implementation deferred to the artemis-side sprint that lan
 Section G does not gate cassiopeia GA closure (the existing G1-G12 table covers GA). It documents post-GA UX and test work spawned by the 2026-05-12 staleness investigation. Closes when:
 
 1. Phase 1 CLI changes ship in `@freecodecamp/universe-cli` (next patch). **2026-05-13 status: commits landed on universe-cli `main` (`37af29d`, `75f71e9`, `9a5e50e`, `9f16b7f`); awaits `git push origin main` + v0.5.1 `Actions → Release` workflow_dispatch.**
-1. Phase 2 tests land in `fCC/artemis` `internal/integration/` and pass on the next `just artemis-postdeploy-check` run. **2026-05-13 status: 9 of 10 commits pushed to `fCC/artemis` `origin/main`; `f025693` (regex widening) local pending push. `make integration` 12/12 green with `R2_*` env.**
+1. Phase 2 tests land in `fCC/artemis` `internal/integration/` and pass on the next `just verify-artemis` run. **2026-05-13 status: 9 of 10 commits pushed to `fCC/artemis` `origin/main`; `f025693` (regex widening) local pending push. `make integration` 12/12 green with `R2_*` env.**
 1. Phase 3 service work is either landed OR explicitly parked with a re-evaluation trigger (e.g. "Phase 1 telemetry shows continued B2 reports after 2 sprints"). **2026-05-13: scaffolded as sibling dossier `~/DEV/fCC/artemis/.scratchpad/dossier/` (G3 phase); telemetry gate still applies before implementation.**
 
 Phase G3 closure is independent of cassiopeia GA — the RFC remains "closed" once G1-G12 land; G is a tracking section for the staleness sub-initiative.
@@ -436,7 +436,7 @@ Items 3 and 4 are **planning** scope of this RFC; the **work** is a post-audit s
 
 - Origin allow-list automation (CF edge IPs only on DO firewall)
 - R2 lifecycle GC for orphan deploy bytes
-- ArgoCD-driven sync of valkey + artemis manifests (post-D005 reactivation; today driven by `just deploy`)
+- ArgoCD-driven sync of valkey + artemis manifests (post-D005 reactivation; today driven by `just release`)
 - Supply-chain pipeline reactivation (cosign + Grype/Trivy + Syft)
 - cert-manager / DNS-01 issuer
 - gxy-cassiopeia Hetzner pivot (post-M5)
