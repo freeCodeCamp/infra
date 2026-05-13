@@ -3,29 +3,9 @@ set shell := ["bash", "-cu"]
 secrets_dir := env("SECRETS_DIR", justfile_directory() + "/../infra-secrets")
 crds_schema := 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 
-# ---------------------------------------------------------------------------
-# Recipes are organized by operator-lifecycle stage. `just --list` reads
-# top-to-bottom as the actual workflow:
-#
-#   provision  → D0 cloud resources (Terraform)
-#   bootstrap  → D0 node OS + k3s install (Ansible)
-#   release    → D1/D2 chart push to a cluster (helm + kustomize, smart-dispatched)
-#   configure  → D1/D2 mutation outside chart-release surface (secrets, registry, external SaaS, local creds)
-#   verify     → D2 read-only health probes (cluster, image, manifest, smoke E2E)
-#   test       → D2 active test suites (loadtest, contract tests)
-#   inspect    → D2 read-only deep dives (secrets, crds, terraform state, field-notes)
-#   backup     → D2 state extraction (pg_dump, etc.)
-#   build      → D2 image production (rare for ops)
-#   destroy    → DN destructive reset / teardown
-# ---------------------------------------------------------------------------
-
 # Show available recipes
 default:
     @just --list
-
-# ===========================================================================
-# provision — D0 cloud (Terraform)
-# ===========================================================================
 
 # Run terraform on one or all workspaces. Examples:
 #   just provision plan all
@@ -45,10 +25,6 @@ provision cmd workspace="all":
       terraform -chdir=$ws {{ cmd }}
     fi
 
-# ===========================================================================
-# bootstrap — D0 node (Ansible)
-# ===========================================================================
-
 # Run any ansible playbook (logs to ansible/.ansible/logs/).
 # Example: just bootstrap k3s--install gxy_management_k3s
 [group('bootstrap')]
@@ -66,10 +42,6 @@ bootstrap playbook host *args:
 [group('bootstrap')]
 bootstrap-tools:
     cd ansible && uv sync && uv run ansible-galaxy install -r requirements.yml
-
-# ===========================================================================
-# release — D1/D2 chart push to cluster (helm + kustomize, smart-dispatched)
-# ===========================================================================
 
 # Release an app to a cluster — single high-level verb covering both fresh
 # install and version upgrade (helm semantics: `helm upgrade --install`).
@@ -185,10 +157,6 @@ release cluster app:
 
     echo "Released {{ app }} to {{ cluster }}"
 
-# ===========================================================================
-# configure — D1/D2 mutation outside chart-release surface
-# ===========================================================================
-
 # Decrypt kubeconfig from infra-secrets to k3s/<cluster>/.kubeconfig.yaml.
 # Run once per cluster after clone.
 [group('configure')]
@@ -254,10 +222,6 @@ configure-field-notes-trim area="infra" age="30":
     python3 scripts/trim-field-notes.py \
         ../Universe/spike/field-notes/{{area}}.md \
         --age-days {{age}}
-
-# ===========================================================================
-# verify — D2 read-only health probes
-# ===========================================================================
 
 # Verify all encrypted secrets are decryptable with the operator's age key.
 [group('verify')]
@@ -398,10 +362,6 @@ verify-caddy-s3:
     ! echo "${MODULES}" | grep -q '^caddy.fs.s3$' || { echo "FAIL: caddy.fs.s3 present (D32 violated)"; exit 1; }
     echo "OK: http.handlers.r2_alias + caddy.fs.r2 present; caddy.fs.s3 absent"
 
-# ===========================================================================
-# test — D2 active test suites
-# ===========================================================================
-
 # k6 load test — pick a scenario from `loadtest/scenarios/`.
 #
 # Scenarios:
@@ -432,10 +392,6 @@ test-loadtest scenario:
 [group('test')]
 test-constellation:
     bash scripts/tests/constellation-register.sh
-
-# ===========================================================================
-# inspect — D2 read-only deep dives
-# ===========================================================================
 
 # View a decrypted secret (auto-detects format from extension).
 [group('inspect')]
@@ -479,10 +435,6 @@ inspect-field-notes-trim area="infra" age="30":
         ../Universe/spike/field-notes/{{area}}.md \
         --age-days {{age}} --dry-run
 
-# ===========================================================================
-# backup — D2 state extraction
-# ===========================================================================
-
 # Ad-hoc Windmill PostgreSQL backup (local file).
 #
 # Dumps pg_dumpall INSIDE the pod to a temp file (so the dump finishes
@@ -517,10 +469,6 @@ backup-windmill cluster:
       || { echo "Error: copied backup missing completion sentinel — aborting"; rm -f ".backups/${FILENAME}"; exit 1; }
     echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
 
-# ===========================================================================
-# build — D2 image production
-# ===========================================================================
-
 # Build the caddy-s3 image locally and tag with dev-<sha>. Platform pinned to
 # linux/amd64 — DO droplets run on AMD64, and buildx defaults to the host
 # architecture (arm64 on Apple Silicon → exec format error in cluster).
@@ -538,10 +486,6 @@ build-caddy-s3:
         -t "ghcr.io/freecodecamp/caddy-s3:${TAG}" \
         docker/images/caddy-s3/
     echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
-
-# ===========================================================================
-# destroy — DN destructive reset / teardown
-# ===========================================================================
 
 # Reset a CNPG Cluster: delete the CR, all PVCs, and pods. DESTRUCTIVE.
 # After reset, re-run `just release {{cluster}} {{app}}` to recreate.

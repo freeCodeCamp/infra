@@ -1,11 +1,8 @@
 # Deploy artemis service (Universe deploy proxy)
 
-End-to-end operator runbook for the artemis svc on `gxy-management`.
-Public surface: `https://uploads.freecode.camp`. Spec: ADR-016.
+End-to-end operator runbook for the artemis svc on `gxy-management`. Public surface: `https://uploads.freecode.camp`. Spec: ADR-016.
 
-Architecture: see `k3s/gxy-management/apps/artemis/README.md`. No
-Tailscale, no Caddy/cassiopeia hop, no CF Access (programmatic API
-behind GitHub OAuth Bearer + Traefik rate-limit + CF WAF).
+Architecture: see `k3s/gxy-management/apps/artemis/README.md`. No Tailscale, no Caddy/cassiopeia hop, no CF Access (programmatic API behind GitHub OAuth Bearer + Traefik rate-limit + CF WAF).
 
 ## Preconditions (one-time, ClickOps + secret mint)
 
@@ -24,16 +21,9 @@ Verify: `dig +short uploads.freecode.camp` returns CF anycast IPs.
 
 ### 2. CF zone SSL mode (no origin cert at k8s layer)
 
-`freecode.camp` zone is on **Flexible SSL** — CF Edge terminates
-HTTPS using Universal SSL; CF→origin is plain HTTP. Matches the
-cassiopeia caddy precedent on the same zone. Verify via CF
-dashboard → SSL/TLS → Overview — mode = `Flexible`.
+`freecode.camp` zone is on **Flexible SSL** — CF Edge terminates HTTPS using Universal SSL; CF→origin is plain HTTP. Matches the cassiopeia caddy precedent on the same zone. Verify via CF dashboard → SSL/TLS → Overview — mode = `Flexible`.
 
-No origin cert mint required at the k8s layer; chart Gateway
-listener is HTTP :80 only. To flip the zone to Full Strict later,
-cassiopeia caddy + artemis charts both need TLS terminator
-listeners + sealed origin certs; file as a separate dispatch
-(`T-strict-tls`) — out of T34 scope.
+No origin cert mint required at the k8s layer; chart Gateway listener is HTTP :80 only. To flip the zone to Full Strict later, cassiopeia caddy + artemis charts both need TLS terminator listeners + sealed origin certs; file as a separate dispatch (`T-strict-tls`) — out of T34 scope.
 
 ### 3. GitHub OAuth App — `Universe CLI`
 
@@ -71,16 +61,11 @@ sops decrypt --input-type dotenv --output-type dotenv \
   infra-secrets/management/artemis.env.enc
 ```
 
-Both flags required — sops auto-detect from `.enc` extension falls
-back to JSON parser; dotenv envelopes silently fail without explicit
-type flags. See `infra/CLAUDE.md` §Secrets.
+Both flags required — sops auto-detect from `.enc` extension falls back to JSON parser; dotenv envelopes silently fail without explicit type flags. See `infra/CLAUDE.md` §Secrets.
 
 ### 5. Mint sops YAML overlay (helm input) — `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`
 
-The dotenv envelope is the source of truth. The YAML overlay is the
-helm input mirror — same secret values in YAML form. One-time mint
-(also re-run on env-var rotation, ≤1×/quarter typical). Paste this
-block from the infra repo root:
+The dotenv envelope is the source of truth. The YAML overlay is the helm input mirror — same secret values in YAML form. One-time mint (also re-run on env-var rotation, ≤1×/quarter typical). Paste this block from the infra repo root:
 
 ```bash
 SOT="../infra-secrets/management/artemis.env.enc"
@@ -122,9 +107,7 @@ The dotenv stays the SOT — never hand-edit the YAML overlay.
 
 ### 6. Bootstrap the sites registry
 
-Source of truth is Valkey, not a file. On a fresh cluster the registry
-starts empty; seed it with the `test` slug (smoke-target reserved for
-the post-deploy E2E suite) plus any production slugs:
+Source of truth is Valkey, not a file. On a fresh cluster the registry starts empty; seed it with the `test` slug (smoke-target reserved for the post-deploy E2E suite) plus any production slugs:
 
 ```bash
 universe sites register test --team staff
@@ -133,12 +116,7 @@ universe sites register test --team staff
 # universe sites register <slug> --team <team>[,<team>...]
 ```
 
-The CLI POSTs `/api/site/register` against artemis; staff-team
-membership gates writes (`REGISTRY_AUTHZ_TEAM` chart env, default
-`staff`). Cold-start reference: `freeCodeCamp/artemis`
-`config/sites.yaml` is a **dormant seed** of the historical map —
-not consumed at runtime; only useful when replaying entries after a
-full Valkey wipe.
+The CLI POSTs `/api/site/register` against artemis; staff-team membership gates writes (`REGISTRY_AUTHZ_TEAM` chart env, default `staff`). Cold-start reference: `freeCodeCamp/artemis` `config/sites.yaml` is a **dormant seed** of the historical map — not consumed at runtime; only useful when replaying entries after a full Valkey wipe.
 
 ### 7. artemis CI — first GHCR image
 
@@ -167,10 +145,9 @@ just release gxy-management artemis
 The generic `deploy` recipe smart-dispatches on `apps/<app>/`:
 
 1. Loads chart defaults (`charts/artemis/values.yaml`).
-2. Loads production overlay (`apps/artemis/values.production.yaml`).
-3. Decrypts + loads sops sealed overlay
-   (`infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`).
-4. Runs `helm upgrade --install` into the `artemis` namespace.
+1. Loads production overlay (`apps/artemis/values.production.yaml`).
+1. Decrypts + loads sops sealed overlay (`infra-secrets/k3s/gxy-management/artemis.values.yaml.enc`).
+1. Runs `helm upgrade --install` into the `artemis` namespace.
 
 Optional: `kubectl -n artemis rollout status deploy/artemis --timeout=120s`.
 
@@ -185,28 +162,23 @@ curl -fsS https://uploads.freecode.camp/healthz
 E2E proxy smoke:
 
 ```bash
-just phase5-smoke
+just verify-artemis
 ```
 
-The script init→upload→finalize→preview→promote→prod against the
-`test` site, marker-content match on both surfaces, rollback on exit.
-Exit 0 on green.
+Recipe wraps `make integration` against the deployed artemis (see `docs/runbooks/03-artemis-postdeploy-check.md` for the full suite shape): init→upload→finalize→preview→promote→prod against the `test` site, marker-content match on both surfaces, rollback on exit. Exit 0 on green.
 
 ## Rotate
 
 | What rotates                         | Recipe                                                                                                                         |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just release gxy-management artemis`                                 |
+| GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just release gxy-management artemis`                                |
 | CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch                   |
 | sites registry entries               | `universe sites register/update/rm <slug> …` (staff-gated; live in seconds via `registry.changed` pub-sub, ≤60 s TTL fallback) |
 | Image tag                            | see [§Image update](#image-update-deploy-new-artemis-sha) — full procedure                                                     |
 
 ## Image update (deploy new artemis SHA)
 
-Use when artemis `main` advances past the deployed pin and the new
-SHA must roll into gxy-management. The image pin lives at
-`k3s/gxy-management/apps/artemis/values.production.yaml` under
-`image.tag` (format: `sha-<full-40-char-sha>@sha256:<digest>`).
+Use when artemis `main` advances past the deployed pin and the new SHA must roll into gxy-management. The image pin lives at `k3s/gxy-management/apps/artemis/values.production.yaml` under `image.tag` (format: `sha-<full-40-char-sha>@sha256:<digest>`).
 
 ### 1. Confirm drift
 
@@ -216,8 +188,7 @@ kubectl -n artemis get deploy artemis \
 git -C ~/DEV/fCC/artemis log --oneline -1 main
 ```
 
-If the deployed SHA prefix is not the artemis `main` HEAD, drift is
-real — proceed.
+If the deployed SHA prefix is not the artemis `main` HEAD, drift is real — proceed.
 
 ### 2. Build GHCR image (if CI did not already on push)
 
@@ -249,9 +220,7 @@ image:
   pullPolicy: IfNotPresent
 ```
 
-OCI rule: when both tag and digest are present, digest wins (kubelet
-pulls by digest, immutable). Tag retained for human grok in
-`kubectl describe pod`.
+OCI rule: when both tag and digest are present, digest wins (kubelet pulls by digest, immutable). Tag retained for human grok in `kubectl describe pod`.
 
 ### 5. Commit
 
@@ -273,20 +242,16 @@ kubectl -n artemis rollout status deploy/artemis --timeout=180s
 ### 7. Verify
 
 ```bash
-kubectl -n artemis get pods -l app.kubernetes.io/name=artemis
+just verify-app gxy-management artemis
 curl -fsS https://uploads.freecode.camp/healthz   # {"ok":true}
-just phase5-smoke
+just verify-artemis
 ```
 
-Phase5 smoke is the authoritative E2E check — green = the new image
-serves init/upload/finalize/promote correctly against R2 + GH OAuth.
+`verify-artemis` is the authoritative E2E check — green = the new image serves init/upload/finalize/promote correctly against R2 + GH OAuth.
 
 ### Rollback
 
-Revert the `values.production.yaml` commit and re-run `just release
-gxy-management artemis`. Image is digest-pinned so rollback is
-deterministic. No DB / state migration on artemis (stateless svc
-over R2).
+Revert the `values.production.yaml` commit and re-run `just release gxy-management artemis`. Image is digest-pinned so rollback is deterministic. No DB / state migration on artemis (stateless svc over R2).
 
 ## Failure modes
 

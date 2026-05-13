@@ -13,32 +13,11 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  # Pinned by tag + digest. OCI spec: when both are present, digest
-  # wins. Kubelet/containerd pull by digest (immutable). Tag retained
-  # for human grok in `helm list` / `kubectl describe pod`.
-  #
-  # Tag form: bare semver (no `v` prefix) — docker/metadata-action
-  # `type=semver,pattern={{version}}` strips the leading `v` from the
-  # git tag. Git tag `v0.1.0` → registry tag `0.1.0`. Intentional, per
-  # OCI tag convention. See `RELEASING.md` step 5 in the artemis repo.
-  #
-  # Resolve digest with:
-  #   docker buildx imagetools inspect ghcr.io/freecodecamp/artemis:<tag> \
-  #     --format '{{.Manifest.Digest}}'
-  #
-  # Build provenance: GitHub Actions on freeCodeCamp/artemis repo
-  # (.github/workflows/docker-ghcr.yml) — fires on `v*` tag push and
-  # emits {<semver>, <major.minor>, sha-<full-sha>, latest}. Also
-  # fires on push to main via `workflow_dispatch` (no semver tag in
-  # that path). Build-residency clean per Universe field-note
-  # 2026-04-26 (build pipeline outside Universe). Run-residency clean
-  # per 2026-04-27 amendment (pulls from GHCR direct, not zot).
-  #
-  # Release history:
-  # - v0.1.0 (2026-05-13): first tagged release. AliasGet endpoint,
-  #   promote+rollback CAS guards (alias_drift 409 + expectedCurrent),
-  #   git-cliff + CHANGELOG + RELEASING scaffold, working CI. Replaces
-  #   prior SHA-pin sha-6f492a3 from the 2026-05-10 Valkey cutover.
+  # Pin = bare-semver tag + digest. Digest is load-bearing (OCI: when
+  # both present, digest wins → containerd pulls immutable). Tag is for
+  # `helm list` / `kubectl describe pod` readability. Bare-semver (no
+  # `v`) follows docker/metadata-action `type=semver,pattern={{version}}`
+  # default. Build pipeline + bump procedure: artemis repo RELEASING.md.
   # release: 0.1.0
   tag: "0.1.0@sha256:9e35f1fb9a71f4d7383bbd26739650ed9e099c2926f13ef14049176a81f23903"
   pullPolicy: IfNotPresent
