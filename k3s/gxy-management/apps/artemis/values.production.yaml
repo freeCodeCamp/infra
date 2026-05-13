@@ -18,8 +18,8 @@ image:
   # `helm list` / `kubectl describe pod` readability. Bare-semver (no
   # `v`) follows docker/metadata-action `type=semver,pattern={{version}}`
   # default. Build pipeline + bump procedure: artemis repo RELEASING.md.
-  # release: 0.1.0
-  tag: "0.1.0@sha256:9e35f1fb9a71f4d7383bbd26739650ed9e099c2926f13ef14049176a81f23903"
+  # release: 0.2.0
+  tag: "0.2.0@sha256:038adadab0b62707b8112770c5f2179a8ed64b63db1db56c3d3326da0676b3f2"
   pullPolicy: IfNotPresent
 
 resources:

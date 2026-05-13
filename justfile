@@ -286,7 +286,7 @@ verify-manifests version="1.32.0":
       -schema-location '{{ crds_schema }}' \
       -ignore-filename-pattern 'kustomization\.yaml' \
       -ignore-filename-pattern '\.kubeconfig\.yaml' \
-      -ignore-filename-pattern 'values\.yaml' \
+      -ignore-filename-pattern 'values(\.[^/]+)?\.yaml' \
       -ignore-filename-pattern 'operator-values\.yaml' \
       -ignore-filename-pattern 'pnpm-lock\.yaml' \
       -ignore-filename-pattern 'pss-admission\.yaml' \
