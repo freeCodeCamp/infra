@@ -57,21 +57,24 @@ This repo owns:
 | `docs/infra-guides/`   | Generic primers (k3s layout, legacy fCC ops, etc.)               |
 | `docs/GUIDELINES.md`   | Field-note format spec (legacy; field-notes archived 2026-05-10) |
 
-## Working directory rule (HARD)
+## Working directory rule
 
-**Repo-wide `just` recipes that touch a cluster MUST run from `k3s/<galaxy>/` subfolder.** direnv `.envrc` hierarchy loads cluster-scoped tokens + `KUBECONFIG` only inside the galaxy dir:
-
-- root `.envrc` → loads `$SECRETS_DIR/global/.env.enc` (org-wide tokens)
-- `k3s/<galaxy>/.envrc` → sources root, loads `$SECRETS_DIR/do-universe/.env.enc` (DO Universe token), exports `KUBECONFIG=$(expand_path .kubeconfig.yaml)`
-
-Run `just release …` from repo root → wrong DO token, no `KUBECONFIG`, helm/kubectl hit wrong cluster or fail. Always:
+Post-`cd3b3a32` (lifecycle-verb refactor 2026-05-13), `just` is no longer cwd-sensitive for the `release` family. Recipes carry the cluster as an arg and self-export `KUBECONFIG` from the recipe body (`justfile:80` — `export KUBECONFIG="$(pwd)/k3s/{{ cluster }}/.kubeconfig.yaml"`). All `release`/`configure`/`inspect`/`destroy`/`backup` recipes run from repo root:
 
 ```
-cd k3s/<galaxy>/
-just <recipe>
+just release gxy-management artemis
+just inspect-crds gxy-cassiopeia cnpg
+just configure-kubeconfig gxy-launchbase
 ```
 
-Recipes that don't touch a cluster (e.g. `just bootstrap <playbook>` against ansible inventory) may run from repo root.
+direnv `.envrc` hierarchy still loads:
+
+- root `.envrc` → `$SECRETS_DIR/global/.env.enc` (org-wide tokens, e.g. `DO_API_TOKEN`)
+- `k3s/<galaxy>/.envrc` → sources root + adds galaxy-scoped tokens (e.g. `$SECRETS_DIR/do-universe/.env.enc`) + exports `KUBECONFIG`
+
+The galaxy-scoped `KUBECONFIG` export is now belt-and-suspenders — recipes that need it set it themselves. The galaxy-scoped DO tokens still matter for recipes that hit DO API directly (terraform `provision`, ansible `bootstrap` with DO dynamic inventory) — but those recipes either accept `cluster` as an arg (`provision`) or operate on ansible inventory unrelated to live cluster state (`bootstrap`).
+
+Practical rule: run from repo root unless a specific recipe documents otherwise. The pre-`cd3b3a32` "cd into `k3s/<galaxy>/` first or helm hits wrong cluster" foot-gun is gone.
 
 ## infra-secrets coupling
 
