@@ -159,6 +159,15 @@ curl -fsS https://uploads.freecode.camp/healthz
 # expect: {"ok":true}
 ```
 
+Confirm the running version + commit via the startup banner:
+
+```bash
+kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
+  | grep "starting version"
+```
+
+Expected: `artemis: starting version=<semver-or-sha-or-branch> commit=<full-sha>` one line per replica. `VERSION` reflects the tag that triggered the build (semver on tag push, `sha-<sha>` on `workflow_dispatch`, branch name on branch push); `COMMIT` is the full sha. Both embedded via `-ldflags -X main.version=… -X main.commit=…` at build time.
+
 E2E proxy smoke:
 
 ```bash
@@ -174,40 +183,44 @@ Recipe wraps `make integration` against the deployed artemis (see `docs/runbooks
 | GH_CLIENT_ID, R2 keys, JWT key       | edit dotenv → `sops -e --in-place`; re-run §5 mint block; `just release gxy-management artemis`                                |
 | CF zone SSL flip (Flexible → Strict) | out of artemis scope — needs zone-wide change covering cassiopeia caddy too; file as `T-strict-tls` dispatch                   |
 | sites registry entries               | `universe sites register/update/rm <slug> …` (staff-gated; live in seconds via `registry.changed` pub-sub, ≤60 s TTL fallback) |
-| Image tag                            | see [§Image update](#image-update-deploy-new-artemis-sha) — full procedure                                                     |
+| Image tag                            | see [§Image update](#image-update-deploy-new-artemis-release) — full procedure                                                 |
 
-## Image update (deploy new artemis SHA)
+## Image update (deploy new artemis release)
 
-Use when artemis `main` advances past the deployed pin and the new SHA must roll into gxy-management. The image pin lives at `k3s/gxy-management/apps/artemis/values.production.yaml` under `image.tag` (format: `sha-<full-40-char-sha>@sha256:<digest>`).
+Use when a new artemis release lands and must roll into gxy-management. Releases are tag-triggered: an operator with push rights to `freeCodeCamp/artemis` cuts a `vX.Y.Z` annotated tag per artemis `RELEASING.md`; `.github/workflows/docker-ghcr.yml` fires automatically on the tag push, builds the image, publishes to GHCR with tags `X.Y.Z` (bare semver, no `v`-prefix — docker/metadata-action strips it; OCI convention is bare semver), `X.Y`, and `sha-<full-sha>`, and auto-publishes a GitHub Release.
+
+The image pin lives at `k3s/gxy-management/apps/artemis/values.production.yaml` under `image.tag` (format: `X.Y.Z@sha256:<digest>`). Bootstrap-only path (no semver tag exists yet) uses `sha-<full-sha>@sha256:<digest>` via the `workflow_dispatch` route — see §7.
 
 ### 1. Confirm drift
 
 ```bash
 kubectl -n artemis get deploy artemis \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
-git -C ~/DEV/fCC/artemis log --oneline -1 main
+git -C ~/DEV/fCC/artemis fetch --tags origin
+git -C ~/DEV/fCC/artemis describe --tags --abbrev=0 origin/main
 ```
 
-If the deployed SHA prefix is not the artemis `main` HEAD, drift is real — proceed.
+If the deployed semver lags the most-recent tag on artemis `origin/main`, drift is real — proceed.
 
-### 2. Build GHCR image (if CI did not already on push)
+### 2. Cut + push the artemis tag
+
+The artemis-side flow (audit unreleased commits, pick the bump, annotated tag, regen CHANGELOG, push) is documented in `~/DEV/fCC/artemis/RELEASING.md`. Operator runs that flow; the tag push fires the GHCR workflow + the GH Release auto-publish step.
+
+Watch the build:
 
 ```bash
-gh workflow run ci.yml --repo freeCodeCamp/artemis --ref main
-gh run watch --repo freeCodeCamp/artemis
+gh run watch --repo freeCodeCamp/artemis --exit-status
 ```
-
-GHCR tag format on success: `ghcr.io/freecodecamp/artemis:sha-<full-sha>`.
 
 ### 3. Resolve digest
 
 ```bash
-SHA=$(git -C ~/DEV/fCC/artemis rev-parse main)
-docker buildx imagetools inspect "ghcr.io/freecodecamp/artemis:sha-${SHA}" \
-  | awk '/^Name:|^Digest:/'
+VERSION=X.Y.Z
+docker buildx imagetools inspect "ghcr.io/freecodecamp/artemis:${VERSION}" \
+  --format '{{.Manifest.Digest}}'
 ```
 
-Copy the `sha256:<digest>` line.
+Output is the `sha256:<64-hex>` digest that becomes the load-bearing pin.
 
 ### 4. Bump pin
 
@@ -216,21 +229,22 @@ Edit `k3s/gxy-management/apps/artemis/values.production.yaml`:
 ```yaml
 image:
   repository: ghcr.io/freecodecamp/artemis
-  tag: "sha-<FULL_40_CHAR_SHA>@sha256:<DIGEST>"
+  # release: X.Y.Z
+  tag: "X.Y.Z@sha256:<digest>"
   pullPolicy: IfNotPresent
 ```
 
-OCI rule: when both tag and digest are present, digest wins (kubelet pulls by digest, immutable). Tag retained for human grok in `kubectl describe pod`.
+Both the `# release:` comment and the `tag:` value carry the bare semver (no `v`-prefix). The `@sha256:<digest>` suffix is the immutable anchor — kubelet pulls by digest when both are present. Never ship `tag: X.Y.Z` without the digest, and never ship `tag: latest` in production values.
 
 ### 5. Commit
 
 ```bash
 cd ~/DEV/fCC/infra
 git add k3s/gxy-management/apps/artemis/values.production.yaml
-git commit -m "chore(artemis): bump image to sha-${SHA:0:7}"
+git commit -m "chore(artemis): pin vX.Y.Z"
 ```
 
-Operator pushes.
+Operator pushes per infra-repo conventions (small-fix-direct vs PR-with-review threshold; see `PR_WORKFLOW.md`).
 
 ### 6. Deploy + watch rollout
 
@@ -247,11 +261,22 @@ curl -fsS https://uploads.freecode.camp/healthz   # {"ok":true}
 just verify-artemis
 ```
 
+Confirm the running version banner picks up the new release:
+
+```bash
+kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
+  | grep "starting version"
+```
+
+Expected: `artemis: starting version=X.Y.Z commit=<full-sha>` one line per replica.
+
 `verify-artemis` is the authoritative E2E check — green = the new image serves init/upload/finalize/promote correctly against R2 + GH OAuth.
 
 ### Rollback
 
 Revert the `values.production.yaml` commit and re-run `just release gxy-management artemis`. Image is digest-pinned so rollback is deterministic. No DB / state migration on artemis (stateless svc over R2).
+
+Faster path when the regression is acute: `helm -n artemis history artemis` + `helm -n artemis rollback artemis <revision>` — re-pin the file afterward so the next `just release` does not undo the rollback.
 
 ## Failure modes
 
@@ -268,6 +293,7 @@ Revert the `values.production.yaml` commit and re-run `just release gxy-manageme
 ## Cross-references
 
 - ADR-016 — Universe deploy proxy
+- `~/DEV/fCC/artemis/RELEASING.md` — artemis-side release flow (cut, tag, CHANGELOG, push)
 - `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-26 build-residency, §2026-04-27 RUN-residency clause
 - `~/DEV/fCC-U/Universe/decisions/009-...` — Tailscale Operator rejected
 - [`01-deploy-new-constellation-site.md`](01-deploy-new-constellation-site.md) — staff-side deploy flow against this service
