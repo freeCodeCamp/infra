@@ -215,7 +215,7 @@ Third-party pins with EOL windows. Roll-forward is an explicit backlog item — 
 | Component                 | Current pin               | EOL / stale-after        | Action window   | Notes                                                                 |
 | ------------------------- | ------------------------- | ------------------------ | --------------- | --------------------------------------------------------------------- |
 | k3s                       | `v1.34.5+k3s1`            | 2026-10-27               | by Sept 2026    | All galaxies. Plan 1.35 upgrade. Test on gxy-management first.        |
-| Caddy (in caddy-s3 image) | `v2.11.2`                 | CVE-driven               | 14 days per D30 | gxy-cassiopeia. Bump via PR + caddy-s3 build + smoke.                 |
+| Caddy (in caddy-s3 image) | `v2.11.3`                 | CVE-driven               | 14 days per D30 | gxy-cassiopeia. Bump via PR + caddy-s3 build + smoke.                 |
 | CloudNativePG             | chart `0.28` / op `1.29`  | 1.28 EOL 2026-06-30      | during `1.29.x` | gxy-launchbase. Operator-guided pg_upgrade rolling in place.          |
 | Cilium                    | chart default (1.19 line) | 3-minor community window | on minor bump   | All galaxies. MTU/devices pin must persist; bump behind feature gate. |
 | Valkey                    | (added with RFC §B)       | LF community             | on minor bump   | gxy-management. Single-instance; bolt on Sentinel later.              |

@@ -2,7 +2,7 @@
 
 **Status:** Proposed (universe-master-audit, 2026-05-10) · Owner: infra **Anchors:** ADR-007 (DX), ADR-009 (networking), ADR-010 (secrets), ADR-011 (security), ADR-016 (deploy proxy) **Supersedes:** archived `rfc-gxy-cassiopeia.md` (2026-04-30), archived `task-gxy-cassiopeia.md` (2026-04-30); also retires the still-in-tree `rfc-gxy-cassiopeia-caddyfile-poc.md` (POC, surfaced for retirement 2026-04-30).
 
-> **Closeout note (2026-05-11):** The registry decouple section (§B / Phase 2 migration table) is **DONE**. The `sites_yaml` backend was retired in artemis @ `f115198`; Valkey is the sole backend, and operator writes go through the `universe sites register/ls/update/rm` CLI (universe-cli v0.5.0, `POST /api/site/register` and siblings). Migration step rows are retained below as historical record — do not re-execute them. Live operator flow now lives in `docs/runbooks/01-deploy-new-constellation-site.md` §A. All other RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain in-scope.
+> **Closeout note (2026-05-11, refreshed 2026-05-17):** The registry decouple section (§B / Phase 2 migration table) is **DONE**. The `sites_yaml` backend was retired in artemis @ `f115198`; Valkey is the sole backend, and operator writes go through the `universe sites register/ls/update/rm` CLI (universe-cli v0.6.0 GA published 2026-05-15, `POST /api/site/register` and siblings). Migration step rows are retained below as historical record — do not re-execute them. Live operator flow now lives in `docs/runbooks/01-deploy-new-constellation-site.md` §A. All other RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain in-scope.
 
 ## Context
 

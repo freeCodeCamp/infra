@@ -313,7 +313,7 @@ Nightly RDB → R2 mirror is **not** part of the v0.1 chart. Tracked as post-GA 
 
 ### C.6 Cutover smoke gate G13 — 2026-05-11
 
-Closes the cassiopeia registry cutover phase (P7) plus G12 idempotency rehearsal. Run by mrugesh from a laptop hitting `https://uploads.freecode.camp` after Phase 5 deploy of artemis chart 0.2.0 / image `sha256:f61f2b…`. Both rounds produced identical output (modulo per-call `created_at` / `updated_at` timestamps stamped by artemis at write time).
+Closes the cassiopeia registry cutover phase (P7) plus G12 idempotency rehearsal. Run by mrugesh from a laptop hitting `https://uploads.freecode.camp` after deploy of artemis chart 0.2.0 / image `sha256:f61f2b…` (pre-tag rehearsal build; current production pin is `0.2.0@sha256:038adadab0b62707b8112770c5f2179a8ed64b63db1db56c3d3326da0676b3f2` per `k3s/gxy-management/apps/artemis/values.production.yaml`). Both rounds produced identical output (modulo per-call `created_at` / `updated_at` timestamps stamped by artemis at write time).
 
 Pre-state — `/api/sites` returns the 11 canonical slugs:
 
@@ -326,7 +326,7 @@ $ curl -sS -H "Authorization: Bearer $(gh auth token)" \
 Round 1 — `universe sites` write path against staff-authz endpoints:
 
 ```console
-$ universe sites ls    (universe-cli v0.5.0 / built locally)
+$ universe sites ls    (universe-cli v0.6.0 / npm)
 │  SLUG                   TEAMS  CREATED BY  CREATED AT
 │  checkers               staff  mrugesh     2026-05-10T00:00:00Z
 │  cognitive-biases       staff  mrugesh     2026-05-10T00:00:00Z

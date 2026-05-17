@@ -6,7 +6,7 @@ Related repos:
 
 - `../infra-secrets` — sops+age vault. Hard-coded relative-path sibling (see "infra-secrets coupling" below).
 - `../artemis` — static-apps deploy proxy. Deployed via `docs/runbooks/02-deploy-artemis-service.md`.
-- `~/DEV/fCC-U/Universe/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 17 ADRs at `decisions/00{1..17}-*.md` and the spike plan at `spike/spike-plan.md`.
+- `~/DEV/fCC-U/Universe/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 18 ADRs at `decisions/00{1..18}-*.md` and the spike plan at `spike/spike-plan.md`.
 - `~/DEV/fCC-U/windmill/` — Windmill IaC (CLI sync repo for the gxy-management Windmill workspace).
 
 **Design lives in Universe ADRs + spike plan. No dup design content this repo.**

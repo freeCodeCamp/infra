@@ -40,13 +40,13 @@ Operational gotchas that bite once per rebuild — full notes link out.
 
 ## Anchors out (read these before deviating from any step)
 
-| Anchor                                                                                 | Why                                                                      |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `Universe/decisions/00{1..16}-*.md`                                                    | 16 ADRs that govern the platform                                         |
-| [`../architecture/adr-drift-2026-05-10.md`](../architecture/adr-drift-2026-05-10.md)   | Audit reconciling each ADR with cluster reality                          |
-| [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md) | GA hardening RFC — Valkey KV decision, artemis trim, ingress/DNS posture |
-| [`../architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md)       | sops+age envelope contract, two-scope model, sample-twin discipline      |
-| `Universe/spike/spike-plan.md`                                                         | Galaxy placement, phase status, post-spike trigger conditions            |
+| Anchor                                                                                 | Why                                                                                                   |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Universe/decisions/00{1..18}-*.md`                                                    | 18 ADRs that govern the platform (ADR-017 build-residency 2026-05-11; ADR-018 EA baseline 2026-05-12) |
+| [`../architecture/adr-drift-2026-05-10.md`](../architecture/adr-drift-2026-05-10.md)   | Audit reconciling each ADR with cluster reality                                                       |
+| [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md) | GA hardening RFC — Valkey KV decision, artemis trim, ingress/DNS posture                              |
+| [`../architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md)       | sops+age envelope contract, two-scope model, sample-twin discipline                                   |
+| `Universe/spike/spike-plan.md`                                                         | Galaxy placement, phase status, post-spike trigger conditions                                         |
 
 ## Operator runbooks (single-purpose)
 
