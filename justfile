@@ -610,3 +610,36 @@ destroy-cnpg cluster namespace name:
     kubectl -n {{ namespace }} delete pvc -l cnpg.io/cluster={{ name }} --ignore-not-found
     kubectl -n {{ namespace }} get pvc -o name | grep -E "{{ name }}-[0-9]+$" | xargs -r kubectl -n {{ namespace }} delete --ignore-not-found
     echo 'Done. Re-run "just release {{ cluster }} <app>" to recreate.'
+
+# Tear down a Universe galaxy: runs the k3s--teardown playbook, optionally
+# deletes droplets via doctl. Preserves shared infra (VPC, firewall, R2).
+# DESTRUCTIVE — operator-fired only.
+#
+# Galaxy slug → inventory group via `tr '-' '_' + _k3s` suffix:
+#   gxy-management → gxy_management_k3s
+#
+# Set `delete_droplets=true` to also `doctl compute droplet delete --tag-name`.
+# Idempotent: re-runnable if first attempt aborts mid-stream.
+[group('destroy')]
+destroy-galaxy galaxy delete_droplets="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    GALAXY="{{ galaxy }}"
+    case "$GALAXY" in
+      gxy-management|gxy-launchbase|gxy-cassiopeia) ;;
+      *) echo "Refusing: unknown galaxy '$GALAXY' (expected one of gxy-{management,launchbase,cassiopeia})"; exit 1 ;;
+    esac
+    INVENTORY_GROUP=$(echo "$GALAXY" | tr '-' '_')_k3s
+
+    echo "==> k3s teardown via ansible: $INVENTORY_GROUP"
+    just bootstrap k3s--teardown "$INVENTORY_GROUP"
+
+    if [[ "{{ delete_droplets }}" == "true" ]]; then
+      DROPLET_TAG="${GALAXY}-k3s"
+      echo "==> doctl compute droplet delete --tag-name $DROPLET_TAG --force"
+      doctl compute droplet delete --tag-name "$DROPLET_TAG" --force
+    else
+      echo "==> Skipping droplet delete (pass delete_droplets=true to remove DO droplets)"
+    fi
+
+    echo "Done. Shared infra (VPC, firewall, R2) preserved."
