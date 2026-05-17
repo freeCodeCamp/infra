@@ -323,8 +323,20 @@ verify-cnpg cluster namespace name timeout="5m":
     fi
 
 # Validate K8s manifests with kubeconform.
+#
+# Two stages:
+#   1. raw manifests in k3s/ + k8s/ (kustomize bases, plain YAML) —
+#      chart templates excluded because Go template syntax isn't YAML.
+#   2. first-party chart templates rendered via `helm template` against
+#      each chart's values.production.yaml + a stub set for the
+#      sops-only required keys, then piped to kubeconform.
 [group('verify')]
 verify-manifests version="1.32.0":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    fail=0
+
+    echo "=== stage 1: raw manifests ==="
     kubeconform \
       -summary \
       -output text \
@@ -344,7 +356,35 @@ verify-manifests version="1.32.0":
       -ignore-filename-pattern 'node_modules' \
       -ignore-filename-pattern '\.json' \
       -ignore-filename-pattern 'dashboards/' \
-      k3s/ k8s/
+      -ignore-filename-pattern 'charts/.*/(Chart\.yaml|templates/)' \
+      k3s/ k8s/ || fail=1
+
+    echo "=== stage 2: rendered chart templates ==="
+    KC_ARGS=(
+      -summary -output text -strict -ignore-missing-schemas
+      -kubernetes-version "{{ version }}"
+      -schema-location default
+      -schema-location "{{ crds_schema }}"
+    )
+    for entry in \
+      "gxy-management:artemis:--set,secretEnv.R2_ENDPOINT=x,--set,secretEnv.R2_ACCESS_KEY_ID=x,--set,secretEnv.R2_SECRET_ACCESS_KEY=x,--set,secretEnv.GH_CLIENT_ID=x,--set,secretEnv.JWT_SIGNING_KEY=x,--set,secretEnv.VALKEY_PASSWORD=x" \
+      "gxy-management:valkey:--set,secretEnv.VALKEY_PASSWORD=x" \
+      "gxy-cassiopeia:caddy:--set,r2.accessKeyId=x,--set,r2.secretAccessKey=y,--set,r2.bucket=z,--set,r2.endpoint=https://example" \
+      ; do
+      galaxy="${entry%%:*}"
+      rest="${entry#*:}"
+      app="${rest%%:*}"
+      stubs="${rest#*:}"
+      IFS=',' read -ra STUB_ARR <<<"$stubs"
+      chart="k3s/${galaxy}/apps/${app}/charts/${app}"
+      values="k3s/${galaxy}/apps/${app}/values.production.yaml"
+      [[ -d "$chart" && -f "$values" ]] || { echo "skip ${galaxy}/${app} (chart or values absent)"; continue; }
+      echo "--- ${galaxy}/${app} ---"
+      if ! helm template "$app" "$chart" --values "$values" "${STUB_ARR[@]}" | kubeconform "${KC_ARGS[@]}"; then
+        fail=1
+      fi
+    done
+    exit "$fail"
 
 # Verify an R2 bucket is provisioned correctly (exists, rw/ro keys work, ro
 # cannot write). Reads credentials from
