@@ -48,6 +48,8 @@ ansible/inventory/hosts
 # Secrets
 *.env
 *.env.*
+# `.<name>.env.sample` files are tracked envelope schemas — not real secrets.
+!*.env.sample
 
 .kubeconfig.yaml
 *.crt

@@ -28,7 +28,8 @@ spec:
                   set -euo pipefail
                   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
                   FILENAME="windmill-${TIMESTAMP}.sql.gz"
-                  S3_PATH="windmill/gxy-management/${FILENAME}"
+                  S3_PREFIX="windmill/${GALAXY}"
+                  S3_PATH="${S3_PREFIX}/${FILENAME}"
 
                   echo "Starting backup: ${FILENAME}"
                   PGPASSWORD="${PGPASSWORD}" pg_dumpall \
@@ -44,21 +45,26 @@ spec:
                   aws s3 cp "/tmp/${FILENAME}" "s3://${S3_BUCKET}/${S3_PATH}" \
                     --endpoint-url "${S3_ENDPOINT}"
 
-                  echo "Cleaning up backups older than 7 days"
+                  echo "Cleaning up backups older than 7 days under s3://${S3_BUCKET}/${S3_PREFIX}/"
                   CUTOFF=$(date -d '7 days ago' +%Y%m%d 2>/dev/null || date -v-7d +%Y%m%d)
-                  aws s3 ls "s3://${S3_BUCKET}/windmill/gxy-management/" \
+                  aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" \
                     --endpoint-url "${S3_ENDPOINT}" | while read -r line; do
                     FILE=$(echo "$line" | awk '{print $4}')
                     FILE_DATE=$(echo "$FILE" | grep -oP '\d{8}' | head -1)
                     if [ -n "${FILE_DATE}" ] && [ "${FILE_DATE}" -lt "${CUTOFF}" ]; then
                       echo "Deleting old backup: ${FILE}"
-                      aws s3 rm "s3://${S3_BUCKET}/windmill/gxy-management/${FILE}" \
+                      aws s3 rm "s3://${S3_BUCKET}/${S3_PREFIX}/${FILE}" \
                         --endpoint-url "${S3_ENDPOINT}"
                     fi
                   done
 
                   echo "Backup complete: ${S3_PATH}"
               env:
+                # Galaxy literal — only place the slug appears in this manifest;
+                # mirror to a sibling k3s/<galaxy>/apps/windmill/ tree by
+                # editing this single line.
+                - name: GALAXY
+                  value: gxy-management
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
