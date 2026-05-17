@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+#
+# cloudflare_api_token must have Zone:Read + DNS:Edit + Zone Settings:Edit
+# scoped to the freecode.camp zone. Mint at:
+#   https://dash.cloudflare.com/profile/api-tokens
+# and stash the result in 1Password / sops, NOT in this file.
+#
+# Galaxy ingress IPs come from `doctl compute droplet list`. Re-pin
+# whenever a galaxy is reprovisioned or the floating IP rotates.
+
+cloudflare_api_token    = "<scoped-token>"
+cassiopeia_ingress_ipv4 = "<gxy-cassiopeia-droplet-ipv4>"
+management_ingress_ipv4 = "<gxy-management-droplet-ipv4>"
