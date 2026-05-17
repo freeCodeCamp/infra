@@ -6,13 +6,11 @@ kind: CiliumNetworkPolicy
 metadata:
   name: {{ .Release.Name }}-egress
   labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "caddy.labels" . | nindent 4 }}
 spec:
   endpointSelector:
     matchLabels:
-      app.kubernetes.io/name: {{ .Chart.Name }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- include "caddy.selectorLabels" . | nindent 6 }}
   egress:
     - toFQDNs:
         - matchPattern: "*.r2.cloudflarestorage.com"

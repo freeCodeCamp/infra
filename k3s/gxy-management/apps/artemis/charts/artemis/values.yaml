@@ -8,6 +8,8 @@
 #   2. apps/artemis/values.production.yaml (production overlay — image pin, replicas, non-secret env)
 #   3. infra-secrets/k3s/gxy-management/artemis.values.yaml.enc (sops sealed — secret env only)
 
+namespace: artemis
+
 # ---------------------------------------------------------------------
 # Image
 # ---------------------------------------------------------------------

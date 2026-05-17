@@ -3,8 +3,7 @@ kind: Gateway
 metadata:
   name: caddy-gateway
   labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "caddy.labels" . | nindent 4 }}
 spec:
   gatewayClassName: traefik
   listeners:

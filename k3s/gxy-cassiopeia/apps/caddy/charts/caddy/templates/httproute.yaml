@@ -3,8 +3,7 @@ kind: HTTPRoute
 metadata:
   name: {{ .Release.Name }}
   labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "caddy.labels" . | nindent 4 }}
 spec:
   parentRefs:
     - name: {{ .Values.httpRoute.parentName }}

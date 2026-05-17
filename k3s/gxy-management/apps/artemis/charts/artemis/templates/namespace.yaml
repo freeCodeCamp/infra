@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .Release.Namespace }}
+  name: {{ .Values.namespace }}
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
     # PSS baseline — artemis runs unprivileged Go binary, no escalation
