@@ -68,7 +68,56 @@ variable "vpc_ip_range_by_galaxy" {
 }
 
 variable "operator_ssh_cidrs" {
-  description = "CIDRs allowed inbound to droplet :22. Empty list = SSH closed (operator MUST add their workstation/jumpbox CIDR before terraform apply or they'll lock themselves out)."
+  description = "CIDRs allowed inbound to droplet :22 + ICMP. Empty list = SSH + ICMP closed (operator MUST add their workstation/jumpbox CIDR before terraform apply or they'll lock themselves out)."
   type        = list(string)
   default     = []
+}
+
+# Cloudflare edge CIDRs. Published at https://www.cloudflare.com/ips-v4
+# + /ips-v6 — refresh quarterly. These two variables narrow inbound
+# HTTP/HTTPS on every galaxy firewall so CF-as-mandatory-proxy is
+# enforced at the L3 layer (matches Flexible-SSL on the freecode.camp
+# zone where CF→origin is plain HTTP — without this lockdown, anyone
+# with the droplet IP can hit the origin and bypass the CF WAF).
+#
+# Defaults below are the CF ranges published at 2026-05-17. If
+# Cloudflare adds a new range and the variable isn't refreshed,
+# HTTP/HTTPS reads from those new IPs will be dropped at the firewall
+# (visible as connection-resets at the CF edge → propagates as 521).
+# That's the right failure mode — the operator notices fast and pulls
+# the new list.
+variable "cf_edge_cidrs_v4" {
+  description = "Cloudflare published IPv4 edge ranges allowed inbound on 80/443."
+  type        = list(string)
+  default = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+  ]
+}
+
+variable "cf_edge_cidrs_v6" {
+  description = "Cloudflare published IPv6 edge ranges allowed inbound on 80/443."
+  type        = list(string)
+  default = [
+    "2400:cb00::/32",
+    "2606:4700::/32",
+    "2803:f800::/32",
+    "2405:b500::/32",
+    "2405:8100::/32",
+    "2a06:98c0::/29",
+    "2c0f:f248::/32",
+  ]
 }

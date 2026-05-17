@@ -6,25 +6,45 @@
 #   <site>.freecode.camp/deploys/<id>/...   → immutable deploy bytes
 #
 # Aliases are overwritten by artemis on every promote/rollback;
-# deploys/ prefixes accumulate and rely on the archive sweep cron to
-# age out. Bucket-level versioning is NOT used — the deploy-id prefix
-# scheme provides immutability + rollback semantics already.
+# deploys/ prefixes accumulate and are aged out by the artemis-side
+# archive sweep cron (see prior dossier
+# 2026-05-11-archive-sweep-ga-hardening). Bucket-level versioning is
+# NOT used — the deploy-id prefix scheme provides immutability +
+# rollback semantics already.
+#
+# IaC absorb contract for this workspace:
+#   1. `imports.sh` must run BEFORE any `terraform apply` (state-pull
+#      from the live bucket).
+#   2. `terraform plan` post-import MUST report zero diff. Non-zero
+#      diff means either drift in `var.*` defaults or an attribute the
+#      provider surfaces that isn't yet mirrored in this file — fix
+#      the .tf, not the live bucket.
+#   3. Every resource carries `prevent_destroy = true`. Operator who
+#      genuinely needs to destroy must edit the .tf to remove the
+#      lifecycle guard FIRST, then plan + apply.
 resource "cloudflare_r2_bucket" "this" {
   account_id = var.cloudflare_account_id
   name       = var.bucket_name
   location   = var.bucket_location
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
-# Lifecycle rules cover two concerns:
+# Lifecycle rule: abort-incomplete-uploads only.
 #
-#   1. abort-incomplete-uploads — caps the orphaned multipart-upload
-#      buffer that builds up when universe-cli crashes mid-deploy
-#      (operator never finalizes; R2 holds the parts indefinitely).
-#
-#   2. deploy-prefix-sweep — ages out `*/deploys/<id>/` objects beyond
-#      var.deploy_retention_days. Production / preview alias pointers
-#      live OUTSIDE that prefix and are NOT eligible for deletion, so
-#      they're never swept.
+# The prior `sweep-stale-deploys` rule used `prefix = ""` which the R2
+# API matches as "every object in the bucket" — including the alias
+# pointers at `<site>.freecode.camp/production` + `/preview`. After
+# the age window passed, any site that wasn't touched would lose its
+# production pointer and stop serving. R2 lifecycle prefix-match is
+# literal-prefix, NOT path-glob, so no single prefix can target
+# `<site>.freecode.camp/deploys/<id>/` without also matching alias
+# pointers under the same `<site>.freecode.camp/` parent. Removing the
+# rule entirely is the safe move; the artemis archive-sweep cron
+# already owns this responsibility and operates with site-scoped
+# awareness.
 resource "cloudflare_r2_bucket_lifecycle" "this" {
   account_id  = var.cloudflare_account_id
   bucket_name = cloudflare_r2_bucket.this.name
@@ -43,23 +63,9 @@ resource "cloudflare_r2_bucket_lifecycle" "this" {
         }
       }
     },
-    {
-      id      = "sweep-stale-deploys"
-      enabled = true
-      conditions = {
-        # All Universe deploy-id prefixes match the pattern
-        # `<site>.freecode.camp/deploys/`. R2 lifecycle prefix match
-        # is substring, so trailing `/deploys/` would also match
-        # `<site>/deploys/...` if site naming ever drops the
-        # `.freecode.camp` suffix. Current artemis pin is FQDN-only.
-        prefix = ""
-      }
-      delete_objects_transition = {
-        condition = {
-          max_age = var.deploy_retention_days * 24 * 60 * 60
-          type    = "Age"
-        }
-      }
-    },
   ]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

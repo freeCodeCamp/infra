@@ -13,5 +13,4 @@ cloudflare_account_id = "<32-char-account-id>"
 # Tunables (uncomment to override defaults in variables.tf).
 # bucket_name                   = "universe-static-apps-01"
 # bucket_location               = "WEUR"
-# deploy_retention_days         = 90
 # abort_incomplete_uploads_days = 7

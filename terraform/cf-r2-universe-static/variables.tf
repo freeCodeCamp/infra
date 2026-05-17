@@ -15,14 +15,14 @@ variable "bucket_location" {
   default     = "WEUR"
 }
 
-variable "deploy_retention_days" {
-  description = "Age threshold for archive sweep of per-deploy prefixes; matches the archive-sweep policy (see prior dossier 2026-05-11-archive-sweep-ga-hardening)."
-  type        = number
-  default     = 90
-}
-
 variable "abort_incomplete_uploads_days" {
   description = "Age threshold for cleaning up incomplete multipart uploads"
   type        = number
   default     = 7
 }
+
+# `deploy_retention_days` was dropped — the prior `sweep-stale-deploys`
+# R2 lifecycle rule with `prefix = ""` was unsafe (it matched alias
+# pointers too). Deploy-prefix aging is owned by the artemis-side
+# archive-sweep cron landed in dossier
+# 2026-05-11-archive-sweep-ga-hardening, which is site-aware.

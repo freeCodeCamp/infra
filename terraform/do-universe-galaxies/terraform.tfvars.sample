@@ -26,3 +26,9 @@ operator_ssh_cidrs = []
 #   "gxy-launchbase" = "10.117.1.0/24"
 #   "gxy-cassiopeia" = "10.117.2.0/24"
 # }
+#
+# cf_edge_cidrs_v4 / cf_edge_cidrs_v6 — defaults in variables.tf snapshot
+# the CF published list at 2026-05-17. Refresh quarterly from:
+#   https://www.cloudflare.com/ips-v4 + ips-v6
+# Empty list = HTTP/HTTPS closed entirely (operator chooses lockout
+# explicitly over silent world-open).

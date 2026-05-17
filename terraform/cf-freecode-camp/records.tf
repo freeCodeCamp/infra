@@ -58,4 +58,12 @@ resource "cloudflare_record" "this" {
   proxied = each.value.proxied
   ttl     = each.value.ttl
   comment = each.value.comment
+
+  # IaC absorb: every record exists in live state already and is
+  # imported by `imports.sh`. A typo-driven `terraform destroy` must
+  # not wipe `uploads.freecode.camp` etc. — operator wanting genuine
+  # destroy edits this block out first.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
