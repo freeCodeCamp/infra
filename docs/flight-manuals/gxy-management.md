@@ -14,7 +14,7 @@ Control-plane galaxy. Today: Windmill (live), artemis (live, deploy proxy), Valk
 
 > **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2 secrets, §3 shared infra. Not repeated here.
 >
-> **Working-directory rule (HARD):** `cd k3s/gxy-management/` before any cluster-touching recipe. Each section repeats the `cd`.
+> **Working-directory rule (post-`cd3b3a32`):** run `just <verb> gxy-management <app>` from repo root; recipes self-export `KUBECONFIG`. `cd k3s/gxy-management/` is only required for raw `kubectl` / `helm` invocations shown explicitly below.
 >
 > **Idempotency:** every state-changing step has a "skip-if-already-done" guard. Re-run any section in isolation and the second run is a no-op.
 
@@ -436,7 +436,6 @@ curl -fsS https://uploads.freecode.camp/healthz
 ```bash
 cd ~/DEV/fCC/infra
 just verify-artemis
-just phase5-smoke
 ```
 
 E2E flow: init → upload → finalize (preview) → preview curl → promote → prod curl. Marker-content match on both surfaces. Trap rolls back to the prior production deploy on exit (success OR failure). Exit 0 = green.
@@ -508,8 +507,8 @@ curl -fsS https://uploads.freecode.camp/healthz
 | Valkey (registry) | **Deferred — post-GA** (see §C.5)                  | not yet running             | future: `r2://universe-static-apps-01/_meta/registry/<date>.rdb`  | post-GA scope        |
 | ArgoCD            | not backed up — state in git                       | n/a                         | n/a                                                               | re-deploy from git   |
 | Zot (parked)      | not backed up                                      | n/a                         | DO Spaces (when reactivated)                                      | n/a                  |
-| Helm releases     | not backed up — chart values are source of truth   | n/a                         | infra repo                                                        | `just release`  |
-| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                         | infra-secrets repo                                                | `just release`        |
+| Helm releases     | not backed up — chart values are source of truth   | n/a                         | infra repo                                                        | `just release`       |
+| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                         | infra-secrets repo                                                | `just release`       |
 
 ### G.1 Ad-hoc Windmill backup (before maintenance)
 
@@ -585,11 +584,9 @@ cd ~/DEV/fCC/infra
 # Cassiopeia caddy reachable; assumes gxy-cassiopeia chapter green.
 curl -fsSI https://test.freecode.camp/ | head -5
 
-# artemis healthy + sites enumeration.
+# artemis healthy + sites enumeration + static apps deploy E2E
+# (deploys to test, curls cassiopeia, rolls back).
 just verify-artemis
-
-# Static apps deploy E2E (deploys to test, curls cassiopeia, rolls back).
-just phase5-smoke
 ```
 
 Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from RFC §E):

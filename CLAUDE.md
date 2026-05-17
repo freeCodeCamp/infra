@@ -86,7 +86,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Operations
 
-`just` lists recipes. cd into `k3s/<galaxy>/` first for cluster-scoped recipes (see Working directory rule).
+`just` lists recipes. Run from repo root — recipes carry the galaxy as an arg and self-export `KUBECONFIG`. See Working-directory rule above.
 
 ## Ansible
 

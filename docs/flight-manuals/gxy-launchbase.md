@@ -1,10 +1,6 @@
 # Flight Manual — gxy-launchbase
 
-Standby galaxy. CNPG operator running, no workload. Reactivation
-candidate location for Apollo MVP preview constellations
-(spike-plan §"Galaxy placement map"). Woodpecker CI is **retired**
-(2026-05-03, no consumer post-D016 pivot) — chart artifacts are
-slated for archive in P5 of the universe-master-audit.
+Standby galaxy. CNPG operator running, no workload. Reactivation candidate location for Apollo MVP preview constellations (spike-plan §"Galaxy placement map"). Woodpecker CI is **retired** (2026-05-03, no consumer post-D016 pivot) — chart artifacts are slated for archive in P5 of the universe-master-audit.
 
 | Field             | Value                                                        |
 | ----------------- | ------------------------------------------------------------ |
@@ -16,32 +12,21 @@ slated for archive in P5 of the universe-master-audit.
 | TLS posture       | n/a (no public ingress at present)                           |
 | Last rehearsed    | 2026-05-10 (post universe-master-audit; Phase 16-18 retired) |
 
-> **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2
-> secrets, §3 shared infra. Not repeated here.
+> **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2 secrets, §3 shared infra. Not repeated here.
 >
-> **Working-directory rule (HARD):** `cd k3s/gxy-launchbase/` before any
-> cluster-touching recipe.
+> **Working-directory rule (post-`cd3b3a32`):** run `just <verb> gxy-launchbase <app>` from repo root; recipes self-export `KUBECONFIG`. `cd k3s/gxy-launchbase/` is only required for raw `kubectl` / `helm` invocations shown explicitly below.
 >
-> **Idempotency:** every state-changing step has a "skip-if-already-done"
-> guard.
+> **Idempotency:** every state-changing step has a "skip-if-already-done" guard.
 
-This chapter intentionally does NOT cover Woodpecker. The chart at
-`k3s/gxy-launchbase/apps/woodpecker/` is dead weight scheduled for
-archival; do not bring it up. If a future sprint re-establishes a CI
-plane, write a fresh chapter or runbook — do not resurrect the old.
+This chapter intentionally does NOT cover Woodpecker. The chart at `k3s/gxy-launchbase/apps/woodpecker/` is dead weight scheduled for archival; do not bring it up. If a future sprint re-establishes a CI plane, write a fresh chapter or runbook — do not resurrect the old.
 
 ## §A — k3s bootstrap
 
 ### A.1 Pre-flight (galaxy-specific files)
 
-`infra-secrets/k3s/gxy-launchbase/` after the woodpecker archive
-sweep is **empty** (no chart at this galaxy needs sealed values
-today). When CNPG-managed Postgres clusters land for preview
-constellations, secrets follow the per-app pattern from gxy-management.
+`infra-secrets/k3s/gxy-launchbase/` after the woodpecker archive sweep is **empty** (no chart at this galaxy needs sealed values today). When CNPG-managed Postgres clusters land for preview constellations, secrets follow the per-app pattern from gxy-management.
 
-`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin
-wildcard reused if any future ingress lands on this galaxy on the
-`freecodecamp.net` zone.
+`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard reused if any future ingress lands on this galaxy on the `freecodecamp.net` zone.
 
 ```bash
 cd ~/DEV/fCC/infra
@@ -50,10 +35,7 @@ just verify-secrets
 
 ### A.2 DigitalOcean infrastructure
 
-3× `s-4vcpu-8gb-amd` in FRA1, named `gxy-vm-launchbase-k3s-{1,2,3}`,
-tag `gxy-launchbase-k3s`, image Ubuntu 24.04, VPC `universe-vpc-fra1`.
-Cloud Firewall: add tag `gxy-launchbase-k3s` to existing
-`gxy-fw-fra1`.
+3× `s-4vcpu-8gb-amd` in FRA1, named `gxy-vm-launchbase-k3s-{1,2,3}`, tag `gxy-launchbase-k3s`, image Ubuntu 24.04, VPC `universe-vpc-fra1`. Cloud Firewall: add tag `gxy-launchbase-k3s` to existing `gxy-fw-fra1`.
 
 Idempotency:
 
@@ -74,11 +56,7 @@ cd k3s/gxy-launchbase
 just bootstrap k3s--bootstrap gxy_launchbase_k3s
 ```
 
-Per-galaxy config in
-`ansible/inventory/group_vars/gxy_launchbase_k3s.yml` (CIDRs above,
-`cilium_cluster_id: 3`). etcd snapshots land in
-`s3://net-freecodecamp-universe-backups/etcd/gxy-launchbase/` every
-6h, 20 retained.
+Per-galaxy config in `ansible/inventory/group_vars/gxy_launchbase_k3s.yml` (CIDRs above, `cilium_cluster_id: 3`). etcd snapshots land in `s3://net-freecodecamp-universe-backups/etcd/gxy-launchbase/` every 6h, 20 retained.
 
 ### A.4 Verify
 
@@ -105,9 +83,7 @@ helm get values -n cnpg-system cnpg-system >/dev/null 2>&1 \
   || just release gxy-launchbase cnpg-system
 ```
 
-Chart at `k3s/gxy-launchbase/apps/cnpg-system/charts/`. Cluster-scoped:
-installs CRDs (`Cluster`, `ScheduledBackup`, `Pooler`, `Backup`, etc.)
-and the controller in namespace `cnpg-system`.
+Chart at `k3s/gxy-launchbase/apps/cnpg-system/charts/`. Cluster-scoped: installs CRDs (`Cluster`, `ScheduledBackup`, `Pooler`, `Backup`, etc.) and the controller in namespace `cnpg-system`.
 
 ### B.2 Verify
 
@@ -122,9 +98,7 @@ just inspect-crds gxy-launchbase cnpg
 # postgresql.cnpg.io CRDs present (Cluster, ScheduledBackup, etc.)
 ```
 
-No `Cluster` CR exists today — the operator runs idle, waiting for
-its first workload (preview constellation Postgres when Apollo MVP
-expands; or migrated Windmill PG if CNPG-on-management lands first).
+No `Cluster` CR exists today — the operator runs idle, waiting for its first workload (preview constellation Postgres when Apollo MVP expands; or migrated Windmill PG if CNPG-on-management lands first).
 
 ## §C — Standby state (what's intentionally not here)
 
@@ -136,9 +110,7 @@ expands; or migrated Windmill PG if CNPG-on-management lands first).
 | TLS secrets                          | no per-app sealed values envelope at this level (post-woodpecker)                          |
 | Future workloads                     | Apollo MVP preview constellations (per spike-plan §Phase 0); not scheduled                 |
 
-If a future sprint reactivates a CI plane, the new design must be
-captured in a fresh ADR or runbook and a new chapter section here —
-do not paste the retired Phase 16-18 back in.
+If a future sprint reactivates a CI plane, the new design must be captured in a fresh ADR or runbook and a new chapter section here — do not paste the retired Phase 16-18 back in.
 
 ## §D — Smoke
 
@@ -162,8 +134,7 @@ Acceptance: nodes Ready, operator pod Running, 7+ CNPG CRDs present.
 
 ## §E — Teardown
 
-Destructive. Not blocking on workload state today (no `Cluster` CR
-in tree).
+Destructive. Not blocking on workload state today (no `Cluster` CR in tree).
 
 ### Cluster only (preserves VMs)
 
@@ -182,6 +153,4 @@ doctl compute droplet delete \
   --force
 ```
 
-VPC, firewall, DO Spaces, R2 buckets persist (shared infra — see
-`UNIVERSE.md §3`). When woodpecker DNS deletion lands, no further DNS
-hygiene is owed by this chapter.
+VPC, firewall, DO Spaces, R2 buckets persist (shared infra — see `UNIVERSE.md §3`). When woodpecker DNS deletion lands, no further DNS hygiene is owed by this chapter.

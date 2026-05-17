@@ -1,8 +1,6 @@
 # Flight Manual — gxy-cassiopeia
 
-Production static-apps galaxy. Serves `*.freecode.camp` from R2 via
-caddy-s3 with the in-tree `caddy.fs.r2` alias module. Three nodes, DO
-FRA1.
+Production static-apps galaxy. Serves `*.freecode.camp` from R2 via caddy-s3 with the in-tree `caddy.fs.r2` alias module. Three nodes, DO FRA1.
 
 | Field             | Value                                                  |
 | ----------------- | ------------------------------------------------------ |
@@ -14,34 +12,22 @@ FRA1.
 | TLS posture       | CF Flexible (CF-edge HTTPS, origin HTTP)               |
 | Last rehearsed    | 2026-05-10 (post universe-master-audit)                |
 
-> **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2
-> secrets. Those are shared across all galaxies and are **not**
-> repeated here.
+> **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2 secrets. Those are shared across all galaxies and are **not** repeated here.
 >
-> **Working-directory rule (HARD):** every cluster-touching recipe in
-> this chapter must run from `k3s/gxy-cassiopeia/`. The galaxy `.envrc`
-> loads the right DO token + `KUBECONFIG`. Running from repo root
-> targets the wrong cluster or fails. Each section repeats the `cd`.
+> **Working-directory rule (post-`cd3b3a32`):** run `just <verb> gxy-cassiopeia <app>` from repo root; recipes self-export `KUBECONFIG`. `cd k3s/gxy-cassiopeia/` is only required for raw `kubectl` / `helm` invocations shown explicitly below (the galaxy `.envrc` loads the DO token + `KUBECONFIG` for those).
 >
-> **Idempotency:** every state-changing step has a "skip-if-already-done"
-> guard. Re-run any section in isolation and the second run is a no-op.
+> **Idempotency:** every state-changing step has a "skip-if-already-done" guard. Re-run any section in isolation and the second run is a no-op.
 
-This chapter feeds the cassiopeia design captured in
-[`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md);
-read it before deviating from any step.
+This chapter feeds the cassiopeia design captured in [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md); read it before deviating from any step.
 
 ## §A — k3s bootstrap
 
 ### A.1 Pre-flight
 
-`UNIVERSE.md §0` already covers tool versions, age key, infra-secrets
-mount, and `just verify-secrets`. Cassiopeia-specific files:
+`UNIVERSE.md §0` already covers tool versions, age key, infra-secrets mount, and `just verify-secrets`. Cassiopeia-specific files:
 
-- `infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc` — sops
-  overlay carrying R2 credentials (`endpoint`, `accessKeyId`,
-  `secretAccessKey`).
-- `infra-secrets/k3s/gxy-cassiopeia/r2-rw.env.enc` +
-  `r2-ro.env.enc` — bucket-scoped key pair for `just verify-r2`.
+- `infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc` — sops overlay carrying R2 credentials (`endpoint`, `accessKeyId`, `secretAccessKey`).
+- `infra-secrets/k3s/gxy-cassiopeia/r2-rw.env.enc` + `r2-ro.env.enc` — bucket-scoped key pair for `just verify-r2`.
 
 Verify before proceeding:
 
@@ -52,10 +38,7 @@ just verify-secrets
 
 ### A.2 DigitalOcean infrastructure (one-time, ClickOps)
 
-3× `s-4vcpu-8gb-amd` in FRA1, named `gxy-vm-cassiopeia-k3s-{1,2,3}`,
-tag `gxy-cassiopeia-k3s`, image Ubuntu 24.04, VPC `universe-vpc-fra1`,
-cloud-init `cloud-init/basic.yml`. Add tag `gxy-cassiopeia-k3s` to
-the existing `gxy-fw-fra1` Cloud Firewall.
+3× `s-4vcpu-8gb-amd` in FRA1, named `gxy-vm-cassiopeia-k3s-{1,2,3}`, tag `gxy-cassiopeia-k3s`, image Ubuntu 24.04, VPC `universe-vpc-fra1`, cloud-init `cloud-init/basic.yml`. Add tag `gxy-cassiopeia-k3s` to the existing `gxy-fw-fra1` Cloud Firewall.
 
 Idempotency check (skip if 3 droplets already up):
 
@@ -79,13 +62,7 @@ cd k3s/gxy-cassiopeia
 just bootstrap k3s--bootstrap gxy_cassiopeia_k3s
 ```
 
-`k3s--bootstrap` is idempotent: it's a sequence of validate →
-prerequisites → k3s deploy → Cilium → verify + kubeconfig that
-no-ops on already-applied state. Cilium devices/MTU pin
-(`devices: [eth0, eth1]`, `mtu: 1500`) is in
-`k3s/gxy-cassiopeia/cluster/cilium/values.yaml` — required to keep
-cross-node TCP working when Tailscale is on the node (per ADR-009
-spike finding 2026-04-06).
+`k3s--bootstrap` is idempotent: it's a sequence of validate → prerequisites → k3s deploy → Cilium → verify + kubeconfig that no-ops on already-applied state. Cilium devices/MTU pin (`devices: [eth0, eth1]`, `mtu: 1500`) is in `k3s/gxy-cassiopeia/cluster/cilium/values.yaml` — required to keep cross-node TCP working when Tailscale is on the node (per ADR-009 spike finding 2026-04-06).
 
 ### A.4 Verify
 
@@ -103,9 +80,7 @@ kubectl exec -n kube-system $(kubectl get pods -n kube-system -l k8s-app=cilium 
 # 3/3 reachable, all endpoints 1/1
 ```
 
-etcd snapshots auto-land in
-`s3://net-freecodecamp-universe-backups/etcd/gxy-cassiopeia/` every
-6h, 20 retained.
+etcd snapshots auto-land in `s3://net-freecodecamp-universe-backups/etcd/gxy-cassiopeia/` every 6h, 20 retained.
 
 ## §B — caddy-s3 + R2
 
@@ -125,12 +100,7 @@ else
 fi
 ```
 
-The recipe layers chart defaults → `values.production.yaml` (image
-SHA pin, hostnames, replicas) → sops overlay
-`caddy.values.yaml.enc` (R2 credentials). Image pulls from
-`ghcr.io/freecodecamp/caddy-s3:<sha-tag>@sha256:<digest>` direct
-(build-residency principle — pillars build outside Universe; never
-through zot for chicken-egg avoidance).
+The recipe layers chart defaults → `values.production.yaml` (image SHA pin, hostnames, replicas) → sops overlay `caddy.values.yaml.enc` (R2 credentials). Image pulls from `ghcr.io/freecodecamp/caddy-s3:<sha-tag>@sha256:<digest>` direct (build-residency principle — pillars build outside Universe; never through zot for chicken-egg avoidance).
 
 ### B.2 R2 bucket verify
 
@@ -150,10 +120,7 @@ universe-static-apps-01/
 └── <site>/production               (alias: body = deploy id)
 ```
 
-caddy reads alias keys at `<site>.freecode.camp/<env>` (full FQDN —
-the `<sitePrefix>.<rootDomain>` form). artemis writes the same
-form via `ALIAS_*_KEY_FORMAT` env. **Format coupling is real**: any
-chart edit on either side must echo the other (probe 03).
+caddy reads alias keys at `<site>.freecode.camp/<env>` (full FQDN — the `<sitePrefix>.<rootDomain>` form). artemis writes the same form via `ALIAS_*_KEY_FORMAT` env. **Format coupling is real**: any chart edit on either side must echo the other (probe 03).
 
 ### B.3 Verify Gateway + HTTPRoute
 
@@ -173,27 +140,15 @@ kubectl get httproute -n caddy
 # caddy-route   matches *.freecode.camp via parentRef caddy-gateway
 ```
 
-R2 read-only token rotation: see
-[`../runbooks/05-r2-keys-rotation.md`](../runbooks/05-r2-keys-rotation.md).
-Rotate at least annually; cluster reads non-disruptively after secret
-update + pod rollout.
+R2 read-only token rotation: see [`../runbooks/05-r2-keys-rotation.md`](../runbooks/05-r2-keys-rotation.md). Rotate at least annually; cluster reads non-disruptively after secret update + pod rollout.
 
 ## §C — Static-apps registry
 
 ### C.1 What it is, where it lives
 
-The static-apps registry maps `<site-slug> → [authorized GH teams]`
-and is the source of truth for both site enumeration and per-deploy
-authz (per ADR-016 §Authn / authz). Per
-`rfc-gxy-cassiopeia-ga.md` §B (locked 2026-05-10), the registry
-substrate is **Valkey single-instance alongside artemis on
-gxy-management**. AOF + RDB on PVC; nightly RDB dump to R2.
+The static-apps registry maps `<site-slug> → [authorized GH teams]` and is the source of truth for both site enumeration and per-deploy authz (per ADR-016 §Authn / authz). Per `rfc-gxy-cassiopeia-ga.md` §B (locked 2026-05-10), the registry substrate is **Valkey single-instance alongside artemis on gxy-management**. AOF + RDB on PVC; nightly RDB dump to R2.
 
-This galaxy (cassiopeia) does **not** host the registry — the
-cassiopeia caddy reads R2 only, and the alias bytes in R2 are produced
-by artemis on gxy-management after authz lands. Bring-up of valkey +
-artemis lives in `gxy-management.md §C/§D` and is run **before** the
-first staff deploy hits cassiopeia.
+This galaxy (cassiopeia) does **not** host the registry — the cassiopeia caddy reads R2 only, and the alias bytes in R2 are produced by artemis on gxy-management after authz lands. Bring-up of valkey + artemis lives in `gxy-management.md §C/§D` and is run **before** the first staff deploy hits cassiopeia.
 
 ### C.2 What cassiopeia consumes
 
@@ -202,16 +157,11 @@ Caddy on cassiopeia reads:
 - `<site>/preview` and `<site>/production` alias keys (atomic R2 puts).
 - `<site>/deploys/<ts>-<sha>/...` deploy bytes pointed-at by the alias.
 
-caddy never talks to Valkey, never talks to artemis. The trust
-boundary is one-directional: artemis (gxy-management) writes R2;
-caddy (cassiopeia) reads R2. Compromise of cassiopeia cannot mutate
-the registry or cross-write deploy bytes (caddy uses an R2
-read-only token, see B.2).
+caddy never talks to Valkey, never talks to artemis. The trust boundary is one-directional: artemis (gxy-management) writes R2; caddy (cassiopeia) reads R2. Compromise of cassiopeia cannot mutate the registry or cross-write deploy bytes (caddy uses an R2 read-only token, see B.2).
 
 ### C.3 Cassiopeia-side verifier
 
-Once gxy-management has Valkey + artemis up and at least one site
-registered (default: `test`), this galaxy's read-side smoke is:
+Once gxy-management has Valkey + artemis up and at least one site registered (default: `test`), this galaxy's read-side smoke is:
 
 ```bash
 # Replace with any registered site from `universe site list`.
@@ -244,8 +194,7 @@ aws --endpoint-url "$R2_ENDPOINT" s3api get-object \
 
 ### D.1 Cloudflare DNS
 
-Wildcard A records to all 3 cassiopeia node public IPs, CF orange
-cloud ON, SSL Flexible.
+Wildcard A records to all 3 cassiopeia node public IPs, CF orange cloud ON, SSL Flexible.
 
 ```bash
 # Confirm node public IPs.
@@ -257,35 +206,19 @@ dig +short test.freecode.camp @1.1.1.1
 #   anycast is the steady state with proxy ON).
 ```
 
-The wildcard `*.freecode.camp` covers both `<site>.freecode.camp`
-(production) and `<site>--preview.freecode.camp` (preview, double-dash
-per ADR-009 §"Domains"). **No per-site DNS edit required** after
-the wildcard is in place — site registration via `universe site
-register` does not provision DNS, only registers in Valkey.
+The wildcard `*.freecode.camp` covers both `<site>.freecode.camp` (production) and `<site>--preview.freecode.camp` (preview, double-dash per ADR-009 §"Domains"). **No per-site DNS edit required** after the wildcard is in place — site registration via `universe site register` does not provision DNS, only registers in Valkey.
 
 ### D.2 TLS posture (recap, source of truth in `UNIVERSE.md §1`)
 
-`freecode.camp` zone is **CF Flexible**: CF terminates HTTPS at the
-edge, origin is plain HTTP. caddy listens on HTTP `:80` only behind
-Traefik gatewayClassName. No origin cert at the k8s layer for this
-zone.
+`freecode.camp` zone is **CF Flexible**: CF terminates HTTPS at the edge, origin is plain HTTP. caddy listens on HTTP `:80` only behind Traefik gatewayClassName. No origin cert at the k8s layer for this zone.
 
-The `freecodecamp.net` zone (windmill, future argocd/zot) uses Full
-Strict with origin cert pair from
-`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc`. The two
-postures coexist intentionally — see `UNIVERSE.md §1` for the matrix.
+The `freecodecamp.net` zone (windmill, future argocd/zot) uses Full Strict with origin cert pair from `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc`. The two postures coexist intentionally — see `UNIVERSE.md §1` for the matrix.
 
-cert-manager / DNS-01 issuer is **not deployed** and not on the
-short-term path (RFC §D).
+cert-manager / DNS-01 issuer is **not deployed** and not on the short-term path (RFC §D).
 
 ### D.3 Origin allow-list (parked gap)
 
-DO Cloud Firewall on `gxy-fw-fra1` accepts `80/443` from
-`0.0.0.0/0`. Only CF WAF gates origin hits today. The "only-CF-edge-IPs
-on origin firewall" cron + manifest is parked
-(`gxy-static-k7d.14`); document the gap when handing over operator
-state. Not GA-blocking — origin reveals galaxy IPs but everything
-serves through CF.
+DO Cloud Firewall on `gxy-fw-fra1` accepts `80/443` from `0.0.0.0/0`. Only CF WAF gates origin hits today. The "only-CF-edge-IPs on origin firewall" cron + manifest is parked (`gxy-static-k7d.14`); document the gap when handing over operator state. Not GA-blocking — origin reveals galaxy IPs but everything serves through CF.
 
 ### D.4 Verify
 
@@ -303,19 +236,14 @@ kubectl get httproute -n caddy caddy-route -o jsonpath='{.status.parents[*].cond
 
 ## §E — End-to-end smoke
 
-The smoke harness lives on the artemis side (it's the one that holds
-the R2 admin token). From the operator box, with kubeconfig pointed
-at gxy-management:
+The smoke harness lives on the artemis side (it's the one that holds the R2 admin token). From the operator box, with kubeconfig pointed at gxy-management:
 
 ```bash
 cd ~/DEV/fCC/infra
-just verify-artemis        # auth + sites/list + 200 on uploads.freecode.camp/healthz
-just phase5-smoke                    # init → upload → finalize (preview) → preview curl → promote → prod curl
+just verify-artemis        # auth + sites/list + 200 on uploads.freecode.camp/healthz + E2E deploy
 ```
 
-`phase5-smoke` deploys to a known marker site (`test`), curls the
-public URL on cassiopeia, and rolls back to the prior production
-deploy on exit (success OR failure). Exit 0 = green.
+`verify-artemis` deploys to a known marker site (`test`), curls the public URL on cassiopeia, and rolls back to the prior production deploy on exit (success OR failure). Exit 0 = green.
 
 ### Acceptance gates (from RFC §E)
 
@@ -323,34 +251,23 @@ deploy on exit (success OR failure). Exit 0 = green.
 - **G2** caddy chart 3/3 + Gateway Programmed (§B.3).
 - **G3** R2 reachable r/w with the correct keys (§B.2).
 - **G4** `*.freecode.camp` resolves to 3 cassiopeia node IPs (§D.1).
-- **G7** `universe site register test --teams=staff` succeeds without
-  operator action (run on the artemis side; smoke confirms read-side
-  here in §C.3).
-- **G8** `phase5-smoke` exits 0 (deploys to `test.freecode.camp`).
+- **G7** `universe site register test --teams=staff` succeeds without operator action (run on the artemis side; smoke confirms read-side here in §C.3).
+- **G8** `verify-artemis` exits 0 (deploys to `test.freecode.camp`).
 - **G12** Idempotency — full chapter §A→§D rerun is a no-op.
 
-G5 (Valkey running), G6 (artemis with `REGISTRY_BACKEND=valkey`),
-G9-G11 (registry restart, Valkey pod restart, RDB to R2) belong to
-gxy-management.md.
+G5 (Valkey running), G6 (artemis with `REGISTRY_BACKEND=valkey`), G9-G11 (registry restart, Valkey pod restart, RDB to R2) belong to gxy-management.md.
 
 ## §F — Troubleshooting
 
 ### Caddy serving 503 on `<site>.freecode.camp/`
 
-1. Check R2 status: <https://www.cloudflarestatus.com/>. Caddy maps
-   upstream R2 5xx to 502 by default.
-2. Read alias key directly:
-   `aws --endpoint-url "$R2_ENDPOINT" s3api get-object --bucket universe-static-apps-01 --key "<site>.freecode.camp/production" /dev/stdout`.
-   If the alias is empty or points at a deleted prefix → the registry
-   side wrote a bad pointer; fall back via
-   `universe static promote --to <previous-deploy-id>`.
-3. caddy logs:
-   `kubectl logs -n caddy deploy/caddy --tail=200 | grep -i 'r2'`.
+1. Check R2 status: <https://www.cloudflarestatus.com/>. Caddy maps upstream R2 5xx to 502 by default.
+1. Read alias key directly: `aws --endpoint-url "$R2_ENDPOINT" s3api get-object --bucket universe-static-apps-01 --key "<site>.freecode.camp/production" /dev/stdout`. If the alias is empty or points at a deleted prefix → the registry side wrote a bad pointer; fall back via `universe static promote --to <previous-deploy-id>`.
+1. caddy logs: `kubectl logs -n caddy deploy/caddy --tail=200 | grep -i 'r2'`.
 
 ### CF cache shows old deploy after promote
 
-CF edge caches the alias-resolved bytes for the cache TTL. Targeted
-purge via CF API is the surgical option:
+CF edge caches the alias-resolved bytes for the cache TTL. Targeted purge via CF API is the surgical option:
 
 ```
 curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
@@ -359,38 +276,21 @@ curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cac
   --data '{"files":["https://test.freecode.camp/index.html"]}'
 ```
 
-Zone-wide purge is available in CF dashboard → Caching → Purge
-Everything. Use sparingly.
+Zone-wide purge is available in CF dashboard → Caching → Purge Everything. Use sparingly.
 
 ### Cilium / MTU pinning regression
 
-If cross-node TCP starts failing after a node-level change (Tailscale
-upgrade, new NIC, kernel bump), check Cilium's `devices` and `mtu`
-config still pin to `[eth0, eth1]` and `1500`. ADR-009 spike finding;
-recurring footgun.
+If cross-node TCP starts failing after a node-level change (Tailscale upgrade, new NIC, kernel bump), check Cilium's `devices` and `mtu` config still pin to `[eth0, eth1]` and `1500`. ADR-009 spike finding; recurring footgun.
 
 ### Cilium CNP DNS L7 trap (heads-up; dormant in caddy today)
 
-The caddy chart ships a `CiliumNetworkPolicy` with an L7
-`rules.dns.matchPattern` allow-list scoped to external R2 only.
-Today's caddy egresses only to `*.r2.cloudflarestorage.com` so the
-trap is silent. **The moment caddy gains a cross-namespace cluster
-egress** (e.g. an internal status sidecar, a future PG-backed
-audit log, anything resolving `<svc>.<ns>.svc.cluster.local`),
-the L7 DNS proxy will refuse the cluster-local lookup and the pod
-will fail with `server misbehaving` from the Go resolver.
+The caddy chart ships a `CiliumNetworkPolicy` with an L7 `rules.dns.matchPattern` allow-list scoped to external R2 only. Today's caddy egresses only to `*.r2.cloudflarestorage.com` so the trap is silent. **The moment caddy gains a cross-namespace cluster egress** (e.g. an internal status sidecar, a future PG-backed audit log, anything resolving `<svc>.<ns>.svc.cluster.local`), the L7 DNS proxy will refuse the cluster-local lookup and the pod will fail with `server misbehaving` from the Go resolver.
 
-This is the same trap that bit artemis on 2026-05-11 during the
-Valkey cutover; original 2026-04-07 incident on woodpecker is in
-archived field-notes. Read
-[`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md)
-**before** adding cluster-local egress to the caddy CNP, and
-upgrade from Pattern A → Pattern B per the rubric there.
+This is the same trap that bit artemis on 2026-05-11 during the Valkey cutover; original 2026-04-07 incident on woodpecker is in archived field-notes. Read [`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) **before** adding cluster-local egress to the caddy CNP, and upgrade from Pattern A → Pattern B per the rubric there.
 
 ## §G — Teardown
 
-Destructive. Confirm CF DNS has been flipped off cassiopeia before
-teardown, otherwise live traffic 5xxs.
+Destructive. Confirm CF DNS has been flipped off cassiopeia before teardown, otherwise live traffic 5xxs.
 
 ### Cluster only (preserves VMs, lets you replay §A.3 on the same droplets)
 
@@ -409,5 +309,4 @@ doctl compute droplet delete \
   --force
 ```
 
-R2 buckets, VPC, firewall, and DO Spaces persist (shared
-infrastructure — see `UNIVERSE.md §"Shared infrastructure"`).
+R2 buckets, VPC, firewall, and DO Spaces persist (shared infrastructure — see `UNIVERSE.md §"Shared infrastructure"`).

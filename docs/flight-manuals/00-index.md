@@ -1,24 +1,14 @@
 # Flight Manuals — Index
 
-Per-cluster doomsday-rebuild manuals for the Universe Platform. Read
-order, galaxy state, and cross-cluster gotchas live here; everything
-else lives in `UNIVERSE.md` (shared phases) or in the per-galaxy
-chapter.
+Per-cluster doomsday-rebuild manuals for the Universe Platform. Read order, galaxy state, and cross-cluster gotchas live here; everything else lives in `UNIVERSE.md` (shared phases) or in the per-galaxy chapter.
 
 ## Read order (rebuilds)
 
-1. **Always start with [`UNIVERSE.md`](UNIVERSE.md)** — §0 prereqs,
-   §1 DNS, §2 secrets, §3 shared infra, §4 lifecycle calendar.
-   Per-galaxy chapters assume these ran.
-2. **gxy-management first** — control plane (Windmill + artemis +
-   Valkey). Every other galaxy reads bytes that originate here.
-3. **gxy-launchbase** — standby (CNPG operator only post-woodpecker
-   retire); brings the database operator before any preview-DB
-   constellation lands.
-4. **gxy-cassiopeia** — static-apps serve plane. Reads R2 written by
-   artemis on gxy-management.
-5. **`UNIVERSE.md §99`** — cross-galaxy smoke. Run only after all
-   three chapters complete twice idempotently.
+1. **Always start with [`UNIVERSE.md`](UNIVERSE.md)** — §0 prereqs, §1 DNS, §2 secrets, §3 shared infra, §4 lifecycle calendar. Per-galaxy chapters assume these ran.
+1. **gxy-management first** — control plane (Windmill + artemis + Valkey). Every other galaxy reads bytes that originate here.
+1. **gxy-launchbase** — standby (CNPG operator only post-woodpecker retire); brings the database operator before any preview-DB constellation lands.
+1. **gxy-cassiopeia** — static-apps serve plane. Reads R2 written by artemis on gxy-management.
+1. **`UNIVERSE.md §99`** — cross-galaxy smoke. Run only after all three chapters complete twice idempotently.
 
 ## Galaxies (current state)
 
@@ -28,10 +18,7 @@ chapter.
 | `gxy-launchbase` | [gxy-launchbase.md](gxy-launchbase.md) | Standby — CNPG operator (workload-free)     | Live (idle) | DO FRA1 → Hetzner post-M5 (parked) |
 | `gxy-cassiopeia` | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static-apps serve plane — Caddy + R2        | Live        | DO FRA1 → Hetzner post-M5 (parked) |
 
-Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are
-**not** in this manual. When they're provisioned, add a chapter then.
-Active state for those galaxies lives in
-`Universe/spike/spike-plan.md` and `docs/architecture/adr-drift-2026-05-10.md`.
+Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are **not** in this manual. When they're provisioned, add a chapter then. Active state for those galaxies lives in `Universe/spike/spike-plan.md` and `docs/architecture/adr-drift-2026-05-10.md`.
 
 Retired galaxies:
 
@@ -72,13 +59,8 @@ Operational gotchas that bite once per rebuild — full notes link out.
 | [`04-secrets-decrypt.md`](../runbooks/04-secrets-decrypt.md)                   | sops envelope decrypt gotchas                              |
 | [`05-r2-keys-rotation.md`](../runbooks/05-r2-keys-rotation.md)                 | R2 read-only / read-write key rotation                     |
 
-## Working-directory rule (HARD)
+## Working-directory rule (post-`cd3b3a32`, 2026-05-13)
 
-Repeated from `UNIVERSE.md` because it's the single most-common
-footgun:
+Repeated from `UNIVERSE.md`:
 
-> Cluster-touching `just` recipes MUST run from `k3s/<galaxy>/`. The
-> galaxy `.envrc` loads the right DO token + `KUBECONFIG`. Repo-root
-> invocation hits the wrong cluster or fails silently.
-
-Each chapter repeats this above every relevant recipe.
+> `just` recipes carry the galaxy as an argument and self-export `KUBECONFIG` from the recipe body. Run all `release` / `configure` / `inspect` / `destroy` / `backup` / `verify-*` recipes from repo root: `just release gxy-management artemis`. `cd k3s/<galaxy>/` is only required for raw `kubectl` / `helm` invocations that bypass the recipe layer (the galaxy `.envrc` loads the DO token + `KUBECONFIG` for those).
