@@ -259,19 +259,68 @@ verify-app cluster app:
     echo "--- recent warning events ---"
     kubectl -n "$NS" get events --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -10 || true
 
-# Wait for a CNPG Cluster CR to become Ready (default 5m).
+# Wait for a CNPG Cluster CR to become Ready, then surface health
+# beyond Ready: instance/primary roll, replica streaming lag, WAL
+# archive freshness, last successful barman backup age.
+#
+# Optional env (warn thresholds; exit code stays 0 unless wait fails):
+#   BACKUP_WARN_HOURS    default 26 (1 day + 2h slack)
+#   WAL_WARN_SECONDS     default 300 (5min)
 [group('verify')]
 verify-cnpg cluster namespace name timeout="5m":
     #!/usr/bin/env bash
     set -eu
     cd k3s/{{ cluster }}
     export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    echo "Waiting for CNPG Cluster {{ namespace }}/{{ name }} (timeout {{ timeout }})..."
-    kubectl -n {{ namespace }} wait --for=condition=Ready cluster/{{ name }} --timeout={{ timeout }}
+    : "${BACKUP_WARN_HOURS:=26}"
+    : "${WAL_WARN_SECONDS:=300}"
+    NS={{ namespace }}
+    NAME={{ name }}
+
+    echo "Waiting for CNPG Cluster ${NS}/${NAME} (timeout {{ timeout }})..."
+    kubectl -n "$NS" wait --for=condition=Ready "cluster/${NAME}" --timeout={{ timeout }}
+
     echo "--- cluster summary ---"
-    kubectl -n {{ namespace }} get cluster/{{ name }} -o jsonpath='instances={.status.instances} readyInstances={.status.readyInstances} primary={.status.currentPrimary}{"\n"}'
+    kubectl -n "$NS" get "cluster/${NAME}" \
+      -o jsonpath='instances={.status.instances} readyInstances={.status.readyInstances} primary={.status.currentPrimary}{"\n"}'
+
     echo "--- pods ---"
-    kubectl -n {{ namespace }} get pods -l cnpg.io/cluster={{ name }} -o wide
+    kubectl -n "$NS" get pods -l "cnpg.io/cluster=${NAME}" -o wide
+
+    echo "--- last successful backup ---"
+    LAST_BACKUP=$(kubectl -n "$NS" get "cluster/${NAME}" -o jsonpath='{.status.lastSuccessfulBackup}' 2>/dev/null || true)
+    if [[ -z "$LAST_BACKUP" ]]; then
+      echo "WARN: no lastSuccessfulBackup recorded yet"
+    else
+      LAST_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${LAST_BACKUP%.*}Z" "+%s" 2>/dev/null || date -d "$LAST_BACKUP" "+%s" 2>/dev/null || echo 0)
+      NOW_EPOCH=$(date "+%s")
+      AGE_H=$(( (NOW_EPOCH - LAST_EPOCH) / 3600 ))
+      echo "lastSuccessfulBackup=$LAST_BACKUP (age ${AGE_H}h)"
+      [[ "$AGE_H" -lt "$BACKUP_WARN_HOURS" ]] || echo "WARN: backup older than ${BACKUP_WARN_HOURS}h"
+    fi
+
+    echo "--- first recoverability point (PITR floor) ---"
+    kubectl -n "$NS" get "cluster/${NAME}" -o jsonpath='{.status.firstRecoverabilityPoint}{"\n"}'
+
+    PRIMARY=$(kubectl -n "$NS" get "cluster/${NAME}" -o jsonpath='{.status.currentPrimary}')
+    if [[ -n "$PRIMARY" ]]; then
+      echo "--- WAL archive freshness (primary=$PRIMARY) ---"
+      kubectl -n "$NS" exec -c postgres "$PRIMARY" -- \
+        psql -tA -U postgres -c "SELECT EXTRACT(EPOCH FROM (now() - last_archived_time))::int FROM pg_stat_archiver;" 2>/dev/null \
+        | awk -v warn="$WAL_WARN_SECONDS" '{
+            if ($1 == "") print "WARN: pg_stat_archiver returned no row";
+            else if ($1+0 > warn) printf "WARN: last WAL archive %ss ago (>%ss)\n", $1, warn;
+            else printf "OK: last WAL archive %ss ago\n", $1;
+          }'
+
+      echo "--- replica streaming lag (from primary) ---"
+      kubectl -n "$NS" exec -c postgres "$PRIMARY" -- \
+        psql -tA -U postgres -c "SELECT application_name, state, COALESCE(pg_wal_lsn_diff(sent_lsn, replay_lsn)::text, 'n/a') AS bytes_lag FROM pg_stat_replication;" 2>/dev/null \
+        | awk -F'|' 'NF>0 {printf "  %-20s state=%s lag_bytes=%s\n", $1, $2, $3}' \
+        || echo "  (no replicas connected — single-instance cluster)"
+    else
+      echo "WARN: currentPrimary unset; skipping WAL + replica probes"
+    fi
 
 # Validate K8s manifests with kubeconform.
 [group('verify')]
