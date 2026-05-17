@@ -53,17 +53,25 @@ spec:
             - name: tmp
               mountPath: /tmp
           livenessProbe:
+            # /healthz is the unconditional liveness probe — no upstream
+            # calls, can never go red on a Valkey/R2 outage.
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
+            # /readyz pings Valkey + HEADs R2; pods are removed from the
+            # Service endpoints when either upstream is unreachable.
+            # Sequential probe budget = 2 × 3s; failureThreshold gives
+            # ~30s grace before the pod is taken out of rotation.
             httpGet:
-              path: /healthz
+              path: /readyz
               port: http
-            initialDelaySeconds: 3
-            periodSeconds: 5
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 7
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
