@@ -1,9 +1,6 @@
 # Runbooks — Index
 
-Single-purpose ops runbooks for the freeCodeCamp Universe platform.
-Numeric prefix orders by reader path: staff → operator → foundation
-→ demoted-stack. Each file owns one operational concern;
-larger end-to-end procedures compose from these.
+Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric prefix orders by reader path: staff → operator → foundation → demoted-stack. Each file owns one operational concern; larger end-to-end procedures compose from these.
 
 ## Active runbooks
 
@@ -14,6 +11,7 @@ larger end-to-end procedures compose from these.
 | 03  | [03-artemis-postdeploy-check.md](03-artemis-postdeploy-check.md)           | Operator  | E2E gate after any artemis chart change |
 | 04  | [04-secrets-decrypt.md](04-secrets-decrypt.md)                             | Operator  | Inspect / source a sops envelope        |
 | 05  | [05-r2-keys-rotation.md](05-r2-keys-rotation.md)                           | Operator  | Rotate artemis-admin or caddy-ro R2 key |
+| 06  | [06-windmill-pg-backup.md](06-windmill-pg-backup.md)                       | Operator  | Verify, take, or restore windmill PG    |
 
 ## Reading order by scenario
 
@@ -23,6 +21,8 @@ larger end-to-end procedures compose from these.
 
 **Rotate an R2 key:** 05 (links to 04 + 03 internally).
 
+**Recover windmill PG state:** 06 (links to 04 internally; calls `just inspect-windmill-backup`, `test-windmill-backup-restore`, `backup-windmill`).
+
 ## Block ordering rationale
 
 | Block | Files | Why grouped                                       |
@@ -30,14 +30,11 @@ larger end-to-end procedures compose from these.
 | 01    | 01    | Staff-facing primary — most reads                 |
 | 02–03 | 02–03 | Artemis lifecycle (deploy + verify)               |
 | 04–05 | 04–05 | Foundations consumed by 02/03 (secrets + R2 keys) |
+| 06    | 06    | Backup / DR for windmill PG (calls 04 internally) |
 
-Two-digit prefix gives 99 slots. Promote to three-digit if count grows
-past 99.
+Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
-Slots `06`, `07`, `08`, `09` reserved for future runbooks.
-Woodpecker runbooks formerly at `07–09` are archived under
-[`archive/2026-05-10/`](archive/2026-05-10/) (Woodpecker CI retired
-2026-05-03).
+Slots `07`, `08`, `09` reserved for future runbooks. Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](archive/2026-05-10/) (Woodpecker CI retired 2026-05-03).
 
 ## Cross-doc references
 
