@@ -3,6 +3,8 @@
 # Production overlay at ../../values.production.yaml.
 # Secret credentials overlay at (sops) infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc.
 
+namespace: caddy
+
 replicaCount: 1
 
 image:
