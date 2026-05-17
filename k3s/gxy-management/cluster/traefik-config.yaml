@@ -2,7 +2,7 @@
 # Reference: https://docs.k3s.io/networking/networking-services#customizing-the-traefik-helm-chart
 #
 # This file is copied to /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
-# by Ansible play-k3s--galaxy.yml
+# by Ansible play-k3s--bootstrap.yml
 
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig

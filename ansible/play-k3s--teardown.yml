@@ -3,8 +3,7 @@
 # Preserves: Tailscale, cloud-init hardening, DO infrastructure, CIS sysctls.
 #
 # Usage:
-#   cd k3s/<galaxy>
-#   just play k3s--reset <inventory_group>
+#   just bootstrap k3s--teardown <inventory_group>
 
 - name: "K3s {{ variable_host }} - Build groups"
   hosts: "{{ variable_host }}"

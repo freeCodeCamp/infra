@@ -13,8 +13,7 @@
 #   - Group vars populated for the target inventory group
 #
 # Usage:
-#   cd k3s/<galaxy>
-#   just play k3s--galaxy <inventory_group>
+#   just bootstrap k3s--bootstrap <inventory_group>
 
 # Play 1: Validate prerequisites and build dynamic groups
 - name: "K3s {{ variable_host }} - Validate"
