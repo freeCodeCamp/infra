@@ -1,5 +1,5 @@
 # Production overlay for the valkey chart on gxy-management.
-# Loaded by `just helm-upgrade gxy-management valkey` between chart
+# Loaded by `just release gxy-management valkey` between chart
 # defaults and the sops sealed overlay so the layering is:
 #
 #   chart values.yaml  <  THIS FILE  <  infra-secrets/k3s/gxy-management/valkey.values.yaml.enc

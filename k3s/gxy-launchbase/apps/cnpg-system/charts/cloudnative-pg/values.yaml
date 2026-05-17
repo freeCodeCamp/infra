@@ -1,6 +1,6 @@
 # CloudNativePG operator values — gxy-launchbase.
 # Chart: cloudnative-pg (https://cloudnative-pg.github.io/charts).
-# Chart version pin is set at install time by `just helm-upgrade`.
+# Chart version pin is set at install time by `just release`.
 
 # Single replica — upstream recommendation for < 100 clusters managed.
 replicaCount: 1

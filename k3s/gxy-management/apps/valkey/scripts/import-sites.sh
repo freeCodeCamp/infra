@@ -106,7 +106,7 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   fi
   if ! kubectl -n "$VALKEY_NAMESPACE" get pod "$VALKEY_POD" >/dev/null 2>&1; then
     # shellcheck disable=SC2016 # backticks are markdown, not command sub
-    printf 'Error: pod %s/%s not found. Is `just deploy valkey` complete?\n' \
+    printf 'Error: pod %s/%s not found. Is `just release gxy-management valkey` complete?\n' \
       "$VALKEY_NAMESPACE" "$VALKEY_POD" >&2
     exit 1
   fi

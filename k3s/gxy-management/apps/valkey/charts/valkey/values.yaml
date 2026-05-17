@@ -1,7 +1,7 @@
 # Default values for the valkey chart.
 # Production overlay at ../../values.production.yaml.
 # Secret credentials overlay at (sops) infra-secrets/k3s/gxy-management/valkey.values.yaml.enc.
-# Consumed by `just helm-upgrade gxy-management valkey`.
+# Consumed by `just release gxy-management valkey`.
 #
 # Layer order (lowest → highest precedence):
 #   1. THIS FILE (chart defaults)

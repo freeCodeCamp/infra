@@ -1,7 +1,7 @@
 # Default values for the artemis chart.
 # Production overlay at ../../values.production.yaml.
 # Secret credentials overlay at (sops) infra-secrets/k3s/gxy-management/artemis.values.yaml.enc.
-# Consumed by `just helm-upgrade gxy-management artemis`.
+# Consumed by `just release gxy-management artemis`.
 #
 # Layer order (lowest → highest precedence):
 #   1. THIS FILE (chart defaults)

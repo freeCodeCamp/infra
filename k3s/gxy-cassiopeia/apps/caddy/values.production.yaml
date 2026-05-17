@@ -1,5 +1,5 @@
 ---
-# Consumed by `just helm-upgrade gxy-cassiopeia caddy`.
+# Consumed by `just release gxy-cassiopeia caddy`.
 # Secret credentials come from infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc.
 
 replicaCount: 3

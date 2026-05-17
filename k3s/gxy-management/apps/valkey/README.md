@@ -1,13 +1,8 @@
 # Valkey — registry KV substrate
 
-In-cluster Valkey backing the static-apps registry consumed by
-artemis (`/api/site/register`, `/api/sites`, `/api/site/{slug}`
-PATCH/DELETE).
+In-cluster Valkey backing the static-apps registry consumed by artemis (`/api/site/register`, `/api/sites`, `/api/site/{slug}` PATCH/DELETE).
 
-Selected over CF KV / R2 JSON / Postgres / etcd / Redis in
-`docs/architecture/rfc-gxy-cassiopeia-ga.md` §3 KV substrate matrix.
-Vendor-neutral, in-cluster, decouples the registry from the
-operator-on-PR loop that previously gated `artemis/config/sites.yaml`.
+Selected over CF KV / R2 JSON / Postgres / etcd / Redis in `docs/architecture/rfc-gxy-cassiopeia-ga.md` §3 KV substrate matrix. Vendor-neutral, in-cluster, decouples the registry from the operator-on-PR loop that previously gated `artemis/config/sites.yaml`.
 
 ## Layout
 
@@ -44,17 +39,12 @@ Per the artemis `internal/registry/valkey/store.go` shape:
 | `sites:all`        | set    | slug strings                                                   | enumeration index          |
 | `registry.changed` | pubsub | slug string                                                    | artemis cache invalidation |
 
-All writes go through the artemis `POST /api/site/register` /
-`PATCH /api/site/{slug}` / `DELETE /api/site/{slug}` endpoints.
-Direct Valkey access is reserved for the one-time hand-import
-(`scripts/import-sites.sh`) and break-glass operator probes.
+All writes go through the artemis `POST /api/site/register` / `PATCH /api/site/{slug}` / `DELETE /api/site/{slug}` endpoints. Direct Valkey access is reserved for the one-time hand-import (`scripts/import-sites.sh`) and break-glass operator probes.
 
 ## Deploy
 
 ```sh
-cd k3s/gxy-management/
-just deploy valkey
+just release gxy-management valkey
 ```
 
-End-to-end recipe (mint envelope, deploy, verify, import seed data):
-`docs/flight-manuals/gxy-management.md §C-valkey`.
+End-to-end recipe (mint envelope, deploy, verify, import seed data): `docs/flight-manuals/gxy-management.md §C-valkey`.
