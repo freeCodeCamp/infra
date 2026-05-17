@@ -223,19 +223,68 @@ configure-field-notes-trim area="infra" age="30":
         ../Universe/spike/field-notes/{{area}}.md \
         --age-days {{age}}
 
-# Verify all encrypted secrets are decryptable with the operator's age key.
+# Verify encrypted secrets:
+#   stage 1 — each `*.enc` decrypts with the operator's age key
+#   stage 2 — path-layout contract per `docs/architecture/rfc-secrets-layout.md`
+#             (universe-scope under `k3s/<gxy-*>/`, platform-wide under
+#             `global/`, do-context creds under `do-*/`, per-app namespace
+#             stubs at `<app>/.env.enc`; archive/legacy paths allowed)
 [group('verify')]
 verify-secrets:
     #!/usr/bin/env bash
-    set -eu
+    set -uo pipefail
+    fail=0
+
+    echo "=== stage 1: decryptability ==="
     for f in $(find "{{ secrets_dir }}" -name '*.enc' -type f | sort); do
-      echo -n "$f: "
+      printf '%s: ' "$f"
       case "$f" in
         *.env.enc)            sops -d --input-type dotenv --output-type dotenv "$f" > /dev/null 2>&1 ;;
         *.yaml.enc|*.yml.enc) sops -d --input-type yaml --output-type yaml "$f" > /dev/null 2>&1 ;;
         *)                    sops -d "$f" > /dev/null 2>&1 ;;
-      esac && echo "OK" || echo "FAILED"
+      esac && echo "OK" || { echo "FAILED"; fail=1; }
     done
+
+    echo "=== stage 2: path-layout contract ==="
+    SECRETS_ROOT="{{ secrets_dir }}"
+    unknown=0
+    while IFS= read -r f; do
+      rel="${f#${SECRETS_ROOT}/}"
+      case "$rel" in
+        # Universe k3s clusters — RFC §"Cluster-local"
+        k3s/gxy-management/*.values.yaml.enc|k3s/gxy-launchbase/*.values.yaml.enc|k3s/gxy-cassiopeia/*.values.yaml.enc) ;;
+        k3s/gxy-management/*.secrets.env.enc|k3s/gxy-launchbase/*.secrets.env.enc|k3s/gxy-cassiopeia/*.secrets.env.enc) ;;
+        k3s/gxy-management/*-backup.secrets.env.enc|k3s/gxy-launchbase/*-backup.secrets.env.enc|k3s/gxy-cassiopeia/*-backup.secrets.env.enc) ;;
+        k3s/gxy-management/*.tls.crt.enc|k3s/gxy-management/*.tls.key.enc) ;;
+        k3s/gxy-launchbase/*.tls.crt.enc|k3s/gxy-launchbase/*.tls.key.enc) ;;
+        k3s/gxy-cassiopeia/*.tls.crt.enc|k3s/gxy-cassiopeia/*.tls.key.enc) ;;
+        k3s/gxy-management/kubeconfig.yaml.enc|k3s/gxy-launchbase/kubeconfig.yaml.enc|k3s/gxy-cassiopeia/kubeconfig.yaml.enc) ;;
+        # Platform-wide — RFC §"Two explicit scopes"
+        global/.env.enc) ;;
+        global/tls/*.crt.enc|global/tls/*.key.enc) ;;
+        # DO contexts
+        do-primary/.env.enc|do-universe/.env.enc) ;;
+        # Per-app platform-wide namespace stubs / r2 reader
+        windmill/.env.enc|outline/.env.enc|appsmith/.env.enc|r2-read/.env.enc) ;;
+        # Pre-Universe artemis SoT (audit F42 — flagged for unification)
+        management/artemis.env.enc) ;;
+        # Legacy (retire post-Universe per RFC)
+        archive/*|docker/oldeworld/*|k8s/o11y/*|k3s/ops-backoffice-tools/*) ;;
+        # Operator scratchpad (dev-only)
+        scratchpad/*) ;;
+        *)
+          printf 'UNKNOWN: %s\n' "$rel"
+          unknown=$((unknown + 1))
+          ;;
+      esac
+    done < <(find "${SECRETS_ROOT}" -name '*.enc' -type f | sort)
+    if [ "$unknown" -gt 0 ]; then
+      printf 'WARN: %d path(s) outside layout contract — see docs/architecture/rfc-secrets-layout.md\n' "$unknown"
+    else
+      echo "OK: all .enc files match the layout contract"
+    fi
+
+    exit "$fail"
 
 # Show app namespace status (deploys, sts, pods, secrets, recent warnings).
 [group('verify')]
@@ -414,7 +463,7 @@ verify-artemis:
     : "${ROOT_DOMAIN:=freecode.camp}"
     GH_TOKEN="${GH_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 
-    printf '[1/2] healthz %s/healthz\n' "$ARTEMIS_URL"
+    printf '[1/3] healthz %s/healthz\n' "$ARTEMIS_URL"
     if ! curl -fsS -o /dev/null --max-time 10 "$ARTEMIS_URL/healthz"; then
       printf 'FAIL: %s/healthz unreachable\n' "$ARTEMIS_URL" >&2
       exit 1
@@ -424,12 +473,34 @@ verify-artemis:
       printf 'FAIL: GH_TOKEN unset and `gh auth token` returned empty\n' >&2
       exit 2
     fi
+
+    printf '[2/3] valkey-reach + jwt-mint — GET /api/sites + POST /api/deploy/init\n'
+    # /api/sites hits the Valkey-backed registry; a 200 confirms artemis
+    # holds a live read connection. JWT mint check follows so we surface
+    # auth-side failure separately from Valkey-side failure.
+    SITES_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+      -H "Authorization: Bearer ${GH_TOKEN}" "${ARTEMIS_URL}/api/sites")
+    if [[ "$SITES_CODE" != "200" ]]; then
+      printf 'FAIL: GET /api/sites returned %s (expected 200; Valkey reachable + staff team gated)\n' "$SITES_CODE" >&2
+      exit 1
+    fi
+    JWT_BODY=$(curl -sS --max-time 10 \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H 'content-type: application/json' \
+      -d "{\"site\":\"${SITE}\"}" \
+      "${ARTEMIS_URL}/api/deploy/init")
+    if ! echo "$JWT_BODY" | grep -qE '"token"|"deployId"'; then
+      printf 'FAIL: /api/deploy/init body lacked token/deployId — %s\n' "$JWT_BODY" >&2
+      exit 1
+    fi
+    printf '  /api/sites=200; /api/deploy/init returned JWT envelope\n'
+
     if [[ ! -d "$ARTEMIS_REPO" ]]; then
       printf 'FAIL: ARTEMIS_REPO=%s not a directory\n' "$ARTEMIS_REPO" >&2
       exit 2
     fi
 
-    printf '[2/2] artemis E2E — repo=%s url=%s site=%s\n' \
+    printf '[3/3] artemis E2E — repo=%s url=%s site=%s\n' \
       "$ARTEMIS_REPO" "$ARTEMIS_URL" "$SITE"
     cd "$ARTEMIS_REPO"
     ARTEMIS_URL="$ARTEMIS_URL" GH_TOKEN="$GH_TOKEN" \
