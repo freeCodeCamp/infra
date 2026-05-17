@@ -347,6 +347,47 @@ verify-artemis:
       SITE="$SITE" ROOT_DOMAIN="$ROOT_DOMAIN" \
       make integration
 
+# Caddy cluster-side health on cassiopeia: chart pods 3/3, Gateway +
+# HTTPRoute programmed, e2e curl against a probe site.
+#
+# Optional env:
+#   PROBE_SITE     default test
+#   ROOT_DOMAIN    default freecode.camp
+[group('verify')]
+verify-caddy cluster="gxy-cassiopeia":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${PROBE_SITE:=test}"
+    : "${ROOT_DOMAIN:=freecode.camp}"
+    cd k3s/{{ cluster }}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+
+    printf '[1/4] caddy pods in caddy ns\n'
+    READY=$(kubectl -n caddy get pods -l app.kubernetes.io/name=caddy \
+      -o jsonpath='{range .items[*]}{.status.containerStatuses[0].ready}{"\n"}{end}' | grep -c true || true)
+    TOTAL=$(kubectl -n caddy get pods -l app.kubernetes.io/name=caddy --no-headers | wc -l | tr -d ' ')
+    printf '    ready=%s total=%s\n' "$READY" "$TOTAL"
+    [[ "$READY" -ge 1 && "$READY" -eq "$TOTAL" ]] || { echo "FAIL: caddy pods not all Ready"; exit 1; }
+
+    printf '[2/4] gateway caddy-gateway Programmed\n'
+    GW=$(kubectl -n caddy get gateway caddy-gateway \
+      -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}')
+    [[ "$GW" == "True" ]] || { echo "FAIL: Gateway Programmed=$GW"; exit 1; }
+
+    printf '[3/4] httproute caddy Accepted + ResolvedRefs\n'
+    ACC=$(kubectl -n caddy get httproute caddy \
+      -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}')
+    RES=$(kubectl -n caddy get httproute caddy \
+      -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}')
+    [[ "$ACC" == "True" && "$RES" == "True" ]] || { echo "FAIL: HTTPRoute Accepted=$ACC ResolvedRefs=$RES"; exit 1; }
+
+    URL="https://${PROBE_SITE}.${ROOT_DOMAIN}/"
+    printf '[4/4] e2e %s\n' "$URL"
+    HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 10 "$URL") || true
+    [[ "$HTTP" == "200" ]] || { echo "FAIL: $URL returned $HTTP (expected 200)"; exit 1; }
+
+    echo "OK: caddy chart healthy on {{ cluster }}; ${URL} → 200"
+
 # Verify the locally-built caddy-s3 image lists both in-tree modules AND does
 # NOT list the third-party caddy.fs.s3 (D32 — no third-party Caddy plugins).
 # Runs the image under emulation since the host is usually arm64.
@@ -435,6 +476,32 @@ inspect-field-notes-trim area="infra" age="30":
         ../Universe/spike/field-notes/{{area}}.md \
         --age-days {{age}} --dry-run
 
+# Windmill backup CronJob health on gxy-management: schedule, last
+# successful run, recent job pods, local `.backups/` artefact list.
+# Operator-runnable read-only probe — never triggers a new backup.
+[group('inspect')]
+inspect-windmill-backup cluster="gxy-management":
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{ cluster }}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    NS=windmill
+    CJ=windmill-backup
+    echo "=== {{ cluster }} / ${NS}/${CJ} ==="
+    echo "--- cronjob ---"
+    kubectl -n "$NS" get cronjob "$CJ" -o wide 2>&1 || { echo "(not found — CronJob absent)"; exit 1; }
+    echo "--- schedule + last run ---"
+    kubectl -n "$NS" get cronjob "$CJ" \
+      -o jsonpath='schedule={.spec.schedule}{"\n"}lastSchedule={.status.lastScheduleTime}{"\n"}lastSuccessful={.status.lastSuccessfulTime}{"\n"}'
+    echo "--- recent job pods (latest 5) ---"
+    kubectl -n "$NS" get pods -l job-name --sort-by=.status.startTime 2>&1 | tail -6 || true
+    echo "--- local .backups/ ---"
+    if [ -d .backups ]; then
+      ls -lh .backups 2>/dev/null | tail -10 || echo "(empty)"
+    else
+      echo "(no .backups/ dir in $(pwd))"
+    fi
+
 # Ad-hoc Windmill PostgreSQL backup (local file).
 #
 # Dumps pg_dumpall INSIDE the pod to a temp file (so the dump finishes
@@ -467,6 +534,46 @@ backup-windmill cluster:
     [ "${FILESIZE}" -gt 100 ] || { echo "Error: backup file too small (${FILESIZE} bytes) — likely empty dump"; exit 1; }
     gunzip -c ".backups/${FILENAME}" | tail -1 | grep -q 'PostgreSQL database cluster dump complete' \
       || { echo "Error: copied backup missing completion sentinel — aborting"; rm -f ".backups/${FILENAME}"; exit 1; }
+    echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
+
+# Ad-hoc Valkey snapshot (local file). Triggers BGSAVE in the pod,
+# polls LASTSAVE until the timestamp advances, then `kubectl cp`s the
+# resulting `dump.rdb` out to `.backups/valkey-<timestamp>.rdb`.
+#
+# BGSAVE is non-blocking but fork-heavy; on a single-replica AOF-on
+# Valkey this is the safest operator-runnable snapshot. For nightly
+# RDB→R2 mirror see the chart (T18) — this recipe is the manual
+# escape hatch.
+[group('backup')]
+backup-valkey cluster="gxy-management":
+    #!/usr/bin/env bash
+    set -eu
+    cd k3s/{{ cluster }}
+    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+    mkdir -p .backups
+    NS=valkey
+    POD=$(kubectl -n "$NS" get pod -l app.kubernetes.io/name=valkey -o jsonpath='{.items[0].metadata.name}')
+    [ -n "$POD" ] || { echo "Error: no valkey pod in $NS namespace"; exit 1; }
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    FILENAME="valkey-${TIMESTAMP}.rdb"
+
+    BEFORE=$(kubectl exec -n "$NS" "$POD" -- valkey-cli LASTSAVE | tr -d '[:space:]')
+    echo "Triggering BGSAVE on ${POD} (lastsave=${BEFORE})..."
+    kubectl exec -n "$NS" "$POD" -- valkey-cli BGSAVE >/dev/null
+
+    for i in $(seq 1 30); do
+      sleep 2
+      NOW=$(kubectl exec -n "$NS" "$POD" -- valkey-cli LASTSAVE | tr -d '[:space:]')
+      if [ "$NOW" != "$BEFORE" ]; then
+        echo "BGSAVE complete (lastsave=${NOW}, ${i} polls)"
+        break
+      fi
+    done
+    [ "$NOW" != "$BEFORE" ] || { echo "Error: BGSAVE LASTSAVE did not advance after 60s"; exit 1; }
+
+    kubectl cp "${NS}/${POD}:/data/dump.rdb" ".backups/${FILENAME}"
+    FILESIZE=$(stat -f%z ".backups/${FILENAME}" 2>/dev/null || stat -c%s ".backups/${FILENAME}")
+    [ "${FILESIZE}" -gt 100 ] || { echo "Error: snapshot too small (${FILESIZE} bytes)"; rm -f ".backups/${FILENAME}"; exit 1; }
     echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
 
 # Build the caddy-s3 image locally and tag with dev-<sha>. Platform pinned to
