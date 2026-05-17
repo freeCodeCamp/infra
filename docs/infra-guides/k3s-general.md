@@ -4,12 +4,12 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose           | Apps                           |
-| -------------------- | ----------------- | ------------------------------ |
-| ops-backoffice-tools | Internal tools    | Appsmith, Outline              |
-| gxy-management       | Universe platform | Windmill, ArgoCD, Zot, artemis |
-| gxy-launchbase       | Supply chain      | Woodpecker, CNPG preview DBs   |
-| gxy-cassiopeia       | Static hosting    | Caddy + R2                     |
+| Cluster              | Purpose                 | Apps                                               |
+| -------------------- | ----------------------- | -------------------------------------------------- |
+| ops-backoffice-tools | Internal tools (legacy) | Appsmith, Outline                                  |
+| gxy-management       | Universe control plane  | Windmill, artemis (uploads.freecode.camp), valkey  |
+| gxy-launchbase       | Standby (post-cutover)  | CNPG operator only (woodpecker retired 2026-05-03) |
+| gxy-cassiopeia       | Static-serve plane      | Caddy-S3 fronting `*.freecode.camp` from R2        |
 
 ## Quick Access
 
@@ -28,20 +28,17 @@ cd k3s/gxy-cassiopeia && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
 ```
 k3s/
-├── archive/                       # Archived configs (historical reference)
 ├── gxy-management/
 │   ├── apps/
-│   │   ├── argocd/
 │   │   ├── artemis/
-│   │   ├── windmill/
-│   │   └── zot/
+│   │   ├── valkey/
+│   │   └── windmill/
 │   └── cluster/
 │       ├── cilium/
 │       └── security/
 ├── gxy-launchbase/
 │   ├── apps/
-│   │   ├── cnpg/
-│   │   └── woodpecker/
+│   │   └── cnpg-system/
 │   └── cluster/
 │       ├── cilium/
 │       └── security/
@@ -51,7 +48,7 @@ k3s/
 │   └── cluster/
 │       ├── cilium/
 │       └── security/
-├── ops-backoffice-tools/
+├── ops-backoffice-tools/             # legacy
 │   ├── apps/
 │   │   ├── appsmith/
 │   │   └── outline/
@@ -62,7 +59,9 @@ k3s/
     └── traefik-config.yaml
 ```
 
----
+Retired chart trees (argocd, zot, woodpecker) tracked in [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md).
+
+______________________________________________________________________
 
 ## DigitalOcean Resources
 
@@ -89,7 +88,7 @@ k3s/
 | --------------------- | ---------- | --------------------------------- |
 | ops-lb-tools-k3s-nyc3 | tools_k3s  | 80→30080, 443→30443 (passthrough) |
 
----
+______________________________________________________________________
 
 ## Ansible Deployment
 
@@ -106,7 +105,7 @@ just bootstrap k3s--bootstrap gxy_launchbase_k3s
 just bootstrap k3s--bootstrap gxy_cassiopeia_k3s
 ```
 
----
+______________________________________________________________________
 
 ## Tailscale Network
 
@@ -114,7 +113,7 @@ Tailscale on nodes for SSH/kubectl access only (under review).
 
 See `tailscale/README.md` (repo root) for device inventory.
 
----
+______________________________________________________________________
 
 ## Storage
 
@@ -128,22 +127,20 @@ See `tailscale/README.md` (repo root) for device inventory.
 - Schedule: Daily 2 AM UTC
 - Retention: 7 days
 
----
+______________________________________________________________________
 
 ## DNS (Cloudflare)
 
-| Record                    | Type | Value                   | SSL Mode                 |
-| ------------------------- | ---- | ----------------------- | ------------------------ |
-| appsmith.freecodecamp.net | A    | tools LB                | Full (Strict)            |
-| outline.freecodecamp.net  | A    | tools LB                | Full (Strict)            |
-| windmill.freecodecamp.net | A    | gxy-management node IPs | Full (Strict)            |
-| argocd.freecodecamp.net   | A    | gxy-management node IPs | Full (Strict)            |
-| registry.freecodecamp.net | A    | gxy-management node IPs | Full (Strict) (deferred) |
-| freecode.camp             | A    | gxy-cassiopeia node IPs | Flexible                 |
-| \*.freecode.camp          | A    | gxy-cassiopeia node IPs | Flexible                 |
-| uploads.freecode.camp     | A    | gxy-management node IPs | Flexible                 |
+| Record                    | Type | Value                   | SSL Mode      |
+| ------------------------- | ---- | ----------------------- | ------------- |
+| appsmith.freecodecamp.net | A    | tools LB (legacy)       | Full (Strict) |
+| outline.freecodecamp.net  | A    | tools LB (legacy)       | Full (Strict) |
+| windmill.freecodecamp.net | A    | gxy-management node IPs | Full (Strict) |
+| freecode.camp             | A    | gxy-cassiopeia node IPs | Flexible      |
+| \*.freecode.camp          | A    | gxy-cassiopeia node IPs | Flexible      |
+| uploads.freecode.camp     | A    | gxy-management node IPs | Flexible      |
 
----
+______________________________________________________________________
 
 ## Maintenance
 
@@ -159,7 +156,7 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 just release <cluster> <app>
 ```
 
----
+______________________________________________________________________
 
 ## Architecture
 
@@ -188,18 +185,22 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 ```
 Internet → Cloudflare (Full Strict) → Node Public IPs → Traefik (hostNetwork) → Gateway API → Apps
                                                                                        │
-                                                                         ┌─────────────┘
-                                                                         ↓
-                                                                     Windmill, ArgoCD
+                                                                         ┌─────────────┴─────────────┐
+                                                                         ↓                           ↓
+                                                                     Windmill                    artemis
+                                                                                                     │
+                                                                                                  Valkey (in-cluster registry)
+                                                                                                     │
+                                                                                                  R2 (universe-static-apps-01)
 
-CNI: Cilium    Storage: local-path    SSH/kubectl: Tailscale
+CNI: Cilium    Storage: local-path
 ```
 
-| App      | Replicas            | Access | Notes              |
-| -------- | ------------------- | ------ | ------------------ |
-| Windmill | 1 server, 2 workers | Direct | CF Access deferred |
-| ArgoCD   | 1 (single replica)  | Direct | CF Access deferred |
-| Zot      | deferred            | —      | Phase 1            |
+| App      | Access                                      | Notes                                          |
+| -------- | ------------------------------------------- | ---------------------------------------------- |
+| Windmill | `windmill.freecodecamp.net` (staff)         | server + workers; CF Access deferred           |
+| artemis  | `uploads.freecode.camp` (staff via GH team) | Deploy-proxy; Valkey-backed sites registry     |
+| Valkey   | in-cluster only (`valkey.valkey.svc`)       | Single-replica; AOF; backs artemis sites + JWT |
 
 ### gxy-cassiopeia
 
@@ -216,7 +217,7 @@ CNI: Cilium    Storage: emptyDir    SSH/kubectl: Tailscale
 | ----- | -------- | ------------- | ------------------------------------------------------ |
 | Caddy | 3        | freecode.camp | R2 bucket `universe-static-apps-01`, alias-pinned read |
 
----
+______________________________________________________________________
 
 ## Playbooks Reference
 
@@ -228,11 +229,7 @@ CNI: Cilium    Storage: emptyDir    SSH/kubectl: Tailscale
 
 ## Cross-refs
 
-- [`cilium-multi-nic.md`](./cilium-multi-nic.md) — MTU + device pinning
-  on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
-- [`cilium-cnp.md`](./cilium-cnp.md) — CiliumNetworkPolicy patterns and
-  the DNS L7 trap.
-- [`traefik-hostnetwork.md`](./traefik-hostnetwork.md) — Traefik DaemonSet
-  pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
-- [`chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) —
-  five-point gate every new chart clears before merge.
+- [`cilium-multi-nic.md`](./cilium-multi-nic.md) — MTU + device pinning on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
+- [`cilium-cnp.md`](./cilium-cnp.md) — CiliumNetworkPolicy patterns and the DNS L7 trap.
+- [`traefik-hostnetwork.md`](./traefik-hostnetwork.md) — Traefik DaemonSet pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
+- [`chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) — five-point gate every new chart clears before merge.
