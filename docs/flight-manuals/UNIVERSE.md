@@ -208,6 +208,40 @@ direnv exec k3s/gxy-<g> env | grep -E 'DIGITALOCEAN_TOKEN|KUBECONFIG'
 
 DO inventory plugin resolves to empty without `DO_API_TOKEN`; Tailscale plays silent-fail in that state. Hard-gate before running anything.
 
+### §3.3 — PILLAR_SET (cross-galaxy pillars per ADR-017 + ADR-019)
+
+Curated list of Universe pillars (recovery-path workloads — see [ADR-017](https://github.com/freeCodeCamp/Universe/blob/main/decisions/017-build-run-residency.md) §Decision). The reviewer-bot rule from ADR-017 §Reviewer-bot rule keys on `PILLAR_SET` membership to flag `image.repository: zot/...` references in pillar charts.
+
+| Pillar           | Galaxy           | Class                                                                                                                                                                      | Image source                             | Storage backing                                                                                                    | Status                                                                                        |
+| ---------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `caddy-s3`       | `gxy-cassiopeia` | Stateless                                                                                                                                                                  | `ghcr.io/freecodecamp/caddy-s3`          | None (reads R2 via in-tree `caddy.fs.r2`)                                                                          | LIVE                                                                                          |
+| `artemis`        | `gxy-management` | Stateless                                                                                                                                                                  | `ghcr.io/freecodecamp/artemis`           | Valkey registry (in-cluster) + R2 `universe-static-apps-01` (admin write path)                                     | LIVE                                                                                          |
+| Traefik DS       | every galaxy     | Stateless                                                                                                                                                                  | upstream `traefik/traefik` digest-pinned | None                                                                                                               | LIVE                                                                                          |
+| Recovery scripts | n/a (operator)   | Stateless                                                                                                                                                                  | n/a (operator workstations + GHA)        | n/a                                                                                                                | LIVE                                                                                          |
+| `veritas`        | `gxy-cassiopeia` | **Stateful** — first stateful pillar per [ADR-019](https://github.com/freeCodeCamp/Universe/blob/main/decisions/019-cassiopeia-shared-services.md) §Stateful-pillar backup | `ghcr.io/freecodecamp/veritas` (planned) | CNPG on local-path PV (cassiopeia has no Ceph); T1 = CNPG replicas; T2 = R2 `cassiopeia-cnpg-backups` (base + WAL) | **PLANNED** — gated on Veritas codebase dossier (D1) chart land; activate this row on cutover |
+| Donations        | `gxy-cassiopeia` | **Stateful** — future per ADR-019 §Cassiopeia charter                                                                                                                      | `ghcr.io/freecodecamp/donations` (TBD)   | CNPG on local-path PV; per-galaxy R2 backup (`cassiopeia-cnpg-backups`)                                            | **FUTURE** — gates on Veritas live + cassiopeia resize milestone                              |
+
+**Pillar criticality ranking** (P1 highest, P5 lowest) per [ADR-019](https://github.com/freeCodeCamp/Universe/blob/main/decisions/019-cassiopeia-shared-services.md) §Pillar criticality:
+
+| Rank | Galaxy           | Charter                                                                                        | Venue policy               |
+| ---- | ---------------- | ---------------------------------------------------------------------------------------------- | -------------------------- |
+| P1   | `gxy-management` | Shepherd — ArgoCD, Atlantis, Windmill; backup + recovery services. Thin and reliable.          | DO / Cloud forever         |
+| P2   | `gxy-cassiopeia` | Critical shared services — static serve + Veritas + donations + future cross-universe central. | DO / Cloud forever         |
+| P3   | `gxy-triangulum` | Dynamic prod constellations — containers, FaaS, anything non-static.                           | Hetzner bare metal direct  |
+| P4   | `gxy-launchbase` | Supply chain — CI/CD, preview environments.                                                    | Hetzner bare metal post-M5 |
+| P5   | `gxy-backoffice` | Observability + internal devtools (Windmill EXCLUDED — stays P1).                              | Hetzner bare metal direct  |
+
+Provisioning order (`mgmt → cassiopeia → launchbase → backoffice → triangulum`) is **distinct** from criticality rank — see ADR-019 §Provisioning order.
+
+**Stateful-pillar invariants** (mandatory floor per ADR-019 §Stateful-pillar backup, before declaring stateful pillar GA):
+
+- T1 = in-cluster replicas (CNPG primary + replicas) — RPO 0, RTO seconds.
+- T2 = per-galaxy R2 bucket — CNPG base backup nightly + WAL archive continuous. RPO ≤ 5 min, RTO ≤ 60 min.
+- Per-galaxy bucket convention (never shared): `cassiopeia-cnpg-backups` (LIVE on Veritas land), `triangulum-cnpg-backups` (future).
+- Restore drill documented in per-galaxy flight manual §G sub-section before GA.
+
+T3 (cross-vendor mirror) + T4 (Velero cluster-state) are deferred per the Universe cassiopeia-charter dossier §D2 + §D3 handoff registry; not blocking GA but tracked for revival.
+
 ## §4 — Lifecycle calendar (cross-cluster pins)
 
 Third-party pins with EOL windows. Roll-forward is an explicit backlog item — never automatic.
