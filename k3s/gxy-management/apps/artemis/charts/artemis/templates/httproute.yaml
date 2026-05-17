@@ -5,6 +5,14 @@
 # them would loop).
 #
 # Filter chain: rate-limit (chart-internal Middleware) → secure-headers (cluster-shared).
+#
+# Operator-only paths (`/metrics`, `/readyz`) are routed first to a
+# rewritten not-found path so external callers via the public Gateway
+# see chi's 404 instead of the prom exposition or registry-health
+# response. In-cluster scrape (Prometheus → Service:port) and k8s
+# readinessProbe (kubelet → pod IP) both bypass this HTTPRoute and so
+# continue to reach the real handlers. `/healthz` stays public — it
+# carries no labels and is the documented external liveness probe.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -18,6 +26,29 @@ spec:
   hostnames:
     - {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname | quote }}
   rules:
+    # Public-block: rewrite /metrics + /readyz to an unrouted path.
+    # chi-router returns 404 for unknown paths so callers see a clean
+    # 404, not a 200 with operator-only payload. Must come BEFORE the
+    # catch-all PathPrefix `/` rule — Gateway API rule precedence is
+    # most-specific-first and PathPrefix `/` would otherwise win on
+    # everything.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /metrics
+        - path:
+            type: PathPrefix
+            value: /readyz
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /_artemis_blocked_path
+      backendRefs:
+        - name: {{ .Release.Name }}
+          port: {{ .Values.service.port }}
+
     - matches:
         - path:
             type: PathPrefix
