@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+#
+# cloudflare_account_id — fCC's CF account id (32-char hex). Found at
+#   dash.cloudflare.com → right sidebar → "Account ID".
+#
+# Token comes from env:
+#   export CLOUDFLARE_API_TOKEN="<token-with-R2-Read+Edit>"
+# Mint at https://dash.cloudflare.com/profile/api-tokens; stash in
+# 1Password / sops, NOT in this file.
+
+cloudflare_account_id = "<32-char-account-id>"
+
+# Tunables (uncomment to override defaults in variables.tf).
+# bucket_name                   = "universe-static-apps-01"
+# bucket_location               = "WEUR"
+# deploy_retention_days         = 90
+# abort_incomplete_uploads_days = 7
