@@ -754,6 +754,22 @@ build-caddy-s3:
         docker/images/caddy-s3/
     echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
 
+# Build the postgres-awscli image locally (postgres:18-bookworm + baked
+# awscli for the windmill backup CronJob). GitHub Actions
+# (`.github/workflows/docker--postgres-awscli.yml`) builds the canonical
+# `ghcr.io/freecodecamp/postgres-awscli:{sha}` tag on workflow_dispatch.
+[group('build')]
+build-postgres-awscli:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TAG="dev-$(git rev-parse --short HEAD)"
+    docker buildx build \
+        --platform linux/amd64 \
+        --load \
+        -t "ghcr.io/freecodecamp/postgres-awscli:${TAG}" \
+        docker/images/postgres-awscli/
+    echo "Built: ghcr.io/freecodecamp/postgres-awscli:${TAG} (linux/amd64)"
+
 # Reset a CNPG Cluster: delete the CR, all PVCs, and pods. DESTRUCTIVE.
 # After reset, re-run `just release {{cluster}} {{app}}` to recreate.
 [group('destroy')]

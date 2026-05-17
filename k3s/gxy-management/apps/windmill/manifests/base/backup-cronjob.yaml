@@ -17,7 +17,10 @@ spec:
           restartPolicy: Never
           containers:
             - name: backup
-              image: postgres:18-bookworm
+              # Pinned digest landed by the docker--postgres-awscli GHA;
+              # bump alongside any base-image refresh. Per ADR-017 the
+              # image pulls from ghcr.io direct, never through zot.management.
+              image: ghcr.io/freecodecamp/postgres-awscli:latest
               command:
                 - /bin/bash
                 - -c
@@ -38,7 +41,6 @@ spec:
                   echo "Backup size: ${FILESIZE} bytes"
 
                   echo "Uploading to s3://${S3_BUCKET}/${S3_PATH}"
-                  apt-get update -qq && apt-get install -y -qq awscli > /dev/null 2>&1
                   aws s3 cp "/tmp/${FILENAME}" "s3://${S3_BUCKET}/${S3_PATH}" \
                     --endpoint-url "${S3_ENDPOINT}"
 
