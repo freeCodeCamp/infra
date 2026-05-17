@@ -4,10 +4,9 @@ metadata:
   name: {{ .Values.namespace }}
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
-    # PSS baseline — artemis runs unprivileged Go binary, no escalation
-    # required. Keep namespace at the cluster default. Do NOT add to
-    # the privileged-exempt list (that list is reserved for tailscale +
-    # windmill workers per CLAUDE.md §Non-obvious Conventions).
-    pod-security.kubernetes.io/enforce: baseline
-    pod-security.kubernetes.io/audit: baseline
-    pod-security.kubernetes.io/warn: baseline
+    # PSS restricted — artemis pod runs as 1000:1000 non-root with
+    # readOnlyRootFilesystem, RuntimeDefault seccomp, ALL caps dropped,
+    # no privilege escalation. Matches valkey + caddy on the same plane.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

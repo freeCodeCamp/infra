@@ -4,3 +4,9 @@ metadata:
   name: {{ .Values.namespace }}
   labels:
     {{- include "caddy.labels" . | nindent 4 }}
+    # PSS restricted — caddy pod runs as 1000:1000 non-root with
+    # readOnlyRootFilesystem, RuntimeDefault seccomp, ALL caps dropped
+    # (NET_BIND_SERVICE added back for port 80, allowed under restricted).
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
