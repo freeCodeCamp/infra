@@ -594,6 +594,40 @@ test-loadtest scenario:
 test-constellation:
     bash scripts/tests/constellation-register.sh
 
+# Round-trip verification for the windmill backup pipeline. Lists the
+# newest S3 object under `windmill/<cluster>/`, downloads it to a temp
+# file, asserts the gzip is well-formed and ends with the postgres
+# `cluster dump complete` sentinel. Does NOT restore — that path lives
+# in `docs/runbooks/06-windmill-pg-backup.md`.
+[group('test')]
+test-windmill-backup-restore cluster="gxy-management":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    S3_ENV="{{ secrets_dir }}/k3s/{{ cluster }}/windmill-backup.secrets.env.enc"
+    [ -f "$S3_ENV" ] || { echo "FAIL: missing $S3_ENV"; exit 1; }
+    set -a
+    source <(sops -d --input-type dotenv --output-type dotenv "$S3_ENV")
+    set +a
+    PREFIX="windmill/{{ cluster }}"
+    NEWEST=$(AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+      aws s3 ls "s3://${S3_BUCKET}/${PREFIX}/" --endpoint-url "$S3_ENDPOINT" \
+      | awk '$4 ~ /\.sql\.gz$/ {print $4}' | sort | tail -1)
+    [ -n "$NEWEST" ] || { echo "FAIL: no .sql.gz under s3://${S3_BUCKET}/${PREFIX}/"; exit 1; }
+    TMP=$(mktemp -d)
+    trap 'rm -rf "$TMP"' EXIT
+    DEST="${TMP}/${NEWEST}"
+    echo "Downloading s3://${S3_BUCKET}/${PREFIX}/${NEWEST}"
+    AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+      aws s3 cp "s3://${S3_BUCKET}/${PREFIX}/${NEWEST}" "$DEST" \
+      --endpoint-url "$S3_ENDPOINT" --only-show-errors
+    SIZE=$(stat -f%z "$DEST" 2>/dev/null || stat -c%s "$DEST")
+    [ "$SIZE" -gt 100 ] || { echo "FAIL: backup too small ($SIZE bytes)"; exit 1; }
+    gunzip -t "$DEST" || { echo "FAIL: gunzip integrity check"; exit 1; }
+    gunzip -c "$DEST" | tail -1 \
+      | grep -q 'PostgreSQL database cluster dump complete' \
+      || { echo "FAIL: completion sentinel missing"; exit 1; }
+    echo "OK: ${NEWEST} (${SIZE} bytes) gunzip-clean + sentinel present"
+
 # View a decrypted secret (auto-detects format from extension).
 [group('inspect')]
 inspect-secret name:
@@ -695,6 +729,29 @@ backup-windmill cluster:
     gunzip -c ".backups/${FILENAME}" | tail -1 | grep -q 'PostgreSQL database cluster dump complete' \
       || { echo "Error: copied backup missing completion sentinel — aborting"; rm -f ".backups/${FILENAME}"; exit 1; }
     echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
+
+    # Upload to the same S3 prefix the nightly CronJob targets so an
+    # ad-hoc operator dump is recoverable through the same restore path
+    # documented in `docs/runbooks/06-windmill-pg-backup.md`. Creds come
+    # from the same sops envelope the chart's secretGenerator consumes.
+    S3_ENV="{{ secrets_dir }}/k3s/{{ cluster }}/windmill-backup.secrets.env.enc"
+    if [ -f "$S3_ENV" ]; then
+      echo "Uploading to S3 (mirroring CronJob path)..."
+      set -a
+      source <(sops -d --input-type dotenv --output-type dotenv "$S3_ENV")
+      set +a
+      S3_PATH="windmill/{{ cluster }}/${FILENAME}"
+      AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+        aws s3 cp ".backups/${FILENAME}" "s3://${S3_BUCKET}/${S3_PATH}" \
+        --endpoint-url "$S3_ENDPOINT"
+      AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+        aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}" --endpoint-url "$S3_ENDPOINT" \
+        | grep -q "${FILENAME}" \
+        || { echo "Error: S3 head-list did not surface the uploaded object"; exit 1; }
+      echo "Uploaded: s3://${S3_BUCKET}/${S3_PATH}"
+    else
+      echo "WARN: ${S3_ENV} not found — local-only backup (CronJob path NOT mirrored)"
+    fi
 
 # Ad-hoc Valkey snapshot (local file). Triggers BGSAVE in the pod,
 # polls LASTSAVE until the timestamp advances, then `kubectl cp`s the
