@@ -15,4 +15,3 @@ plugins:
       exemptions:
         namespaces:
           - kube-system
-          - tailscale
