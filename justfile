@@ -490,7 +490,11 @@ verify-artemis:
       -d "{\"site\":\"${SITE}\",\"sha\":\"0000000000000000000000000000000000000000\"}" \
       "${ARTEMIS_URL}/api/deploy/init")
     if ! echo "$JWT_BODY" | grep -qE '"token"|"deployId"'; then
-      printf 'FAIL: /api/deploy/init body lacked token/deployId — %s\n' "$JWT_BODY" >&2
+      # Strip jwt/token fields before logging; fall back to first 200
+      # chars so a non-JSON body (gateway HTML page, etc) doesn't echo
+      # an entire CF block-page response either.
+      SAFE_BODY=$(echo "$JWT_BODY" | jq -c 'del(.jwt, .token)' 2>/dev/null || printf '%s' "${JWT_BODY:0:200}")
+      printf 'FAIL: /api/deploy/init body lacked token/deployId — %s\n' "$SAFE_BODY" >&2
       exit 1
     fi
     printf '  /api/sites=200; /api/deploy/init returned JWT envelope\n'
