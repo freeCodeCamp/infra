@@ -9,7 +9,7 @@ default:
 
 # Run terraform on one or all workspaces. Examples:
 #   just provision plan all
-#   just provision apply gxy-management
+# just provision apply gxy-management
 [group('provision')]
 provision cmd workspace="all":
     #!/usr/bin/env bash
@@ -65,7 +65,7 @@ bootstrap-tools:
 #   just release gxy-management windmill   → helm + kustomize
 #   just release gxy-cassiopeia caddy      → helm only
 #   just release gxy-management artemis    → helm only
-#   just release ops-backoffice-tools outline → kustomize only
+# just release ops-backoffice-tools outline → kustomize only
 [group('release')]
 release cluster app:
     #!/usr/bin/env bash
@@ -220,15 +220,15 @@ configure-uptime-robot *args:
 [group('configure')]
 configure-field-notes-trim area="infra" age="30":
     python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{area}}.md \
-        --age-days {{age}}
+        ../Universe/spike/field-notes/{{ area }}.md \
+        --age-days {{ age }}
 
 # Verify encrypted secrets:
 #   stage 1 — each `*.enc` decrypts with the operator's age key
 #   stage 2 — path-layout contract per `docs/architecture/rfc-secrets-layout.md`
 #             (universe-scope under `k3s/<gxy-*>/`, platform-wide under
 #             `global/`, do-context creds under `do-*/`, per-app namespace
-#             stubs at `<app>/.env.enc`; archive/legacy paths allowed)
+# stubs at `<app>/.env.enc`; archive/legacy paths allowed)
 [group('verify')]
 verify-secrets:
     #!/usr/bin/env bash
@@ -314,7 +314,7 @@ verify-app cluster app:
 #
 # Optional env (warn thresholds; exit code stays 0 unless wait fails):
 #   BACKUP_WARN_HOURS    default 26 (1 day + 2h slack)
-#   WAL_WARN_SECONDS     default 300 (5min)
+# WAL_WARN_SECONDS     default 300 (5min)
 [group('verify')]
 verify-cnpg cluster namespace name timeout="5m":
     #!/usr/bin/env bash
@@ -378,7 +378,7 @@ verify-cnpg cluster namespace name timeout="5m":
 #      chart templates excluded because Go template syntax isn't YAML.
 #   2. first-party chart templates rendered via `helm template` against
 #      each chart's values.production.yaml + a stub set for the
-#      sops-only required keys, then piped to kubeconform.
+# sops-only required keys, then piped to kubeconform.
 [group('verify')]
 verify-manifests version="1.32.0":
     #!/usr/bin/env bash
@@ -452,7 +452,7 @@ verify-r2 bucket:
 #   ARTEMIS_REPO   default $HOME/DEV/fCC/artemis
 #   GH_TOKEN       default `gh auth token`
 #   SITE           default test
-#   ROOT_DOMAIN    default freecode.camp
+# ROOT_DOMAIN    default freecode.camp
 [group('verify')]
 verify-artemis:
     #!/usr/bin/env bash
@@ -512,7 +512,7 @@ verify-artemis:
 #
 # Optional env:
 #   PROBE_SITE     default test
-#   ROOT_DOMAIN    default freecode.camp
+# ROOT_DOMAIN    default freecode.camp
 [group('verify')]
 verify-caddy cluster="gxy-cassiopeia":
     #!/usr/bin/env bash
@@ -663,15 +663,15 @@ inspect-tf:
 [group('inspect')]
 inspect-field-notes area="infra":
     python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{area}}.md --list
+        ../Universe/spike/field-notes/{{ area }}.md --list
 
 # Dry-run: show which dated journal entries would be archived by
 # `configure-field-notes-trim`. Default cutoff 30 days. Override with `age=N`.
 [group('inspect')]
 inspect-field-notes-trim area="infra" age="30":
     python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{area}}.md \
-        --age-days {{age}} --dry-run
+        ../Universe/spike/field-notes/{{ area }}.md \
+        --age-days {{ age }} --dry-run
 
 # Windmill backup CronJob health on gxy-management: schedule, last
 # successful run, recent job pods, local `.backups/` artefact list.

@@ -9,11 +9,12 @@
 # pin can carry an immutable image digest on top.
 FROM postgres:18-bookworm@sha256:0b4577caeca90c29e7a9e4de1bff0a6aa90bdaaa1cd229d4f95feec1550fadf7
 
-ARG RCLONE_VERSION=1.68.2
+ARG RCLONE_VERSION=1.74.1
 
 # Install rclone via the upstream static binary — no apt awscli on this
 # image. curl + unzip are removed after install so the runtime surface
 # is just postgres-client + rclone.
+# hadolint ignore=DL3008
 RUN set -eux \
  && apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl unzip \

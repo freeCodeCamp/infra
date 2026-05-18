@@ -24,7 +24,7 @@ The 2026-04-21 cluster audit surfaced drift that blocks task #22:
 
 ### infra-secrets tree (trimmed)
 
-```
+```text
 .sops.yaml                       # single path_regex `.*` → platform age key
 README.md                        # existing directory-structure doc
 global/.env.enc                  # platform-wide tokens (CF, Tailscale, HCP, ...)
@@ -47,7 +47,7 @@ scratchpad/                      # dev scratch
 
 ### Deploy pipeline (existing `just release <cluster> <app>`)
 
-```
+```text
 for suffix in '.secrets.env.enc' '.tls.crt.enc' '.tls.key.enc' '-backup.secrets.env.enc':
     if infra-secrets/k3s/<cluster>/<app><suffix> exists:
         sops -d → k3s/<cluster>/apps/<app>/manifests/base/secrets/<plain-name>
@@ -91,7 +91,7 @@ trap cleanup decrypted files on exit
 
 Each cluster declares its default TLS zone via an **unencrypted** single-line marker file:
 
-```
+```text
 k3s/<cluster>/cluster.tls.zone       # contents: `freecodecamp-net` or `freecode-camp`
 ```
 
@@ -104,7 +104,7 @@ k3s/<cluster>/cluster.tls.zone       # contents: `freecodecamp-net` or `freecode
 
 ### Extended `just release` probe order
 
-```
+```text
 # TLS resolution for `just release <cluster> <app>`:
 if k3s/<cluster>/<app>.tls.crt.enc exists:
     use per-app override
