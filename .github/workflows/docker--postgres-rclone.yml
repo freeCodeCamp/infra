@@ -1,11 +1,17 @@
-name: Docker -- postgres-awscli
+name: Docker -- postgres-rclone
 
-# Manual trigger only — image ships with the windmill backup CronJob
-# roll, not on every commit. Push from any branch via:
-#   gh workflow run docker--postgres-awscli.yml --ref <branch>
+# Manual trigger — image ships with the windmill backup CronJob roll,
+# not on every commit. Once the workflow lives on `main`, dispatch via:
+#   gh workflow run docker--postgres-rclone.yml --ref <branch>
 
 on:
   workflow_dispatch:
+
+concurrency:
+  group: docker-postgres-rclone-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
 
 jobs:
   build-and-push:
@@ -32,7 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
-          images: ghcr.io/freecodecamp/postgres-awscli
+          images: ghcr.io/freecodecamp/postgres-rclone
           tags: |
             type=sha,format=long
             type=ref,event=branch
@@ -42,15 +48,15 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-postgres-awscli-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-postgres-rclone-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-postgres-awscli-
+            ${{ runner.os }}-buildx-postgres-rclone-
 
       - name: Build and push Docker image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
-          context: ./docker/images/postgres-awscli
-          file: ./docker/images/postgres-awscli/Dockerfile
+          context: ./docker/images/postgres-rclone
+          file: ./docker/images/postgres-rclone/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

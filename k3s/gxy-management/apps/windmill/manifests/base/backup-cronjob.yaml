@@ -24,15 +24,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: backup
-              # TODO(pr-followup): pin to ghcr.io/freecodecamp/postgres-awscli@sha256:<digest>
-              # produced by a passing docker--postgres-awscli GHA run on
-              # main. `:latest` is a supply-chain footgun (registry
-              # compromise + image swap exfiltrates PG_PASSWORD +
-              # S3_SECRET_KEY); the GHA tags `type=sha,format=long`
-              # already so the digest is available — operator captures
-              # it from `docker manifest inspect ghcr.io/.../postgres-awscli:sha-<commit-sha>`
-              # and bumps this manifest in the same PR.
-              image: ghcr.io/freecodecamp/postgres-awscli:latest
+              image: ghcr.io/freecodecamp/postgres-rclone:latest
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
@@ -46,8 +38,8 @@ spec:
                   set -euo pipefail
                   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
                   FILENAME="windmill-${TIMESTAMP}.sql.gz"
-                  S3_PREFIX="windmill/${GALAXY}"
-                  S3_PATH="${S3_PREFIX}/${FILENAME}"
+                  R2_PREFIX="windmill/${GALAXY}"
+                  R2_PATH="${R2_PREFIX}/${FILENAME}"
 
                   echo "Starting backup: ${FILENAME}"
                   PGPASSWORD="${PGPASSWORD}" pg_dumpall \
@@ -59,24 +51,13 @@ spec:
                   FILESIZE=$(stat -c%s "/tmp/${FILENAME}" 2>/dev/null || stat -f%z "/tmp/${FILENAME}")
                   echo "Backup size: ${FILESIZE} bytes"
 
-                  echo "Uploading to s3://${S3_BUCKET}/${S3_PATH}"
-                  aws s3 cp "/tmp/${FILENAME}" "s3://${S3_BUCKET}/${S3_PATH}" \
-                    --endpoint-url "${S3_ENDPOINT}"
+                  echo "Uploading to r2:${R2_BUCKET}/${R2_PATH}"
+                  rclone copyto "/tmp/${FILENAME}" "r2:${R2_BUCKET}/${R2_PATH}"
 
-                  echo "Cleaning up backups older than 7 days under s3://${S3_BUCKET}/${S3_PREFIX}/"
-                  CUTOFF=$(date -d '7 days ago' +%Y%m%d 2>/dev/null || date -v-7d +%Y%m%d)
-                  aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" \
-                    --endpoint-url "${S3_ENDPOINT}" | while read -r line; do
-                    FILE=$(echo "$line" | awk '{print $4}')
-                    FILE_DATE=$(echo "$FILE" | grep -oP '\d{8}' | head -1)
-                    if [ -n "${FILE_DATE}" ] && [ "${FILE_DATE}" -lt "${CUTOFF}" ]; then
-                      echo "Deleting old backup: ${FILE}"
-                      aws s3 rm "s3://${S3_BUCKET}/${S3_PREFIX}/${FILE}" \
-                        --endpoint-url "${S3_ENDPOINT}"
-                    fi
-                  done
+                  echo "Pruning backups older than 7d under r2:${R2_BUCKET}/${R2_PREFIX}/"
+                  rclone delete --min-age 7d "r2:${R2_BUCKET}/${R2_PREFIX}/"
 
-                  echo "Backup complete: ${S3_PATH}"
+                  echo "Backup complete: ${R2_PATH}"
               env:
                 # Galaxy literal — only place the slug appears in this manifest;
                 # mirror to a sibling k3s/<galaxy>/apps/windmill/ tree by
@@ -86,28 +67,39 @@ spec:
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: windmill-backup-s3
+                      name: windmill-backup-r2
                       key: PG_PASSWORD
-                - name: S3_BUCKET
+                - name: R2_BUCKET
                   valueFrom:
                     secretKeyRef:
-                      name: windmill-backup-s3
-                      key: S3_BUCKET
-                - name: S3_ENDPOINT
+                      name: windmill-backup-r2
+                      key: R2_BUCKET
+                # rclone reads remote `r2` from RCLONE_CONFIG_R2_* env vars;
+                # RCLONE_CONFIG=/dev/null refuses any on-disk rclone.conf
+                # so the readOnlyRootFilesystem securityContext holds.
+                - name: RCLONE_CONFIG
+                  value: /dev/null
+                - name: RCLONE_CONFIG_R2_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_R2_PROVIDER
+                  value: Cloudflare
+                - name: RCLONE_CONFIG_R2_ACL
+                  value: private
+                - name: RCLONE_CONFIG_R2_ENDPOINT
                   valueFrom:
                     secretKeyRef:
-                      name: windmill-backup-s3
-                      key: S3_ENDPOINT
-                - name: AWS_ACCESS_KEY_ID
+                      name: windmill-backup-r2
+                      key: R2_ENDPOINT
+                - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
                   valueFrom:
                     secretKeyRef:
-                      name: windmill-backup-s3
-                      key: S3_ACCESS_KEY
-                - name: AWS_SECRET_ACCESS_KEY
+                      name: windmill-backup-r2
+                      key: R2_ACCESS_KEY
+                - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: windmill-backup-s3
-                      key: S3_SECRET_KEY
+                      name: windmill-backup-r2
+                      key: R2_SECRET_KEY
               resources:
                 requests:
                   cpu: 100m
@@ -117,7 +109,7 @@ spec:
                   memory: 512Mi
               volumeMounts:
                 # /tmp is writable scratch for pg_dump output before
-                # the gzipped dump streams to S3. emptyDir tmpfs keeps
+                # the gzipped dump streams to R2. emptyDir tmpfs keeps
                 # the secret-laden plaintext off the node disk + dies
                 # with the pod.
                 - name: tmp

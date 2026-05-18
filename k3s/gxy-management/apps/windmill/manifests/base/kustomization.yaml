@@ -16,7 +16,7 @@ secretGenerator:
       - tls.key=secrets/tls.key
     options:
       disableNameSuffixHash: true
-  - name: windmill-backup-s3
+  - name: windmill-backup-r2
     type: Opaque
     envs:
       - secrets/.backup-secrets.env
