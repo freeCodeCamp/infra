@@ -24,7 +24,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: backup
-              image: ghcr.io/freecodecamp/postgres-rclone:latest
+              image: ghcr.io/freecodecamp/postgres-rclone@sha256:294e8b276ee23b44f6a16bcef6239f55e4e93ecad7372af7a079650f8a6583e5
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
