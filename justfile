@@ -626,7 +626,7 @@ test-windmill-backup-restore cluster="gxy-management":
     SIZE=$(stat -f%z "$DEST" 2>/dev/null || stat -c%s "$DEST")
     [ "$SIZE" -gt 100 ] || { echo "FAIL: backup too small ($SIZE bytes)"; exit 1; }
     gunzip -t "$DEST" || { echo "FAIL: gunzip integrity check"; exit 1; }
-    gunzip -c "$DEST" | tail -1 \
+    gunzip -c "$DEST" | tail -10 \
       | grep -q 'PostgreSQL database cluster dump complete' \
       || { echo "FAIL: completion sentinel missing"; exit 1; }
     echo "OK: ${NEWEST} (${SIZE} bytes) gunzip-clean + sentinel present"
