@@ -9,7 +9,13 @@
 # pin can carry an immutable image digest on top.
 FROM postgres:18-bookworm@sha256:0b4577caeca90c29e7a9e4de1bff0a6aa90bdaaa1cd229d4f95feec1550fadf7
 
-ARG RCLONE_VERSION=1.74.1
+# ARG name avoids `RCLONE_*` prefix on purpose — Docker exposes every
+# ARG as an env var to its RUN step, and `rclone` parses any
+# `RCLONE_<FLAG>` env as a flag override. `RCLONE_VERSION=1.74.1`
+# made the smoke `rclone --version` step blow up with
+# `strconv.ParseBool: parsing "1.74.1": invalid syntax` because
+# rclone interpreted the env as `--version=1.74.1` (a bool flag).
+ARG RCLONE_VER=1.74.1
 
 # Install rclone via the upstream static binary — no apt awscli on this
 # image. curl + unzip are removed after install so the runtime surface
@@ -18,8 +24,8 @@ ARG RCLONE_VERSION=1.74.1
 RUN set -eux \
  && apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl unzip \
- && curl -fsSL "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-amd64.zip" -o /tmp/rclone.zip \
- && unzip -j /tmp/rclone.zip "rclone-v${RCLONE_VERSION}-linux-amd64/rclone" -d /usr/local/bin/ \
+ && curl -fsSL "https://downloads.rclone.org/v${RCLONE_VER}/rclone-v${RCLONE_VER}-linux-amd64.zip" -o /tmp/rclone.zip \
+ && unzip -j /tmp/rclone.zip "rclone-v${RCLONE_VER}-linux-amd64/rclone" -d /usr/local/bin/ \
  && chmod +x /usr/local/bin/rclone \
  && rclone --version \
  && rm -f /tmp/rclone.zip \
