@@ -487,7 +487,7 @@ verify-artemis:
     JWT_BODY=$(curl -sS --max-time 10 \
       -H "Authorization: Bearer ${GH_TOKEN}" \
       -H 'content-type: application/json' \
-      -d "{\"site\":\"${SITE}\"}" \
+      -d "{\"site\":\"${SITE}\",\"sha\":\"0000000000000000000000000000000000000000\"}" \
       "${ARTEMIS_URL}/api/deploy/init")
     if ! echo "$JWT_BODY" | grep -qE '"token"|"deployId"'; then
       printf 'FAIL: /api/deploy/init body lacked token/deployId — %s\n' "$JWT_BODY" >&2
