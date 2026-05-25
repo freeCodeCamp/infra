@@ -68,6 +68,10 @@ x-deploy-config: &deploy-config
     # Rate Limiting
     - PER_USER_LIMIT=${PER_USER_LIMIT:-10}
     - GLOBAL_LIMIT=${GLOBAL_LIMIT:-1000}
+    # Observability
+    - SENTRY_DSN=${SENTRY_DSN:-}
+    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-${DEPLOYMENT_ENV}}
+    - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-}
 
 x-port-config: &port-config
   target: 3001
