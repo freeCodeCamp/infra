@@ -36,7 +36,7 @@ resources:
 # Production env defaults (non-secret). Match artemis.env.sample.
 env:
   R2_BUCKET: "universe-static-apps-01"
-  GH_ORG: "freeCodeCamp"
+  GH_ORG: "freeCodeCamp-Universe"
   GH_API_BASE: "https://api.github.com"
   # Valkey registry (replaces SITES_YAML_PATH; sites_yaml backend
   # retired in artemis@f115198). Cross-namespace cluster DNS:

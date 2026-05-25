@@ -70,7 +70,7 @@ service:
 # ---------------------------------------------------------------------
 env:
   R2_BUCKET: "universe-static-apps-01"
-  GH_ORG: "freeCodeCamp"
+  GH_ORG: "freeCodeCamp-Universe"
   GH_API_BASE: "https://api.github.com"
   # Valkey registry — required by artemis since the `sites_yaml` backend
   # was retired in artemis@f115198. The address is in-cluster
