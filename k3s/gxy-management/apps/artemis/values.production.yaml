@@ -18,14 +18,11 @@ image:
   # `helm list` / `kubectl describe pod` readability. Bare-semver (no
   # `v`) follows docker/metadata-action `type=semver,pattern={{version}}`
   # default. Build pipeline + bump procedure: artemis repo RELEASING.md.
-  # release: sha-916247f (PRE-MERGE ephemeral pin for P4.5 empirical verify.
-  # Source = artemis feat/readyz @ 916247feb50c9511d5969ae140779cf3d79f2728.
-  # Image built locally via `docker buildx --platform linux/amd64 --push`
-  # 2026-05-18; matches docker/metadata-action `type=sha,format=long` naming
-  # so the GHCR object lines up byte-for-byte with what CI will emit when
-  # the feat/readyz changes land on main. Re-pin to canonical `0.2.1@<digest>`
-  # post-merge once tag `v0.2.1` fires `docker-ghcr.yml` on main.)
-  tag: "sha-916247feb50c9511d5969ae140779cf3d79f2728@sha256:0d7d87e9dc49a8c456647dea1bab28622fc6390b428f45a63848d96c57994dbc"
+  # release: 0.3.0 (canonical CI-built artemis @ v0.3.0,
+  # ghcr.io/freecodecamp/artemis:0.3.0 emitted by docker-ghcr.yml run
+  # 26336512486-rerun on 2026-05-25 after the metadata-action transient
+  # detailed in artemis RELEASING.md §6).
+  tag: "0.3.0@sha256:b3ee09b74893a77bd6b6e6b0fcd5c25a6203f404415d2fbe4ab23a581412cdaa"
   pullPolicy: IfNotPresent
 
 resources:
