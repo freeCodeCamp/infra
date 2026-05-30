@@ -98,6 +98,13 @@ env:
   GH_REPO_ORG: "freeCodeCamp-Universe"
   REPO_CREATE_AUTHZ_TEAM: "staff"
   REPO_APPROVE_AUTHZ_TEAM: "apollo-11-approvers"
+  # Observability (Sentry). artemis reads ENVIRONMENT (NOT
+  # SENTRY_ENVIRONMENT — that name belongs to the swarm api/socrates
+  # stacks). The SDK is OFF unless secretEnv.SENTRY_DSN is set; these
+  # two are non-secret tags. Health/ready/metrics probes are always
+  # dropped from tracing regardless of the sample rate.
+  ENVIRONMENT: "development"
+  SENTRY_TRACES_SAMPLE_RATE: "0.2"
 
 # Required secret env keys — populated by sops overlay
 # (infra-secrets/k3s/gxy-management/artemis.values.yaml.enc).
@@ -121,6 +128,11 @@ secretEnv:
   GH_APP_ID: null
   GH_APP_INSTALLATION_ID: null
   GH_APP_PRIVATE_KEY: null
+  # Sentry DSN — sealed in the sops overlay (operator decision: DSN
+  # held as a secret rather than plaintext ConfigMap). Leave null to
+  # keep the SDK uninitialised; absent ⇒ no event traffic leaves the
+  # process. Not chart-`required`: the SDK degrades to off, never fails.
+  SENTRY_DSN: null
 
 # ---------------------------------------------------------------------
 # Gateway / HTTPRoute (Traefik gatewayClassName) — public surface

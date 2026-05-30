@@ -13,7 +13,8 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  tag: "latest"
+  # release: 0.5.0
+  tag: "0.5.0@sha256:3a0b12fe2655597e0b6160a096a9e4cc36749a9130e11af90dfb896bc46dc82f"
   pullPolicy: IfNotPresent
 
 resources:
@@ -48,6 +49,11 @@ env:
   ALIAS_PREVIEW_KEY_FORMAT: "<site>.freecode.camp/preview"
   DEPLOY_PREFIX_FORMAT: "<site>.freecode.camp/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
+  # Observability (Sentry). DSN is sops-sealed (secretEnv.SENTRY_DSN);
+  # these two are non-secret. artemis reads ENVIRONMENT, not
+  # SENTRY_ENVIRONMENT. SDK stays off until the DSN is provisioned.
+  ENVIRONMENT: "production"
+  SENTRY_TRACES_SAMPLE_RATE: "0.2"
 
 # Rate-limit tunables — Traefik Middleware (chart-internal). Per
 # source IP (CF-rewritten X-Forwarded-For depth=1).
