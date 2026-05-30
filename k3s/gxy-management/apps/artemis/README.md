@@ -42,7 +42,7 @@ apps/artemis/
 │       ├── deployment.yaml
 │       ├── service.yaml
 │       ├── configmap.yaml      # non-secret env only
-│       ├── secret-env.yaml     # 5 secret env vars (sops overlay)
+│       ├── secret-env.yaml     # 6 required + 3 optional secret env vars (sops overlay)
 │       ├── middleware-ratelimit.yaml
 │       ├── gateway.yaml        # HTTP :80 only — CF Flexible SSL
 │       ├── httproute.yaml
@@ -61,7 +61,7 @@ Generic `release` recipe smart-dispatches: `apps/artemis/charts/<chart>/` presen
 
 1. `charts/artemis/values.yaml` — chart defaults
 1. `apps/artemis/values.production.yaml` — production overlay
-1. `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` — sops-sealed (5 secret env keys)
+1. `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` — sops-sealed (6 required + 3 optional secret env keys; optional triple gates the repo-creation feature)
 
 No `.deploy-flags.sh` hook for artemis post-cutover — the chart no longer mounts a sites ConfigMap. The Valkey registry is the authoritative store; `universe sites <subcommand>` is the operator surface (see `docs/runbooks/01-deploy-new-constellation-site.md`).
 
@@ -85,6 +85,21 @@ universe sites ls       [--mine]
 ```
 
 All artemis replicas pick up writes via `registry.changed` pub-sub within seconds; ≤60 s on the TTL fallback. No pod restart, no Helm upgrade. Full staff/admin flow: `docs/runbooks/01-deploy-new-constellation-site.md`.
+
+## Repo-creation feature
+
+`/api/repo*` (ADR-016 §2026-05-29 amendment) — server-side repo creation in the `freeCodeCamp-Universe` org with an admin approval queue. Replaces the legacy Windmill `repo_mgmt` flow.
+
+Feature is **opt-in** via the sops envelope: supply all three of `GH_APP_ID` + `GH_APP_INSTALLATION_ID` + `GH_APP_PRIVATE_KEY` (the Apollo-11 GitHub App credentials) and artemis mounts the routes at boot. Leave all three blank to keep the routes unmounted (deploy-only deployments unaffected). Partial config is a hard boot-failure.
+
+Two GitHub teams gate the surface (overridable via env, defaults below):
+
+- `REPO_CREATE_AUTHZ_TEAM=staff` — `POST /api/repo` (request a repo)
+- `REPO_APPROVE_AUTHZ_TEAM=apollo-11-approvers` — `POST /api/repo/{id}/{approve,reject}`
+
+Read routes (`GET /api/repos`, `GET /api/repo/{id}`, `GET /api/repo/templates`) are open to any GitHub bearer.
+
+Trust boundary per ADR-016: the App private key lives in this envelope only — never on staff laptops, never in the CLI. artemis mints the App JWT (RS256) and exchanges for an installation token inline.
 
 ## Image / build / pull
 
