@@ -19,7 +19,9 @@ Operator-runnable flight manuals live in `docs/flight-manuals/` (this repo). Ind
 
 ADR-vs-reality reconciliation: `docs/architecture/adr-drift-2026-05-10.md`.
 
-Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `docs/architecture/rfc-gxy-cassiopeia-ga.md`.
+Platform-wide live-state + automation-gap + drift snapshot (current): `docs/architecture/universe-state-2026-05-29.md`.
+
+Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `.archive/2026-05-26-prose-trim/rfcs-shipped/rfc-gxy-cassiopeia-ga.md`.
 
 Pre-2026-05-10 field-notes are consolidated in `~/DEV/fCC-U/Universe/.archive/` (see `INDEX.md` for the 40-shard grid across 7 topic dirs: artemis, cassiopeia, gxy-static, windmill, universe-cli, infra, audits). New durable operator content goes into the flight-manuals or runbooks, not new field-notes.
 
