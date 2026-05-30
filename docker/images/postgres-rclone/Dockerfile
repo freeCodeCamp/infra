@@ -24,7 +24,7 @@
 # This image creates a service-only `backup` user at UID 999 to
 # match the chart's runAsUser.
 
-FROM rclone/rclone:1.74.1 AS rclone-bin
+FROM rclone/rclone:1.74.2 AS rclone-bin
 
 FROM debian:bookworm-slim
 
