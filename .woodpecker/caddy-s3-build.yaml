@@ -8,7 +8,7 @@ when:
 
 steps:
   test:
-    image: golang:1.26.2-alpine3.22
+    image: golang:1.26.3-alpine3.22
     commands:
       - apk add --no-cache git
       - cd docker/images/caddy-s3/modules/r2alias
