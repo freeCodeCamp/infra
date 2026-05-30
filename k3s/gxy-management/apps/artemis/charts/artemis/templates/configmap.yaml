@@ -16,3 +16,10 @@ data:
   ALIAS_PREVIEW_KEY_FORMAT:     {{ required ".Values.env.ALIAS_PREVIEW_KEY_FORMAT is required" .Values.env.ALIAS_PREVIEW_KEY_FORMAT | quote }}
   DEPLOY_PREFIX_FORMAT:         {{ required ".Values.env.DEPLOY_PREFIX_FORMAT is required" .Values.env.DEPLOY_PREFIX_FORMAT | quote }}
   LOG_LEVEL:                    {{ default "info" .Values.env.LOG_LEVEL | quote }}
+  # Repo-creation feature (ADR-016 §2026-05-29 amendment, /api/repo*).
+  # Feature gates server-side on Apollo-11 GH App credentials in the
+  # sops envelope (secretEnv.GH_APP_*); when absent the routes are not
+  # mounted. These three are non-secret config and ship with defaults.
+  GH_REPO_ORG:                  {{ default "freeCodeCamp-Universe" .Values.env.GH_REPO_ORG | quote }}
+  REPO_CREATE_AUTHZ_TEAM:       {{ default "staff" .Values.env.REPO_CREATE_AUTHZ_TEAM | quote }}
+  REPO_APPROVE_AUTHZ_TEAM:      {{ default "apollo-11-approvers" .Values.env.REPO_APPROVE_AUTHZ_TEAM | quote }}

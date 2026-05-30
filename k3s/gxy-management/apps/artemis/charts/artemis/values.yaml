@@ -91,6 +91,13 @@ env:
   ALIAS_PREVIEW_KEY_FORMAT: "<site>.freecode.camp/preview"
   DEPLOY_PREFIX_FORMAT: "<site>.freecode.camp/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
+  # Repo-creation feature (ADR-016 §2026-05-29 amendment, /api/repo*).
+  # Feature gates server-side on the Apollo-11 GH App creds (secretEnv
+  # below). These three are non-secret config; defaults match artemis
+  # config defaults so the chart is no-op for deploy-only deployments.
+  GH_REPO_ORG: "freeCodeCamp-Universe"
+  REPO_CREATE_AUTHZ_TEAM: "staff"
+  REPO_APPROVE_AUTHZ_TEAM: "apollo-11-approvers"
 
 # Required secret env keys — populated by sops overlay
 # (infra-secrets/k3s/gxy-management/artemis.values.yaml.enc).
@@ -108,6 +115,12 @@ secretEnv:
   GH_CLIENT_ID: null
   JWT_SIGNING_KEY: null
   VALKEY_PASSWORD: null
+  # Apollo-11 GH App credentials — leave null to keep /api/repo*
+  # feature OFF. Provide all three in the sops envelope to enable.
+  # Partial config fails artemis validate() at boot.
+  GH_APP_ID: null
+  GH_APP_INSTALLATION_ID: null
+  GH_APP_PRIVATE_KEY: null
 
 # ---------------------------------------------------------------------
 # Gateway / HTTPRoute (Traefik gatewayClassName) — public surface
