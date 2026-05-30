@@ -47,6 +47,8 @@ spec:
               - matchPattern: "*.r2.cloudflarestorage.com"
               - matchPattern: "api.github.com"
               - matchPattern: "ghcr.io"
+              - matchPattern: "*.ingest.sentry.io"
+              - matchPattern: "*.ingest.*.sentry.io"
               # In-cluster service DNS — required for the Valkey
               # registry resolution (`valkey.valkey.svc.cluster.local`).
               # Cilium DNS `matchPattern` wildcards do NOT cross dots
@@ -70,6 +72,13 @@ spec:
     # GitHub API — token validation + team-membership probe.
     - toFQDNs:
         - matchName: "api.github.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toFQDNs:
+        - matchPattern: "*.ingest.sentry.io"
+        - matchPattern: "*.ingest.*.sentry.io"
       toPorts:
         - ports:
             - port: "443"

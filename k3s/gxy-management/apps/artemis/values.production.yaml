@@ -49,9 +49,6 @@ env:
   ALIAS_PREVIEW_KEY_FORMAT: "<site>.freecode.camp/preview"
   DEPLOY_PREFIX_FORMAT: "<site>.freecode.camp/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
-  # Observability (Sentry). DSN is sops-sealed (secretEnv.SENTRY_DSN);
-  # these two are non-secret. artemis reads ENVIRONMENT, not
-  # SENTRY_ENVIRONMENT. SDK stays off until the DSN is provisioned.
   ENVIRONMENT: "production"
   SENTRY_TRACES_SAMPLE_RATE: "0.2"
 

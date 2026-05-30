@@ -23,7 +23,5 @@ data:
   GH_REPO_ORG:                  {{ default "freeCodeCamp-Universe" .Values.env.GH_REPO_ORG | quote }}
   REPO_CREATE_AUTHZ_TEAM:       {{ default "staff" .Values.env.REPO_CREATE_AUTHZ_TEAM | quote }}
   REPO_APPROVE_AUTHZ_TEAM:      {{ default "apollo-11-approvers" .Values.env.REPO_APPROVE_AUTHZ_TEAM | quote }}
-  # Observability (Sentry) — non-secret tags. DSN rides the secret
-  # lane (secret-env.yaml). artemis reads ENVIRONMENT, not SENTRY_ENVIRONMENT.
   ENVIRONMENT:                  {{ default "development" .Values.env.ENVIRONMENT | quote }}
   SENTRY_TRACES_SAMPLE_RATE:    {{ default "0.2" .Values.env.SENTRY_TRACES_SAMPLE_RATE | quote }}
