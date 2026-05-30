@@ -13,16 +13,7 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  # Pin = bare-semver tag + digest. Digest is load-bearing (OCI: when
-  # both present, digest wins → containerd pulls immutable). Tag is for
-  # `helm list` / `kubectl describe pod` readability. Bare-semver (no
-  # `v`) follows docker/metadata-action `type=semver,pattern={{version}}`
-  # default. Build pipeline + bump procedure: artemis repo RELEASING.md.
-  # release: 0.3.0 (canonical CI-built artemis @ v0.3.0,
-  # ghcr.io/freecodecamp/artemis:0.3.0 emitted by docker-ghcr.yml run
-  # 26336512486-rerun on 2026-05-25 after the metadata-action transient
-  # detailed in artemis RELEASING.md §6).
-  tag: "0.3.0@sha256:b3ee09b74893a77bd6b6e6b0fcd5c25a6203f404415d2fbe4ab23a581412cdaa"
+  tag: "latest"
   pullPolicy: IfNotPresent
 
 resources:
