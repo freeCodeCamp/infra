@@ -195,7 +195,7 @@ ______________________________________________________________________
 
 ## Cross-references
 
-- [ADR-016 — Universe deploy proxy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
+- [ADR-016 — Universe deploy proxy](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/016-deploy-proxy.md)
 - [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) — operator-side artemis lifecycle
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — post-deploy smoke
 - [`05-r2-keys-rotation.md`](05-r2-keys-rotation.md) — R2 admin + read-only key rotation

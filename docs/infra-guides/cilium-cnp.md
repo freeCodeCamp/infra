@@ -2,7 +2,7 @@
 
 Operator-runnable reference for writing `CiliumNetworkPolicy` (CNP) manifests on the Universe galaxies. Promotes operational findings that previously lived only in field-notes (now consolidated under `Universe/.archive/infra/`) into canonical guidance.
 
-> **Read first:** [ADR-009 §Cilium](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/009-networking-domains.md#cni-cilium-without-cluster-mesh) for the CNI choice rationale; [ADR-011 §Within-galaxy CiliumNetworkPolicy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/011-security-model.md#within-galaxy-cilium-ciliumnetworkpolicy) for the constellation-isolation posture.
+> **Read first:** [ADR-009 §Cilium](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/009-networking-domains.md#cni-cilium-without-cluster-mesh) for the CNI choice rationale; [ADR-011 §Within-galaxy CiliumNetworkPolicy](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/011-security-model.md#within-galaxy-cilium-ciliumnetworkpolicy) for the constellation-isolation posture.
 
 ## When to write a CNP at all
 

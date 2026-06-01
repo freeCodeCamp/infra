@@ -2,7 +2,7 @@
 
 Operator-runnable reference for Cilium on Universe galaxies where nodes carry more than one network interface (e.g. `eth0` + `eth1` + `tailscale0`). Promotes operational findings that previously lived only in field-notes (now consolidated under `Universe/.archive/infra/`) into canonical guidance.
 
-> **Read first:** [ADR-009 §Cilium](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/009-networking-domains.md#cni-cilium-without-cluster-mesh) for the CNI choice rationale; [ADR-001 §Spike topology](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/001-topology.md) for the 3-node HA layout this guide assumes.
+> **Read first:** [ADR-009 §Cilium](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/009-networking-domains.md#cni-cilium-without-cluster-mesh) for the CNI choice rationale; [ADR-001 §Spike topology](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/001-topology.md) for the 3-node HA layout this guide assumes.
 
 ## When this guide applies
 

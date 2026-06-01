@@ -220,7 +220,7 @@ configure-uptime-robot *args:
 [group('configure')]
 configure-field-notes-trim area="infra" age="30":
     python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{ area }}.md \
+        ../Architecture/spike/field-notes/{{ area }}.md \
         --age-days {{ age }}
 
 # Verify encrypted secrets:
@@ -667,14 +667,14 @@ inspect-tf:
 [group('inspect')]
 inspect-field-notes area="infra":
     python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{ area }}.md --list
+        ../Architecture/spike/field-notes/{{ area }}.md --list
 
 # Dry-run: show which dated journal entries would be archived by
 # `configure-field-notes-trim`. Default cutoff 30 days. Override with `age=N`.
 [group('inspect')]
 inspect-field-notes-trim area="infra" age="30":
     python3 scripts/trim-field-notes.py \
-        ../Universe/spike/field-notes/{{ area }}.md \
+        ../Architecture/spike/field-notes/{{ area }}.md \
         --age-days {{ age }} --dry-run
 
 # Windmill backup CronJob health on gxy-management: schedule, last

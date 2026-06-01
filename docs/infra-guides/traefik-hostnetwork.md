@@ -2,7 +2,7 @@
 
 Operator-runnable reference for the Traefik DaemonSet that every Universe galaxy uses for `:80`/`:443` ingress. Promotes operational findings from the archived field-notes (`Universe/.archive/infra/`) into canonical guidance — the WHY behind values that already live in chart code.
 
-> **Read first:** [ADR-009 §Ingress](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/009-networking-domains.md) for the Traefik-DaemonSet-over-cloud-LB rationale.
+> **Read first:** [ADR-009 §Ingress](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/009-networking-domains.md) for the Traefik-DaemonSet-over-cloud-LB rationale.
 
 ## Why hostNetwork?
 
