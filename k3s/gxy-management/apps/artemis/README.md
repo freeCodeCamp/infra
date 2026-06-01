@@ -71,20 +71,11 @@ No TLS material in the overlay — CF Flexible SSL on `freecode.camp` zone (CF t
 
 ## Sites registry
 
-Source of truth: Valkey (`valkey.valkey.svc.cluster.local:6379`, namespace `valkey`). Mutated via the artemis registry endpoints (`POST /api/site/register`, `PATCH /api/site/{slug}`, `DELETE /api/site/{slug}`), gated on `staff` team membership (`REGISTRY_AUTHZ_TEAM` env, default `staff`). Reads (`GET /api/sites`) open to any GitHub bearer.
+Source of truth: Valkey (`valkey.valkey.svc.cluster.local:6379`, namespace `valkey`). The registry API contract — endpoints (`POST`/`PATCH`/`DELETE /api/site*`, `GET /api/sites`), `REGISTRY_AUTHZ_TEAM` authz (default `staff`; reads open to any GitHub bearer), slug rules, and `registry.changed` pub-sub propagation (≤60 s TTL fallback; no pod restart or Helm upgrade) — is canonical in **ADR-016 §Authn-authz**.
 
-`freeCodeCamp/artemis` `config/sites.yaml` is a **dormant cold-start seed** — checked in for cold-recovery reference, not consumed at runtime. Editing it does not register anything live.
+`freeCodeCamp/artemis` `config/sites.yaml` is a **dormant cold-start seed** — checked in for cold-recovery reference, not consumed at runtime.
 
-Updates (staff):
-
-```bash
-universe sites register <slug> --team <team>[,<team>...]
-universe sites update   <slug> --team <team>[,<team>...]
-universe sites rm       <slug>
-universe sites ls       [--mine]
-```
-
-All artemis replicas pick up writes via `registry.changed` pub-sub within seconds; ≤60 s on the TTL fallback. No pod restart, no Helm upgrade. Full staff/admin flow: `docs/runbooks/01-deploy-new-constellation-site.md`.
+Operator writes go through `universe sites {register,update,rm,ls}` (staff-gated). Full staff/admin flow: `docs/runbooks/01-deploy-new-constellation-site.md`.
 
 ## Repo-creation feature
 
