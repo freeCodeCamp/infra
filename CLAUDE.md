@@ -21,9 +21,9 @@ ADR-vs-reality reconciliation: `docs/architecture/adr-drift-2026-05-10.md`.
 
 Platform-wide live-state + automation-gap + drift snapshot (2026-05-29 snapshot — re-scout in `.scratchpad/dossier/2026-05-29-universe-doc-trim/`): `docs/architecture/universe-state-2026-05-29.md`.
 
-Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `.archive/2026-05-26-prose-trim/rfcs-shipped/rfc-gxy-cassiopeia-ga.md`.
+Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `docs/architecture/rfc-gxy-cassiopeia-ga.md`.
 
-Pre-2026-05-10 field-notes are consolidated in `~/DEV/fCC-U/Universe/.archive/` (see `INDEX.md` for the 40-shard grid across 7 topic dirs: artemis, cassiopeia, gxy-static, windmill, universe-cli, infra, audits). New durable operator content goes into the flight-manuals or runbooks, not new field-notes.
+Pre-2026-05-10 field-notes are consolidated in `~/DEV/fCC-U/Universe/.archive/` as §1 of the master federation index (`INDEX.md`): the frozen 40-shard grid across 7 topic dirs (artemis, cassiopeia, gxy-static, windmill, universe-cli, infra, audits). §1 is do-not-extend; §2/§3/§4 (cross-repo cold-store, federated in-repo catalogue, gitignored-scratchpad pointers) are extendable. New durable operator content goes into the flight-manuals or runbooks, not new field-notes.
 
 Internal-only material (sprints, planning conventions, parked items, audit dossiers) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
 
