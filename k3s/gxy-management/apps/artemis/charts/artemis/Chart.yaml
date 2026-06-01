@@ -18,7 +18,7 @@ description: |
   NetworkPolicy. No upstream chart — greenfield.
 type: application
 # Chart version (this chart's release cadence — bump on chart-shape changes).
-version: 0.2.0
+version: 0.3.0
 # appVersion tracks the artemis service tag in GHCR — bump alongside
 # image tag rolls in values.production.yaml so `helm list` reflects
 # what is actually running.

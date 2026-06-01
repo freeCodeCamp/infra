@@ -4,7 +4,10 @@
 # always arrive on :80 from CF→origin under Flexible SSL; redirecting
 # them would loop).
 #
-# Filter chain: rate-limit (chart-internal Middleware) → secure-headers (cluster-shared).
+# Filter chain (catch-all): rate-limit → body-limit → secure-headers.
+# /api/deploy is exempt from body-limit — Traefik buffering reads the
+# whole body before forwarding, which would break the streaming
+# PUT /upload; deploy bodies are capped in-app via MaxBytesReader.
 #
 # Operator-only paths (`/metrics`, `/readyz`) are routed first to a
 # rewritten not-found path so external callers via the public Gateway
@@ -52,6 +55,25 @@ spec:
     - matches:
         - path:
             type: PathPrefix
+            value: /api/deploy
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ .Release.Name }}-ratelimit
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ .Values.middlewares.secureHeaders }}
+      backendRefs:
+        - name: {{ .Release.Name }}
+          port: {{ .Values.service.port }}
+
+    - matches:
+        - path:
+            type: PathPrefix
             value: /
       filters:
         - type: ExtensionRef
@@ -59,6 +81,11 @@ spec:
             group: traefik.io
             kind: Middleware
             name: {{ .Release.Name }}-ratelimit
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ .Release.Name }}-bodylimit
         - type: ExtensionRef
           extensionRef:
             group: traefik.io

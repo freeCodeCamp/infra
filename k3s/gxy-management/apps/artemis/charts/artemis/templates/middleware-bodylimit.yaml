@@ -1,0 +1,9 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-bodylimit
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+spec:
+  buffering:
+    maxRequestBodyBytes: {{ .Values.bodyLimit.maxRequestBodyBytes | default 1048576 | int64 }}

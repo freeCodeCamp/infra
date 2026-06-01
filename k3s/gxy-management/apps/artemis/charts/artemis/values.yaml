@@ -151,6 +151,16 @@ rateLimit:
   period: "1s"
 
 # ---------------------------------------------------------------------
+# Request body limit (Traefik buffering Middleware — chart-internal).
+# Applied to the catch-all route only; /api/deploy is exempt so the
+# streaming upload (PUT /upload, up to 100 MiB) is never buffered.
+# In-app MaxBytesReader caps stay the primary guard; this is an edge
+# backstop for the small-JSON endpoints (register/promote/repo/...).
+# ---------------------------------------------------------------------
+bodyLimit:
+  maxRequestBodyBytes: 1048576
+
+# ---------------------------------------------------------------------
 # NetworkPolicy
 # ---------------------------------------------------------------------
 networkPolicy:
