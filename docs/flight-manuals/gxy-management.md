@@ -307,9 +307,9 @@ kubectl -n valkey exec sts/valkey -- sh -c \
 # → 11 slugs, alphabetized
 ```
 
-### C.5 Backups (deferred — post-GA)
+### C.5 Backups (automated R2 mirror deferred — post-GA)
 
-Nightly RDB → R2 mirror is **not** part of the v0.1 chart. Tracked as post-GA scope in the cassiopeia GA RFC. Until then, Valkey AOF on the local-path PVC is the sole durability layer; an unscheduled node loss on the gxy-management node forfeits up to 1s of writes (`appendfsync everysec`). Acceptable for the 11-site / write-bursty-by-staff workload; revisit if write rate grows.
+Nightly RDB → R2 mirror is **not** part of the v0.1 chart. Tracked as post-GA scope in the cassiopeia GA RFC. Until then, Valkey AOF on the local-path PVC is the sole durability layer; an unscheduled node loss on the gxy-management node forfeits up to 1s of writes (`appendfsync everysec`). Acceptable for the 11-site / write-bursty-by-staff workload; revisit if write rate grows. For an on-demand snapshot (e.g. pre-teardown), `just backup-valkey gxy-management` runs `BGSAVE` and `kubectl cp`s the `dump.rdb` to the operator machine — only the automated nightly R2 mirror is deferred.
 
 ### C.6 Cutover smoke gate G13 — 2026-05-11
 
@@ -599,7 +599,7 @@ Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from RFC §E):
 
 ## §J — Teardown
 
-Destructive. Run an ad-hoc Windmill backup (G.1) and a Valkey manual-trigger RDB upload (§C.4) before teardown.
+Destructive. Run an ad-hoc Windmill backup (G.1) and a Valkey ad-hoc RDB capture (§C.5, `just backup-valkey`) before teardown.
 
 ### Cluster only (preserves VMs)
 
