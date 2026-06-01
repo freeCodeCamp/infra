@@ -294,8 +294,8 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 
 - ADR-016 — Universe deploy proxy
 - `~/DEV/fCC/artemis/RELEASING.md` — artemis-side release flow (cut, tag, CHANGELOG, push)
-- `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` §2026-04-26 build-residency, §2026-04-27 RUN-residency clause
-- `~/DEV/fCC-U/Universe/decisions/009-...` — Tailscale Operator rejected
+- `~/DEV/fCC-U/Architecture/spike/field-notes/infra.md` §2026-04-26 build-residency, §2026-04-27 RUN-residency clause
+- `~/DEV/fCC-U/Architecture/decisions/009-...` — Tailscale Operator rejected
 - [`01-deploy-new-constellation-site.md`](01-deploy-new-constellation-site.md) — staff-side deploy flow against this service
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — E2E post-deploy gate
 - [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops dotenv decrypt

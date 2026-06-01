@@ -8,9 +8,9 @@ description: |
   held cluster-side.
 
   Built and stored outside Universe (build-residency + run-residency
-  per ADR-017 — see ~/DEV/fCC-U/Universe/decisions/017-build-run-residency.md
+  per ADR-017 — see ~/DEV/fCC-U/Architecture/decisions/017-build-run-residency.md
   and the §2026-04-27 RUN-residency clause in
-  ~/DEV/fCC-U/Universe/spike/field-notes/infra.md). Pulls from
+  ~/DEV/fCC-U/Architecture/spike/field-notes/infra.md). Pulls from
   ghcr.io/freecodecamp/artemis direct.
 
   Chart owns: Deployment, Service, ConfigMap (non-secret env), Secret

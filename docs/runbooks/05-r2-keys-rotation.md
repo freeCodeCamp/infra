@@ -151,7 +151,7 @@ ______________________________________________________________________
 | caddy-ro      | 90 days           | calendar reminder; immediate on caddy pod compromise |
 | Both          | Out-of-cycle      | platform-team lead's discretion (incident response)  |
 
-Both rotations should produce a field-notes entry at `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` under the `## Secrets rotation log` heading.
+Both rotations should produce a field-notes entry at `~/DEV/fCC-U/Architecture/spike/field-notes/infra.md` under the `## Secrets rotation log` heading.
 
 ______________________________________________________________________
 

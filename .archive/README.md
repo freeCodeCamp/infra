@@ -1,6 +1,6 @@
 # infra `.archive/`
 
-Tracked infra-local archives. Catalogued in the master Universe federation index, **§3** (federated in-repo — kept here, NOT relocated): `~/DEV/fCC-U/Universe/.archive/INDEX.md`.
+Tracked infra-local archives. Catalogued in the master Universe federation index, **§3** (federated in-repo — kept here, NOT relocated): `~/DEV/fCC-U/Architecture/.archive/INDEX.md`.
 
 ## Bundles here
 

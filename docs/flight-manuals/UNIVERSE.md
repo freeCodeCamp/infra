@@ -14,7 +14,7 @@ Cross-galaxy steps that apply to every cluster. Read this before any per-galaxy 
 | §99  | Cross-galaxy smoke (post-bring-up)                    |
 | §100 | Teardown (reverse order, rarely run)                  |
 
-> **Early Access (2026-05-12):** the canonical platform-EA declaration is `~/DEV/fCC-U/Universe/decisions/018-early-access-baseline.md` (ADR-018). It defines the live-for-staff scope, the parked Phase-2 list with per-workload gating triggers, and the next sequencing: **static-finish → auth → o11y → later**. This flight manual covers operational procedures; ADR-018 covers strategic intent. Operational journals consolidated in `~/DEV/fCC-U/Universe/.archive/INDEX.md`.
+> **Early Access (2026-05-12):** the canonical platform-EA declaration is `~/DEV/fCC-U/Architecture/decisions/018-early-access-baseline.md` (ADR-018). It defines the live-for-staff scope, the parked Phase-2 list with per-workload gating triggers, and the next sequencing: **static-finish → auth → o11y → later**. This flight manual covers operational procedures; ADR-018 covers strategic intent. Operational journals consolidated in `~/DEV/fCC-U/Architecture/.archive/INDEX.md`.
 
 > **Working-directory rule (post-`cd3b3a32`, 2026-05-13):** `just` recipes carry the galaxy as an argument and self-export `KUBECONFIG` from the recipe body (`justfile:80`). Run all `release` / `configure` / `inspect` / `destroy` / `backup` / `verify-*` recipes **from repo root**: `just release gxy-management artemis`. `cd k3s/<galaxy>/` is only required for raw `kubectl` / `helm` invocations that bypass the recipe layer (shown explicitly below).
 

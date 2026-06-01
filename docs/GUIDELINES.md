@@ -4,7 +4,7 @@ Conventions for docs maintained by this repo.
 
 ## Field-note format
 
-Field notes live upstream in `~/DEV/fCC-U/Universe/spike/field-notes/<team>.md`,
+Field notes live upstream in `~/DEV/fCC-U/Architecture/spike/field-notes/<team>.md`,
 one file per team. This repo's team owns `infra.md`.
 
 - **Append-only.** New entries at the bottom, dated `### YYYY-MM-DD — <title>`.

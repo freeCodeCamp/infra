@@ -6,14 +6,14 @@ Related repos:
 
 - `../infra-secrets` — sops+age vault. Hard-coded relative-path sibling (see "infra-secrets coupling" below).
 - `../artemis` — static-apps deploy proxy. Deployed via `docs/runbooks/02-deploy-artemis-service.md`.
-- `~/DEV/fCC-U/Universe/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 19 ADRs at `decisions/0{01..19}-*.md` and the spike plan at `spike/spike-plan.md`.
+- `~/DEV/fCC-U/Architecture/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 19 ADRs at `decisions/0{01..19}-*.md` and the spike plan at `spike/spike-plan.md`.
 - `~/DEV/fCC-U/windmill/` — Windmill IaC (CLI sync repo for the gxy-management Windmill workspace).
 
 **Design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
 ## Doc ownership
 
-Authoritative model + flow diagram in `~/DEV/fCC-U/Universe/CLAUDE.md`.
+Authoritative model + flow diagram in `~/DEV/fCC-U/Architecture/CLAUDE.md`.
 
 Operator-runnable flight manuals live in `docs/flight-manuals/` (this repo). Index at `docs/flight-manuals/00-index.md`; read order starts with `UNIVERSE.md`.
 
@@ -23,7 +23,7 @@ Platform-wide live-state + automation-gap + drift snapshot (2026-05-29 snapshot 
 
 Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `docs/architecture/rfc-gxy-cassiopeia-ga.md`.
 
-Pre-2026-05-10 field-notes are consolidated in `~/DEV/fCC-U/Universe/.archive/` as §1 of the master federation index (`INDEX.md`): the frozen 40-shard grid across 7 topic dirs (artemis, cassiopeia, gxy-static, windmill, universe-cli, infra, audits). §1 is do-not-extend; §2/§3/§4 (cross-repo cold-store, federated in-repo catalogue, gitignored-scratchpad pointers) are extendable. New durable operator content goes into the flight-manuals or runbooks, not new field-notes.
+Pre-2026-05-10 field-notes are consolidated in `~/DEV/fCC-U/Architecture/.archive/` as §1 of the master federation index (`INDEX.md`): the frozen 40-shard grid across 7 topic dirs (artemis, cassiopeia, gxy-static, windmill, universe-cli, infra, audits). §1 is do-not-extend; §2/§3/§4 (cross-repo cold-store, federated in-repo catalogue, gitignored-scratchpad pointers) are extendable. New durable operator content goes into the flight-manuals or runbooks, not new field-notes.
 
 Internal-only material (sprints, planning conventions, parked items, audit dossiers) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
 
@@ -98,7 +98,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Clusters
 
-Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Universe/spike/spike-plan.md` (canonical, Universe-team-owned). Cluster-vs-ADR reconciliation: `docs/architecture/adr-drift-2026-05-10.md`. Verify reality with `doctl compute droplet list` before acting.
+Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Architecture/spike/spike-plan.md` (canonical, Universe-team-owned). Cluster-vs-ADR reconciliation: `docs/architecture/adr-drift-2026-05-10.md`. Verify reality with `doctl compute droplet list` before acting.
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
@@ -110,7 +110,7 @@ Inventory groups (matches `ansible/inventory/group_vars/`):
 
 Retired:
 
-- `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). Historical journal: `~/DEV/fCC-U/Universe/.archive/gxy-static/2026-04-27-teardown.md`.
+- `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). Historical journal: `~/DEV/fCC-U/Architecture/.archive/gxy-static/2026-04-27-teardown.md`.
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 

@@ -8,7 +8,7 @@ Successor in spirit to [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) (t
 
 | Axis            | Source                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------- |
-| Design          | `~/DEV/fCC-U/Universe/decisions/001..019` + `spike/spike-plan.md`                         |
+| Design          | `~/DEV/fCC-U/Architecture/decisions/001..019` + `spike/spike-plan.md`                         |
 | Repo reality    | `infra/` (justfile, k3s, ansible, terraform), `artemis/`, `veritas/`, `windmill/` on disk |
 | Cluster reality | `doctl compute droplet list` + `kubectl` reads, this date                                 |
 | CI reality      | `.github/workflows/` across all repos; `renovate.json` presence                           |
@@ -25,7 +25,7 @@ ______________________________________________________________________
 | infra-secrets | `~/DEV/fCC/infra-secrets`  | sops+age vault (single org key). Hard-coded sibling `../infra-secrets`. No secrets in infra repo                                                                       |
 | artemis       | `~/DEV/fCC/artemis`        | Go service on `uploads.freecode.camp`. Sole R2 writer. GitHub-team authz → mints deploy JWT → streams uploads to R2 with atomic alias flip. Deployed to gxy-management |
 | veritas       | `~/DEV/fCC-U/veritas`      | TypeScript auth IdP (BetterAuth embedded). `login.` + `account.freecodecamp.org`. Active source repo. CI carries cosign + SBOM                                         |
-| Universe      | `~/DEV/fCC-U/Universe`     | Design repo: 19 ADRs + spike-plan. No code, no CI. Authoritative architecture model                                                                                    |
+| Universe      | `~/DEV/fCC-U/Architecture`     | Design repo: 19 ADRs + spike-plan. No code, no CI. Authoritative architecture model                                                                                    |
 | windmill      | `~/DEV/fCC-U/windmill`     | Windmill IaC (wmill CLI sync). "Apollo-11" = staff repo request/approve via Google Chat + React SPA. Tenant on gxy-management. EA-live for staff                       |
 | universe-cli  | `~/DEV/fCC-U/universe-cli` | `universe` CLI (deploy / sites registry). v0.7.0 on npm                                                                                                                |
 
