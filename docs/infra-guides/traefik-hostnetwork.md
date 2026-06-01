@@ -83,7 +83,7 @@ spec:
           from: Same
 ```
 
-Adding `:443` requires CF zone in `Full (Strict)`, an origin certificate, and a chart-owned `Secret` carrying the cert. The `docs/architecture/adr-drift-2026-05-10.md` row covering this is the authoritative source on which galaxies are on which SSL mode today.
+Adding `:443` requires CF zone in `Full (Strict)`, an origin certificate, and a chart-owned `Secret` carrying the cert. The per-zone SSL-mode table in [`../flight-manuals/UNIVERSE.md`](../flight-manuals/UNIVERSE.md) §1.1 (DNS / TLS posture) is the authoritative source on which galaxies/zones use which SSL mode today.
 
 ## Pitfall 5 — Gateway parentRef must point at an in-namespace Gateway
 
