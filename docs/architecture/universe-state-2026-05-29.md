@@ -40,7 +40,7 @@ ______________________________________________________________________
 | gxy-launchbase | P4   | DO FRA1 → bare metal | **LIVE but idle** — CNPG operator only, no DB workloads                                                                         | matches                     |
 | gxy-triangulum | P3   | Hetzner              | **NOT provisioned** (zero droplets)                                                                                             | PARKED — gates ADR-013 Q-24 |
 | gxy-backoffice | P5   | Hetzner              | **NOT provisioned** (zero droplets)                                                                                             | PARKED — gates auth epic    |
-| ~~gxy-static~~ | —    | —                    | RETIRED 2026-04-27 → cassiopeia                                                                                                 | matches                     |
+| ~~gxy-static~~ | —    | —                    | RETIRED → cassiopeia (canonical: `flight-manuals/00-index.md` Retired-galaxies row)                                            | matches                     |
 
 Legacy, out-of-Universe-scope (retire post-Universe): `ops-backoffice-tools` (outline + appsmith), `ops-mgmt`, plus Linode/Azure Docker-Swarm stacks.
 

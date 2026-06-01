@@ -223,13 +223,15 @@ Curated list of Universe pillars (recovery-path workloads — see [ADR-017](http
 
 **Pillar criticality ranking** (P1 highest, P5 lowest) per [ADR-019](https://github.com/freeCodeCamp/Universe/blob/main/decisions/019-cassiopeia-shared-services.md) §Pillar criticality:
 
-| Rank | Galaxy           | Charter                                                                                        | Venue policy               |
-| ---- | ---------------- | ---------------------------------------------------------------------------------------------- | -------------------------- |
-| P1   | `gxy-management` | Shepherd — ArgoCD, Atlantis, Windmill; backup + recovery services. Thin and reliable.          | DO / Cloud forever         |
-| P2   | `gxy-cassiopeia` | Critical shared services — static serve + Veritas + donations + future cross-universe central. | DO / Cloud forever         |
-| P3   | `gxy-triangulum` | Dynamic prod constellations — containers, FaaS, anything non-static.                           | Hetzner bare metal direct  |
-| P4   | `gxy-launchbase` | Supply chain — CI/CD, preview environments.                                                    | Hetzner bare metal post-M5 |
-| P5   | `gxy-backoffice` | Observability + internal devtools (Windmill EXCLUDED — stays P1).                              | Hetzner bare metal direct  |
+Charter prose per rank lives in canonical ADR-019 §Pillar criticality — this manual keeps only the venue/rank lens needed for rebuild-ordering:
+
+| Rank | Galaxy           | Venue policy               |
+| ---- | ---------------- | -------------------------- |
+| P1   | `gxy-management` | DO / Cloud forever         |
+| P2   | `gxy-cassiopeia` | DO / Cloud forever         |
+| P3   | `gxy-triangulum` | Hetzner bare metal direct  |
+| P4   | `gxy-launchbase` | Hetzner bare metal post-M5 |
+| P5   | `gxy-backoffice` | Hetzner bare metal direct  |
 
 Provisioning order (`mgmt → cassiopeia → launchbase → backoffice → triangulum`) is **distinct** from criticality rank — see ADR-019 §Provisioning order.
 

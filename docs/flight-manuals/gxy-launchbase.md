@@ -1,6 +1,6 @@
 # Flight Manual — gxy-launchbase
 
-Standby galaxy. CNPG operator running, no workload. Reactivation candidate location for Apollo MVP preview constellations (spike-plan §"Galaxy placement map"). Woodpecker CI is **retired** (2026-05-03, no consumer post-D016 pivot) — chart artifacts are slated for archive in P5 of the universe-master-audit.
+Standby galaxy. CNPG operator running, no workload. Reactivation candidate location for Apollo MVP preview constellations (spike-plan §"Galaxy placement map"). Woodpecker CI is **retired** — do not deploy; full rationale, last-live commit, and resurrection path in [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker.
 
 | Field             | Value                                                        |
 | ----------------- | ------------------------------------------------------------ |
@@ -18,13 +18,13 @@ Standby galaxy. CNPG operator running, no workload. Reactivation candidate locat
 >
 > **Idempotency:** every state-changing step has a "skip-if-already-done" guard.
 
-This chapter intentionally does NOT cover Woodpecker. The chart at `k3s/gxy-launchbase/apps/woodpecker/` is dead weight scheduled for archival; do not bring it up. If a future sprint re-establishes a CI plane, write a fresh chapter or runbook — do not resurrect the old.
+This chapter intentionally does NOT cover Woodpecker (retired; see [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker). If a future sprint re-establishes a CI plane, write a fresh chapter or runbook — do not resurrect the old.
 
 ## §A — k3s bootstrap
 
 ### A.1 Pre-flight (galaxy-specific files)
 
-`infra-secrets/k3s/gxy-launchbase/` after the woodpecker archive sweep is **empty** (no chart at this galaxy needs sealed values today). When CNPG-managed Postgres clusters land for preview constellations, secrets follow the per-app pattern from gxy-management.
+`infra-secrets/k3s/gxy-launchbase/` is **empty** (no chart at this galaxy needs sealed values today; the prior woodpecker envelope retired with the stack — see [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker). When CNPG-managed Postgres clusters land for preview constellations, secrets follow the per-app pattern from gxy-management.
 
 `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard reused if any future ingress lands on this galaxy on the `freecodecamp.net` zone.
 
@@ -102,13 +102,13 @@ No `Cluster` CR exists today — the operator runs idle, waiting for its first w
 
 ## §C — Standby state (what's intentionally not here)
 
-| Component                            | Status                                                                                     |
-| ------------------------------------ | ------------------------------------------------------------------------------------------ |
-| Woodpecker CI server + agents        | **RETIRED 2026-05-03**. Chart at `apps/woodpecker/` slated for archive. **Do not deploy.** |
-| `woodpecker-postgres` CNPG `Cluster` | retired with woodpecker; no `Cluster` CR in tree                                           |
-| Public DNS                           | none active. `woodpecker.freecodecamp.net` deletion queued (operator-side ClickOps).       |
-| TLS secrets                          | no per-app sealed values envelope at this level (post-woodpecker)                          |
-| Future workloads                     | Apollo MVP preview constellations (per spike-plan §Phase 0); not scheduled                 |
+| Component         | Status                                                                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Woodpecker CI     | **RETIRED**. **Do not deploy.** Full park rationale, DNS-deletion state, last-live commit → [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker. |
+| CNPG `Cluster` CR | none in tree (no workload yet; operator idle — see §B)                                                                                        |
+| Public DNS        | none active                                                                                                                                  |
+| TLS secrets       | no per-app sealed values envelope at this level                                                                                              |
+| Future workloads  | Apollo MVP preview constellations (per spike-plan §Phase 0); not scheduled                                                                   |
 
 If a future sprint reactivates a CI plane, the new design must be captured in a fresh ADR or runbook and a new chapter section here — do not paste the retired Phase 16-18 back in.
 
@@ -153,4 +153,4 @@ doctl compute droplet delete \
   --force
 ```
 
-VPC, firewall, DO Spaces, R2 buckets persist (shared infra — see `UNIVERSE.md §3`). When woodpecker DNS deletion lands, no further DNS hygiene is owed by this chapter.
+VPC, firewall, DO Spaces, R2 buckets persist (shared infra — see `UNIVERSE.md §3`). No DNS hygiene is owed by this chapter (the retired woodpecker record is tracked in [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker).
