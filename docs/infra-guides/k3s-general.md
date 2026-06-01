@@ -67,11 +67,11 @@ ______________________________________________________________________
 
 ### VPC
 
-| Property | Value            |
-| -------- | ---------------- |
-| Name     | ops-vpc-k3s-nyc3 |
-| Region   | nyc3             |
-| IP Range | 10.108.0.0/20    |
+| Property | Value             |
+| -------- | ----------------- |
+| Name     | universe-vpc-fra1 |
+| Region   | fra1              |
+| IP Range | 10.110.0.0/20     |
 
 ### Droplets
 

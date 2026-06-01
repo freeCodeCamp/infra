@@ -65,7 +65,7 @@ Generic `release` recipe smart-dispatches: `apps/artemis/charts/<chart>/` presen
 
 No `.deploy-flags.sh` hook for artemis post-cutover — the chart no longer mounts a sites ConfigMap. The Valkey registry is the authoritative store; `universe sites <subcommand>` is the operator surface (see `docs/runbooks/01-deploy-new-constellation-site.md`).
 
-The sops sealed overlay is operator-owned. Mint via the paste-once shell block in `docs/runbooks/deploy-artemis-service.md` §5. Re-run on env-var rotation. See runbook for end-to-end operator flow.
+The sops sealed overlay is operator-owned. Mint via the paste-once shell block in `docs/runbooks/02-deploy-artemis-service.md` §5. Re-run on env-var rotation. See runbook for end-to-end operator flow.
 
 No TLS material in the overlay — CF Flexible SSL on `freecode.camp` zone (CF terminates HTTPS, CF→origin plain HTTP).
 

@@ -1,52 +1,40 @@
 # R2 keys — provision + rotation
 
-**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit.
-**Bucket:** `universe-static-apps-01` (single, prefix-scoped per D8).
-**Spec:** ADR-016 §R2 layout; `docs/rfc/gxy-cassiopeia.md` §4.4.
+**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Bucket:** `universe-static-apps-01` (single, prefix-scoped per D8). **Spec:** ADR-016 §R2 layout; secret-envelope layout per `docs/architecture/rfc-secrets-layout.md`.
 
-Two role-keys exist on the bucket. They live in different sops envelopes
-because the consumers run in different galaxies and different blast-radius
-domains.
+Two role-keys exist on the bucket. They live in different sops envelopes because the consumers run in different galaxies and different blast-radius domains.
 
 | Role          | Permission        | Consumer                    | Sops envelope                                                   |
 | ------------- | ----------------- | --------------------------- | --------------------------------------------------------------- |
 | artemis-admin | Object Read+Write | `artemis` (gxy-management)  | `infra-secrets/management/artemis.env.enc` (dotenv SOT)         |
 | caddy-ro      | Object Read       | `caddy-s3` (gxy-cassiopeia) | `infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc` (yaml) |
 
-Caddy is read-only by design: a compromised caddy pod cannot promote,
-rollback, or write artifacts. Artemis holds the only rw key and gates
-every write behind GitHub team membership (see
-[`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) and ADR-016).
+Caddy is read-only by design: a compromised caddy pod cannot promote, rollback, or write artifacts. Artemis holds the only rw key and gates every write behind GitHub team membership (see [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) and ADR-016).
 
-> **Superseded path.** A third role-key — Woodpecker per-site rw bootstrap
-> — was specced under T11 / D40. ADR-016 (deploy-proxy plane) supersedes
-> that flow: Woodpecker no longer holds R2 credentials; artemis brokers
-> every write.
+> **Superseded path.** A third role-key — Woodpecker per-site rw bootstrap — was specced under T11 / D40. ADR-016 (deploy-proxy plane) supersedes that flow: Woodpecker no longer holds R2 credentials; artemis brokers every write.
 
----
+______________________________________________________________________
 
 ## Prerequisites
 
 - Cloudflare account owner or admin on the **freeCodeCamp-Universe** account.
-- `infra-secrets/` checked out as a sibling of `infra/` with sops+age set
-  up — see [`04-secrets-decrypt.md`](04-secrets-decrypt.md).
+- `infra-secrets/` checked out as a sibling of `infra/` with sops+age set up — see [`04-secrets-decrypt.md`](04-secrets-decrypt.md).
 - `rclone` installed locally (verification only).
 
----
+______________________________________________________________________
 
 ## Mint a fresh artemis-admin key
 
-Use this on first artemis bring-up or on rotation. Steps 1–4 are
-ClickOps; step 5 is the dotenv envelope edit.
+Use this on first artemis bring-up or on rotation. Steps 1–4 are ClickOps; step 5 is the dotenv envelope edit.
 
 ### 1. CF dashboard → mint token
 
 1. Cloudflare Dashboard → R2 → **Manage R2 API Tokens** → **Create API Token**.
-2. Token name: `universe-static-apps-01-artemis-admin-<YYYYMMDD>` (date suffix lets two coexist during rotation).
-3. Permissions: **Object Read & Write**.
-4. Specify bucket: `universe-static-apps-01`.
-5. TTL: none (rotated every 90 days).
-6. **Create** → capture three values shown once:
+1. Token name: `universe-static-apps-01-artemis-admin-<YYYYMMDD>` (date suffix lets two coexist during rotation).
+1. Permissions: **Object Read & Write**.
+1. Specify bucket: `universe-static-apps-01`.
+1. TTL: none (rotated every 90 days).
+1. **Create** → capture three values shown once:
    - Access Key ID
    - Secret Access Key
    - Jurisdictional endpoint (`https://<account-id>.r2.cloudflarestorage.com`)
@@ -66,10 +54,7 @@ Save + exit. Sops re-encrypts on close.
 
 ### 3. Mirror dotenv → YAML overlay (helm input)
 
-The chart consumes a YAML overlay; the dotenv is the SOT. Re-run the
-mirror block from
-[`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) §5 to
-re-encrypt the YAML overlay.
+The chart consumes a YAML overlay; the dotenv is the SOT. Re-run the mirror block from [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) §5 to re-encrypt the YAML overlay.
 
 ### 4. Commit + push infra-secrets
 
@@ -97,27 +82,24 @@ curl -fsS https://uploads.freecode.camp/healthz                           # 200
 just verify-artemis                                             # E2E green
 ```
 
-See [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md)
-for the full E2E gate.
+See [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) for the full E2E gate.
 
 ### 7. Revoke old key
 
-CF dashboard → R2 → API Tokens → revoke the prior `*-artemis-admin-*`
-token **only after** step 6 is green. Keeping both live during the
-soak window means a fast revert if the new key is bad.
+CF dashboard → R2 → API Tokens → revoke the prior `*-artemis-admin-*` token **only after** step 6 is green. Keeping both live during the soak window means a fast revert if the new key is bad.
 
----
+______________________________________________________________________
 
 ## Mint a fresh caddy-ro key
 
 ### 1. CF dashboard → mint token
 
 1. Cloudflare Dashboard → R2 → **Manage R2 API Tokens** → **Create API Token**.
-2. Token name: `universe-static-apps-01-caddy-ro-<YYYYMMDD>`.
-3. Permissions: **Object Read** only.
-4. Specify bucket: `universe-static-apps-01`.
-5. TTL: none.
-6. Create → capture credentials.
+1. Token name: `universe-static-apps-01-caddy-ro-<YYYYMMDD>`.
+1. Permissions: **Object Read** only.
+1. Specify bucket: `universe-static-apps-01`.
+1. TTL: none.
+1. Create → capture credentials.
 
 ### 2. Edit the caddy values overlay
 
@@ -153,17 +135,13 @@ direnv exec ~/DEV/fCC/infra/k3s/gxy-cassiopeia \
 
 ### 5. Verify
 
-Pick any production site (e.g. `https://test.freecode.camp/`) and
-confirm 200 + content match. Caddy serves from R2 via the `r2_alias`
-module; if the new ro key is bad, expect `502` or `404` on the live
-site immediately.
+Pick any production site (e.g. `https://test.freecode.camp/`) and confirm 200 + content match. Caddy serves from R2 via the `r2_alias` module; if the new ro key is bad, expect `502` or `404` on the live site immediately.
 
 ### 6. Revoke old key
 
-CF dashboard → R2 → API Tokens → revoke the prior `*-caddy-ro-*`
-token only after the rollout is Ready and a real-site curl is 200.
+CF dashboard → R2 → API Tokens → revoke the prior `*-caddy-ro-*` token only after the rollout is Ready and a real-site curl is 200.
 
----
+______________________________________________________________________
 
 ## Cadence
 
@@ -173,11 +151,9 @@ token only after the rollout is Ready and a real-site curl is 200.
 | caddy-ro      | 90 days           | calendar reminder; immediate on caddy pod compromise |
 | Both          | Out-of-cycle      | platform-team lead's discretion (incident response)  |
 
-Both rotations should produce a field-notes entry at
-`~/DEV/fCC-U/Universe/spike/field-notes/infra.md` under the
-`## Secrets rotation log` heading.
+Both rotations should produce a field-notes entry at `~/DEV/fCC-U/Universe/spike/field-notes/infra.md` under the `## Secrets rotation log` heading.
 
----
+______________________________________________________________________
 
 ## Failure modes
 
@@ -188,7 +164,7 @@ Both rotations should produce a field-notes entry at
 | `404` on production site immediately after caddy roll | new caddy-ro key wrong endpoint or revoked       | check sops envelope; mint replacement                                         |
 | `Error unmarshalling input json: invalid character`   | sops auto-detect on `.enc` routed to JSON parser | use canonical incantation in [`04-secrets-decrypt.md`](04-secrets-decrypt.md) |
 
----
+______________________________________________________________________
 
 ## Cross-references
 

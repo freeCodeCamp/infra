@@ -4,6 +4,8 @@ Live-verified snapshot of the freeCodeCamp Universe platform: what is what, what
 
 Successor in spirit to [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) (that report = ADR-vs-reality only; all its AD-1..AD-8 actions are closed). This report is broader: ADR design + on-disk code + **live cluster reads** + CI/automation posture, in one place. Design rationale stays in the Universe ADRs (001-019) — not duplicated here.
 
+> **Freshness (2026-06-01):** dated 2026-05-29 snapshot — version/state specifics drift. Known drift since: artemis `0.7.0` (was 0.3.0), valkey `8.1.7-alpine` (was 8.1.4), universe-cli `0.8.0` (was 0.7.0); drift **D5 + D11 resolved** (repo-create now LIVE — mounted + team-gated, no longer dark). Live re-scout + trim plan: `.scratchpad/dossier/2026-05-29-universe-doc-trim/`. Treat figures below as as-of-2026-05-29.
+
 | Axis            | Source                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------- |
 | Design          | `~/DEV/fCC-U/Universe/decisions/001..019` + `spike/spike-plan.md`                         |
