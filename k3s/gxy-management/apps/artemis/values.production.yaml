@@ -13,8 +13,8 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  # release: 0.7.1
-  tag: "0.7.1@sha256:eabd8148ccedb2c39f6bf44bdd5999b929b2c6e26c4b76859d3c210cdc14ca05"
+  # release: 0.8.0
+  tag: "0.8.0@sha256:8f67910090359698b1a196fc78ff8936b9f864443d0536a66fb4a93c88b7f756"
   pullPolicy: IfNotPresent
 
 resources:
@@ -37,6 +37,7 @@ env:
   #   sops overlay (VALKEY_PASSWORD).
   VALKEY_ADDR: "valkey.valkey.svc.cluster.local:6379"
   REGISTRY_AUTHZ_TEAM: "staff"
+  REPO_APPROVE_AUTHZ_TEAM: "gh-artemis-approvers"
   JWT_TTL_SECONDS: "900"
   GH_MEMBERSHIP_CACHE_TTL: "300"
   # Site key in R2 = `<site>.freecode.camp` (full FQDN). Matches the
