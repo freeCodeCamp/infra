@@ -192,6 +192,14 @@ networkPolicy:
 # production overlay flips enabled=true to turn on GC. HA is the
 # backup/restore floor (ADR-019), not replication — see artemis-backup.
 # ---------------------------------------------------------------------
+# Hatchet engine (operator-deployed via hatchet-stack into this namespace,
+# sharing the bundled PG `hatchet` tenant). grpcPort MUST match the
+# engine Service's gRPC port AND the port in env.HATCHET_ADDR — verify
+# against the deployed chart (hatchet-stack has shipped both :7070 and
+# :7077 across versions). Used by the egress NetworkPolicy.
+hatchet:
+  grpcPort: 7077
+
 postgres:
   enabled: false
   image:

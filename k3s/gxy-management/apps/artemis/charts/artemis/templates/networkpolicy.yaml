@@ -113,7 +113,7 @@ spec:
             "k8s:app.kubernetes.io/name": hatchet-engine
       toPorts:
         - ports:
-            - port: "7077"
+            - port: "{{ .Values.hatchet.grpcPort }}"
               protocol: TCP
     {{- end }}
 {{- end }}
