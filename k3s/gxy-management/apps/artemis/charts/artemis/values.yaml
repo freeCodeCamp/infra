@@ -100,6 +100,13 @@ env:
   REPO_APPROVE_AUTHZ_TEAM: "apollo-11-approvers"
   ENVIRONMENT: "development"
   SENTRY_TRACES_SAMPLE_RATE: "0.2"
+  # Durable-execution (rendered only when postgres.enabled). HATCHET_ADDR
+  # points at the in-cluster Hatchet engine gRPC Service. CLEANUP_BLAST_CAP
+  # is the per-run tombstone ceiling (0 = uncapped); CLEANUP_DRY_RUN plans
+  # without deleting — set true for the cutover dry-run, then false.
+  HATCHET_ADDR: "hatchet-engine.gxy-management.svc.cluster.local:7077"
+  CLEANUP_BLAST_CAP: "0"
+  CLEANUP_DRY_RUN: "false"
 
 # Required secret env keys — populated by sops overlay
 # (infra-secrets/k3s/gxy-management/artemis.values.yaml.enc).
@@ -117,6 +124,17 @@ secretEnv:
   GH_CLIENT_ID: null
   JWT_SIGNING_KEY: null
   VALKEY_PASSWORD: null
+  # Durable-execution (GC) secrets — required only when postgres.enabled.
+  # POSTGRES_PASSWORD = superuser; ARTEMIS_DB_PASSWORD / HATCHET_DB_PASSWORD
+  # = the two isolated tenant roles on the shared instance. DATABASE_URL is
+  # auto-constructed from ARTEMIS_DB_PASSWORD unless set explicitly (external
+  # PG). HATCHET_CLIENT_TOKEN is minted from the deployed Hatchet engine and
+  # flips artemis into GC mode.
+  POSTGRES_PASSWORD: null
+  ARTEMIS_DB_PASSWORD: null
+  HATCHET_DB_PASSWORD: null
+  DATABASE_URL: null
+  HATCHET_CLIENT_TOKEN: null
   # Apollo-11 GH App credentials — leave null to keep /api/repo*
   # feature OFF. Provide all three in the sops envelope to enable.
   # Partial config fails artemis validate() at boot.
@@ -165,3 +183,27 @@ bodyLimit:
 # ---------------------------------------------------------------------
 networkPolicy:
   enabled: true
+
+# ---------------------------------------------------------------------
+# Bundled Postgres (M1 — durable-execution substrate). One single-node
+# postgres:16-alpine StatefulSet, SHARED by artemis + the Hatchet engine
+# with tenant isolation (separate databases + login roles, least-priv).
+# Disabled by default so deploy-only deployments stay stateless; the
+# production overlay flips enabled=true to turn on GC. HA is the
+# backup/restore floor (ADR-019), not replication — see artemis-backup.
+# ---------------------------------------------------------------------
+postgres:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  storage: 10Gi
+  storageClassName: "local-path"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi

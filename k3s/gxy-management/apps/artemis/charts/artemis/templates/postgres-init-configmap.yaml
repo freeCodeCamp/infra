@@ -1,0 +1,41 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-postgresql-init
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+data:
+  10-init-tenants.sh: |
+    #!/bin/bash
+    # Bootstraps two isolated tenants on the shared instance: artemis and
+    # hatchet each own their own database + login role, with no cross-tenant
+    # access (REVOKE PUBLIC + no CONNECT grant on the sibling DB). Runs once,
+    # as the postgres superuser, on an empty PGDATA.
+    set -euo pipefail
+
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-EOSQL
+      CREATE ROLE artemis LOGIN PASSWORD '${ARTEMIS_DB_PASSWORD}';
+      CREATE ROLE hatchet LOGIN PASSWORD '${HATCHET_DB_PASSWORD}';
+
+      CREATE DATABASE artemis OWNER artemis;
+      CREATE DATABASE hatchet OWNER hatchet;
+
+      REVOKE ALL ON DATABASE artemis FROM PUBLIC;
+      REVOKE ALL ON DATABASE hatchet FROM PUBLIC;
+
+      GRANT ALL PRIVILEGES ON DATABASE artemis TO artemis;
+      GRANT ALL PRIVILEGES ON DATABASE hatchet TO hatchet;
+    EOSQL
+
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname artemis <<-EOSQL
+      GRANT ALL ON SCHEMA public TO artemis;
+      ALTER SCHEMA public OWNER TO artemis;
+    EOSQL
+
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname hatchet <<-EOSQL
+      GRANT ALL ON SCHEMA public TO hatchet;
+      ALTER SCHEMA public OWNER TO hatchet;
+    EOSQL
+{{- end }}

@@ -25,3 +25,8 @@ data:
   REPO_APPROVE_AUTHZ_TEAM:      {{ default "apollo-11-approvers" .Values.env.REPO_APPROVE_AUTHZ_TEAM | quote }}
   ENVIRONMENT:                  {{ default "development" .Values.env.ENVIRONMENT | quote }}
   SENTRY_TRACES_SAMPLE_RATE:    {{ default "0.2" .Values.env.SENTRY_TRACES_SAMPLE_RATE | quote }}
+  {{- if .Values.postgres.enabled }}
+  HATCHET_ADDR:                 {{ required ".Values.env.HATCHET_ADDR is required when postgres is enabled" .Values.env.HATCHET_ADDR | quote }}
+  CLEANUP_BLAST_CAP:            {{ default "0" .Values.env.CLEANUP_BLAST_CAP | quote }}
+  CLEANUP_DRY_RUN:              {{ default "false" .Values.env.CLEANUP_DRY_RUN | quote }}
+  {{- end }}
