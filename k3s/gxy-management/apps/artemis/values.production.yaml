@@ -51,7 +51,7 @@ env:
   DEPLOY_PREFIX_FORMAT: "<site>.freecode.camp/deploys/<ts>-<sha>/"
   LOG_LEVEL: "info"
   ENVIRONMENT: "production"
-  SENTRY_TRACES_SAMPLE_RATE: "0.2"
+  SENTRY_TRACES_SAMPLE_RATE: "0.5"
 
 # Rate-limit tunables — Traefik Middleware (chart-internal). Per
 # source IP (CF-rewritten X-Forwarded-For depth=1).
@@ -64,4 +64,11 @@ gateway:
   hostname: "uploads.freecode.camp"
 
 networkPolicy:
+  enabled: true
+
+# Bundled shared Postgres (retention-GC substrate). Enabling flips artemis
+# out of deploy-only; the worker + relay stay dormant until env.HATCHET_ADDR
+# is also set (left unset until the Hatchet engine is live). The image.tag
+# above must be an artemis build that contains the durable-exec code.
+postgres:
   enabled: true
