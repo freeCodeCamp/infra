@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         {{- include "artemis.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: deploy-proxy
       annotations:
         # Roll pods on env / secret changes. Pre-cutover this also
         # depended on a sites ConfigMap (fsnotify hot-reload of

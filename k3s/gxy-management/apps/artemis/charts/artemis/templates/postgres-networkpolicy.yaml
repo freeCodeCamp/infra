@@ -1,0 +1,35 @@
+{{- if and .Values.networkPolicy.enabled .Values.postgres.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-postgresql
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: postgresql
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*"
+{{- end }}
