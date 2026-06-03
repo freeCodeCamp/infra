@@ -100,13 +100,17 @@ env:
   REPO_APPROVE_AUTHZ_TEAM: "apollo-11-approvers"
   ENVIRONMENT: "development"
   SENTRY_TRACES_SAMPLE_RATE: "0.2"
-  # Durable-execution (rendered only when postgres.enabled). HATCHET_ADDR
-  # points at the in-cluster Hatchet engine gRPC Service. CLEANUP_BLAST_CAP
+  # Durable-execution (rendered only when postgres.enabled). CLEANUP_BLAST_CAP
   # is the per-run tombstone ceiling (0 = uncapped); CLEANUP_DRY_RUN plans
   # without deleting — set true for the cutover dry-run, then false.
-  HATCHET_ADDR: "hatchet-engine.gxy-management.svc.cluster.local:7077"
   CLEANUP_BLAST_CAP: "0"
   CLEANUP_DRY_RUN: "false"
+  # HATCHET_ADDR is intentionally EMPTY by default — the worker + relay
+  # boot only when it is set. Stage-1 deploy (postgres.enabled, this blank)
+  # brings up PG + runs migrations; set this in values.production.yaml to
+  # the live engine gRPC address (e.g. hatchet-engine.artemis.svc.cluster.local:7077)
+  # once the Hatchet engine is deployed, then re-release to start the worker.
+  HATCHET_ADDR: ""
 
 # Required secret env keys — populated by sops overlay
 # (infra-secrets/k3s/gxy-management/artemis.values.yaml.enc).
