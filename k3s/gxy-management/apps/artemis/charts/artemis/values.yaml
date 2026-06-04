@@ -36,6 +36,40 @@ resources:
     memory: 256Mi
 
 # ---------------------------------------------------------------------
+# High availability (R13). artemis is stateless: every replica is
+# interchangeable, sessions are JWT-bearer (no sticky state), and the
+# in-app migration runner takes an advisory lock (R1) so concurrent
+# pod boots are race-free. Chart default replicaCount is 1 for the
+# deploy-only (stateless, no-PG) profile; the production overlay sets
+# replicaCount 3. The Deployment honours replicaCount directly.
+#
+# PodDisruptionBudget — caps voluntary disruptions (node drains,
+# rolling node upgrades) so a quorum stays serving. minAvailable 1 is
+# safe at replicaCount 1 (blocks drain until operator hand-roll) and
+# keeps >=1 pod during multi-replica drains. Raise toward N-1 if a
+# tighter availability floor is wanted on gxy-management.
+# ---------------------------------------------------------------------
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# ---------------------------------------------------------------------
+# HorizontalPodAutoscaler — disabled by default (the static
+# replicaCount governs unless this is flipped on). When enabled it
+# overrides replicaCount between min/max on CPU/memory utilization.
+# A metric block renders only when its target percentage is set, so
+# leaving either null drops that metric. Safe to enable on the
+# multi-replica production profile; the advisory-locked migrations
+# (R1) make scale-up pod boots concurrent-safe.
+# ---------------------------------------------------------------------
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: null
+
+# ---------------------------------------------------------------------
 # Pod & container security context (PSS baseline-compliant; artemis
 # namespace runs PSS baseline — no privileged escalation needed).
 # ---------------------------------------------------------------------
@@ -195,6 +229,14 @@ networkPolicy:
 # Disabled by default so deploy-only deployments stay stateless; the
 # production overlay flips enabled=true to turn on GC. HA is the
 # backup/restore floor (ADR-019), not replication — see artemis-backup.
+#
+# PG-HA posture (M1): the bundled single-node StatefulSet is the
+# ACCEPTED availability floor for M1. artemis app replicas are HA
+# (R13: N>=2 stateless, advisory-locked migrations), but the durable-
+# execution substrate is intentionally single-node — its availability
+# rests on the nightly logical backup + restore drill (ADR-019), not
+# on PG replication. CNPG / streaming-replica HA is OUT OF SCOPE for
+# M1; revisit post-M1 if the GC substrate's RTO floor proves too high.
 # ---------------------------------------------------------------------
 # Hatchet engine (operator-deployed via hatchet-stack into this namespace,
 # sharing the bundled PG `hatchet` tenant). grpcPort MUST match the
