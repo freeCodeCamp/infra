@@ -1,0 +1,124 @@
+{{- if and .Values.postgres.enabled .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "artemis.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: {{ .Values.backup.image }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  FILENAME="artemis-${TIMESTAMP}.sql.gz"
+                  R2_PREFIX="artemis/${GALAXY}"
+                  R2_PATH="${R2_PREFIX}/${FILENAME}"
+
+                  echo "Starting backup: ${FILENAME}"
+                  PGPASSWORD="${PGPASSWORD}" pg_dumpall \
+                    -h {{ .Release.Name }}-postgresql \
+                    -U postgres \
+                    --clean \
+                    --if-exists | gzip > "/tmp/${FILENAME}"
+
+                  FILESIZE=$(stat -c%s "/tmp/${FILENAME}" 2>/dev/null || stat -f%z "/tmp/${FILENAME}")
+                  echo "Backup size: ${FILESIZE} bytes"
+
+                  echo "Uploading to r2:${R2_BUCKET}/${R2_PATH}"
+                  rclone copyto "/tmp/${FILENAME}" "r2:${R2_BUCKET}/${R2_PATH}"
+
+                  echo "Pruning backups older than {{ .Values.backup.retention }} under r2:${R2_BUCKET}/${R2_PREFIX}/"
+                  rclone delete --min-age {{ .Values.backup.retention }} "r2:${R2_BUCKET}/${R2_PREFIX}/"
+
+                  echo "Backup complete: ${R2_PATH}"
+              env:
+                # Galaxy literal -- the R2 object prefix is namespaced per
+                # galaxy so a future sibling tree can back up to the same
+                # bucket without key collisions.
+                - name: GALAXY
+                  value: {{ .Values.backup.galaxy | quote }}
+                # pg_dumpall connects as the postgres superuser and so
+                # captures BOTH tenant databases (artemis + hatchet) plus
+                # the roles on the shared instance in one logical dump.
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: POSTGRES_PASSWORD
+                - name: R2_BUCKET
+                  value: {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
+                # rclone reads remote `r2` from RCLONE_CONFIG_R2_* env vars;
+                # RCLONE_CONFIG=/dev/null refuses any on-disk rclone.conf
+                # so the readOnlyRootFilesystem securityContext holds.
+                - name: RCLONE_CONFIG
+                  value: /dev/null
+                - name: RCLONE_CONFIG_R2_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_R2_PROVIDER
+                  value: Cloudflare
+                - name: RCLONE_CONFIG_R2_ACL
+                  value: private
+                - name: RCLONE_CONFIG_R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: R2_ENDPOINT
+                - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: R2_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: R2_SECRET_ACCESS_KEY
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                # /tmp is writable scratch for the pg_dumpall output before
+                # the gzipped dump streams to R2. emptyDir tmpfs keeps the
+                # secret-laden plaintext off the node disk + dies with the
+                # pod.
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: {{ .Values.backup.tmpSizeLimit }}
+{{- end }}

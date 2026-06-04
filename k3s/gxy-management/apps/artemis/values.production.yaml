@@ -72,3 +72,9 @@ networkPolicy:
 # above must be an artemis build that contains the durable-exec code.
 postgres:
   enabled: true
+
+# Nightly logical backup of the shared PG instance (both tenant DBs)
+# to R2 with a 7-day prune. Reuses the artemis env secret for the PG
+# superuser password + R2 creds. See chart values.yaml `backup:` block.
+backup:
+  enabled: true

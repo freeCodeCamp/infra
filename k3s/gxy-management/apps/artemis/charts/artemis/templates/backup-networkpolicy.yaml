@@ -1,0 +1,51 @@
+{{- if and .Values.networkPolicy.enabled .Values.postgres.enabled .Values.backup.enabled }}
+# Egress policy for the backup CronJob pod. The main artemis
+# CiliumNetworkPolicy selects only `component: deploy-proxy`, so the
+# backup pod (`component: backup`) needs its own egress allowance:
+# cluster DNS (Cilium DNS proxy) for R2 FQDN resolution, TCP :5432 to
+# the in-namespace shared Postgres, and TCP :443 to the R2 S3 endpoint.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: backup
+  egress:
+    # DNS -- Cilium DNS proxy on kube-dns. L7 rules:dns block required
+    # so the toFQDNs entry below is populated (otherwise FQDN egress
+    # silently drops with empty IP set).
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.r2.cloudflarestorage.com"
+    # R2 -- admin S3 endpoint (account-scoped subdomain).
+    - toFQDNs:
+        - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    # Bundled Postgres (intra-namespace, shared instance).
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/component": postgresql
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+{{- end }}

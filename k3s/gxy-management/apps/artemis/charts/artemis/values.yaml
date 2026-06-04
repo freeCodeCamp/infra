@@ -219,3 +219,39 @@ postgres:
     limits:
       cpu: "1"
       memory: 512Mi
+
+# ---------------------------------------------------------------------
+# Backup CronJob (ADR-019 stateful floor). Logical pg_dumpall of the
+# shared instance (both tenant DBs: artemis + hatchet) gzipped and
+# pushed to R2, with a 7-day prune. Gated on postgres.enabled AND
+# backup.enabled so deploy-only (stateless) deployments stay no-op.
+# REUSES the artemis env secret ({{ .Release.Name }}-env-secret) for
+# POSTGRES_PASSWORD + R2 creds -- no separate backup secret is minted.
+# Mirrors the windmill precedent (manifests/base/backup-cronjob.yaml)
+# on schedule, history limits, concurrency, and the postgres-rclone
+# image.
+# ---------------------------------------------------------------------
+backup:
+  enabled: false
+  # postgres-rclone image -- pg_dumpall + rclone in one run-once-and-die
+  # rootfs. Digest-pinned; build is workflow_dispatch-only on the
+  # postgres-rclone repo (see docs/runbooks/06-windmill-pg-backup.md).
+  image: ghcr.io/freecodecamp/postgres-rclone@sha256:294e8b276ee23b44f6a16bcef6239f55e4e93ecad7372af7a079650f8a6583e5
+  schedule: "0 2 * * *"
+  # rclone --min-age threshold for the prune step (objects older than
+  # this under the artemis/<galaxy>/ R2 prefix are deleted post-upload).
+  retention: 7d
+  # Galaxy literal -- namespaces the R2 object prefix (artemis/<galaxy>/)
+  # so a sibling galaxy can share the bucket without key collisions.
+  galaxy: gxy-management
+  activeDeadlineSeconds: 1800
+  # emptyDir tmpfs sizeLimit for the /tmp dump scratch. Raise if the
+  # gzipped logical dump approaches this ceiling.
+  tmpSizeLimit: 512Mi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
