@@ -79,7 +79,7 @@ sops -d --input-type dotenv --output-type dotenv "$SOT" > "$TMP_DOT"
   echo "secretEnv:"
   while IFS='=' read -r KEY VAL; do
     case "$KEY" in
-      R2_ENDPOINT|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|GH_CLIENT_ID|JWT_SIGNING_KEY)
+      R2_ENDPOINT|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|GH_CLIENT_ID|JWT_SIGNING_KEY|VALKEY_PASSWORD|POSTGRES_PASSWORD|ARTEMIS_DB_PASSWORD|HATCHET_DB_PASSWORD)
         ESC=$(printf '%s' "$VAL" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
         printf '  %s: "%s"\n' "$KEY" "$ESC"
         ;;
@@ -94,6 +94,8 @@ echo "Sealed $TGT"
 ```
 
 No TLS material — CF Flexible SSL on `freecode.camp` (see §2).
+
+The glob seals nine keys. The first six (`R2_*`, `GH_CLIENT_ID`, `JWT_SIGNING_KEY`, `VALKEY_PASSWORD`) are the always-required deploy-proxy secrets. The last three (`POSTGRES_PASSWORD`, `ARTEMIS_DB_PASSWORD`, `HATCHET_DB_PASSWORD`) are durable-execution secrets the chart hard-requires once `postgres.enabled` is true — the `secret-env.yaml` template wraps them in `{{- if .Values.postgres.enabled }}` `required` guards, so a missing key fails the helm upgrade with `.Values.secretEnv.<KEY> is required when postgres.enabled`. Add all three to the dotenv SOT (`management/artemis.env.enc`) before sealing if you are deploying the durable-exec profile (production overlay flips `postgres.enabled: true`). `HATCHET_CLIENT_TOKEN` is NOT sealed here at mint time — it is minted from the live Hatchet engine in stage-2 (see §Staged durable-exec bootstrap).
 
 After it succeeds, commit the new `.enc` from infra-secrets:
 
@@ -150,6 +152,82 @@ The generic `deploy` recipe smart-dispatches on `apps/<app>/`:
 1. Runs `helm upgrade --install` into the `artemis` namespace.
 
 Optional: `kubectl -n artemis rollout status deploy/artemis --timeout=120s`.
+
+## Staged durable-exec bootstrap
+
+The durable-execution substrate (bundled Postgres + Hatchet engine, ADR-020) comes up in two stages so the migration runner and the GC worker are never racing an un-deployed engine. The chart gates each stage on a single value:
+
+| Stage | `postgres.enabled` | `env.HATCHET_ADDR` | `secretEnv.HATCHET_CLIENT_TOKEN` | What runs                                                                                     |
+| ----- | ------------------ | ------------------ | -------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1     | `true`             | unset (`""`)       | unset                            | PG StatefulSet up, artemis migrations applied, GC **wired but dormant** — no worker, no relay |
+| 2     | `true`             | engine gRPC addr   | sealed engine token              | worker + outbox relay live; retention GC executes                                             |
+
+The production overlay (`apps/artemis/values.production.yaml`) ships `postgres.enabled: true` with `env.HATCHET_ADDR` left at the chart default (empty). That is **stage 1 by construction** — a first `just release gxy-management artemis` against the durable-exec image brings up PG, runs migrations, and leaves the worker dormant.
+
+### Stage 1 — Postgres up, migrations applied, worker dormant
+
+Preconditions: the three durable-exec passwords sealed in the overlay (§5 glob), and the production overlay image pinned to a durable-exec artemis build (the `0.8.0` pin predates durable-exec — see the RELEASE-CUT CHECKLIST below).
+
+```bash
+cd ~/DEV/fCC/infra
+just release gxy-management artemis
+kubectl -n artemis rollout status statefulset/artemis-postgresql --timeout=120s
+kubectl -n artemis rollout status deploy/artemis --timeout=120s
+```
+
+Confirm PG is up and the two tenant databases + roles were bootstrapped by the init ConfigMap (`postgres-init-configmap.yaml`):
+
+```bash
+kubectl -n artemis exec statefulset/artemis-postgresql -- \
+  psql -U postgres -c '\l' | grep -E 'artemis|hatchet'
+```
+
+Expect both `artemis` and `hatchet` databases owned by their like-named roles.
+
+Confirm migrations applied and the worker stayed dormant via the artemis pod logs:
+
+```bash
+kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
+  | grep -E 'postgres: connected, migrations applied|gc: wired|worker: starting|outbox relay: started'
+```
+
+Stage-1 expectation: `postgres: connected, migrations applied` and `gc: wired` appear; `worker: starting` and `outbox relay: started` do **NOT** (they are gated on a non-empty `HATCHET_ADDR`, `cmd/artemis/main.go`).
+
+`/readyz` semantics in stage 1: the readiness probe checks Valkey + R2 + Postgres. With PG up it returns `200 {"ready":true}`. If PG is unreachable while Valkey + R2 are fine, `/readyz` returns `200 {"ready":true,"degraded":true}` — the pod stays in the Service endpoints (deploy/serve still work; only GC is impaired). A `503` from `/readyz` means Valkey or R2 is down, not Postgres (`internal/handler/readyz.go`).
+
+### Stage 2 — deploy the Hatchet engine, wire the worker
+
+Once the Hatchet engine is deployed into the `artemis` namespace (operator step, sharing the bundled PG `hatchet` tenant — out of this chart's scope) and a client token has been minted from it:
+
+1. Add the minted `HATCHET_CLIENT_TOKEN` to the dotenv SOT and re-seal the overlay (re-run §5 — the token rides in `secretEnv.HATCHET_CLIENT_TOKEN`, rendered by `secret-env.yaml` only when present).
+
+1. Set `env.HATCHET_ADDR` in `values.production.yaml` to the engine Service's gRPC address. The port MUST match `hatchet.grpcPort` in the chart (default `7077`) and the deployed engine Service — verify against the deployed chart (hatchet-stack has shipped both `:7070` and `:7077`):
+
+   ```yaml
+   env:
+     HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"
+   ```
+
+1. Re-release and confirm the worker + relay came up:
+
+   ```bash
+   just release gxy-management artemis
+   kubectl -n artemis rollout status deploy/artemis --timeout=120s
+   kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
+     | grep -E 'worker: starting|outbox relay: started'
+   ```
+
+Stage-2 expectation: both `worker: starting addr=<HATCHET_ADDR>` and `outbox relay: started` now appear.
+
+## RELEASE-CUT CHECKLIST (durable-exec cutover)
+
+Run once when cutting the gxy-management artemis over from the stateless (deploy-only) profile to the durable-exec profile. Both items are hard gates — skipping either fails the helm upgrade or boots a worker against the wrong image.
+
+1. **Seal the durable-exec passwords in the overlay.** Add `POSTGRES_PASSWORD`, `ARTEMIS_DB_PASSWORD`, and `HATCHET_DB_PASSWORD` to the dotenv SOT (`infra-secrets/management/artemis.env.enc`), then re-run the §5 mint block (its case-glob now seals all three). The chart hard-requires them when `postgres.enabled` — `secret-env.yaml` fails the upgrade with `.Values.secretEnv.HATCHET_DB_PASSWORD is required when postgres.enabled` if the overlay is missing the key. `DATABASE_URL` is auto-constructed from `ARTEMIS_DB_PASSWORD` unless set explicitly; `HATCHET_CLIENT_TOKEN` is sealed later in stage 2, not now.
+
+1. **Bump the image pin off `0.8.0`.** The current `values.production.yaml` pin (`0.8.0@sha256:...`) is the **pre-durable-exec** release — it does not contain the migration runner, GC wiring, or the Hatchet worker. Bump `image.tag` (and the `# release:` comment) to the new durable-exec release per the [§Image update](#image-update-deploy-new-artemis-release) procedure — resolve the digest, pin `X.Y.Z@sha256:<digest>`, commit. A `postgres.enabled` release on the `0.8.0` image brings up PG but the pod never runs migrations or wires GC.
+
+After both land, run the staged bootstrap above (stage 1, then stage 2).
 
 ## Verify
 
@@ -280,19 +358,25 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 
 ## Failure modes
 
-| Symptom                                                           | Likely cause                                 | Action                                                               |
-| ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------- |
-| `Error unmarshalling input json: invalid character '#'` from sops | dotenv decrypted without explicit type flags | use the canonical incantation in §4                                  |
-| Helm fail with `.Values.secretEnv.X is required`                  | sops overlay missing key                     | re-run §5 mint block (paste-once)                                    |
-| `whoami` lists no sites on a freshly bootstrapped cluster         | Valkey registry not yet seeded               | `universe sites register <slug> --team <team>` per §6 bootstrap      |
-| 503 on `uploads.freecode.camp/healthz`                            | Gateway not bound; HTTPRoute not picked up   | `kubectl -n artemis describe gateway,httproute` — check Traefik logs |
-| 502 / "no available server" via CF                                | CF zone SSL = Strict + origin no cert        | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)   |
-| ERR_SSL_PROTOCOL_ERROR in browser                                 | CF zone SSL = Off                            | set CF zone SSL to Flexible                                          |
-| 429 on bulk upload                                                | rate-limit middleware tripped                | tune `rateLimit.average` / `.burst` in `values.production.yaml`      |
+| Symptom                                                                                  | Likely cause                                   | Action                                                                                                     |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Error unmarshalling input json: invalid character '#'` from sops                        | dotenv decrypted without explicit type flags   | use the canonical incantation in §4                                                                        |
+| Helm fail with `.Values.secretEnv.X is required`                                         | sops overlay missing key                       | re-run §5 mint block (paste-once)                                                                          |
+| Helm fail with `.Values.secretEnv.HATCHET_DB_PASSWORD is required when postgres.enabled` | durable-exec password not sealed               | RELEASE-CUT CHECKLIST item 1 — seal the three PG passwords, re-run §5                                      |
+| PG StatefulSet up but no migrations + GC never wired                                     | image pinned to pre-durable-exec `0.8.0`       | RELEASE-CUT CHECKLIST item 2 — bump image off `0.8.0`                                                      |
+| Worker stays dormant after stage 2 (no `worker: starting` log)                           | `env.HATCHET_ADDR` empty or engine unreachable | set `HATCHET_ADDR` in `values.production.yaml`; verify engine Service gRPC port matches `hatchet.grpcPort` |
+| `whoami` lists no sites on a freshly bootstrapped cluster                                | Valkey registry not yet seeded                 | `universe sites register <slug> --team <team>` per §6 bootstrap                                            |
+| 503 on `uploads.freecode.camp/healthz`                                                   | Gateway not bound; HTTPRoute not picked up     | `kubectl -n artemis describe gateway,httproute` — check Traefik logs                                       |
+| 502 / "no available server" via CF                                                       | CF zone SSL = Strict + origin no cert          | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)                                         |
+| ERR_SSL_PROTOCOL_ERROR in browser                                                        | CF zone SSL = Off                              | set CF zone SSL to Flexible                                                                                |
+| 429 on bulk upload                                                                       | rate-limit middleware tripped                  | tune `rateLimit.average` / `.burst` in `values.production.yaml`                                            |
 
 ## Cross-references
 
 - ADR-016 — Universe deploy proxy
+- ADR-020 — durable-execution model (Hatchet engine, retention GC substrate)
+- ADR-019 §Stateful-pillar backup pattern — RPO/RTO floor for the bundled PG
+- `~/DEV/fCC/artemis/docs/design/0001-durable-execution-model.md` — staged bootstrap rationale (M1 bundled PG)
 - `~/DEV/fCC/artemis/RELEASING.md` — artemis-side release flow (cut, tag, CHANGELOG, push)
 - `~/DEV/fCC-U/Architecture/spike/field-notes/infra.md` §2026-04-26 build-residency, §2026-04-27 RUN-residency clause
 - `~/DEV/fCC-U/Architecture/decisions/009-...` — Tailscale Operator rejected
@@ -300,6 +384,7 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — E2E post-deploy gate
 - [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops dotenv decrypt
 - [`05-r2-keys-rotation.md`](05-r2-keys-rotation.md) — R2 admin key rotation
+- [`08-artemis-pg-restore-drill.md`](08-artemis-pg-restore-drill.md) — PG backup restore drill (RPO/RTO floor)
 - `infra/CLAUDE.md` §Secrets
 - `infra/k3s/gxy-management/apps/artemis/README.md`
 - `infra/scripts/phase5-proxy-smoke.sh`

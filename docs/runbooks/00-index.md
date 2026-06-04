@@ -13,6 +13,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 05  | [05-r2-keys-rotation.md](05-r2-keys-rotation.md)                           | Operator  | Rotate artemis-admin or caddy-ro R2 key    |
 | 06  | [06-windmill-pg-backup.md](06-windmill-pg-backup.md)                       | Operator  | Verify, take, or restore windmill PG       |
 | 07  | [07-artemis-registry-restore.md](07-artemis-registry-restore.md)           | Operator  | Rebuild artemis registry after Valkey wipe |
+| 08  | [08-artemis-pg-restore-drill.md](08-artemis-pg-restore-drill.md)           | Operator  | Rehearse artemis-PG restore from R2 backup |
 
 ## Reading order by scenario
 
@@ -26,6 +27,8 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 
 **Recover artemis registry (Valkey wipe):** 07 (RDB-restore path or universe-cli replay against R2-derived site list; links to 02 + 04 internally).
 
+**Rehearse artemis-PG restore (durable-exec DR):** 08 (pull newest R2 dump, restore into scratch PG, row-count sanity, RPO/RTO statement; links to 02 + 03 + 04 + 06 internally).
+
 ## Block ordering rationale
 
 | Block | Files | Why grouped                                       |
@@ -35,10 +38,11 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 04–05 | 04–05 | Foundations consumed by 02/03 (secrets + R2 keys) |
 | 06    | 06    | Backup / DR for windmill PG (calls 04 internally) |
 | 07    | 07    | Backup / DR for artemis registry (calls 02 + 04)  |
+| 08    | 08    | Backup / DR for artemis PG (calls 02 + 03 + 04)   |
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
-Slots `08`, `09` reserved for future runbooks. Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook.
+Slot `09` reserved for future runbooks. Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook and slot `08` for the artemis-PG restore drill.
 
 ## Cross-doc references
 
