@@ -61,6 +61,18 @@ spec:
             # Writable tmp for read-only-root-fs Go binary scratch.
             - name: tmp
               mountPath: /tmp
+          startupProbe:
+            # Gates liveness/readiness until the HTTP server is up.
+            # Boot blocks on the PG connect retry window (45s default,
+            # PG_CONNECT_RETRY_WINDOW) + migrations + registry import;
+            # without this gate the liveness probe kills the pod at
+            # ~30s, truncating the retry and re-creating the Sentry
+            # boot-race fatal it exists to absorb (dossier T32).
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 18
           livenessProbe:
             # /healthz is the unconditional liveness probe — no upstream
             # calls, can never go red on a Valkey/R2 outage.
