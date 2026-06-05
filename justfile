@@ -509,7 +509,7 @@ verify-artemis:
     cd "$ARTEMIS_REPO"
     ARTEMIS_URL="$ARTEMIS_URL" GH_TOKEN="$GH_TOKEN" \
       SITE="$SITE" ROOT_DOMAIN="$ROOT_DOMAIN" \
-      make integration
+      just integration
 
 # Caddy cluster-side health on cassiopeia: chart pods 3/3, Gateway +
 # HTTPRoute programmed, e2e curl against a probe site.

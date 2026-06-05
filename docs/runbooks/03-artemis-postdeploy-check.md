@@ -36,7 +36,7 @@ That's it. The recipe:
 1. Curls `${ARTEMIS_URL}/healthz` (default `https://uploads.freecode.camp`)
 1. Resolves a GH token via `${GH_TOKEN}` or `gh auth token`
 1. Shells into `${ARTEMIS_REPO}` (default `$HOME/DEV/fCC/artemis`)
-1. Runs `make integration` — the Go E2E suite
+1. Runs `just integration` — the Go E2E suite
 
 Expected wall time: 2–5 minutes (production-alias SLO is 2 min per D38).
 
@@ -100,7 +100,7 @@ Edge cases:
 
 ## Pass criteria
 
-- `make integration` exits 0
+- `just integration` exits 0
 - Setup log: `[setup] healthz green at <ARTEMIS_URL>` and `[setup] captured baseline: site=test deployId=<id>`
 - Final test line: `OK — full deploy flow green for site=test deployId=<id>`
 - Teardown log: `[teardown] restored prod alias: site=test deployId=<id>`
@@ -180,7 +180,7 @@ Expect the nightly CronJob (`schedule: 0 2 * * *`). Full backup verify + restore
 ## Related
 
 - `internal/integration/doc.go` — full env-var contract
-- `make integration-help` (run inside artemis repo) — same as above, terse
+- `just integration-help` (run inside artemis repo) — same as above, terse
 - ADR-016 (`Universe/decisions/016-deploy-proxy.md`) — design rationale, SLOs (Q6, D38)
 - ADR-020 — durable-execution model (the Postgres + Hatchet substrate this section checks)
 - [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) §Staged durable-exec bootstrap — the deploy procedure this verifies
