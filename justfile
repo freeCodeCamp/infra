@@ -416,7 +416,7 @@ verify-manifests version="1.32.0":
       -schema-location "{{ crds_schema }}"
     )
     for entry in \
-      "gxy-management:artemis:--set,secretEnv.R2_ENDPOINT=x,--set,secretEnv.R2_ACCESS_KEY_ID=x,--set,secretEnv.R2_SECRET_ACCESS_KEY=x,--set,secretEnv.GH_CLIENT_ID=x,--set,secretEnv.JWT_SIGNING_KEY=x,--set,secretEnv.VALKEY_PASSWORD=x" \
+      "gxy-management:artemis:--set,secretEnv.R2_ENDPOINT=x,--set,secretEnv.R2_ACCESS_KEY_ID=x,--set,secretEnv.R2_SECRET_ACCESS_KEY=x,--set,secretEnv.GH_CLIENT_ID=x,--set,secretEnv.JWT_SIGNING_KEY=x,--set,secretEnv.VALKEY_PASSWORD=x,--set,secretEnv.POSTGRES_PASSWORD=x,--set,secretEnv.ARTEMIS_DB_PASSWORD=x,--set,secretEnv.HATCHET_DB_PASSWORD=x" \
       "gxy-management:valkey:--set,secretEnv.VALKEY_PASSWORD=x" \
       "gxy-cassiopeia:caddy:--set,r2.accessKeyId=x,--set,r2.secretAccessKey=y,--set,r2.bucket=z,--set,r2.endpoint=https://example" \
       ; do
