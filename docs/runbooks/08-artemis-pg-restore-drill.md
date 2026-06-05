@@ -93,8 +93,12 @@ cd $HOME/DEV/fCC/infra/k3s/gxy-management
 export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
 
 SCRATCH=artemis-restore-drill
+# The artemis namespace enforces PodSecurity `restricted`; a bare
+# `kubectl run` is rejected. The overrides satisfy the profile —
+# uid/gid 70 = the postgres user in the alpine image.
 kubectl -n artemis run "$SCRATCH" --image=postgres:16-alpine --restart=Never \
-  --env=POSTGRES_PASSWORD=drill-only-throwaway
+  --env=POSTGRES_PASSWORD=drill-only-throwaway \
+  --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":70,"runAsGroup":70,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"artemis-restore-drill","image":"postgres:16-alpine","env":[{"name":"POSTGRES_PASSWORD","value":"drill-only-throwaway"}],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}'
 kubectl -n artemis wait --for=condition=Ready "pod/${SCRATCH}" --timeout=120s
 
 # Copy the verified dump in and replay it as the superuser. The dump is
@@ -131,7 +135,8 @@ Pass criteria:
 
 - Both `artemis` and `hatchet` databases listed by `\l`.
 - All six artemis tables resolve (no `relation does not exist`) — proves the schema restored.
-- `sites` and `deploys` counts are non-zero and roughly match the live registry size on a populated cluster (cross-check against `universe sites ls --json | jq '.count'`). On a freshly bootstrapped cluster zeros are acceptable — the gate is that the tables exist and the dump replayed.
+- `sites` count is non-zero and roughly matches the live registry size on a populated cluster (cross-check against `universe sites ls --json | jq '.count'`). On a freshly bootstrapped cluster zeros are acceptable — the gate is that the tables exist and the dump replayed.
+- `deploys` is EXPECTED to be zero until the T24 backfill has run and the stage-2 worker is live — the deploy hot path never writes PG (design 0001 §M1 "deploy hot path untouched"); the index populates asynchronously. `outbox` non-zero at stage-1 is likewise expected (site.changed events accumulate until the relay starts).
 
 If a table is missing or `\l` shows only one database, the dump is partial — treat the artefact as unusable and force a fresh nightly run.
 
