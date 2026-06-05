@@ -35,4 +35,8 @@ data:
   # relay when this is non-empty. Stage-1 deploy leaves it blank so the PG
   # (and the hatchet tenant db) comes up first.
   HATCHET_ADDR:                 {{ .Values.env.HATCHET_ADDR | quote }}
+  # Read by the Hatchet Go SDK directly from pod env (artemis config
+  # does not parse it). SDK default is "tls"; the in-cluster engine
+  # serves plaintext gRPC (SERVER_GRPC_INSECURE) — runbook 09 §D.
+  HATCHET_CLIENT_TLS_STRATEGY:  {{ default "none" .Values.env.HATCHET_CLIENT_TLS_STRATEGY | quote }}
   {{- end }}
