@@ -72,6 +72,7 @@ spec:
               path: /healthz
               port: http
             periodSeconds: 5
+            timeoutSeconds: 2
             failureThreshold: 18
           livenessProbe:
             # /healthz is the unconditional liveness probe — no upstream
