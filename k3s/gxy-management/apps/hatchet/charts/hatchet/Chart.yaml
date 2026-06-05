@@ -1,0 +1,11 @@
+apiVersion: v2
+name: hatchet
+description: >-
+  Hatchet durable-execution engine for artemis (ADR-020). Engine-only
+  footprint (no api/dashboard): gRPC server for the artemis Go SDK
+  worker, sharing the artemis-bundled Postgres "hatchet" tenant.
+  Engine image tag MUST stay in lockstep with the artemis go.mod
+  hatchet module version (monorepo single-tag releases).
+type: application
+version: 0.1.0
+appVersion: "0.88.6"

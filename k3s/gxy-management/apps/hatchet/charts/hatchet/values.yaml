@@ -1,0 +1,79 @@
+# ---------------------------------------------------------------------
+# Hatchet engine for artemis durable execution (ADR-020, artemis design
+# 0001). Deploys INTO the artemis namespace, sharing the artemis
+# bundled Postgres "hatchet" tenant (provisioned by the artemis chart's
+# postgres-init-configmap). Engine-only footprint: no hatchet-api, no
+# dashboard — the artemis Go SDK worker talks gRPC straight to the
+# engine, tokens are minted in-cluster by the bootstrap jobs.
+#
+# VERSION LOCKSTEP: image tags MUST match the hatchet module version in
+# artemis go.mod (monorepo: one git tag builds engine + migrate + admin
+# images AND the Go SDK). Bump together, never independently.
+# ---------------------------------------------------------------------
+namespace: artemis
+
+images:
+  # Digest-pin at release time (tags float). All three MUST carry the
+  # same version.
+  engine: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.88.6
+  migrate: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.88.6
+  admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6
+
+engine:
+  replicas: 1
+  # gRPC contract: 7077 everywhere — artemis values hatchet.grpcPort,
+  # the artemis egress netpol, HATCHET_ADDR, and upstream's own
+  # docker-compose.release.yml all use 7077. The engine BINARY default
+  # is 7070 (pkg/config/server/server.go ConfigFileRuntime.GRPCPort),
+  # so SERVER_GRPC_PORT is set explicitly in the deployment.
+  grpcPort: 7077
+  # Engine healthcheck sidecar-port (pkg/config/server default 8733,
+  # endpoints /live /ready). Requires the literal "health" service
+  # token in SERVER_SERVICES — HasService() is an exact string match,
+  # "all" does NOT imply it (cmd/hatchet-engine/engine/run.go:161).
+  healthPort: 8733
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      # No CPU limit: Go GC degrades under hard CPU throttling.
+      memory: 1Gi
+
+# Bootstrap secrets written in-cluster by hatchet-admin (k8s
+# quickstart): SERVER_AUTH_COOKIE_SECRETS + the three encryption
+# keysets land in `keysetSecretName`; the worker token lands in
+# `tokenSecretName` (key HATCHET_CLIENT_TOKEN). Keysets are generated
+# ONCE and reused on re-runs (quickstart only generates missing keys,
+# no --overwrite) — regenerating keysets would invalidate every issued
+# worker token.
+bootstrap:
+  keysetSecretName: hatchet-config
+  tokenSecretName: hatchet-client-config
+
+# DATABASE_URL for the shared-instance hatchet tenant, e.g.
+#   postgres://hatchet:<HATCHET_DB_PASSWORD>@artemis-postgresql.artemis.svc.cluster.local:5432/hatchet?sslmode=disable
+# Carries the DB password -> supplied ONLY via the sops-encrypted
+# overlay (infra-secrets), never in plain values.
+secretEnv:
+  DATABASE_URL: ""
+
+networkPolicy:
+  enabled: true
+  postgresPort: 5432
+
+# Restricted-PSS pod defaults. Upstream images run as root (no USER in
+# build/package/servers.dockerfile) — the static Go binaries tolerate
+# an arbitrary non-root uid, enforced here.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

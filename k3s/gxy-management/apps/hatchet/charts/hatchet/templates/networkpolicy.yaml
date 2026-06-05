@@ -1,0 +1,88 @@
+{{- if .Values.networkPolicy.enabled }}
+# Engine: ingress = artemis deploy-proxy gRPC only; egress = shared
+# Postgres + cluster DNS. The artemis chart's postgres netpol admits
+# any same-namespace pod on 5432, so no change needed on that side.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-engine
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- include "hatchet.engineSelectorLabels" . | nindent 6 }}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/name": artemis
+            "k8s:app.kubernetes.io/component": deploy-proxy
+      toPorts:
+        - ports:
+            - port: {{ .Values.engine.grpcPort | quote }}
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              # Cilium DNS matchPattern wildcards do NOT cross dots —
+              # in-cluster idiom mirrors the artemis chart (B9).
+              - matchPattern: "*.*.svc.cluster.local"
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/component": postgresql
+      toPorts:
+        - ports:
+            - port: {{ .Values.networkPolicy.postgresPort | quote }}
+              protocol: TCP
+---
+# Bootstrap jobs: kube-apiserver (hatchet-admin k8s writes Secrets),
+# shared Postgres (migrate/seed/token), cluster DNS.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: hatchet-engine
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: bootstrap
+  egress:
+    - toEntities:
+        - kube-apiserver
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.*.svc.cluster.local"
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/component": postgresql
+      toPorts:
+        - ports:
+            - port: {{ .Values.networkPolicy.postgresPort | quote }}
+              protocol: TCP
+{{- end }}

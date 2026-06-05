@@ -1,0 +1,42 @@
+# ServiceAccount for the bootstrap + token jobs. hatchet-admin's k8s
+# subcommands write the generated keysets/token into Secrets via the
+# in-cluster API (cmd/hatchet-admin/cli/k8s.go) — namespace-scoped
+# secret RW only, no other verbs.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-bootstrap
+    namespace: {{ .Values.namespace }}

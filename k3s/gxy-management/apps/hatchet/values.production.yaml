@@ -1,0 +1,12 @@
+# Production overlay for the hatchet engine (artemis namespace).
+# secretEnv.DATABASE_URL comes from the sops-encrypted overlay in
+# infra-secrets (k3s/gxy-management/hatchet.values.yaml.enc) — it
+# carries HATCHET_DB_PASSWORD. Shape:
+#   secretEnv:
+#     DATABASE_URL: "postgres://hatchet:<password>@artemis-postgresql.artemis.svc.cluster.local:5432/hatchet?sslmode=disable"
+namespace: artemis
+
+images:
+  engine: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.88.6
+  migrate: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.88.6
+  admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6

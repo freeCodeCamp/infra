@@ -1,0 +1,20 @@
+# Service name "hatchet-engine" is load-bearing: it forms the
+# HATCHET_ADDR DNS name (hatchet-engine.artemis.svc.cluster.local:7077)
+# and the gRPC broadcast address baked into worker tokens.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hatchet-engine
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  type: ClusterIP
+  ports:
+    - name: grpc
+      port: {{ .Values.engine.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    {{- include "hatchet.engineSelectorLabels" . | nindent 4 }}

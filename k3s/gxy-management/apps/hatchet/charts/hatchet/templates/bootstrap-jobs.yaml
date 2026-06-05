@@ -1,0 +1,188 @@
+# Ordered pre-install/pre-upgrade hooks (weights), all idempotent:
+#   -10 quickstart — hatchet-admin k8s quickstart: generates
+#       SERVER_AUTH_COOKIE_SECRETS + 3 encryption keysets into the
+#       {{ .Values.bootstrap.keysetSecretName }} Secret. Generates ONLY
+#       missing keys (no --overwrite): keysets persist across releases,
+#       so issued worker tokens stay valid.
+#    -5 migrate — hatchet-migrate: schema migrations on the hatchet DB.
+#    -4 seed — hatchet-admin seed: creates the default tenant
+#       (707d0855-80ab-4e1f-a156-f1c4546cbf52, pkg/config/database
+#       default) if absent; token minting requires it.
+# Post-install/post-upgrade:
+#    +5 token — hatchet-admin k8s create-worker-token: mints
+#       HATCHET_CLIENT_TOKEN into {{ .Values.bootstrap.tokenSecretName }}.
+#       Operator copies it into the artemis env SOT (sops) for
+#       secretEnv.HATCHET_CLIENT_TOKEN.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-quickstart
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "hatchet.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      serviceAccountName: {{ .Release.Name }}-bootstrap
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: quickstart
+          image: {{ .Values.images.admin }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command:
+            - /hatchet/hatchet-admin
+            - k8s
+            - quickstart
+            - --resource-type=secret
+            - --resource-name={{ .Values.bootstrap.keysetSecretName }}
+            - --namespace={{ .Values.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "hatchet.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ .Values.images.migrate }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-env-secret
+                  key: DATABASE_URL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-seed
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "hatchet.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: seed
+          image: {{ .Values.images.admin }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command:
+            - /hatchet/hatchet-admin
+            - seed
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-env-secret
+                  key: DATABASE_URL
+          envFrom:
+            - secretRef:
+                name: {{ .Values.bootstrap.keysetSecretName }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-worker-token
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "hatchet.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      serviceAccountName: {{ .Release.Name }}-bootstrap
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker-token
+          image: {{ .Values.images.admin }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command:
+            - /hatchet/hatchet-admin
+            - k8s
+            - create-worker-token
+            - --resource-type=secret
+            - --resource-name={{ .Values.bootstrap.tokenSecretName }}
+            - --namespace={{ .Values.namespace }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-env-secret
+                  key: DATABASE_URL
+            # Token minting loads the server config; the gRPC broadcast
+            # address is baked into the token's grpc_broadcast_address
+            # claim, so it must match what workers dial.
+            - name: SERVER_GRPC_PORT
+              value: {{ .Values.engine.grpcPort | quote }}
+            - name: SERVER_GRPC_BROADCAST_ADDRESS
+              value: "hatchet-engine.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.engine.grpcPort }}"
+            - name: SERVER_GRPC_INSECURE
+              value: "true"
+            - name: SERVER_MSGQUEUE_KIND
+              value: postgres
+          envFrom:
+            - secretRef:
+                name: {{ .Values.bootstrap.keysetSecretName }}
