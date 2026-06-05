@@ -43,6 +43,7 @@ x-deploy-config: &deploy-config
     - PORT=3001
     - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     - LOG_LEVEL=${LOG_LEVEL:-info}
+    - DEBUG_SOCRATES=${DEBUG_SOCRATES:-false}
     # Redis (local — each app connects to co-located Redis via host gateway)
     - REDIS_URL=redis://host.docker.internal:6379
     # Authentication
