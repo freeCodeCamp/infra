@@ -32,6 +32,7 @@ spec:
           rules:
             dns:
               - matchPattern: "*.r2.cloudflarestorage.com"
+              - matchPattern: "*.cluster.local"
     # R2 -- admin S3 endpoint (account-scoped subdomain).
     - toFQDNs:
         - matchPattern: "*.r2.cloudflarestorage.com"
