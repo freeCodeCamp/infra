@@ -22,6 +22,7 @@ metadata:
   name: {{ .Release.Name }}-route
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 spec:
   parentRefs:
     - name: {{ .Release.Name }}-gateway

@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}-env
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 data:
   R2_BUCKET:                    {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
   GH_ORG:                       {{ required ".Values.env.GH_ORG is required" .Values.env.GH_ORG | quote }}

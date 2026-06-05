@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}-ratelimit
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 spec:
   rateLimit:
     # Average requests-per-second per source IP, sliding 1s window.

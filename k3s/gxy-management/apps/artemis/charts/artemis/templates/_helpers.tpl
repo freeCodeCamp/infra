@@ -22,7 +22,6 @@ helm.sh/chart: {{ include "artemis.chart" . }}
 {{ include "artemis.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-app.kubernetes.io/component: deploy-proxy
 app.kubernetes.io/part-of: universe-static-apps
 {{- end -}}
 

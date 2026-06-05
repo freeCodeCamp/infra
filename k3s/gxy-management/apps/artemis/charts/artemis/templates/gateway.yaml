@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}-gateway
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 spec:
   gatewayClassName: traefik
   # CF zone `freecode.camp` is on Flexible SSL (matches cassiopeia

@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 spec:
   type: {{ .Values.service.type }}
   ports:

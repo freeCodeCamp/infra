@@ -4,6 +4,7 @@ metadata:
   name: {{ .Values.namespace }}
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
     # PSS restricted — artemis pod runs as 1000:1000 non-root with
     # readOnlyRootFilesystem, RuntimeDefault seccomp, ALL caps dropped,
     # no privilege escalation. Matches valkey + caddy on the same plane.

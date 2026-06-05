@@ -4,6 +4,7 @@ metadata:
   name: {{ .Values.middlewares.secureHeaders }}
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 spec:
   headers:
     # CF terminates HTTPS at the edge (Flexible SSL on freecode.camp).

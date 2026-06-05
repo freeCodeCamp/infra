@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}-bodylimit
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deploy-proxy
 spec:
   buffering:
     maxRequestBodyBytes: {{ .Values.bodyLimit.maxRequestBodyBytes | default 1048576 | int64 }}
