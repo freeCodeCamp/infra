@@ -32,7 +32,11 @@ spec:
           rules:
             dns:
               - matchPattern: "*.r2.cloudflarestorage.com"
-              - matchPattern: "*.cluster.local"
+              # Cilium DNS matchPattern wildcards do NOT cross dots
+              # (`*` → regex `[^.]*`); mirror networkpolicy.yaml's
+              # in-cluster service idiom.
+              - matchName: "artemis-postgresql.artemis.svc.cluster.local"
+              - matchPattern: "*.*.svc.cluster.local"
     # R2 -- admin S3 endpoint (account-scoped subdomain).
     - toFQDNs:
         - matchPattern: "*.r2.cloudflarestorage.com"
