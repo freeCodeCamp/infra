@@ -14,3 +14,8 @@ spec:
       protocol: TCP
   selector:
     {{- include "artemis.selectorLabels" . | nindent 4 }}
+    # Component scope required: bare selectorLabels also match the
+    # postgres STS pod + backup Job pods (named-port resolution keeps
+    # them out of endpoints, but kubectl port-forward svc/ resolves to
+    # the wrong pod).
+    app.kubernetes.io/component: deploy-proxy

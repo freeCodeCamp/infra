@@ -10,6 +10,13 @@ spec:
   selector:
     matchLabels:
       {{- include "artemis.selectorLabels" . | nindent 6 }}
+      # KNOWN GAP — selector also matches postgres STS / backup Job
+      # pods (kubectl deploy/-targeted ops resolve wrong pod; HPA pod
+      # set would skew if ever enabled). Do NOT add the component
+      # label here: apps/v1 spec.selector is immutable and helm
+      # upgrade fails with "field is immutable". Fix = delete
+      # deployment --cascade=orphan + helm upgrade in a maintenance
+      # window (scheduled stage-2; dossier B12).
   template:
     metadata:
       labels:

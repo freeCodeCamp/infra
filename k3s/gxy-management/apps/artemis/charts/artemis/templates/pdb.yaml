@@ -11,4 +11,9 @@ spec:
   selector:
     matchLabels:
       {{- include "artemis.selectorLabels" . | nindent 6 }}
+      # Component scope required: bare selectorLabels also match the
+      # postgres STS pod + backup Job pods, letting a node drain evict
+      # every deploy-proxy pod while minAvailable is satisfied by
+      # postgres alone.
+      app.kubernetes.io/component: deploy-proxy
 {{- end }}
