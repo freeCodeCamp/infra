@@ -13,8 +13,8 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  # release: 1.1.0
-  tag: "1.1.0@sha256:6e57f0a35ef1e2a2c93db363911a4f7439a3753e72b39e120ceabbc3cf40cbcd"
+  # release: 1.1.1
+  tag: "1.1.1@sha256:6ee8b2879d351f6035c4163517dc24e4db2b4f8ef5eae731caa4280c7db3b97d"
   pullPolicy: IfNotPresent
 
 resources:
