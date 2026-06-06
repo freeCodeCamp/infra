@@ -64,8 +64,15 @@ spec:
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: bootstrap
   egress:
+    # kube-apiserver entity alone is unreliable on k3s: the embedded
+    # apiserver shares the node IP, so Cilium may classify the traffic
+    # as host/remote-node instead (no in-cluster precedent uses this
+    # entity). All three kept until live cilium-monitor evidence picks
+    # the real one — tighten in the cleanup sweep.
     - toEntities:
         - kube-apiserver
+        - host
+        - remote-node
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": kube-system

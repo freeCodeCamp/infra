@@ -2,6 +2,14 @@
 # subcommands write the generated keysets/token into Secrets via the
 # in-cluster API (cmd/hatchet-admin/cli/k8s.go) — namespace-scoped
 # secret RW only, no other verbs.
+#
+# Hook resources (weight -20): the quickstart Job is a pre-install
+# hook and pre-install hooks run BEFORE regular manifests — a plain
+# SA does not exist yet and pod creation fails with "serviceaccount
+# not found" (release 1 failure, 2026-06-06). before-hook-creation
+# (and no success-deletion) keeps them alive for the post-install
+# token job and recreates them on every upgrade. helm uninstall
+# orphans them — runbook 09 §E.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -10,6 +18,10 @@ metadata:
   labels:
     {{- include "hatchet.labels" . | nindent 4 }}
     app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -19,6 +31,10 @@ metadata:
   labels:
     {{- include "hatchet.labels" . | nindent 4 }}
     app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -32,6 +48,10 @@ metadata:
   labels:
     {{- include "hatchet.labels" . | nindent 4 }}
     app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

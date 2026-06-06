@@ -55,6 +55,10 @@ spec:
               value: postgres
             - name: SERVER_DEFAULT_ENGINE_VERSION
               value: V1
+            # Default-on phone-home to https://security.hatchet.run —
+            # egress CNP drops it (PG+DNS only); disable at source.
+            - name: SERVER_SECURITY_CHECK_ENABLED
+              value: "false"
             # "health" must be listed explicitly: HasService() is an
             # exact match, "all" does NOT enable the /live + /ready
             # server (cmd/hatchet-engine/engine/run.go:161).

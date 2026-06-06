@@ -50,6 +50,12 @@ spec:
             - --resource-type=secret
             - --resource-name={{ .Values.bootstrap.keysetSecretName }}
             - --namespace={{ .Values.namespace }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -86,6 +92,12 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-env-secret
                   key: DATABASE_URL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -128,6 +140,12 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.bootstrap.keysetSecretName }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -186,3 +204,9 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.bootstrap.keysetSecretName }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -27,6 +27,15 @@ secretEnv:
 
 ## B. Release
 
+If a previous release attempt FAILED (e.g. revision 1 on 2026-06-06 — hook-ordering bug, fixed since), clean up first; a failed pre-install means zero regular manifests were applied, so uninstall is side-effect-free:
+
+```
+helm -n artemis uninstall hatchet
+kubectl -n artemis delete jobs -l app.kubernetes.io/instance=hatchet
+```
+
+Then:
+
 ```
 just release gxy-management hatchet
 ```
@@ -73,5 +82,5 @@ kubectl -n artemis get secret hatchet-client-config -o jsonpath='{.data.HATCHET_
 ## E. Rollback
 
 - artemis side: unset `HATCHET_ADDR` → worker + relay gate off at next boot; deploys/registry unaffected (stage-1 posture).
-- engine side: `helm -n artemis uninstall hatchet` removes engine + netpols. Secrets `hatchet-config`/`hatchet-client-config` are cluster-side artifacts created by the jobs (not helm-owned) and survive uninstall — keep them unless keyset rotation is intended.
+- engine side: `helm -n artemis uninstall hatchet` removes engine + netpols. Secrets `hatchet-config`/`hatchet-client-config` are cluster-side artifacts created by the jobs (not helm-owned) and survive uninstall — keep them unless keyset rotation is intended. The hook resources (bootstrap SA/Role/RoleBinding, `hatchet-env-secret`) also survive uninstall (helm never garbage-collects hooks) — delete manually for full teardown.
 - Worker processes nothing destructive regardless: `CLEANUP_DRY_RUN` stays `true` until the SHIP7 cutover flip.
