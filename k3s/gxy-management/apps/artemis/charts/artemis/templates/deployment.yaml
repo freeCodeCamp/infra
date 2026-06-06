@@ -10,13 +10,13 @@ spec:
   selector:
     matchLabels:
       {{- include "artemis.selectorLabels" . | nindent 6 }}
-      # KNOWN GAP — selector also matches postgres STS / backup Job
-      # pods (kubectl deploy/-targeted ops resolve wrong pod; HPA pod
-      # set would skew if ever enabled). Do NOT add the component
-      # label here: apps/v1 spec.selector is immutable and helm
-      # upgrade fails with "field is immutable". Fix = delete
-      # deployment --cascade=orphan + helm upgrade in a maintenance
-      # window (scheduled stage-2; dossier B12).
+      # apps/v1 spec.selector is immutable — releasing this change
+      # over a live deployment fails with "field is immutable". MUST
+      # be preceded by `kubectl -n artemis delete deployment artemis
+      # --cascade=orphan`; the recreated deployment adopts the orphaned
+      # ReplicaSet (live RS labels verified to carry the component
+      # label — dossier B12). Runbook 02 stage-2 documents the window.
+      app.kubernetes.io/component: deploy-proxy
   template:
     metadata:
       labels:

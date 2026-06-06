@@ -52,6 +52,12 @@ env:
   LOG_LEVEL: "info"
   ENVIRONMENT: "production"
   SENTRY_TRACES_SAMPLE_RATE: "0.5"
+  # Stage-2 flip (2026-06-06): Hatchet engine live (hatchet chart,
+  # same namespace). Non-empty value boots the worker + outbox relay.
+  # Port 7077 = engine SERVER_GRPC_PORT + Service port; the configmap
+  # also emits HATCHET_CLIENT_TLS_STRATEGY=none alongside (in-cluster
+  # plaintext gRPC, SERVER_GRPC_INSECURE on the engine side).
+  HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"
 
 # Rate-limit tunables — Traefik Middleware (chart-internal). Per
 # source IP (CF-rewritten X-Forwarded-For depth=1).
@@ -67,9 +73,9 @@ networkPolicy:
   enabled: true
 
 # Bundled shared Postgres (retention-GC substrate). Enabling flips artemis
-# out of deploy-only; the worker + relay stay dormant until env.HATCHET_ADDR
-# is also set (left unset until the Hatchet engine is live). The image.tag
-# above must be an artemis build that contains the durable-exec code.
+# out of deploy-only; worker + relay boot because env.HATCHET_ADDR is set
+# (stage-2 flip 2026-06-06). The image.tag above must be an artemis build
+# that contains the durable-exec code.
 postgres:
   enabled: true
 
