@@ -13,8 +13,8 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  # release: 1.0.0
-  tag: "1.0.0@sha256:f1f6ee0aa6085272e335bfb31d1e3a45cee603e8e111e35a532efc31328858d3"
+  # release: 1.1.0
+  tag: "1.1.0@sha256:6e57f0a35ef1e2a2c93db363911a4f7439a3753e72b39e120ceabbc3cf40cbcd"
   pullPolicy: IfNotPresent
 
 resources:
@@ -58,6 +58,13 @@ env:
   # also emits HATCHET_CLIENT_TLS_STRATEGY=none alongside (in-cluster
   # plaintext gRPC, SERVER_GRPC_INSECURE on the engine side).
   HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"
+  # M4-live flip (2026-06-06): GC moves bytes for real. Tombstoned
+  # deploys sit in _trash/ for CLEANUP_RECOVERY_DAYS (7d default)
+  # before the purge cron hard-deletes — reversible window. Blast cap
+  # bounds any single gc-site run; plan larger than the cap aborts the
+  # run untouched (fail-safe direction).
+  CLEANUP_DRY_RUN: "false"
+  CLEANUP_BLAST_CAP: "10"
 
 # Rate-limit tunables — Traefik Middleware (chart-internal). Per
 # source IP (CF-rewritten X-Forwarded-For depth=1).
