@@ -201,6 +201,17 @@ spec:
               value: "true"
             - name: SERVER_MSGQUEUE_KIND
               value: postgres
+            # create-worker-token loads the FULL server config; the
+            # session store hard-requires a cookie domain
+            # (pkg/auth/cookie/sessionstore.go:116). Mirror the engine
+            # env block — upstream's release compose gives hatchet-admin
+            # the same env set as the engine.
+            - name: SERVER_AUTH_COOKIE_DOMAIN
+              value: "hatchet-engine.{{ .Values.namespace }}.svc.cluster.local"
+            - name: SERVER_AUTH_COOKIE_INSECURE
+              value: "true"
+            - name: SERVER_URL
+              value: "http://hatchet-engine.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.engine.healthPort }}"
           envFrom:
             - secretRef:
                 name: {{ .Values.bootstrap.keysetSecretName }}
