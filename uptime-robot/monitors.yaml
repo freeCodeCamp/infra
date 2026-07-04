@@ -1,7 +1,6 @@
 ---
-# Declarative Uptime Robot monitors — gxy-cassiopeia sites + artemis (gxy-management).
-# Applied via: `just configure-uptime-robot` (needs infra-secrets/uptime-robot/api.env.enc,
-# NOT provisioned as of 2026-07-04 — apply fails; artemis-uploads below is intent, not live).
+# Declarative Uptime Robot monitors for gxy-cassiopeia.
+# Applied via: `just uptime-robot-apply`
 #
 # Free tier: 50 monitors, 5-min interval. Contact names resolved to IDs by
 # the apply script; expected: "Platform Team — Google Chat".
@@ -23,21 +22,6 @@ monitors:
     description: >-
       Woodpecker API healthcheck. Alert on 2 consecutive
       failures (5m + 5m = 10m detection).
-
-  # ---------------------------------------------------------------------------
-  # artemis deploy-proxy — uploads.freecode.camp liveness (gxy-management)
-  # Primary EXTERNAL availability pager. In-cluster /metrics scrape is parked
-  # on gxy-backoffice (ADR-015 vmagent, ADR-018 epic 3), so this synthetic +
-  # Sentry are the live paging paths until that lands.
-  # ---------------------------------------------------------------------------
-  - name: artemis-uploads
-    type: https
-    url: https://uploads.freecode.camp/healthz
-    expected_status: [200]
-    description: >-
-      artemis static-apps deploy proxy liveness. /healthz is the public
-      external liveness probe (/readyz + /metrics return 404 externally by
-      design). Alert on 2 consecutive failures (5m + 5m = 10m detection).
 
   # ---------------------------------------------------------------------------
   # Per-site uptime — constellations on freecode.camp
@@ -78,7 +62,7 @@ monitors:
     # (T21). Deploy it as part of Phase 4 bring-up; document in T15 runbook.
 
 verification:
-  # After `just configure-uptime-robot`:
+  # After `just uptime-robot-apply`:
   # 1. Log in to UR dashboard; confirm each monitor shows status "Up".
   # 2. `curl https://stats.uptimerobot.com/<public-id>` returns monitor list.
   # 3. Synthetic canary-latency test: deploy a version of canary.freecode.camp
