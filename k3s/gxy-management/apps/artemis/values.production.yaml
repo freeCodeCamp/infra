@@ -61,8 +61,10 @@ env:
   # M4-live flip (2026-06-06): GC moves bytes for real. Tombstoned
   # deploys sit in _trash/ for CLEANUP_RECOVERY_DAYS (7d default)
   # before the purge cron hard-deletes — reversible window. Blast cap
-  # bounds any single gc-site run; plan larger than the cap aborts the
-  # run untouched (fail-safe direction).
+  # bounds any single gc-site run: a backlog larger than the cap reaps
+  # the oldest CLEANUP_BLAST_CAP deploys (moves bytes to _trash/ +
+  # tombstones) and reports outcome=capped — PARTIAL progress, not a
+  # no-op (artemis 86d0e75, v1.2.0).
   CLEANUP_DRY_RUN: "false"
   CLEANUP_BLAST_CAP: "10"
 
