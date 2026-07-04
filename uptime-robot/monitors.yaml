@@ -24,6 +24,21 @@ monitors:
       failures (5m + 5m = 10m detection).
 
   # ---------------------------------------------------------------------------
+  # artemis deploy-proxy — uploads.freecode.camp liveness (gxy-management)
+  # Primary EXTERNAL availability pager. In-cluster /metrics scrape is parked
+  # on gxy-backoffice (ADR-015 vmagent, ADR-018 epic 3), so this synthetic +
+  # Sentry are the live paging paths until that lands.
+  # ---------------------------------------------------------------------------
+  - name: artemis-uploads
+    type: https
+    url: https://uploads.freecode.camp/healthz
+    expected_status: [200]
+    description: >-
+      artemis static-apps deploy proxy liveness. /healthz is the public
+      external liveness probe (/readyz + /metrics return 404 externally by
+      design). Alert on 2 consecutive failures (5m + 5m = 10m detection).
+
+  # ---------------------------------------------------------------------------
   # Per-site uptime — constellations on freecode.camp
   # Add one entry per live constellation. For M1 launch, seed with test-site
   # used by Phase 4; expand as constellations migrate.
