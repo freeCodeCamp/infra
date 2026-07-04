@@ -1,6 +1,7 @@
 ---
-# Declarative Uptime Robot monitors for gxy-cassiopeia.
-# Applied via: `just uptime-robot-apply`
+# Declarative Uptime Robot monitors — gxy-cassiopeia sites + artemis (gxy-management).
+# Applied via: `just configure-uptime-robot` (needs infra-secrets/uptime-robot/api.env.enc,
+# NOT provisioned as of 2026-07-04 — apply fails; artemis-uploads below is intent, not live).
 #
 # Free tier: 50 monitors, 5-min interval. Contact names resolved to IDs by
 # the apply script; expected: "Platform Team — Google Chat".
@@ -77,7 +78,7 @@ monitors:
     # (T21). Deploy it as part of Phase 4 bring-up; document in T15 runbook.
 
 verification:
-  # After `just uptime-robot-apply`:
+  # After `just configure-uptime-robot`:
   # 1. Log in to UR dashboard; confirm each monitor shows status "Up".
   # 2. `curl https://stats.uptimerobot.com/<public-id>` returns monitor list.
   # 3. Synthetic canary-latency test: deploy a version of canary.freecode.camp
