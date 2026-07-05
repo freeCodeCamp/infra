@@ -162,11 +162,11 @@ The durable-execution substrate (bundled Postgres + Hatchet engine, ADR-020) com
 | 1     | `true`             | unset (`""`)       | unset                            | PG StatefulSet up, artemis migrations applied, GC **wired but dormant** — no worker, no relay |
 | 2     | `true`             | engine gRPC addr   | sealed engine token              | worker + outbox relay live; retention GC executes                                             |
 
-The production overlay (`apps/artemis/values.production.yaml`) ships `postgres.enabled: true` with `env.HATCHET_ADDR` left at the chart default (empty). That is **stage 1 by construction** — a first `just release gxy-management artemis` against the durable-exec image brings up PG, runs migrations, and leaves the worker dormant.
+**Current production state (gxy-management):** stage 2, fully live, since the 2026-06-06 cutover. The production overlay (`apps/artemis/values.production.yaml`) is pinned `v1.2.2` with `postgres.enabled: true`, `env.HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"`, and the sealed `HATCHET_CLIENT_TOKEN` — worker + outbox relay run, retention GC executes for real (`CLEANUP_DRY_RUN: "false"`, `CLEANUP_BLAST_CAP: "10"`), across `replicaCount: 3`. Stage 1 is a transient checkpoint gxy-management has already passed through — the two subsections below document the gate for a fresh galaxy bootstrap or a full DR rebuild, not gxy-management's day-2 posture.
 
 ### Stage 1 — Postgres up, migrations applied, worker dormant
 
-Preconditions: the three durable-exec passwords sealed in the overlay (§5 glob), and the production overlay image pinned to a durable-exec artemis build (the `0.8.0` pin predates durable-exec — see the RELEASE-CUT CHECKLIST below).
+Preconditions: the three durable-exec passwords sealed in the overlay (§5 glob), and the production overlay image pinned to a durable-exec-capable artemis build (>= `v1.0.0`; gxy-management's pre-cutover baseline was `0.8.0` — see the historical RELEASE-CUT CHECKLIST below).
 
 ```bash
 cd ~/DEV/fCC/infra
@@ -219,13 +219,13 @@ Once the Hatchet engine is deployed into the `artemis` namespace (operator step,
 
 Stage-2 expectation: both `worker: starting addr=<HATCHET_ADDR>` and `outbox relay: started` now appear.
 
-## RELEASE-CUT CHECKLIST (durable-exec cutover)
+## RELEASE-CUT CHECKLIST (durable-exec cutover — historical / DR-rebuild reference)
 
-Run once when cutting the gxy-management artemis over from the stateless (deploy-only) profile to the durable-exec profile. Both items are hard gates — skipping either fails the helm upgrade or boots a worker against the wrong image.
+gxy-management already cut over (stage 1 on 2026-06-05, stage 2 on 2026-06-06; current pin `v1.2.2`). This checklist is kept for standing up a fresh galaxy or a full DR rebuild from a stateless (deploy-only) baseline — not needed for day-2 ops on gxy-management. Both items are hard gates — skipping either fails the helm upgrade or boots a worker against the wrong image.
 
 1. **Seal the durable-exec passwords in the overlay.** Add `POSTGRES_PASSWORD`, `ARTEMIS_DB_PASSWORD`, and `HATCHET_DB_PASSWORD` to the dotenv SOT (`infra-secrets/management/artemis.env.enc`), then re-run the §5 mint block (its case-glob now seals all three). The chart hard-requires them when `postgres.enabled` — `secret-env.yaml` fails the upgrade with `.Values.secretEnv.HATCHET_DB_PASSWORD is required when postgres.enabled` if the overlay is missing the key. `DATABASE_URL` is auto-constructed from `ARTEMIS_DB_PASSWORD` unless set explicitly; `HATCHET_CLIENT_TOKEN` is sealed later in stage 2, not now.
 
-1. **Bump the image pin off `0.8.0`.** The current `values.production.yaml` pin (`0.8.0@sha256:...`) is the **pre-durable-exec** release — it does not contain the migration runner, GC wiring, or the Hatchet worker. Bump `image.tag` (and the `# release:` comment) to the new durable-exec release per the [§Image update](#image-update-deploy-new-artemis-release) procedure — resolve the digest, pin `X.Y.Z@sha256:<digest>`, commit. A `postgres.enabled` release on the `0.8.0` image brings up PG but the pod never runs migrations or wires GC.
+1. **Bump the image pin off the pre-durable-exec baseline.** A pre-durable-exec image (gxy-management's baseline was `0.8.0`) does not contain the migration runner, GC wiring, or the Hatchet worker — a `postgres.enabled` release on it brings up PG but the pod never runs migrations or wires GC. Bump `image.tag` (and the `# release:` comment) to a durable-exec-capable release (>= `v1.0.0`) per the [§Image update](#image-update-deploy-new-artemis-release) procedure — resolve the digest, pin `X.Y.Z@sha256:<digest>`, commit.
 
 After both land, run the staged bootstrap above (stage 1, then stage 2).
 

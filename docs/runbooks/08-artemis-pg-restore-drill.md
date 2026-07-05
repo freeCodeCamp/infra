@@ -2,6 +2,8 @@
 
 **Type:** Operator. Disaster-recovery rehearsal (read-mostly; writes only to a throwaway scratch pod). **Cluster:** `gxy-management`. Namespace: `artemis`. **Spec:** chart at `k3s/gxy-management/apps/artemis/`. Stateful floor: ADR-019 §Stateful-pillar backup pattern + ADR-020 (durable-execution model).
 
+**Last rehearsed:** 2026-06-05 — R8 drill PASSED (dossier `2026-06-02-artemis-durable-exec-cutover` §S 2026-06-05 11:25; both tenants restored, 6/6 artemis tables present, `sites` count matched the live registry, §F RPO/RTO floor demonstrated).
+
 The artemis durable-exec substrate is a single-node bundled Postgres StatefulSet (`artemis-postgresql`) shared by two tenants — the `artemis` database (deploy/GC bookkeeping) and the `hatchet` database (engine state). Its availability floor is **not replication** — it is the nightly logical backup to R2 plus this rehearsed restore (chart `values.yaml` `postgres:` block; ADR-020 §3). This runbook restores the newest R2 dump into a throwaway scratch Postgres, sanity-checks row counts, and records the RPO/RTO the artefact actually delivers.
 
 It is a **drill**: nothing here touches the live `artemis-postgresql` StatefulSet or the live databases. The scratch pod is a standalone `postgres:16-alpine` with no tenant labels, so neither the live PG nor the postgres NetworkPolicy is involved. A real production restore (overwrite the live instance) is a separate, destructive procedure — out of scope here; this drill is the confidence check that such a restore would succeed.

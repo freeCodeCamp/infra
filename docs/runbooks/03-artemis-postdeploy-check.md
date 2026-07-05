@@ -109,6 +109,8 @@ Edge cases:
 
 Run this in addition to the E2E suite after either stage of the durable-exec bootstrap (runbook 02 §Staged durable-exec bootstrap). The E2E suite above exercises only the deploy/serve plane; these checks cover the bundled Postgres + Hatchet worker that the suite does not touch. Skip entirely on a deploy-only (`postgres.enabled: false`) deployment.
 
+gxy-management has been at stage 2 since 2026-06-06 (currently `v1.2.2`) — expect the full worker + relay lines below on every run. The stage-1 column in the table is retained for a fresh galaxy bootstrap or DR rebuild.
+
 All commands run against the cluster, not the public surface:
 
 ```sh
