@@ -38,6 +38,11 @@ spec:
       web:
         port: 80
         exposedPort: 80
+        transport:
+          respondingTimeouts:
+            readTimeout: "900s"
+            writeTimeout: "900s"
+            idleTimeout: "180s"
       websecure:
         port: 443
         exposedPort: 443
