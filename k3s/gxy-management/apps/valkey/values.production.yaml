@@ -24,7 +24,7 @@ image:
   # Run-residency clean per Universe field-note 2026-04-27 — pulls
   # from upstream valkey/valkey direct, NOT through zot.management
   # (zot lives on the same galaxy → chicken-egg on cluster wipe).
-  tag: "8.1.4-alpine"
+  tag: "8.1.4-alpine@sha256:e706d1213aaba6896c162bb6a3a9e1894e1a435f28f8f856d14fab2e10aa098b"
   pullPolicy: IfNotPresent
 
 resources:
