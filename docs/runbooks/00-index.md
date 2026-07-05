@@ -16,6 +16,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 08  | [08-artemis-pg-restore-drill.md](08-artemis-pg-restore-drill.md)           | Operator  | Rehearse artemis-PG restore from R2 backup         |
 | 09  | [09-hatchet-engine-deploy.md](09-hatchet-engine-deploy.md)                 | Operator  | Stand up / rebuild the Hatchet durable-exec engine |
 | 10  | [10-rotate-cf-origin-cert.md](10-rotate-cf-origin-cert.md)                 | Operator  | Rotate the `freecodecamp.net` CF origin cert       |
+| 11  | [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md)             | Operator  | Rehearse R7 — PG outage, serve plane unaffected    |
 
 ## Reading order by scenario
 
@@ -35,6 +36,8 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 
 **Rotate the CF origin cert:** 10 (links to 04 internally; consolidated single-copy wildcard per `docs/architecture/rfc-secrets-layout.md` D1).
 
+**Rehearse the artemis PG-outage boundary (R7):** 11 (scale bundled PG to 0, assert serve plane + degraded readyz, restore; links to 03 + 08 internally; operator-only, destructive to control plane).
+
 ## Block ordering rationale
 
 | Block | Files | Why grouped                                           |
@@ -47,6 +50,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 08    | 08    | Backup / DR for artemis PG (calls 02 + 03 + 04)       |
 | 09    | 09    | Durable-exec engine stand-up (Hatchet); wires into 02 |
 | 10    | 10    | CF origin-cert rotation; foundation-adjacent to 04/05 |
+| 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08       |
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
