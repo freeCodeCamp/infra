@@ -19,7 +19,7 @@ Operator-runnable flight manuals live in `docs/flight-manuals/` (this repo). Ind
 
 ADR-vs-reality reconciliation: `docs/architecture/adr-drift-2026-05-10.md`.
 
-Platform-wide live-state + automation-gap + drift snapshot (2026-05-29 snapshot — re-scout in `.scratchpad/dossier/2026-05-29-universe-doc-trim/`): `docs/architecture/universe-state-2026-05-29.md`.
+Platform-wide live-state + automation-gap + drift snapshot (live-verified 2026-07-06, covers ADR-020 durable-execution): `docs/architecture/universe-state-2026-07-06.md` (supersedes `universe-state-2026-05-29.md`).
 
 Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `docs/architecture/rfc-gxy-cassiopeia-ga.md`.
 

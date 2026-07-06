@@ -1,5 +1,7 @@
 # Universe Platform State — 2026-05-29
 
+> **⚠️ SUPERSEDED 2026-07-06** by [`universe-state-2026-07-06.md`](./universe-state-2026-07-06.md) — this snapshot predates the ADR-020 durable-execution subsystem (Hatchet, artemis v1.3.0, runbook-09). Retained for historical drift record only.
+
 Live-verified snapshot of the freeCodeCamp Universe platform: what is what, what runs, how it is deployed and updated, where automation is missing, and where the docs diverge from reality.
 
 Successor in spirit to [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) (that report = ADR-vs-reality only; all its AD-1..AD-8 actions are closed). This report is broader: ADR design + on-disk code + **live cluster reads** + CI/automation posture, in one place. Design rationale stays in the Universe ADRs (001-019) — not duplicated here.
@@ -8,7 +10,7 @@ Successor in spirit to [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) (t
 
 | Axis            | Source                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------- |
-| Design          | `~/DEV/fCC-U/Architecture/decisions/001..019` + `spike/spike-plan.md`                         |
+| Design          | `~/DEV/fCC-U/Architecture/decisions/001..019` + `spike/spike-plan.md`                     |
 | Repo reality    | `infra/` (justfile, k3s, ansible, terraform), `artemis/`, `veritas/`, `windmill/` on disk |
 | Cluster reality | `doctl compute droplet list` + `kubectl` reads, this date                                 |
 | CI reality      | `.github/workflows/` across all repos; `renovate.json` presence                           |
@@ -25,7 +27,7 @@ ______________________________________________________________________
 | infra-secrets | `~/DEV/fCC/infra-secrets`  | sops+age vault (single org key). Hard-coded sibling `../infra-secrets`. No secrets in infra repo                                                                       |
 | artemis       | `~/DEV/fCC/artemis`        | Go service on `uploads.freecode.camp`. Sole R2 writer. GitHub-team authz → mints deploy JWT → streams uploads to R2 with atomic alias flip. Deployed to gxy-management |
 | veritas       | `~/DEV/fCC-U/veritas`      | TypeScript auth IdP (BetterAuth embedded). `login.` + `account.freecodecamp.org`. Active source repo. CI carries cosign + SBOM                                         |
-| Universe      | `~/DEV/fCC-U/Architecture`     | Design repo: 19 ADRs + spike-plan. No code, no CI. Authoritative architecture model                                                                                    |
+| Universe      | `~/DEV/fCC-U/Architecture` | Design repo: 19 ADRs + spike-plan. No code, no CI. Authoritative architecture model                                                                                    |
 | windmill      | `~/DEV/fCC-U/windmill`     | Windmill IaC (wmill CLI sync). "Apollo-11" = staff repo request/approve via Google Chat + React SPA. Tenant on gxy-management. EA-live for staff                       |
 | universe-cli  | `~/DEV/fCC-U/universe-cli` | `universe` CLI (deploy / sites registry). v0.7.0 on npm                                                                                                                |
 
@@ -40,7 +42,7 @@ ______________________________________________________________________
 | gxy-launchbase | P4   | DO FRA1 → bare metal | **LIVE but idle** — CNPG operator only, no DB workloads                                                                         | matches                     |
 | gxy-triangulum | P3   | Hetzner              | **NOT provisioned** (zero droplets)                                                                                             | PARKED — gates ADR-013 Q-24 |
 | gxy-backoffice | P5   | Hetzner              | **NOT provisioned** (zero droplets)                                                                                             | PARKED — gates auth epic    |
-| ~~gxy-static~~ | —    | —                    | RETIRED → cassiopeia (canonical: `flight-manuals/00-index.md` Retired-galaxies row)                                            | matches                     |
+| ~~gxy-static~~ | —    | —                    | RETIRED → cassiopeia (canonical: `flight-manuals/00-index.md` Retired-galaxies row)                                             | matches                     |
 
 Legacy, out-of-Universe-scope (retire post-Universe): `ops-backoffice-tools` (outline + appsmith), `ops-mgmt`, plus Linode/Azure Docker-Swarm stacks.
 
