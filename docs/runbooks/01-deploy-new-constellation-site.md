@@ -5,12 +5,12 @@ End-to-end runbook for landing a new `<site>.freecode.camp` on the freeCodeCamp 
 ## What you get
 
 - `https://<site>.freecode.camp/` — production
-- `https://<site>--preview.freecode.camp/` — preview (per-deploy alias)
-- Authorization gated on GitHub team membership in the `freeCodeCamp` org. No R2 keys in staff hands; no CI secrets to rotate.
+- `https://<site>.preview.freecode.camp/` — preview (per-deploy alias)
+- Authorization gated on GitHub team membership in the `freeCodeCamp-Universe` org (`GH_ORG`). No R2 keys in staff hands; no CI secrets to rotate.
 
 ## Architecture in one paragraph
 
-Staff dev runs `universe static deploy` from a laptop or CI. The CLI resolves a GitHub identity (env → GHA OIDC → `gh auth token` → device-flow token), packages the build output, and uploads it to the artemis proxy at `https://uploads.freecode.camp`. Artemis verifies the identity, looks up the site → teams map in its Valkey-backed registry, probes GitHub team membership, writes the artifact to the shared R2 bucket under `<site>.freecode.camp/deploys/<ts>-<sha>/`, and (on `promote`) flips the `production` alias to that prefix. Caddy on `gxy-cassiopeia` serves `*.freecode.camp` from R2 via the `r2_alias` D35 dot-scheme. No R2 token leaves artemis.
+Staff dev runs `universe static deploy` from a laptop or CI. The CLI resolves a GitHub identity (first match of `$GITHUB_TOKEN` → `$GH_TOKEN` → `universe login` device-flow token → `gh auth token`), packages the build output, and uploads it to the artemis proxy at `https://uploads.freecode.camp`. Artemis verifies the identity, looks up the site → teams map in its Valkey-backed registry, probes GitHub team membership, writes the artifact to the shared R2 bucket under `<site>.freecode.camp/deploys/<ts>-<sha>/`, and (on `promote`) flips the `production` alias to that prefix. Caddy on `gxy-cassiopeia` serves `*.freecode.camp` from R2 via the `r2_alias` D35 dot-scheme. No R2 token leaves artemis.
 
 ## Two-side flow
 
@@ -35,7 +35,7 @@ From any staff laptop with a GitHub identity in the `staff` team:
 universe sites register <slug> --team <team>[,<team>...]
 ```
 
-`--team` repeats or comma-separates. Omit it and the server defaults to `[staff]`. Slugs match `^[a-z][a-z0-9-]{0,62}$` (DNS-safe; the slug becomes the `<slug>.freecode.camp` subdomain). Team slugs match `freeCodeCamp` org GitHub teams (e.g. `bots`, `curriculum`, `dev-team`, `i18n`, `mobile`, `moderators`, `ops`, `staff`). ANY listed team grants deploy access.
+`--team` repeats or comma-separates. Omit it and the server defaults to `[staff]`. Slugs match `^[a-z][a-z0-9-]{0,62}$` (DNS-safe; the slug becomes the `<slug>.freecode.camp` subdomain). Team slugs must be GitHub teams in the `freeCodeCamp-Universe` org (`GH_ORG`). Today that is `staff` (the deploy-authz team). `gh-artemis-approvers` also exists but gates repo-creation approval (the `universe repo` group), not deploys. ANY listed team grants deploy access.
 
 The CLI `POST`s `/api/site/register` against artemis; the handler writes a row into the Valkey-backed registry and publishes a `registry.changed` event. Every artemis replica picks up the new row within seconds via pub-sub (or ≤60 s via the TTL fallback). No pod restart, no Helm upgrade, no PR.
 
@@ -57,7 +57,7 @@ The authorized-sites count goes up by one if you're in any team listed on the ne
 
 ### A3. DNS
 
-`*.freecode.camp` (single wildcard) is proxied through Cloudflare to `gxy-cassiopeia` Caddy under the `r2_alias` scheme. The double-dash form `<site>--preview.freecode.camp` reuses the same wildcard cert (no separate `*.preview.freecode.camp` zone). **No DNS work needed for standard subdomain sites.**
+`*.freecode.camp` (production wildcard) and `*.preview.freecode.camp` (preview wildcard) are proxied through Cloudflare to `gxy-cassiopeia` Caddy under the `r2_alias` D35 dot-scheme. Preview URLs use `<site>.preview.freecode.camp` — covered by the `*.preview.freecode.camp` wildcard, **not** the production apex. **No DNS work needed for standard subdomain sites** (both wildcards already in place).
 
 Exceptions requiring a separate dispatch:
 
@@ -135,7 +135,7 @@ The CLI:
 1. `POST /api/deploy/init` against artemis → receives a deploy-session JWT (HS256, 15min TTL, scope `(login, site, deployId)`).
 1. Multipart-uploads the artifact under that JWT.
 1. `POST /api/deploy/{id}/finalize?mode=preview`.
-1. Prints the preview URL: `https://<site>--preview.freecode.camp/`.
+1. Prints the preview URL: `https://<site>.preview.freecode.camp/`.
 
 QA the preview. Re-running `universe static deploy` overwrites the preview alias to the latest deploy.
 
@@ -151,11 +151,10 @@ Production live at `https://<site>.freecode.camp/`. Rollout latency: seconds (CF
 
 ### B6. CI flow (GitHub Actions)
 
-Skip B2 entirely. Slot 2 of the identity chain (GHA OIDC) takes over. Workflow snippet:
+Skip B2 entirely. CI exports `$GITHUB_TOKEN` (slot 1 of the identity chain). Workflow snippet:
 
 ```yaml
 permissions:
-  id-token: write # required for OIDC slot 2
   contents: read
 jobs:
   deploy:
@@ -163,11 +162,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npx @freecodecamp/universe-cli@latest static deploy --promote
+        env:
+          # Team-membership probe needs read:org on freeCodeCamp-Universe.
+          # secrets.GITHUB_TOKEN is repo-scoped — use a PAT / App token with read:org.
+          GITHUB_TOKEN: ${{ secrets.UNIVERSE_DEPLOY_TOKEN }}
 ```
 
 The `--promote` flag rolls preview + promote into one step for CI fast-paths (use only on already-validated branches, e.g. `main`).
 
-For non-OIDC CI (Woodpecker today, until slot 3 ships), pass an explicit token via `GITHUB_TOKEN` env.
+Any CI works the same way — export `$GITHUB_TOKEN` (or `$GH_TOKEN`) with `read:org` on `freeCodeCamp-Universe`. There is no OIDC path: artemis validates user-scoped bearers only, never OIDC ID tokens (ADR-016 Q10).
 
 ### B7. List deploys / roll back
 
