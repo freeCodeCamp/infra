@@ -1,6 +1,6 @@
 # RFC — gxy-cassiopeia GA Hardening
 
-**Status:** Proposed (universe-master-audit, 2026-05-10) · Owner: infra **Anchors:** ADR-007 (DX), ADR-009 (networking), ADR-010 (secrets), ADR-011 (security), ADR-016 (deploy proxy) **Supersedes:** archived `rfc-gxy-cassiopeia.md` (2026-04-30), archived `task-gxy-cassiopeia.md` (2026-04-30); also retires `rfc-gxy-cassiopeia-caddyfile-poc.md` (POC, NOT-VIABLE; archived 2026-06-01 to Universe `.archive/_crossrepo/cassiopeia/2026-04-18-caddyfile-poc.md`).
+**Status:** Proposed (universe-master-audit, 2026-05-10) — read-plane gates G1/G2/G4/G6 verified live 2026-07-06 (see §E gate-verification); GA held on G11 (no registry RDB→R2 backup) + operator drill (G7–G10, G12) · Owner: infra **Anchors:** ADR-007 (DX), ADR-009 (networking), ADR-010 (secrets), ADR-011 (security), ADR-016 (deploy proxy) **Supersedes:** archived `rfc-gxy-cassiopeia.md` (2026-04-30), archived `task-gxy-cassiopeia.md` (2026-04-30); also retires `rfc-gxy-cassiopeia-caddyfile-poc.md` (POC, NOT-VIABLE; archived 2026-06-01 to Universe `.archive/_crossrepo/cassiopeia/2026-04-18-caddyfile-poc.md`).
 
 > **Closeout note (2026-05-11, refreshed 2026-05-17):** The registry decouple section (§B / Phase 2 migration table) is **DONE**. The `sites_yaml` backend was retired in artemis @ `f115198`; Valkey is the sole backend, and operator writes go through the `universe sites register/ls/update/rm` CLI (universe-cli v0.6.0 GA published 2026-05-15, `POST /api/site/register` and siblings). Migration step rows are retained below as historical record — do not re-execute them. Live operator flow now lives in `docs/runbooks/01-deploy-new-constellation-site.md` §A. All other RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain in-scope.
 
@@ -297,7 +297,7 @@ The zones intentionally use different posture: `freecode.camp` is public static-
 Two flavors:
 
 1. **`<site>.freecode.camp`** (production). Wildcard A record to all 3 cassiopeia node public IPs, CF orange cloud ON. Per-site DNS addition is **NOT** required — wildcard catches everything.
-1. **`<site>--preview.freecode.camp`** (preview). Same wildcard covers — the `--preview` is part of the `<sitePrefix>` from caddy's perspective. ADR-009 already specifies double-dash to avoid wildcard-cert scope creep.
+1. **`<site>.preview.freecode.camp`** (preview). Served by caddy-s3's `r2alias` dot-scheme (design decision D35, supersedes double-dash D5; shipped `c1a06681`). Requires its **own** `*.preview.freecode.camp` wildcard (A record to the 3 cassiopeia node public IPs, CF orange cloud ON) — it is **not** covered by the `*.freecode.camp` wildcard. Per ADR-009 2026-07-04 reconciliation amendment.
 
 Per `gxy-cassiopeia.md` Phase 23 today: 3 A records per production domain, proxy ON, SSL Flexible. No per-site DNS edit required after wildcard is in place.
 
@@ -325,7 +325,7 @@ Cassiopeia GA = all of the following pass on a fresh back-to-back idempotent rer
 | G2   | caddy-s3 chart deployed and pods 3/3 Running with Gateway Programmed                               | `kubectl get pods,gateway,httproute -n caddy`                                                                                                         |
 | G3   | R2 bucket reachable from caddy with read-only key                                                  | `just verify-r2 universe-static-apps-01`                                                                                                              |
 | G4   | DNS resolves `*.freecode.camp` to 3 cassiopeia node IPs                                            | `dig +short test.freecode.camp` matches `doctl droplet list` output                                                                                   |
-| G5   | Valkey running in artemis ns with persistence + AUTH                                               | `kubectl -n artemis get pods,svc,pvc -l app=valkey`; `valkey-cli AUTH … && valkey-cli PING` returns `PONG`                                            |
+| G5   | Valkey running in `valkey` ns with persistence + AUTH                                              | `kubectl -n valkey get statefulset,pods,svc,pvc`; `valkey-cli AUTH … && valkey-cli PING` returns `PONG`                                               |
 | G6   | artemis on gxy-management with `REGISTRY_BACKEND=valkey` (no `--set-file`)                         | `helm get values -n artemis artemis` shows no `sites:` key; `kubectl -n artemis exec deploy/artemis -- env \| grep REGISTRY_BACKEND` reports `valkey` |
 | G7   | `universe sites register test --team staff` succeeds without operator action                       | CLI exits 0; `GET /api/sites` includes `test`; `valkey-cli SMEMBERS sites:all` includes `test`                                                        |
 | G8   | E2E deploy → preview → promote → production through artemis                                        | `just verify-artemis` (replaces retired `phase5-smoke` per 2026-04-27 refactor `20da6067`)                                                            |
@@ -335,6 +335,27 @@ Cassiopeia GA = all of the following pass on a fresh back-to-back idempotent rer
 | G12  | Idempotency — operator runs the cassiopeia chapter top-to-bottom **twice** with no divergent state | flight-manual §E reruns clean                                                                                                                         |
 
 G12 is the single most-important gate for the user's stated constraint ("I will run every step of it to check if the manual is idempotent"). Every section in the cassiopeia chapter must include a "skip-if-already-done" guard (e.g. `helm get -n caddy caddy >/dev/null 2>&1 || just release gxy-cassiopeia caddy`).
+
+### Gate verification — 2026-07-06 (live-probed, non-disruptive subset)
+
+Empirical status against the three galaxy clusters (all 3/3 nodes Ready, k3s v1.34.5). Mutating/disruptive/procedural gates (G7–G10, G12) were **not** run against production — they require an operator drill.
+
+| Gate | Verdict                 | Evidence (2026-07-06)                                                                                                                                                                                                                                        |
+| ---- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| G1   | ✅ met                  | gxy-cassiopeia 3 nodes Ready; cilium DaemonSet 3 pods Running                                                                                                                                                                                                |
+| G2   | ✅ met                  | `caddy` ns 3 pods Running; `caddy-gateway` Programmed=True                                                                                                                                                                                                   |
+| G3   | ⚠️ unverified           | `just verify-r2` not run — R2 read-key is sops-gated; caddy serving traffic implies reachability but is not gate-proven                                                                                                                                      |
+| G4   | ✅ met (nuance)         | `dig test.freecode.camp` resolves to Cloudflare edge IPs (104.21/172.67). Origin-IP match is **not observable** through the CF orange-cloud proxy (ON by design, ADR-016) — the gate's `doctl`-match anchor is naive for a proxied record                    |
+| G5   | ⚠️ partial + gate-drift | `valkey-0` STS 1/1 Running 56d, PVC `data-valkey-0` Bound (2Gi, local-path). Gate text said "artemis ns" — **actual ns is `valkey`** (corrected in §E table). AUTH `PING` unverified (password sops-gated)                                                   |
+| G6   | ✅ config-confirmed     | artemis chart injects `VALKEY_ADDR` + `REGISTRY_BACKEND=valkey` via `envFrom`; no `sites:` / `--set-file`                                                                                                                                                    |
+| G7   | ⛔ operator drill       | mutating (registers a live site)                                                                                                                                                                                                                             |
+| G8   | ⛔ operator drill       | `just verify-artemis` E2E mutates (deploy→promote)                                                                                                                                                                                                           |
+| G9   | ⛔ operator drill       | disruptive (`rollout restart`)                                                                                                                                                                                                                               |
+| G10  | ⛔ operator drill       | disruptive (delete valkey pod)                                                                                                                                                                                                                               |
+| G11  | ❌ **UNMET**            | **No Valkey registry RDB→R2 backup exists** in any namespace. The only nightly backup (`artemis-backup` CronJob, `0 2 * * *`) is a Postgres `pg_dumpall`→R2, not the registry. Registry durability rests solely on the single local-path `data-valkey-0` PVC |
+| G12  | ⛔ operator drill       | idempotency — operator reruns the flight-manual chapter twice                                                                                                                                                                                                |
+
+**GA verdict (2026-07-06):** serve/read plane is GA-shaped (G1/G2/G4/G6 green). GA is **held** on: G11 (registry-backup gap — the one true durability hole), G5 AUTH confirmation, and an operator drill covering G7–G10 + G12. Closing G11 (a Valkey `BGSAVE` RDB→R2 CronJob mirroring `artemis-backup`, or a cross-node registry replica) is the highest-value remaining GA task.
 
 ## Section F — Open questions for user
 
