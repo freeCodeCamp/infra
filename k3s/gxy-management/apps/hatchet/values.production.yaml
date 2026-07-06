@@ -7,6 +7,6 @@
 namespace: artemis
 
 images:
-  engine: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.88.6
-  migrate: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.88.6
-  admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6
+  engine: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.88.6@sha256:5f4e17bef5ab0406565fd4c60a5dbd0ceb9f95a237e65c77c76ab9d8015d1fc2
+  migrate: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.88.6@sha256:6ec7b9e3bbdca63f40e47b295e077b00b0e8bb638e5eac04441aae1c536f1c55
+  admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6@sha256:6009c2948b6a862dc66326299688d03b9617de5770996f916629bed0b8f86143
