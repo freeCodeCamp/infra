@@ -30,16 +30,13 @@ spec:
   hostnames:
     - {{ required ".Values.gateway.hostname is required" .Values.gateway.hostname | quote }}
   rules:
-    # Public-block: rewrite /metrics + /readyz to an unrouted path.
+    # Public-block: rewrite /readyz to an unrouted path.
     # chi-router returns 404 for unknown paths so callers see a clean
     # 404, not a 200 with operator-only payload. Must come BEFORE the
     # catch-all PathPrefix `/` rule — Gateway API rule precedence is
     # most-specific-first and PathPrefix `/` would otherwise win on
-    # everything.
+    # everything. (/metrics is no longer a route — Sentry-only o11y.)
     - matches:
-        - path:
-            type: PathPrefix
-            value: /metrics
         - path:
             type: PathPrefix
             value: /readyz
