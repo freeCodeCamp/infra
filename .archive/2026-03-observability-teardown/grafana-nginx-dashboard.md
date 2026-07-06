@@ -6,7 +6,7 @@ Dashboard panels for analyzing NGINX access logs stored in ClickHouse.
 
 - Grafana deployed on ops-backoffice-tools cluster
 - ClickHouse datasource configured via Grafana UI:
-  - **Host:** `ops-k3s-clickhouse-logs.batfish-ray.ts.net`
+  - **Host:** `ops-k3s-clickhouse-logs.<tailnet>.ts.net`
   - **Port:** `9000` (Native)
   - **Protocol:** Native
   - **Username:** `grafana`
@@ -14,22 +14,23 @@ Dashboard panels for analyzing NGINX access logs stored in ClickHouse.
 
 ## Dashboard Structure
 
-| Row | Section | Panels |
-|-----|---------|--------|
-| 1 | Key Metrics | Stats: Total Requests, Error Rate, P95 Latency, Real Traffic % |
-| 2 | Traffic | Time series: Requests over time |
-| 3 | Status Codes | Time series: Status distribution, Pie: Status breakdown |
-| 4 | Latency | Time series: P50/P95/P99 percentiles |
-| 5 | Endpoints | Tables: Top paths, Slowest endpoints |
-| 6 | Geographic | Bar: Requests by country |
+| Row | Section      | Panels                                                         |
+| --- | ------------ | -------------------------------------------------------------- |
+| 1   | Key Metrics  | Stats: Total Requests, Error Rate, P95 Latency, Real Traffic % |
+| 2   | Traffic      | Time series: Requests over time                                |
+| 3   | Status Codes | Time series: Status distribution, Pie: Status breakdown        |
+| 4   | Latency      | Time series: P50/P95/P99 percentiles                           |
+| 5   | Endpoints    | Tables: Top paths, Slowest endpoints                           |
+| 6   | Geographic   | Bar: Requests by country                                       |
 
----
+______________________________________________________________________
 
 ## Panel Queries
 
 ### Row 1: Key Metrics (Stat Panels)
 
 **Total Requests**
+
 ```sql
 SELECT count(*) AS total
 FROM logs_nginx_stg.access
@@ -37,34 +38,41 @@ WHERE $__timeFilter(timestamp)
 ```
 
 **Error Rate %**
+
 ```sql
 SELECT round(countIf(status >= 400 AND status != 444) * 100.0 / count(), 2) AS error_rate
 FROM logs_nginx_stg.access
 WHERE $__timeFilter(timestamp)
 ```
+
 - Thresholds: green < 1%, yellow < 5%, red >= 5%
 
 **P95 Latency (ms)**
+
 ```sql
 SELECT round(quantile(0.95)(request_time) * 1000, 2) AS p95_ms
 FROM logs_nginx_stg.access
 WHERE $__timeFilter(timestamp) AND request_time > 0
 ```
+
 - Thresholds: green < 500ms, yellow < 1000ms, red >= 1000ms
 
 **Real Traffic %**
+
 ```sql
 SELECT round(countIf(cf_ray != '') * 100.0 / count(), 2) AS real_traffic_pct
 FROM logs_nginx_stg.access
 WHERE $__timeFilter(timestamp)
 ```
+
 - Description: Traffic through Cloudflare (has cf_ray) vs direct/bot traffic
 
----
+______________________________________________________________________
 
 ### Row 2: Traffic Over Time (Time Series)
 
 **Requests per Minute**
+
 ```sql
 SELECT
   toStartOfMinute(timestamp) AS time,
@@ -76,6 +84,7 @@ ORDER BY time
 ```
 
 **Requests by Host**
+
 ```sql
 SELECT
   toStartOfMinute(timestamp) AS time,
@@ -87,11 +96,12 @@ GROUP BY time, host
 ORDER BY time
 ```
 
----
+______________________________________________________________________
 
 ### Row 3: Status Code Analysis
 
 **Status Codes Over Time (Time Series - Stacked)**
+
 ```sql
 SELECT
   toStartOfMinute(timestamp) AS time,
@@ -110,6 +120,7 @@ ORDER BY time
 ```
 
 **Status Distribution (Pie Chart)**
+
 ```sql
 SELECT
   multiIf(
@@ -126,11 +137,12 @@ GROUP BY status_class
 ORDER BY count DESC
 ```
 
----
+______________________________________________________________________
 
 ### Row 4: Latency Percentiles (Time Series)
 
 **P50/P95/P99 Latency**
+
 ```sql
 SELECT
   toStartOfMinute(timestamp) AS time,
@@ -142,13 +154,15 @@ WHERE $__timeFilter(timestamp) AND request_time > 0
 GROUP BY time
 ORDER BY time
 ```
+
 - Y-axis unit: milliseconds (ms)
 
----
+______________________________________________________________________
 
 ### Row 5: Endpoint Analysis (Tables)
 
 **Top Endpoints by Request Count**
+
 ```sql
 SELECT
   path,
@@ -164,6 +178,7 @@ LIMIT 20
 ```
 
 **Slowest Endpoints (P95)**
+
 ```sql
 SELECT
   path,
@@ -180,6 +195,7 @@ LIMIT 20
 ```
 
 **Top Error Paths**
+
 ```sql
 SELECT
   path,
@@ -192,11 +208,12 @@ ORDER BY error_count DESC
 LIMIT 20
 ```
 
----
+______________________________________________________________________
 
 ### Row 6: Geographic & Security
 
 **Requests by Country (Bar Gauge)**
+
 ```sql
 SELECT
   country_code,
@@ -209,6 +226,7 @@ LIMIT 15
 ```
 
 **Bot vs Real Traffic (Time Series)**
+
 ```sql
 SELECT
   toStartOfMinute(timestamp) AS time,
@@ -225,6 +243,7 @@ ORDER BY time
 ```
 
 **SSL Protocol Distribution (Pie Chart)**
+
 ```sql
 SELECT
   if(ssl_protocol = '', 'No SSL', ssl_protocol) AS protocol,
@@ -235,32 +254,32 @@ GROUP BY protocol
 ORDER BY count DESC
 ```
 
----
+______________________________________________________________________
 
 ## Dashboard Variables
 
 Add these template variables for filtering:
 
-| Variable | Label | Query | Multi |
-|----------|-------|-------|-------|
-| `host` | Host | `SELECT DISTINCT host FROM logs_nginx_stg.access WHERE timestamp >= now() - INTERVAL 1 DAY ORDER BY host` | Yes |
-| `status` | Status | `SELECT DISTINCT status FROM logs_nginx_stg.access WHERE timestamp >= now() - INTERVAL 1 DAY ORDER BY status` | Yes |
-| `country` | Country | `SELECT DISTINCT country_code FROM logs_nginx_stg.access WHERE timestamp >= now() - INTERVAL 1 DAY AND country_code != '' ORDER BY country_code` | Yes |
+| Variable  | Label   | Query                                                                                                                                            | Multi |
+| --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| `host`    | Host    | `SELECT DISTINCT host FROM logs_nginx_stg.access WHERE timestamp >= now() - INTERVAL 1 DAY ORDER BY host`                                        | Yes   |
+| `status`  | Status  | `SELECT DISTINCT status FROM logs_nginx_stg.access WHERE timestamp >= now() - INTERVAL 1 DAY ORDER BY status`                                    | Yes   |
+| `country` | Country | `SELECT DISTINCT country_code FROM logs_nginx_stg.access WHERE timestamp >= now() - INTERVAL 1 DAY AND country_code != '' ORDER BY country_code` | Yes   |
 
 Use in queries: `AND host IN ($host)` or `AND status IN ($status)`
 
----
+______________________________________________________________________
 
 ## Alert Recommendations
 
-| Metric | Warning | Critical |
-|--------|---------|----------|
-| Error Rate (5xx) | > 1% | > 5% |
-| P95 Latency | > 500ms | > 1000ms |
-| P99 Latency | > 1000ms | > 2000ms |
-| Blocked Rate (444) | > 10% | > 25% |
+| Metric             | Warning  | Critical |
+| ------------------ | -------- | -------- |
+| Error Rate (5xx)   | > 1%     | > 5%     |
+| P95 Latency        | > 500ms  | > 1000ms |
+| P99 Latency        | > 1000ms | > 2000ms |
+| Blocked Rate (444) | > 10%    | > 25%    |
 
----
+______________________________________________________________________
 
 ## Notes
 

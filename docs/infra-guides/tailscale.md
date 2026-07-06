@@ -5,7 +5,7 @@ Master inventory of all Tailscale devices across the infrastructure.
 ## Architecture
 
 ```
-                      Tailscale Network (batfish-ray.ts.net)
+                      Tailscale Network (<tailnet>.ts.net)
                                     |
                     +---------------+---------------+
                     |                               |

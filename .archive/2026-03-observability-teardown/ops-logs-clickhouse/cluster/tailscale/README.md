@@ -4,15 +4,15 @@ Tailscale operator for the ops-logs-clickhouse k3s cluster.
 
 ## Devices
 
-| Device | Type | Purpose |
-|--------|------|---------|
-| `ops-k3s-clickhouse-operator` | Operator | Manages Tailscale resources |
-| `ops-k3s-clickhouse-logs` | Ingress | ClickHouse accessible via `ops-k3s-clickhouse-logs.batfish-ray.ts.net` |
+| Device                        | Type     | Purpose                                                              |
+| ----------------------------- | -------- | -------------------------------------------------------------------- |
+| `ops-k3s-clickhouse-operator` | Operator | Manages Tailscale resources                                          |
+| `ops-k3s-clickhouse-logs`     | Ingress  | ClickHouse accessible via `ops-k3s-clickhouse-logs.<tailnet>.ts.net` |
 
 ## Files
 
-| File | Purpose |
-|------|---------|
+| File                   | Purpose                            |
+| ---------------------- | ---------------------------------- |
 | `operator-values.yaml` | Helm values for Tailscale operator |
 
 ## Install/Upgrade Operator
@@ -30,8 +30,9 @@ helm upgrade tailscale-operator tailscale/tailscale-operator \
 ## Accessing ClickHouse
 
 External consumers reach ClickHouse via Tailscale FQDN:
-- HTTP: `http://ops-k3s-clickhouse-logs.batfish-ray.ts.net:8123`
-- Native: `ops-k3s-clickhouse-logs.batfish-ray.ts.net:9000`
+
+- HTTP: `http://ops-k3s-clickhouse-logs.<tailnet>.ts.net:8123`
+- Native: `ops-k3s-clickhouse-logs.<tailnet>.ts.net:9000`
 
 ## See Also
 
