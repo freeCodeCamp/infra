@@ -10,7 +10,7 @@ If instead you're rotating a **per-app override** cert (`k3s/<cluster>/<app>.tls
 
 - Cloudflare account owner or admin on the account holding the `freecodecamp.net` zone.
 - `infra-secrets/` checked out as a sibling of `infra/` with sops+age set up — see [`04-secrets-decrypt.md`](04-secrets-decrypt.md).
-- Know which (cluster, app) pairs currently resolve the wildcard via zone-fallback (no per-app override file present). Today: `gxy-management` (`cluster.tls.zone` = `freecodecamp-net`) → `windmill`'s Gateway (`k3s/gxy-management/apps/windmill/manifests/base/gateway.yaml`, `certificateRefs: windmill-tls-cloudflare`) is the only live consumer. `argocd`/`zot` are parked (chart on disk, deploy frozen — RFC D4) and don't currently render a Gateway or Secret.
+- Know which (cluster, app) pairs currently resolve the wildcard via zone-fallback (no per-app override file present). **Windmill retired 2026-07-07** (`docs/runbooks/12-windmill-decommission.md`) — it was the sole live consumer (`gxy-management`, `cluster.tls.zone` = `freecodecamp-net`, Gateway `certificateRefs: windmill-tls-cloudflare`); that Gateway + Secret are gone with the namespace. There is **no live consumer today**. `argocd`/`zot` remain parked (chart on disk, deploy frozen — RFC D4) and don't currently render a Gateway or Secret either. The cert itself is not retired — keep rotating on schedule so it's ready the moment argocd/zot (or a future galaxy plane on this zone) reactivate.
 
 ## Steps
 
@@ -57,6 +57,8 @@ git commit -m "chore(tls): rotate freecodecamp-net origin cert"
 
 ### 4. Roll every zone-fallback consumer
 
+No live consumer exists today (Windmill retired 2026-07-07 — see Preconditions). The command below is retained as the worked example from when Windmill held the wildcard; it also documents the mechanism zone-fallback consumers rely on, unchanged for whichever app reactivates next.
+
 ```bash
 cd ~/DEV/fCC/infra
 just release gxy-management windmill
@@ -67,6 +69,8 @@ just release gxy-management windmill
 If/when argocd or zot reactivate on this zone, repeat `just release gxy-management <app>` for each.
 
 ### 5. Verify
+
+No live consumer exists today; the commands below are the worked example against Windmill's former Gateway/domain — substitute the reactivated consumer's namespace/Gateway/hostname once one exists.
 
 ```bash
 cd ~/DEV/fCC/infra/k3s/gxy-management
@@ -87,8 +91,8 @@ Prior cert content is recoverable from `infra-secrets` git history (`git show HE
 ## Exit criteria
 
 - `sops -d ... | openssl x509 -noout -dates` on the re-encrypted envelope shows the new `notBefore` + expected SANs.
-- `kubectl get gateway -n windmill windmill-gateway` → `Programmed=True`.
-- Live TLS handshake serial (step 5) matches the newly minted cert for every zone-fallback consumer (`windmill.freecodecamp.net` today).
+- `kubectl get gateway -n <consumer-namespace> <consumer-gateway>` → `Programmed=True` (no live consumer today — see Preconditions; skip if none reactivated).
+- Live TLS handshake serial (step 5) matches the newly minted cert for every zone-fallback consumer (none live today; was `windmill.freecodecamp.net` pre-retirement).
 - Prior Origin Certificate revoked in the CF dashboard only after the above is green.
 - `infra-secrets` commit pushed; no plaintext PEM left in shell scrollback or `/tmp`.
 

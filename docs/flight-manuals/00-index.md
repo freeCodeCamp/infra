@@ -5,18 +5,18 @@ Per-cluster doomsday-rebuild manuals for the Universe Platform. Read order, gala
 ## Read order (rebuilds)
 
 1. **Always start with [`UNIVERSE.md`](UNIVERSE.md)** — §0 prereqs, §1 DNS, §2 secrets, §3 shared infra, §4 lifecycle calendar. Per-galaxy chapters assume these ran.
-1. **gxy-management first** — control plane (Windmill + artemis + Valkey). Every other galaxy reads bytes that originate here.
-1. **gxy-launchbase** — standby (CNPG operator only post-woodpecker retire); brings the database operator before any preview-DB constellation lands.
+1. **gxy-management first** — control plane (artemis + Hatchet + Valkey; Windmill retired 2026-07-07). Every other galaxy reads bytes that originate here.
+1. **gxy-launchbase** — standby (CNPG operator only post-woodpecker retire); brings the database operator before any preview-DB constellation lands. Currently decommissioned (2026-07-07 — 3 droplets deleted, pending rebuild); replay this chapter to bring it back.
 1. **gxy-cassiopeia** — static-apps serve plane. Reads R2 written by artemis on gxy-management.
 1. **`UNIVERSE.md §99`** — cross-galaxy smoke. Run only after all three chapters complete twice idempotently.
 
 ## Galaxies (current state)
 
-| Galaxy           | File                                   | Role                                        | State       | Provider (now → future)            |
-| ---------------- | -------------------------------------- | ------------------------------------------- | ----------- | ---------------------------------- |
-| `gxy-management` | [gxy-management.md](gxy-management.md) | Control plane — Windmill + artemis + Valkey | Live        | DO FRA1                            |
-| `gxy-launchbase` | [gxy-launchbase.md](gxy-launchbase.md) | Standby — CNPG operator (workload-free)     | Live (idle) | DO FRA1 → Hetzner post-M5 (parked) |
-| `gxy-cassiopeia` | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static-apps serve plane — Caddy + R2        | Live        | DO FRA1 → Hetzner post-M5 (parked) |
+| Galaxy           | File                                   | Role                                       | State                                      | Provider (now → future)            |
+| ---------------- | -------------------------------------- | ------------------------------------------ | ------------------------------------------ | ---------------------------------- |
+| `gxy-management` | [gxy-management.md](gxy-management.md) | Control plane — artemis + Hatchet + Valkey | Live                                       | DO FRA1                            |
+| `gxy-launchbase` | [gxy-launchbase.md](gxy-launchbase.md) | Standby — CNPG operator (workload-free)    | Decommissioned 2026-07-07, pending rebuild | DO FRA1 → Hetzner post-M5 (parked) |
+| `gxy-cassiopeia` | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static-apps serve plane — Caddy + R2       | Live                                       | DO FRA1 → Hetzner post-M5 (parked) |
 
 Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are **not** in this manual. When they're provisioned, add a chapter then. Active state for those galaxies lives in `Universe/spike/spike-plan.md` and `docs/architecture/adr-drift-2026-05-10.md`.
 

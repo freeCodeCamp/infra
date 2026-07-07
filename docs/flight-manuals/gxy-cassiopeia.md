@@ -212,7 +212,7 @@ The wildcard `*.freecode.camp` covers both `<site>.freecode.camp` (production) a
 
 `freecode.camp` zone is **CF Flexible**: CF terminates HTTPS at the edge, origin is plain HTTP. caddy listens on HTTP `:80` only behind Traefik gatewayClassName. No origin cert at the k8s layer for this zone.
 
-The `freecodecamp.net` zone (windmill, future argocd/zot) uses Full Strict with origin cert pair from `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc`. The two postures coexist intentionally — see `UNIVERSE.md §1` for the matrix.
+The `freecodecamp.net` zone (future argocd/zot; Windmill was the prior consumer, retired 2026-07-07) uses Full Strict with origin cert pair from `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — the cert itself is not retired, kept live for the parked argocd/zot reactivation. The two postures coexist intentionally — see `UNIVERSE.md §1` for the matrix.
 
 cert-manager / DNS-01 issuer is **not deployed** and not on the short-term path (RFC §D).
 

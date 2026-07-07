@@ -138,12 +138,11 @@ None of the above?
 
 ## Charts in this repo using each pattern
 
-| Chart                                              | Pattern                          | Notes                                                                                                       |
-| -------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `k3s/gxy-cassiopeia/apps/caddy/charts/caddy`       | A                                | External: R2 only. Dormant trap if cluster-local egress added — would need Pattern B upgrade.               |
-| `k3s/gxy-management/apps/artemis/charts/artemis`   | B                                | External: R2 + GitHub + ghcr. Cluster-local: Valkey. Both halves wired since 2026-05-11.                    |
-| `k3s/gxy-management/apps/valkey/charts/valkey`     | (vanilla NetworkPolicy, not CNP) | Ingress-only restriction (artemis namespace pods). No L7 trap — vanilla NP doesn't engage Cilium DNS proxy. |
-| `k3s/gxy-management/apps/windmill/charts/windmill` | (none)                           | No CNP. Matches field-note advice for non-secret-holding apps.                                              |
+| Chart                                            | Pattern                          | Notes                                                                                                       |
+| ------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `k3s/gxy-cassiopeia/apps/caddy/charts/caddy`     | A                                | External: R2 only. Dormant trap if cluster-local egress added — would need Pattern B upgrade.               |
+| `k3s/gxy-management/apps/artemis/charts/artemis` | B                                | External: R2 + GitHub + ghcr. Cluster-local: Valkey. Both halves wired since 2026-05-11.                    |
+| `k3s/gxy-management/apps/valkey/charts/valkey`   | (vanilla NetworkPolicy, not CNP) | Ingress-only restriction (artemis namespace pods). No L7 trap — vanilla NP doesn't engage Cilium DNS proxy. |
 
 ## Future direction (not in scope today)
 

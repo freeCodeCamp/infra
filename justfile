@@ -239,7 +239,7 @@ verify-secrets:
         # DO contexts
         do-primary/.env.enc|do-universe/.env.enc) ;;
         # Per-app platform-wide namespace stubs / r2 reader
-        windmill/.env.enc|outline/.env.enc|appsmith/.env.enc|r2-read/.env.enc) ;;
+        outline/.env.enc|appsmith/.env.enc|r2-read/.env.enc) ;;
         # Pre-Universe artemis SoT (audit F42 — flagged for unification)
         management/artemis.env.enc) ;;
         # Legacy (retire post-Universe per RFC)

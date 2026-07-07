@@ -1,5 +1,7 @@
 # Universe Platform State — 2026-07-06
 
+> **Post-snapshot update:** as of 2026-07-07, Windmill was retired (see [`docs/runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md)) and gxy-launchbase was decommissioned (idle droplets deleted, pending rebuild). This 2026-07-06 snapshot predates both changes.
+
 Live-verified snapshot of the freeCodeCamp Universe platform: what is what, what runs, how it is deployed and updated, where automation is missing, and where the docs diverge from reality.
 
 Supersedes [`universe-state-2026-05-29.md`](./universe-state-2026-05-29.md) — that snapshot predates the durable-execution subsystem (ADR-020 / Hatchet / artemis stage-2 / runbook-09), all live since 2026-06-05. Design rationale stays in the Universe ADRs (001-020) — not duplicated here.

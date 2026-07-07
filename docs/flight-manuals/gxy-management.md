@@ -1,10 +1,10 @@
 # Flight Manual — gxy-management
 
-Control-plane galaxy. Today: Windmill (live), artemis (live, deploy proxy), Valkey (registry KV substrate). ArgoCD + Zot + Atlantis are **parked** — chart on disk, deploy frozen pending ADR-005 reactivation trigger.
+Control-plane galaxy. Today: artemis (live, deploy proxy + repo-creation), Hatchet (live, durable-execution engine), Valkey (live, registry KV substrate). ArgoCD + Zot + Atlantis are **parked** — chart on disk, deploy frozen pending ADR-005 reactivation trigger. Windmill **retired 2026-07-07** — platform-ops durable execution moved to artemis + Hatchet, repo-creation moved to artemis `/api/repo*` + `universe repo` CLI; full decommission record: [`../runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md).
 
 | Field             | Value                                                           |
 | ----------------- | --------------------------------------------------------------- |
-| Role              | Control plane (Windmill + artemis + Valkey)                     |
+| Role              | Control plane (artemis + Hatchet + Valkey)                      |
 | Provider          | DigitalOcean FRA1                                               |
 | Pod CIDR          | `10.1.0.0/16`                                                   |
 | Service CIDR      | `10.11.0.0/16`                                                  |
@@ -26,12 +26,11 @@ This chapter feeds the cassiopeia GA design at [`../architecture/rfc-gxy-cassiop
 
 `infra-secrets/k3s/gxy-management/`:
 
-- `windmill.values.yaml.enc` — sops overlay for windmill chart
-- `windmill-backup.secrets.env.enc` — DO Spaces creds for daily pg_dump
 - `artemis.values.yaml.enc` — sops overlay for artemis chart (R2 admin creds, GH OAuth client id, JWT signing key)
+- `hatchet.values.yaml.enc` — sops overlay for hatchet chart (engine DB creds, `docs/runbooks/09-hatchet-engine-deploy.md` §A)
 - `valkey.values.yaml.enc` — sops overlay for valkey chart (AUTH password)
 
-`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard for the `freecodecamp.net` zone (windmill / future argocd / future zot reuse).
+`infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard for the `freecodecamp.net` zone (reserved for future argocd/zot reactivation; Windmill was the last live consumer until its 2026-07-07 retirement).
 
 ```bash
 cd ~/DEV/fCC/infra
@@ -50,7 +49,7 @@ test "$(doctl compute droplet list --tag-name gxy-management-k3s --format ID --n
   || echo "↻ provision via DO dashboard"
 ```
 
-DO Spaces bucket `net-freecodecamp-universe-backups` in FRA1 (per `UNIVERSE.md §3`). Single bucket, prefix-scoped per use (`etcd/<galaxy>/`, `windmill/<galaxy>/`).
+DO Spaces bucket `net-freecodecamp-universe-backups` in FRA1 (per `UNIVERSE.md §3`). Single bucket, prefix-scoped per use (`etcd/<galaxy>/`).
 
 ### A.3 Tailscale + cluster bootstrap
 
@@ -84,22 +83,18 @@ kubectl exec -n kube-system $(kubectl get pods -n kube-system -l k8s-app=cilium 
 # 3/3 reachable, all endpoints 1/1
 ```
 
-## §B — Windmill
+## §B — Hatchet (durable execution engine)
+
+Windmill retired 2026-07-07 — this section covered its helm install / PG restore / CNPG-migration-parked notes; that operational history is preserved in [`../runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md) and the archived backup runbook `docs/runbooks/archive/2026-07-07/06-windmill-pg-backup.md`. Platform-ops durable execution (deploy-GC) now runs on Hatchet.
 
 ### B.1 Helm install
 
+Hatchet engine (v0.88.6) lands entirely in the **`artemis` namespace**, sharing the artemis-bundled PostgreSQL `hatchet` tenant — no separate `hatchet` namespace, no dashboard/API surface (engine-only, ClusterIP, no ingress). Full deploy detail, invariants, and hook ordering: [`../runbooks/09-hatchet-engine-deploy.md`](../runbooks/09-hatchet-engine-deploy.md).
+
 ```bash
 cd ~/DEV/fCC/infra
-
-# Skip if release already healthy.
-helm get values -n windmill windmill >/dev/null 2>&1 \
-  && echo "✓ windmill release present" \
-  || just release gxy-management windmill
-
-just release gxy-management windmill
+just release gxy-management hatchet
 ```
-
-`just release` decrypts the sops overlay + applies kustomize manifests (Gateway, HTTPRoute, TLS secret) on top of the helm release.
 
 ### B.2 Verify
 
@@ -107,101 +102,19 @@ just release gxy-management windmill
 cd ~/DEV/fCC/infra/k3s/gxy-management
 export KUBECONFIG=$(pwd)/.kubeconfig.yaml
 
-kubectl get pods -n windmill
-# 6 pods Running (app, 2× workers-default, workers-native, extra, postgresql)
+helm -n artemis list | grep hatchet
 
-kubectl get gateway -n windmill
-# windmill-gateway   Programmed=True
+kubectl -n artemis get pods -l app.kubernetes.io/component=engine
+# hatchet-engine Running, startupProbe budget 120s
 
-kubectl get httproute -n windmill
-# windmill-route, http-redirect
+kubectl -n artemis logs deploy/hatchet-engine | grep -i "grpc\|listen" | head
+# listening on 7077 (NOT the binary default 7070)
 
-kubectl get svc -n kube-system traefik
-# EXTERNAL-IP shows all 3 node VPC IPs
+kubectl -n artemis get secret hatchet-client-config -o jsonpath='{.data.HATCHET_CLIENT_TOKEN}' | head -c 16
+# non-empty — worker token minted
 ```
 
-### B.3 Restore Windmill state (REBUILD ONLY)
-
-Skip on fresh install. Only applies when this chapter is replayed to rebuild an existing cluster — the bundled PostgreSQL comes up empty after B.1, so the pre-teardown `pg_dumpall` must be loaded before end users hit the UI.
-
-For a rebuild, do this BEFORE §D DNS cutover.
-
-#### B.3.1 Preconditions
-
-- Pre-teardown pg_dump exists at `k3s/gxy-management/.backups/windmill-<ts>.sql.gz` (run `just backup-windmill gxy-management` before teardown) OR S3 copy at `s3://net-freecodecamp-universe-backups/windmill/gxy-management/windmill-<ts>.sql.gz`.
-- `windmill-postgresql-0` pod Running (B.2 green).
-
-#### B.3.2 Quiesce Windmill app + worker pods
-
-The bundled PostgreSQL refuses `DROP DATABASE windmill` while app holds connections (~35 sessions per deploy). Scale Windmill deployments to zero first; leave the StatefulSet up.
-
-```bash
-cd ~/DEV/fCC/infra/k3s/gxy-management
-export KUBECONFIG=$(pwd)/.kubeconfig.yaml
-
-# Record current replica counts for restore after (chart 4.x → 1/1/2/1).
-kubectl get deploy -n windmill -o jsonpath='{range .items[*]}{.metadata.name}{"="}{.spec.replicas}{"\n"}{end}'
-
-kubectl scale deploy -n windmill \
-  windmill-app windmill-extra windmill-workers-default windmill-workers-native \
-  --replicas=0
-
-# Wait until only windmill-postgresql-0 is Running.
-kubectl get pods -n windmill -w
-```
-
-#### B.3.3 Restore
-
-```bash
-DUMP=k3s/gxy-management/.backups/windmill-<ts>.sql.gz   # adjust timestamp
-PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
-
-kubectl cp "$DUMP" "windmill/${PG_POD}:/tmp/"
-
-# Kill stragglers + drop the fresh-install DB so the dump's CREATE lands cleanly.
-kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -c "
-  SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-  WHERE datname='windmill' AND pid <> pg_backend_pid();"
-kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -c "DROP DATABASE IF EXISTS windmill;"
-
-kubectl exec -n windmill "${PG_POD}" -- bash -c \
-  "gunzip -c /tmp/$(basename $DUMP) | psql -U postgres"
-```
-
-Expected noise: `NOTICE` / `ERROR: role "postgres" already exists` and similar — harmless (`pg_dumpall --clean --if-exists` emits idempotent DROP statements that race with the bootstrapped `postgres` super-role). Constraint violations on `INSERT` are real errors.
-
-#### B.3.4 Scale back + verify
-
-```bash
-# Restore original replica counts (chart 4.x defaults).
-kubectl scale deploy -n windmill windmill-app --replicas=1
-kubectl scale deploy -n windmill windmill-extra --replicas=1
-kubectl scale deploy -n windmill windmill-workers-default --replicas=2
-kubectl scale deploy -n windmill windmill-workers-native --replicas=1
-
-kubectl rollout status deploy -n windmill windmill-app --timeout=5m
-kubectl rollout status deploy -n windmill windmill-workers-default --timeout=5m
-
-# Row counts
-kubectl exec -n windmill "${PG_POD}" -- psql -U postgres -d windmill -c "
-  SELECT
-    (SELECT count(*) FROM script) AS scripts,
-    (SELECT count(*) FROM flow) AS flows,
-    (SELECT count(*) FROM app) AS apps,
-    (SELECT count(*) FROM resource) AS resources,
-    (SELECT count(*) FROM usr) AS users,
-    (SELECT count(*) FROM schedule) AS schedules
-  ;"
-
-# wmill CLI sync check (from ~/DEV/fCC-U/windmill)
-cd ~/DEV/fCC-U/windmill
-wmill sync pull --workspace platform --yes
-# Expect: zero deletions, zero new additions.
-```
-
-### B.4 CNPG migration (parked)
-
-The bundled PostgreSQL is single-instance, no replication, no WAL archiving. CNPG migration (P0-05 in prior audit) is parked behind the gxy-backoffice provisioning trigger. Tracked in `TODO-park §"CNPG migration for Windmill"`.
+Wire the minted token + `HATCHET_ADDR` into artemis per runbook 09 §D before (or as part of) `just release gxy-management artemis` in §D below.
 
 ## §C — Valkey (registry KV substrate)
 
@@ -476,60 +389,45 @@ doctl compute droplet list --tag-name gxy-management-k3s --format Name,PublicIPv
 
 ### F.2 Cloudflare DNS records
 
-| Hostname                    | Record      | Proxy | SSL         | Notes                                                              |
-| --------------------------- | ----------- | ----- | ----------- | ------------------------------------------------------------------ |
-| `windmill.freecodecamp.net` | A × 3 nodes | ON    | Full Strict | Origin cert from `infra-secrets/global/tls/freecodecamp-net.*.enc` |
-| `uploads.freecode.camp`     | A × 3 nodes | ON    | Flexible    | No origin cert — CF→origin HTTP                                    |
-| `argocd.freecodecamp.net`   | (parked)    | —     | —           | Phantom DNS deletion queued — do not recreate                      |
-| `zot.freecodecamp.net`      | (parked)    | —     | —           | Same                                                               |
+| Hostname                  | Record      | Proxy | SSL      | Notes                                         |
+| ------------------------- | ----------- | ----- | -------- | --------------------------------------------- |
+| `uploads.freecode.camp`   | A × 3 nodes | ON    | Flexible | No origin cert — CF→origin HTTP               |
+| `argocd.freecodecamp.net` | (parked)    | —     | —        | Phantom DNS deletion queued — do not recreate |
+| `zot.freecodecamp.net`    | (parked)    | —     | —        | Same                                          |
+
+`windmill.freecodecamp.net` deleted from Cloudflare 2026-07-07 alongside the Windmill teardown (`docs/runbooks/12-windmill-decommission.md` §5).
 
 ### F.3 Auth gates
 
-- **Windmill** — native auth (no CF Access). D22 OAuth-org-gate canonical (sprint 2026-04-21 amendment).
 - **artemis** — programmatic API; auth is GH Bearer + JWT (no CF Access — that would block CLI clients).
 
 ### F.4 Smoke
 
 ```bash
-curl -sI https://windmill.freecodecamp.net
-# 200
-
 curl -fsS https://uploads.freecode.camp/healthz
 # {"ok":true}
 ```
 
 ## §G — Backups
 
-| Data              | Method                                             | Schedule                    | Storage                                                           | Restore time         |
-| ----------------- | -------------------------------------------------- | --------------------------- | ----------------------------------------------------------------- | -------------------- |
-| etcd              | k3s built-in S3 snapshots                          | Every 6h, 20 retained       | `s3://net-freecodecamp-universe-backups/etcd/gxy-management/`     | Minutes (k3s native) |
-| Windmill PG       | CronJob `pg_dumpall` → S3                          | Daily 02:00 UTC, 7 retained | `s3://net-freecodecamp-universe-backups/windmill/gxy-management/` | Minutes (pg_restore) |
-| Valkey (registry) | **Deferred — post-GA** (see §C.5)                  | not yet running             | future: `r2://universe-static-apps-01/_meta/registry/<date>.rdb`  | post-GA scope        |
-| ArgoCD            | not backed up — state in git                       | n/a                         | n/a                                                               | re-deploy from git   |
-| Zot (parked)      | not backed up                                      | n/a                         | DO Spaces (when reactivated)                                      | n/a                  |
-| Helm releases     | not backed up — chart values are source of truth   | n/a                         | infra repo                                                        | `just release`       |
-| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                         | infra-secrets repo                                                | `just release`       |
+| Data              | Method                                             | Schedule              | Storage                                                          | Restore time         |
+| ----------------- | -------------------------------------------------- | --------------------- | ---------------------------------------------------------------- | -------------------- |
+| etcd              | k3s built-in S3 snapshots                          | Every 6h, 20 retained | `s3://net-freecodecamp-universe-backups/etcd/gxy-management/`    | Minutes (k3s native) |
+| Valkey (registry) | **Deferred — post-GA** (see §C.5)                  | not yet running       | future: `r2://universe-static-apps-01/_meta/registry/<date>.rdb` | post-GA scope        |
+| ArgoCD            | not backed up — state in git                       | n/a                   | n/a                                                              | re-deploy from git   |
+| Zot (parked)      | not backed up                                      | n/a                   | DO Spaces (when reactivated)                                     | n/a                  |
+| Helm releases     | not backed up — chart values are source of truth   | n/a                   | infra repo                                                       | `just release`       |
+| Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                   | infra-secrets repo                                               | `just release`       |
 
-### G.1 Ad-hoc Windmill backup (before maintenance)
+Windmill's `pg_dumpall` CronJob (formerly here) was removed with the Windmill teardown (`docs/runbooks/12-windmill-decommission.md` §4/§6); the final pre-teardown dump is archived outside the cluster per that runbook's Phase 1.
 
-```bash
-cd ~/DEV/fCC/infra
-just backup-windmill gxy-management
-```
-
-Saves to `k3s/gxy-management/.backups/`. Run before any helm-upgrade, teardown, or PG change.
-
-### G.2 Restore Windmill PG
-
-See B.3 above.
-
-### G.3 Restore Valkey from R2 RDB mirror — DEFERRED (post-GA)
+### G.1 Restore Valkey from R2 RDB mirror — DEFERRED (post-GA)
 
 > The R2 mirror CronJob is not yet running (see §C.5). Until it ships, the only recovery path on Valkey data loss is the AOF on the local-path PVC. Worst case (PVC loss + no nightly mirror): rerun `apps/valkey/scripts/import-sites.sh` to re-seed the 11-site registry, then accept that any sites registered after the seed import are lost and must be re-`universe sites register`'d by staff.
 >
-> When G.3 reactivates, the recipe will read from `r2://universe-static-apps-01/_meta/registry/<date>.rdb`, copy into the Valkey pod under `-n valkey`, and decrypt the password from `secretEnv.VALKEY_PASSWORD` in the sops envelope (NOT `auth.password` — schema in C.1).
+> When G.1 reactivates, the recipe will read from `r2://universe-static-apps-01/_meta/registry/<date>.rdb`, copy into the Valkey pod under `-n valkey`, and decrypt the password from `secretEnv.VALKEY_PASSWORD` in the sops envelope (NOT `auth.password` — schema in C.1).
 
-### G.4 Restore etcd from S3
+### G.2 Restore etcd from S3
 
 ```bash
 # List available snapshots:
@@ -547,32 +445,9 @@ k3s server \
 
 Then rejoin the other nodes. See <https://docs.k3s.io/datastore/backup-restore>.
 
-## §H — Windmill IaC (CLI sync, separate repo)
+## §H — Windmill IaC (historical, retired 2026-07-07)
 
-Windmill CE has no Git Sync. Scripts/flows/apps managed via `wmill` CLI in dedicated repo `~/DEV/fCC-U/windmill`. Critical warnings:
-
-- **NEVER `wmill sync push` from the wrong directory.** "No wmill.yaml found" = wrong dir; without config, push sees empty local state and deletes everything remote.
-- **ALWAYS decrypt resources before push, re-encrypt after.** Pushing encrypted ciphertext stores `ENC[AES256_GCM,...]` as literal values.
-- **ALWAYS use `--dry-run` first.** Verify changes show `+`/`~`, not unexpected `-`.
-
-```bash
-cd ~/DEV/fCC-U/windmill
-
-# Push local → remote
-sops -d -i f/integration/apollo-11_github_app.resource.yaml
-wmill sync push --dry-run                           # verify creates/updates
-wmill sync push --yes
-sops -e -i f/integration/apollo-11_github_app.resource.yaml
-
-# Pull remote → local
-wmill sync pull
-sops -e -i f/integration/apollo-11_github_app.resource.yaml
-
-# Regenerate metadata after code changes
-wmill generate-metadata
-```
-
-Branch strategy: `main` config only; `gxy-management` carries scripts/flows/apps for the gxy-management workspace.
+Windmill CE had no Git Sync; scripts/flows/apps were managed via `wmill` CLI in the dedicated repo `~/DEV/fCC-U/windmill`. That repo is slated for read-only archival per [`../runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md) Phase 8 (kept as the auditable record of the Apollo-11 / repo_mgmt / cleanup flow designs, in case a future dedicated user-facing Windmill instance — a fresh decision, likely backoffice, only if requested — needs them). No live sync commands apply to this galaxy anymore.
 
 ## §I — Smoke (post-bring-up)
 
@@ -599,7 +474,7 @@ Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from RFC §E):
 
 ## §J — Teardown
 
-Destructive. Run an ad-hoc Windmill backup (G.1) and a Valkey ad-hoc RDB capture (§C.5, `just backup-valkey`) before teardown.
+Destructive. Run a Valkey ad-hoc RDB capture (§C.5, `just backup-valkey`) before teardown.
 
 ### Cluster only (preserves VMs)
 

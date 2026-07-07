@@ -285,10 +285,10 @@ Cassiopeia serves `*.freecode.camp` from R2 via caddy-s3. The user's locked scop
 
 ### TLS posture per zone (anchors for §1 of UNIVERSE.md)
 
-| Zone               | Mode        | Origin cert                       | Used by                                                                        |
-| ------------------ | ----------- | --------------------------------- | ------------------------------------------------------------------------------ |
-| `freecode.camp`    | Flexible    | none (CF-edge HTTPS, origin HTTP) | caddy on cassiopeia · artemis on management                                    |
-| `freecodecamp.net` | Full Strict | `*.freecodecamp.net` wildcard     | windmill / argocd / zot (when reactivated) on management; future galaxy planes |
+| Zone               | Mode        | Origin cert                       | Used by                                                                                                                       |
+| ------------------ | ----------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `freecode.camp`    | Flexible    | none (CF-edge HTTPS, origin HTTP) | caddy on cassiopeia · artemis on management                                                                                   |
+| `freecodecamp.net` | Full Strict | `*.freecodecamp.net` wildcard     | argocd / zot (when reactivated) on management; future galaxy planes — windmill was the sole live consumer, retired 2026-07-07 |
 
 The zones intentionally use different posture: `freecode.camp` is public static-app surface (high cardinality, wildcard origin cert infeasible across many subdomains, edge HTTPS sufficient); `freecodecamp.net` is internal-tools surface (small fixed set, origin cert worth carrying).
 

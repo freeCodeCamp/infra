@@ -1,16 +1,17 @@
 # Flight Manual — gxy-launchbase
 
-Standby galaxy. CNPG operator running, no workload. Reactivation candidate location for Apollo MVP preview constellations (spike-plan §"Galaxy placement map"). Woodpecker CI is **retired** — do not deploy; full rationale, last-live commit, and resurrection path in [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker.
+Standby galaxy. **Currently decommissioned (2026-07-07) — pending rebuild.** The 3 DO droplets were deleted 2026-07-07 as part of the Windmill-retirement consolidation pass (the cluster was idle: CNPG operator only, zero workload, zero `Cluster` CRs — nothing was orphaned by the teardown). This is **not** a retirement — gxy-launchbase returns on the next Universe buildout. The chapter below is the rebuild manual: replay §A→§B from a clean DO account state to bring it back. Reactivation candidate location for Apollo MVP preview constellations (spike-plan §"Galaxy placement map"). Woodpecker CI is **retired** — do not deploy; full rationale, last-live commit, and resurrection path in [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker.
 
-| Field             | Value                                                        |
-| ----------------- | ------------------------------------------------------------ |
-| Role              | Standby (CNPG operator only); future preview constellations  |
-| Provider          | DigitalOcean FRA1 (Hetzner pivot post-M5, parked)            |
-| Pod CIDR          | `10.6.0.0/16`                                                |
-| Service CIDR      | `10.16.0.0/16`                                               |
-| Cilium cluster ID | `3`                                                          |
-| TLS posture       | n/a (no public ingress at present)                           |
-| Last rehearsed    | 2026-05-10 (post universe-master-audit; Phase 16-18 retired) |
+| Field             | Value                                                                          |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Role              | Standby (CNPG operator only); future preview constellations                    |
+| Status            | **Decommissioned 2026-07-07, pending rebuild** (droplets deleted; not retired) |
+| Provider          | DigitalOcean FRA1 (Hetzner pivot post-M5, parked)                              |
+| Pod CIDR          | `10.6.0.0/16`                                                                  |
+| Service CIDR      | `10.16.0.0/16`                                                                 |
+| Cilium cluster ID | `3`                                                                            |
+| TLS posture       | n/a (no public ingress at present)                                             |
+| Last rehearsed    | 2026-05-10 (post universe-master-audit; Phase 16-18 retired)                   |
 
 > **Read first:** [`UNIVERSE.md`](UNIVERSE.md) §0 prereqs, §1 DNS, §2 secrets, §3 shared infra. Not repeated here.
 >
@@ -98,17 +99,17 @@ just inspect-crds gxy-launchbase cnpg
 # postgresql.cnpg.io CRDs present (Cluster, ScheduledBackup, etc.)
 ```
 
-No `Cluster` CR exists today — the operator runs idle, waiting for its first workload (preview constellation Postgres when Apollo MVP expands; or migrated Windmill PG if CNPG-on-management lands first).
+No `Cluster` CR was present before the 2026-07-07 decommission — the operator ran idle, waiting for its first workload (preview constellation Postgres when Apollo MVP expands). Re-verify this on rebuild; nothing today depends on a migrated-PG scenario, since gxy-management's Windmill (the one hypothetical source) retired 2026-07-07 rather than migrating.
 
 ## §C — Standby state (what's intentionally not here)
 
-| Component         | Status                                                                                                                                       |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Component         | Status                                                                                                                                                                            |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Woodpecker CI     | **RETIRED**. **Do not deploy.** Full park rationale, DNS-deletion state, last-live commit → [`../architecture/retired-stacks.md`](../architecture/retired-stacks.md) §woodpecker. |
-| CNPG `Cluster` CR | none in tree (no workload yet; operator idle — see §B)                                                                                        |
-| Public DNS        | none active                                                                                                                                  |
-| TLS secrets       | no per-app sealed values envelope at this level                                                                                              |
-| Future workloads  | Apollo MVP preview constellations (per spike-plan §Phase 0); not scheduled                                                                   |
+| CNPG `Cluster` CR | none in tree (no workload yet; operator idle — see §B)                                                                                                                            |
+| Public DNS        | none active                                                                                                                                                                       |
+| TLS secrets       | no per-app sealed values envelope at this level                                                                                                                                   |
+| Future workloads  | Apollo MVP preview constellations (per spike-plan §Phase 0); not scheduled                                                                                                        |
 
 If a future sprint reactivates a CI plane, the new design must be captured in a fresh ADR or runbook and a new chapter section here — do not paste the retired Phase 16-18 back in.
 
@@ -134,7 +135,7 @@ Acceptance: nodes Ready, operator pod Running, 7+ CNPG CRDs present.
 
 ## §E — Teardown
 
-Destructive. Not blocking on workload state today (no `Cluster` CR in tree).
+Destructive. Not blocking on workload state today (no `Cluster` CR in tree). Already executed 2026-07-07 (full teardown — cluster + all 3 VMs); kept here as the reference procedure for the next teardown after this galaxy is rebuilt.
 
 ### Cluster only (preserves VMs)
 

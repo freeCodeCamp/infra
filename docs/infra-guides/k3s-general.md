@@ -7,7 +7,7 @@ Self-hosted k3s clusters on DigitalOcean.
 | Cluster              | Purpose                 | Apps                                               |
 | -------------------- | ----------------------- | -------------------------------------------------- |
 | ops-backoffice-tools | Internal tools (legacy) | Appsmith, Outline                                  |
-| gxy-management       | Universe control plane  | Windmill, artemis (uploads.freecode.camp), valkey  |
+| gxy-management       | Universe control plane  | artemis (uploads.freecode.camp), valkey            |
 | gxy-launchbase       | Standby (post-cutover)  | CNPG operator only (woodpecker retired 2026-05-03) |
 | gxy-cassiopeia       | Static-serve plane      | Caddy-S3 fronting `*.freecode.camp` from R2        |
 
@@ -31,8 +31,7 @@ k3s/
 ├── gxy-management/
 │   ├── apps/
 │   │   ├── artemis/
-│   │   ├── valkey/
-│   │   └── windmill/
+│   │   └── valkey/
 │   └── cluster/
 │       ├── cilium/
 │       └── security/
@@ -135,7 +134,6 @@ ______________________________________________________________________
 | ------------------------- | ---- | ----------------------- | ------------- |
 | appsmith.freecodecamp.net | A    | tools LB (legacy)       | Full (Strict) |
 | outline.freecodecamp.net  | A    | tools LB (legacy)       | Full (Strict) |
-| windmill.freecodecamp.net | A    | gxy-management node IPs | Full (Strict) |
 | freecode.camp             | A    | gxy-cassiopeia node IPs | Flexible      |
 | \*.freecode.camp          | A    | gxy-cassiopeia node IPs | Flexible      |
 | uploads.freecode.camp     | A    | gxy-management node IPs | Flexible      |
@@ -183,24 +181,21 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 ### gxy-management
 
 ```
-Internet → Cloudflare (Full Strict) → Node Public IPs → Traefik (hostNetwork) → Gateway API → Apps
-                                                                                       │
-                                                                         ┌─────────────┴─────────────┐
-                                                                         ↓                           ↓
-                                                                     Windmill                    artemis
-                                                                                                     │
-                                                                                                  Valkey (in-cluster registry)
-                                                                                                     │
-                                                                                                  R2 (universe-static-apps-01)
+Internet → Cloudflare (Flexible) → Node Public IPs → Traefik (hostNetwork) → Gateway API → artemis
+                                                                                              │
+                                                                                           Valkey (in-cluster registry)
+                                                                                              │
+                                                                                           R2 (universe-static-apps-01)
 
 CNI: Cilium    Storage: local-path
 ```
 
-| App      | Access                                      | Notes                                          |
-| -------- | ------------------------------------------- | ---------------------------------------------- |
-| Windmill | `windmill.freecodecamp.net` (staff)         | server + workers; CF Access deferred           |
-| artemis  | `uploads.freecode.camp` (staff via GH team) | Deploy-proxy; Valkey-backed sites registry     |
-| Valkey   | in-cluster only (`valkey.valkey.svc`)       | Single-replica; AOF; backs artemis sites + JWT |
+| App     | Access                                      | Notes                                          |
+| ------- | ------------------------------------------- | ---------------------------------------------- |
+| artemis | `uploads.freecode.camp` (staff via GH team) | Deploy-proxy; Valkey-backed sites registry     |
+| Valkey  | in-cluster only (`valkey.valkey.svc`)       | Single-replica; AOF; backs artemis sites + JWT |
+
+Windmill (platform-ops tooling) was retired 2026-07-07 — see [`docs/runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md).
 
 ### gxy-cassiopeia
 

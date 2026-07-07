@@ -28,7 +28,7 @@ Pinned versions live in `infra/docs/flight-manuals/00-index.md §"Lifecycle cale
 | ----------- | ---------------- | ---------------------------------------------------- |
 | `kubectl`   | matches k3s line | Cluster-side calls in every chapter                  |
 | `helm`      | 3.14+            | All app deploys are helm-driven                      |
-| `kustomize` | 5+               | argocd/windmill/zot manifests/base                   |
+| `kustomize` | 5+               | argocd/zot manifests/base                            |
 | `ansible`   | core 2.16+       | k3s bootstrap playbooks                              |
 | `doctl`     | 1.110+           | DO inventory probes + Spaces management              |
 | `gh`        | 2.50+            | GH workflow triggers (artemis, caddy-s3 image build) |
@@ -75,21 +75,21 @@ Per RFC `infra/docs/architecture/rfc-secrets-layout.md` §"Current state" (`.sop
 
 ### §1.1 Zones owned
 
-| Zone               | Purpose                                                   | Cloud SSL   | Origin cert                   |
-| ------------------ | --------------------------------------------------------- | ----------- | ----------------------------- |
-| `freecodecamp.net` | Internal tools (windmill / argocd / zot when reactivated) | Full Strict | `*.freecodecamp.net` wildcard |
-| `freecodecamp.org` | Public app (separate fCC scope; not Universe)             | n/a         | n/a                           |
-| `freecode.camp`    | Static-apps surface (cassiopeia + artemis `uploads.…`)    | Flexible    | none (CF→origin HTTP)         |
+| Zone               | Purpose                                                                                  | Cloud SSL   | Origin cert                   |
+| ------------------ | ---------------------------------------------------------------------------------------- | ----------- | ----------------------------- |
+| `freecodecamp.net` | Internal tools (argocd / zot when reactivated; unused since Windmill retired 2026-07-07) | Full Strict | `*.freecodecamp.net` wildcard |
+| `freecodecamp.org` | Public app (separate fCC scope; not Universe)                                            | n/a         | n/a                           |
+| `freecode.camp`    | Static-apps surface (cassiopeia + artemis `uploads.…`)                                   | Flexible    | none (CF→origin HTTP)         |
 
 Per ADR-009 §"Domains" (with the audit-resolved cassiopeia re-routing per `docs/architecture/adr-drift-2026-05-10.md`).
 
 ### §1.2 Per-galaxy DNS records
 
-| Galaxy           | Records                                                                               | Galaxy chapter §     |
-| ---------------- | ------------------------------------------------------------------------------------- | -------------------- |
-| `gxy-management` | `windmill.freecodecamp.net` + `uploads.freecode.camp` + (parked: `argocd.…`, `zot.…`) | gxy-management.md §D |
-| `gxy-launchbase` | (none at present — woodpecker DNS retired)                                            | gxy-launchbase.md §D |
-| `gxy-cassiopeia` | `*.freecode.camp` wildcard                                                            | gxy-cassiopeia.md §D |
+| Galaxy           | Records                                                                                   | Galaxy chapter §     |
+| ---------------- | ----------------------------------------------------------------------------------------- | -------------------- |
+| `gxy-management` | `uploads.freecode.camp` + (parked: `argocd.…`, `zot.…`) — `windmill.…` deleted 2026-07-07 | gxy-management.md §D |
+| `gxy-launchbase` | (none — cluster decommissioned 2026-07-07, pending rebuild)                               | gxy-launchbase.md §D |
+| `gxy-cassiopeia` | `*.freecode.camp` wildcard                                                                | gxy-cassiopeia.md §D |
 
 CF orange cloud ON for every record. SSL mode per zone (matrix above).
 
@@ -119,8 +119,7 @@ do-universe/
 k3s/
   gxy-management/
     artemis.values.yaml.enc         # sops overlay for artemis chart
-    windmill.values.yaml.enc        # sops overlay for windmill chart
-    windmill-backup.secrets.env.enc # CronJob backup creds (DO Spaces)
+    hatchet.values.yaml.enc         # sops overlay for hatchet chart (engine DB creds)
     valkey.values.yaml.enc          # sops overlay for valkey chart  (after RFC §B lands)
     artemis.env.enc                 # artemis runtime secret env (artemis Q15)
   gxy-launchbase/
@@ -150,7 +149,7 @@ These resources live above any single galaxy. Provisioned once, referenced by ev
 | ----------------------------- | ------------------------------------------------ | --------------------------------------------------------------- |
 | DO VPC                        | `universe-vpc-fra1` (CIDR `10.110.0.0/20`)       | private network for all FRA1 nodes                              |
 | DO Cloud Firewall             | `gxy-fw-fra1`                                    | tag-based attach: `gxy-<galaxy>-k3s`                            |
-| DO Spaces bucket (backups)    | `net-freecodecamp-universe-backups`              | etcd snapshots + Windmill PG dumps + CNPG WAL (TBC)             |
+| DO Spaces bucket (backups)    | `net-freecodecamp-universe-backups`              | etcd snapshots + CNPG WAL (TBC)                                 |
 | Cloudflare R2 bucket (static) | `universe-static-apps-01`                        | cassiopeia static apps deploys + `_meta/registry/<date>.rdb`    |
 | Cloudflare R2 admin token     | `infra-secrets/global/.env.enc:R2_ADMIN_*`       | sole-writer for artemis; sole-uploader for valkey RDB CronJob   |
 | Cloudflare R2 read-only token | `infra-secrets/k3s/gxy-cassiopeia/r2-ro.env.enc` | caddy-s3 read path                                              |
@@ -261,6 +260,8 @@ When a pin crosses its action window, file an entry in the active sprint dossier
 ## §99 — Cross-galaxy smoke (post-bring-up)
 
 Run after all 3 galaxy chapters have been rehearsed end-to-end on a fresh cluster set. Confirms cross-galaxy seams hold.
+
+> `gxy-launchbase` is currently decommissioned (3 droplets deleted 2026-07-07, pending rebuild — see `gxy-launchbase.md`). Until it's rebuilt, step 1 below expects `✗ launchbase unreachable`; that's not a smoke failure today.
 
 ```bash
 cd ~/DEV/fCC/infra
