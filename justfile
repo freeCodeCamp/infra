@@ -62,7 +62,6 @@ bootstrap-tools:
 # `--set-file` knobs the chart needs from operator-local data).
 #
 # Examples:
-#   just release gxy-management windmill   → helm + kustomize
 #   just release gxy-cassiopeia caddy      → helm only
 #   just release gxy-management artemis    → helm only
 # just release ops-backoffice-tools outline → kustomize only
@@ -176,31 +175,6 @@ configure-kubeconfig cluster:
 configure-secret name:
     sops "{{ secrets_dir }}/{{ name }}/.env.enc"
 
-# Mint per-site Cloudflare R2 credentials and register them as Woodpecker
-# repo-scoped secrets via the Windmill flow at
-# `f/static/provision_site_r2_credentials`. Idempotent — re-running rotates
-# the token. T11 (sprint 2026-04-21) + D22 (Woodpecker repo-scope) +
-# D33 amended ×2 + D40 (Woodpecker is sole persistence surface).
-# Requires WINDMILL_REPO (defaults to ../fCC-U/windmill).
-[group('configure')]
-configure-constellation SITE="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "{{ SITE }}" ]; then
-      echo "Usage: just configure-constellation <site>" >&2
-      echo "  <site>: lowercase alphanumeric + hyphens, 1-32 chars" >&2
-      exit 2
-    fi
-    WINDMILL_REPO="${WINDMILL_REPO:-../fCC-U/windmill}"
-    if [ ! -d "${WINDMILL_REPO}/workspaces/platform" ]; then
-      echo "Error: Windmill repo not found at ${WINDMILL_REPO}." >&2
-      echo "Override with WINDMILL_REPO=/abs/path/to/windmill" >&2
-      exit 1
-    fi
-    cd "${WINDMILL_REPO}/workspaces/platform"
-    echo "Registering constellation {{ SITE }} via Windmill flow..."
-    bunx wmill script run f/static/provision_site_r2_credentials \
-      -d '{"site":"{{ SITE }}"}'
 
 # Apply declarative Cloudflare Notifications from cloudflare/notifications.yaml.
 # Use --dry-run to preview without writing.
@@ -593,47 +567,7 @@ test-loadtest scenario:
     fi
     k6 run "$SCRIPT"
 
-# Static contract test for `configure-constellation` recipe.
-[group('test')]
-test-constellation:
-    bash scripts/tests/constellation-register.sh
 
-# Round-trip verification for the windmill backup pipeline. Lists the
-# newest S3 object under `windmill/<cluster>/`, downloads it to a temp
-# file, asserts the gzip is well-formed and ends with the postgres
-# `cluster dump complete` sentinel. Does NOT restore — that path lives
-# in `docs/runbooks/06-windmill-pg-backup.md`.
-[group('test')]
-test-windmill-backup-restore cluster="gxy-management":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    R2_ENV="{{ secrets_dir }}/k3s/{{ cluster }}/windmill-backup.secrets.env.enc"
-    [ -f "$R2_ENV" ] || { echo "FAIL: missing $R2_ENV"; exit 1; }
-    set -a
-    source <(sops -d --input-type dotenv --output-type dotenv "$R2_ENV")
-    set +a
-    export RCLONE_CONFIG=/dev/null
-    export RCLONE_CONFIG_R2_TYPE=s3
-    export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
-    export RCLONE_CONFIG_R2_ACL=private
-    export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
-    export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY"
-    export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_KEY"
-    PREFIX="windmill/{{ cluster }}"
-    NEWEST=$(rclone lsf "r2:${R2_BUCKET}/${PREFIX}/" --include '*.sql.gz' | sort | tail -1)
-    [ -n "$NEWEST" ] || { echo "FAIL: no .sql.gz under r2:${R2_BUCKET}/${PREFIX}/"; exit 1; }
-    TMP=$(mktemp -d)
-    trap 'rm -rf "$TMP"' EXIT
-    DEST="${TMP}/${NEWEST}"
-    echo "Downloading r2:${R2_BUCKET}/${PREFIX}/${NEWEST}"
-    rclone copyto "r2:${R2_BUCKET}/${PREFIX}/${NEWEST}" "$DEST"
-    SIZE=$(stat -f%z "$DEST" 2>/dev/null || stat -c%s "$DEST")
-    [ "$SIZE" -gt 100 ] || { echo "FAIL: backup too small ($SIZE bytes)"; exit 1; }
-    gunzip -t "$DEST" || { echo "FAIL: gunzip integrity check"; exit 1; }
-    gunzip -c "$DEST" | tail -10 \
-      | grep -q 'PostgreSQL database cluster dump complete' \
-      || { echo "FAIL: completion sentinel missing"; exit 1; }
-    echo "OK: ${NEWEST} (${SIZE} bytes) gunzip-clean + sentinel present"
 
 # View a decrypted secret (auto-detects format from extension).
 [group('inspect')]
@@ -677,92 +611,7 @@ inspect-field-notes-trim area="infra" age="30":
         ../Architecture/spike/field-notes/{{ area }}.md \
         --age-days {{ age }} --dry-run
 
-# Windmill backup CronJob health on gxy-management: schedule, last
-# successful run, recent job pods, local `.backups/` artefact list.
-# Operator-runnable read-only probe — never triggers a new backup.
-[group('inspect')]
-inspect-windmill-backup cluster="gxy-management":
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    NS=windmill
-    CJ=windmill-backup
-    echo "=== {{ cluster }} / ${NS}/${CJ} ==="
-    echo "--- cronjob ---"
-    kubectl -n "$NS" get cronjob "$CJ" -o wide 2>&1 || { echo "(not found — CronJob absent)"; exit 1; }
-    echo "--- schedule + last run ---"
-    kubectl -n "$NS" get cronjob "$CJ" \
-      -o jsonpath='schedule={.spec.schedule}{"\n"}lastSchedule={.status.lastScheduleTime}{"\n"}lastSuccessful={.status.lastSuccessfulTime}{"\n"}'
-    echo "--- recent job pods (latest 5) ---"
-    kubectl -n "$NS" get pods -l job-name --sort-by=.status.startTime 2>&1 | tail -6 || true
-    echo "--- local .backups/ ---"
-    if [ -d .backups ]; then
-      ls -lh .backups 2>/dev/null | tail -10 || echo "(empty)"
-    else
-      echo "(no .backups/ dir in $(pwd))"
-    fi
 
-# Ad-hoc Windmill PostgreSQL backup (local file).
-#
-# Dumps pg_dumpall INSIDE the pod to a temp file (so the dump finishes
-# before we pull it) and only then copies it down via `kubectl cp`. This
-# avoids a known failure mode where a streaming `kubectl exec ... | gzip
-# > file.sql.gz` silently truncates mid-dump if the exec connection is
-# interrupted — the gzip closes cleanly, the file looks fine, but the
-# trailing DDL (triggers, ACLs) is missing. Seen during the 2026-04-22
-# gxy-mgmt rename dogfood. Always validate with the "PostgreSQL database
-# cluster dump complete" sentinel before trusting the artefact.
-[group('backup')]
-backup-windmill cluster:
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    mkdir -p .backups
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    FILENAME="windmill-${TIMESTAMP}.sql.gz"
-    PG_POD=$(kubectl get pod -n windmill -l app=windmill-postgresql-demo-app -o jsonpath='{.items[0].metadata.name}')
-    [ -n "${PG_POD}" ] || { echo "Error: no PostgreSQL pod found in windmill namespace"; exit 1; }
-    echo "Backing up Windmill PostgreSQL from ${PG_POD}..."
-    REMOTE="/tmp/${FILENAME}"
-    kubectl exec -n windmill "${PG_POD}" -- bash -c "PGPASSWORD=\"\${POSTGRES_PASSWORD}\" pg_dumpall -U postgres --clean --if-exists | gzip > ${REMOTE}"
-    kubectl exec -n windmill "${PG_POD}" -- bash -c "gunzip -c ${REMOTE} | tail -1" | grep -q 'PostgreSQL database cluster dump complete' \
-      || { echo "Error: in-pod dump missing completion sentinel — aborting"; exit 1; }
-    kubectl cp "windmill/${PG_POD}:${REMOTE}" ".backups/${FILENAME}"
-    kubectl exec -n windmill "${PG_POD}" -- rm -f "${REMOTE}"
-    FILESIZE=$(stat -f%z ".backups/${FILENAME}" 2>/dev/null || stat -c%s ".backups/${FILENAME}")
-    [ "${FILESIZE}" -gt 100 ] || { echo "Error: backup file too small (${FILESIZE} bytes) — likely empty dump"; exit 1; }
-    gunzip -c ".backups/${FILENAME}" | tail -1 | grep -q 'PostgreSQL database cluster dump complete' \
-      || { echo "Error: copied backup missing completion sentinel — aborting"; rm -f ".backups/${FILENAME}"; exit 1; }
-    echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
-
-    # Upload to the same R2 prefix the nightly CronJob targets so an
-    # ad-hoc operator dump is recoverable through the same restore path
-    # documented in `docs/runbooks/06-windmill-pg-backup.md`. Creds come
-    # from the same sops envelope the chart's secretGenerator consumes.
-    R2_ENV="{{ secrets_dir }}/k3s/{{ cluster }}/windmill-backup.secrets.env.enc"
-    if [ -f "$R2_ENV" ]; then
-      echo "Uploading to R2 (mirroring CronJob path)..."
-      set -a
-      source <(sops -d --input-type dotenv --output-type dotenv "$R2_ENV")
-      set +a
-      export RCLONE_CONFIG=/dev/null
-      export RCLONE_CONFIG_R2_TYPE=s3
-      export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
-      export RCLONE_CONFIG_R2_ACL=private
-      export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
-      export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY"
-      export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_KEY"
-      R2_PATH="windmill/{{ cluster }}/${FILENAME}"
-      rclone copyto ".backups/${FILENAME}" "r2:${R2_BUCKET}/${R2_PATH}"
-      rclone lsf "r2:${R2_BUCKET}/${R2_PATH}" \
-        | grep -q "${FILENAME}" \
-        || { echo "Error: R2 head-list did not surface the uploaded object"; exit 1; }
-      echo "Uploaded: r2:${R2_BUCKET}/${R2_PATH}"
-    else
-      echo "WARN: ${R2_ENV} not found — local-only backup (CronJob path NOT mirrored)"
-    fi
 
 # Ad-hoc Valkey snapshot (local file). Triggers BGSAVE in the pod,
 # polls LASTSAVE until the timestamp advances, then `kubectl cp`s the
@@ -823,7 +672,7 @@ build-caddy-s3:
     echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
 
 # Build the postgres-rclone image locally (postgres:18-bookworm + baked
-# rclone for the windmill backup CronJob). GitHub Actions
+# rclone for the artemis backup CronJob). GitHub Actions
 # (`.github/workflows/docker--postgres-rclone.yml`) builds the canonical
 # `ghcr.io/freecodecamp/postgres-rclone:{sha}` tag on workflow_dispatch.
 [group('build')]

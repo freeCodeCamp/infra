@@ -86,7 +86,7 @@ Feature is **opt-in** via the sops envelope: supply all three of `GH_APP_ID` + `
 Two GitHub teams gate the surface (overridable via env, defaults below):
 
 - `REPO_CREATE_AUTHZ_TEAM=staff` — `POST /api/repo` (request a repo)
-- `REPO_APPROVE_AUTHZ_TEAM=apollo-11-approvers` — `POST /api/repo/{id}/{approve,reject}`
+- `REPO_APPROVE_AUTHZ_TEAM=gh-artemis-approvers` — `POST /api/repo/{id}/{approve,reject}` (prod-canonical; `apollo-11-approvers` was the retired Windmill-era name)
 
 Read routes (`GET /api/repos`, `GET /api/repo/{id}`, `GET /api/repo/templates`) are open to any GitHub bearer.
 

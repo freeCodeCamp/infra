@@ -131,7 +131,7 @@ env:
   # config defaults so the chart is no-op for deploy-only deployments.
   GH_REPO_ORG: "freeCodeCamp-Universe"
   REPO_CREATE_AUTHZ_TEAM: "staff"
-  REPO_APPROVE_AUTHZ_TEAM: "apollo-11-approvers"
+  REPO_APPROVE_AUTHZ_TEAM: "gh-artemis-approvers"
   ENVIRONMENT: "development"
   SENTRY_TRACES_SAMPLE_RATE: "0.2"
   # Durable-execution (rendered only when postgres.enabled). CLEANUP_BLAST_CAP

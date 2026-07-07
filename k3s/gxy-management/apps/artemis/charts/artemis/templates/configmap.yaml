@@ -23,7 +23,7 @@ data:
   # mounted. These three are non-secret config and ship with defaults.
   GH_REPO_ORG:                  {{ default "freeCodeCamp-Universe" .Values.env.GH_REPO_ORG | quote }}
   REPO_CREATE_AUTHZ_TEAM:       {{ default "staff" .Values.env.REPO_CREATE_AUTHZ_TEAM | quote }}
-  REPO_APPROVE_AUTHZ_TEAM:      {{ default "apollo-11-approvers" .Values.env.REPO_APPROVE_AUTHZ_TEAM | quote }}
+  REPO_APPROVE_AUTHZ_TEAM:      {{ default "gh-artemis-approvers" .Values.env.REPO_APPROVE_AUTHZ_TEAM | quote }}
   ENVIRONMENT:                  {{ default "development" .Values.env.ENVIRONMENT | quote }}
   SENTRY_TRACES_SAMPLE_RATE:    {{ default "0.2" .Values.env.SENTRY_TRACES_SAMPLE_RATE | quote }}
   {{- if .Values.postgres.enabled }}
