@@ -26,44 +26,14 @@ x-deploy-config: &deploy-config
         - node.labels.api.variant == ${DEPLOYMENT_TLD}
       preferences:
         - spread: node.labels.api.variant == ${DEPLOYMENT_TLD}
-  # logging:
-  #   driver: "json-file"
-  #   options:
-  #     max-size: "100m"
-  #     max-file: "5"
-  #     compress: "true"
-  #     labels: "service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}"
-
+  # Sentry is the log plane now; local json-file is a short-retention safety net.
   logging:
-    driver: loki
+    driver: "json-file"
     options:
-      loki-url: ${LOKI_URL}
-      loki-external-labels: service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}
-      loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-Scope-v20250508-0001}
-      loki-pipeline-stages: |
-        - json:
-            expressions:
-              # top-level
-              level:        level
-              timestamp:    time
-              msg:          msg
-              # under "req"
-              method:       req.REQ_METHOD
-              url:          req.REQ_URL
-              ip:           req.REQ_IP
-              user_agent:   req.REQ_USER_AGENT
-              country:      req.REQ_COUNTRY
-              query:        req.REQ_QUERY
-              id:           req.REQ_ID
-              # under "res"
-              status:       res.RES_STATUS_CODE
-              response_time: res.RES_ELAPSED_TIME
-        - labels:
-              level:
-              method:
-              status:
-              url:
-              msg:
+      max-size: "100m"
+      max-file: "5"
+      compress: "true"
+      labels: "service=api,app=learn-api,variant=${DEPLOYMENT_TLD},version=${DEPLOYMENT_VERSION}"
   healthcheck:
     test:
       [
@@ -90,6 +60,13 @@ x-deploy-config: &deploy-config
     - FCC_API_LOG_TRANSPORT=${FCC_API_LOG_TRANSPORT:-default}
     - SENTRY_DSN=${SENTRY_DSN}
     - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+    # Per-replica identity across redeploys. {{...}} are Swarm task templates —
+    # verify on first deploy that server_name is not the literal string.
+    - SENTRY_SERVER_NAME={{.Service.Name}}.{{.Task.Slot}}
+    - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+    - SENTRY_PROFILE_SESSION_SAMPLE_RATE=${SENTRY_PROFILE_SESSION_SAMPLE_RATE:-0.1}
+    - SENTRY_LOGS_DEBUG_SAMPLE_RATE=${SENTRY_LOGS_DEBUG_SAMPLE_RATE:-0.05}
+    - SENTRY_LOGS_INFO_SAMPLE_RATE=${SENTRY_LOGS_INFO_SAMPLE_RATE:-1}
     # -- Debugging
     # - FCC_ENABLE_SENTRY_ROUTES=${FCC_ENABLE_SENTRY_ROUTES:-false}
     # - FCC_ENABLE_SWAGGER_UI=${FCC_ENABLE_SWAGGER_UI:-false}
