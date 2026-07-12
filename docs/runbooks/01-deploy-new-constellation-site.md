@@ -1,6 +1,6 @@
 # Deploy a new constellation site
 
-End-to-end runbook for landing a new `<site>.freecode.camp` on the freeCodeCamp Universe static-apps platform. Audience: freeCodeCamp staff developers + platform admins. Spec: ADR-016 (deploy proxy). Adjacent runbook: [`deploy-artemis-service.md`](deploy-artemis-service.md) (operator-side artemis lifecycle).
+End-to-end runbook for landing a new `<site>.freecode.camp` on the freeCodeCamp Universe static-apps platform. Audience: freeCodeCamp staff developers + platform admins. Spec: ADR-016 (deploy proxy). Adjacent runbook: [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) (operator-side artemis lifecycle).
 
 ## What you get
 

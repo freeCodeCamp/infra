@@ -168,7 +168,7 @@ Rehearse this drill before declaring artemis-PG GA, and after any change to the 
 - [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) — artemis deploy + staged durable-exec bootstrap + RELEASE-CUT CHECKLIST
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) §Durable-exec substrate check — post-deploy substrate verification
 - [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — sops envelope usage (the overlay is YAML, not dotenv)
-- [`06-windmill-pg-backup.md`](06-windmill-pg-backup.md) — the windmill precedent this backup mirrors (schedule, sentinel, rclone pattern)
+- [`06-windmill-pg-backup.md`](archive/2026-07-07/06-windmill-pg-backup.md) — the windmill precedent this backup mirrors (schedule, sentinel, rclone pattern)
 - ADR-019 §Stateful-pillar backup pattern — RPO/RTO floor + four-tier backup ladder
 - ADR-020 (durable-execution model) — bundled-PG M1 vs CNPG-sweep GA trajectory
 - `~/DEV/fCC/artemis/docs/design/0001-durable-execution-model.md` §3 — data ownership + stateful-pillar trajectory
