@@ -1,0 +1,13 @@
+{{- $env := default "development" .Values.env.ENVIRONMENT }}
+artemis deployed to namespace {{ .Release.Namespace }} (ENVIRONMENT={{ $env }}).
+{{ if .Values.secretEnv.SENTRY_DSN }}
+Sentry: ENABLED — events route to the configured external DSN.
+{{- else if ne $env "development" }}
+WARNING: SENTRY_DSN is unset in a non-development environment ({{ $env }}).
+         artemis will run with Sentry DISABLED — no error monitoring,
+         tracing, or release health for this deployment.
+         Enable by setting secretEnv.SENTRY_DSN via the sops overlay:
+           infra-secrets/k3s/gxy-management/artemis.values.yaml.enc
+{{- else }}
+Sentry: disabled (development default).
+{{- end }}

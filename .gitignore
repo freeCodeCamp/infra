@@ -55,6 +55,8 @@ ansible/inventory/hosts
 *.crt
 *.key
 *.txt
+# Helm charts ship templates/NOTES.txt (post-deploy operator message) — track despite *.txt.
+!**/templates/NOTES.txt
 
 secrets.overrides.yaml
 
