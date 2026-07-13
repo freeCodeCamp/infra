@@ -1,6 +1,6 @@
 # Universe Platform State — 2026-07-06
 
-> **Post-snapshot update:** as of 2026-07-07, Windmill was retired (see [`docs/runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md)) and gxy-launchbase was decommissioned (idle droplets deleted, pending rebuild). This 2026-07-06 snapshot predates both changes.
+> **Post-snapshot update:** as of 2026-07-07, Windmill was retired (see [`docs/runbooks/archive/2026-07-07/12-windmill-decommission.md`](../runbooks/archive/2026-07-07/12-windmill-decommission.md)) and gxy-launchbase was decommissioned (idle droplets deleted, pending rebuild). This 2026-07-06 snapshot predates both changes.
 
 Live-verified snapshot of the freeCodeCamp Universe platform: what is what, what runs, how it is deployed and updated, where automation is missing, and where the docs diverge from reality.
 

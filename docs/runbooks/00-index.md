@@ -16,7 +16,6 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 09  | [09-hatchet-engine-deploy.md](09-hatchet-engine-deploy.md)                 | Operator  | Stand up / rebuild the Hatchet durable-exec engine |
 | 10  | [10-rotate-cf-origin-cert.md](10-rotate-cf-origin-cert.md)                 | Operator  | Rotate the `freecodecamp.net` CF origin cert       |
 | 11  | [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md)             | Operator  | Rehearse R7 — PG outage, serve plane unaffected    |
-| 12  | [12-windmill-decommission.md](12-windmill-decommission.md)                 | Operator  | Retire + uninstall Windmill (platform-ops moved)   |
 
 ## Reading order by scenario
 
@@ -36,25 +35,22 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 
 **Rehearse the artemis PG-outage boundary (R7):** 11 (scale bundled PG to 0, assert serve plane + degraded readyz, restore; links to 03 + 08 internally; operator-only, destructive to control plane).
 
-**Retire Windmill (platform-ops moved to artemis + Hatchet):** 12 (gate-verified teardown — cluster removal executed 2026-07-07; removed helm + kustomize + PVC; DNS/secrets/ADR cleanup follows; operator-only, destructive).
-
 ## Block ordering rationale
 
-| Block | Files | Why grouped                                              |
-| ----- | ----- | -------------------------------------------------------- |
-| 01    | 01    | Staff-facing primary — most reads                        |
-| 02–03 | 02–03 | Artemis lifecycle (deploy + verify)                      |
-| 04–05 | 04–05 | Foundations consumed by 02/03 (secrets + R2 keys)        |
-| 07    | 07    | Backup / DR for artemis registry (calls 02 + 04)         |
-| 08    | 08    | Backup / DR for artemis PG (calls 02 + 03 + 04)          |
-| 09    | 09    | Durable-exec engine stand-up (Hatchet); wires into 02    |
-| 10    | 10    | CF origin-cert rotation; foundation-adjacent to 04/05    |
-| 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08          |
-| 12    | 12    | Windmill decommission (executed 2026-07-07); 06 archived |
+| Block | Files | Why grouped                                           |
+| ----- | ----- | ----------------------------------------------------- |
+| 01    | 01    | Staff-facing primary — most reads                     |
+| 02–03 | 02–03 | Artemis lifecycle (deploy + verify)                   |
+| 04–05 | 04–05 | Foundations consumed by 02/03 (secrets + R2 keys)     |
+| 07    | 07    | Backup / DR for artemis registry (calls 02 + 04)      |
+| 08    | 08    | Backup / DR for artemis PG (calls 02 + 03 + 04)       |
+| 09    | 09    | Durable-exec engine stand-up (Hatchet); wires into 02 |
+| 10    | 10    | CF origin-cert rotation; foundation-adjacent to 04/05 |
+| 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08       |
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
-Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook, slot `08` for the artemis-PG restore drill, and slot `09` for the Hatchet engine deploy runbook. The windmill PG-backup runbook formerly at `06` is archived under [`archive/2026-07-07/`](archive/2026-07-07/) (Windmill retired 2026-07-07); slot `06` is left vacant.
+Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook, slot `08` for the artemis-PG restore drill, and slot `09` for the Hatchet engine deploy runbook. The windmill PG-backup runbook (formerly `06`) and the windmill decommission runbook (formerly `12`) are archived under [`archive/2026-07-07/`](archive/2026-07-07/) (Windmill retired 2026-07-07); slots `06` and `12` are left vacant.
 
 ## Cross-doc references
 

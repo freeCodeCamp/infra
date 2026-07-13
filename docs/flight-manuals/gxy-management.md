@@ -1,6 +1,6 @@
 # Flight Manual — gxy-management
 
-Control-plane galaxy. Today: artemis (live, deploy proxy + repo-creation), Hatchet (live, durable-execution engine), Valkey (live, registry KV substrate). ArgoCD + Zot + Atlantis are **parked** — chart on disk, deploy frozen pending ADR-005 reactivation trigger. Windmill **retired 2026-07-07** — platform-ops durable execution moved to artemis + Hatchet, repo-creation moved to artemis `/api/repo*` + `universe repo` CLI; full decommission record: [`../runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md).
+Control-plane galaxy. Today: artemis (live, deploy proxy + repo-creation), Hatchet (live, durable-execution engine), Valkey (live, registry KV substrate). ArgoCD + Zot + Atlantis are **parked** — chart on disk, deploy frozen pending ADR-005 reactivation trigger. Windmill **retired 2026-07-07** — platform-ops durable execution moved to artemis + Hatchet, repo-creation moved to artemis `/api/repo*` + `universe repo` CLI; full decommission record: [`../runbooks/archive/2026-07-07/12-windmill-decommission.md`](../runbooks/archive/2026-07-07/12-windmill-decommission.md).
 
 | Field             | Value                                                           |
 | ----------------- | --------------------------------------------------------------- |
@@ -85,7 +85,7 @@ kubectl exec -n kube-system $(kubectl get pods -n kube-system -l k8s-app=cilium 
 
 ## §B — Hatchet (durable execution engine)
 
-Windmill retired 2026-07-07 — this section covered its helm install / PG restore / CNPG-migration-parked notes; that operational history is preserved in [`../runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md) and the archived backup runbook `docs/runbooks/archive/2026-07-07/06-windmill-pg-backup.md`. Platform-ops durable execution (deploy-GC) now runs on Hatchet.
+Windmill retired 2026-07-07 — this section covered its helm install / PG restore / CNPG-migration-parked notes; that operational history is preserved in [`../runbooks/archive/2026-07-07/12-windmill-decommission.md`](../runbooks/archive/2026-07-07/12-windmill-decommission.md) and the archived backup runbook `docs/runbooks/archive/2026-07-07/06-windmill-pg-backup.md`. Platform-ops durable execution (deploy-GC) now runs on Hatchet.
 
 ### B.1 Helm install
 
@@ -395,7 +395,7 @@ doctl compute droplet list --tag-name gxy-management-k3s --format Name,PublicIPv
 | `argocd.freecodecamp.net` | (parked)    | —     | —        | Phantom DNS deletion queued — do not recreate |
 | `zot.freecodecamp.net`    | (parked)    | —     | —        | Same                                          |
 
-`windmill.freecodecamp.net` deleted from Cloudflare 2026-07-07 alongside the Windmill teardown (`docs/runbooks/12-windmill-decommission.md` §5).
+`windmill.freecodecamp.net` deleted from Cloudflare 2026-07-07 alongside the Windmill teardown (`docs/runbooks/archive/2026-07-07/12-windmill-decommission.md` §5).
 
 ### F.3 Auth gates
 
@@ -419,7 +419,7 @@ curl -fsS https://uploads.freecode.camp/healthz
 | Helm releases     | not backed up — chart values are source of truth   | n/a                   | infra repo                                                       | `just release`       |
 | Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                   | infra-secrets repo                                               | `just release`       |
 
-Windmill's `pg_dumpall` CronJob (formerly here) was removed with the Windmill teardown (`docs/runbooks/12-windmill-decommission.md` §4/§6); the final pre-teardown dump is archived outside the cluster per that runbook's Phase 1.
+Windmill's `pg_dumpall` CronJob (formerly here) was removed with the Windmill teardown (`docs/runbooks/archive/2026-07-07/12-windmill-decommission.md` §4/§6); the final pre-teardown dump is archived outside the cluster per that runbook's Phase 1.
 
 ### G.1 Restore Valkey from R2 RDB mirror — DEFERRED (post-GA)
 
@@ -447,7 +447,7 @@ Then rejoin the other nodes. See <https://docs.k3s.io/datastore/backup-restore>.
 
 ## §H — Windmill IaC (historical, retired 2026-07-07)
 
-Windmill CE had no Git Sync; scripts/flows/apps were managed via `wmill` CLI in the dedicated repo `~/DEV/fCC-U/windmill`. That repo is slated for read-only archival per [`../runbooks/12-windmill-decommission.md`](../runbooks/12-windmill-decommission.md) Phase 8 (kept as the auditable record of the Apollo-11 / repo_mgmt / cleanup flow designs, in case a future dedicated user-facing Windmill instance — a fresh decision, likely backoffice, only if requested — needs them). No live sync commands apply to this galaxy anymore.
+Windmill CE had no Git Sync; scripts/flows/apps were managed via `wmill` CLI in the dedicated repo `~/DEV/fCC-U/windmill`. That repo is slated for read-only archival per [`../runbooks/archive/2026-07-07/12-windmill-decommission.md`](../runbooks/archive/2026-07-07/12-windmill-decommission.md) Phase 8 (kept as the auditable record of the Apollo-11 / repo_mgmt / cleanup flow designs, in case a future dedicated user-facing Windmill instance — a fresh decision, likely backoffice, only if requested — needs them). No live sync commands apply to this galaxy anymore.
 
 ## §I — Smoke (post-bring-up)
 
