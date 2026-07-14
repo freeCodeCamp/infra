@@ -61,7 +61,6 @@ ansible/inventory/hosts
 secrets.overrides.yaml
 
 .ansible/
-o11y/defaults/
 
 # Beads / Dolt (deprecated; dir kept ignored if it recurs)
 .beads/

@@ -243,7 +243,7 @@ verify-secrets:
         # Pre-Universe artemis SoT (audit F42 — flagged for unification)
         management/artemis.env.enc) ;;
         # Legacy (retire post-Universe per RFC)
-        archive/*|docker/oldeworld/*|k8s/o11y/*|k3s/ops-backoffice-tools/*) ;;
+        archive/*|docker/oldeworld/*|k3s/ops-backoffice-tools/*) ;;
         # Operator scratchpad (dev-only)
         scratchpad/*) ;;
         *)
@@ -348,7 +348,7 @@ verify-cnpg cluster namespace name timeout="5m":
 # Validate K8s manifests with kubeconform.
 #
 # Two stages:
-#   1. raw manifests in k3s/ + k8s/ (kustomize bases, plain YAML) —
+#   1. raw manifests in k3s/ (kustomize bases, plain YAML) —
 #      chart templates excluded because Go template syntax isn't YAML.
 #   2. first-party chart templates rendered via `helm template` against
 #      each chart's values.production.yaml + a stub set for the
@@ -380,7 +380,7 @@ verify-manifests version="1.32.0":
       -ignore-filename-pattern '\.json' \
       -ignore-filename-pattern 'dashboards/' \
       -ignore-filename-pattern 'charts/.*/(Chart\.yaml|templates/)' \
-      k3s/ k8s/ || fail=1
+      k3s/ || fail=1
 
     echo "=== stage 2: rendered chart templates ==="
     KC_ARGS=(

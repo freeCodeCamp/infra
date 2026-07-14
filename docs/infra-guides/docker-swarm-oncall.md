@@ -23,15 +23,13 @@ Service Updater → Auto-update tagged services
 Cleanup Job → Weekly prune on all nodes
 Webhook Receiver → On-demand Gantry updates (via GHA)
     ↓
-All services → Loki logging
+All services → json-file logging (local, rotated)
 ```
 
 ## Prerequisites
 
 - Docker Swarm cluster initialized
 - Docker credentials at `~/.docker/config.json` on manager node
-- Loki instance with push API access (for centralized logging)
-- kubectl access to Kubernetes cluster (for retrieving Loki credentials)
 
 ## Configuration
 
@@ -50,18 +48,7 @@ All services → Loki logging
 
 ### Environment Variables
 
-Set credentials before deployment:
-
-```bash
-# Get Loki gateway password from Kubernetes
-export LOKI_PASSWORD=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_GATEWAY_PASSWORD}' | base64 --decode)
-
-# Construct Loki URL with embedded credentials
-export LOKI_URL="https://loki:${LOKI_PASSWORD}@o11y.freecodecamp.net/loki/api/v1/push"
-
-# Get tenant ID
-export LOKI_TENANT_ID=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_TENANT_ID}' | base64 --decode)
-```
+Only `WEBHOOK_SECRET` is required (see below). Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
 
 ### Webhook Configuration
 
@@ -71,13 +58,11 @@ export LOKI_TENANT_ID=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.d
 
 ### Logging Configuration
 
-Logs are forwarded to Loki with the following labels for clean separation:
+All services log to the local Docker `json-file` driver, rotated per node:
 
-- **Tenant ID**: `fCC-o11y-oncall-v20250113-0001` (separate from other services)
-- **Labels**:
-  - `stack=oncall` (all services)
-  - `service=cronjob|update|cleanup` (per service)
-  - `app=swarm-cronjob|gantry|docker` (application name)
+- **Rotation**: `max-size=10m`, `max-file=3`, `compress=true`
+- **Scope**: logs stay on the node running the task; inspect with `docker service logs oncall_<svc>`
+- **History**: previously shipped to Loki on the o11y cluster (tenant `fCC-o11y-oncall-v20250113-0001`); o11y decommissioned 2026-07-14
 
 ## Deployment
 
@@ -89,13 +74,12 @@ sudo chmod -R u+w /home/freecodecamp/.docker
 # Set Docker context
 docker context use <context_name>
 
-# Set environment variables (see Configuration section)
-export LOKI_PASSWORD=$(kubectl get secret o11y-secrets -n o11y -o jsonpath='{.data.LOKI_GATEWAY_PASSWORD}' | base64 --decode)
-export LOKI_URL="https://loki:${LOKI_PASSWORD}@o11y.freecodecamp.net/loki/api/v1/push"
-export LOKI_TENANT_ID="fCC-o11y-oncall-v20250113-0001"
+# Set WEBHOOK_SECRET (logging is local json-file — no logging env needed)
+export WEBHOOK_SECRET="<strong-random-string>"
 
-# Deploy stack
-docker stack deploy -c docker/swarm/stacks/oncall/stack-oncall.yml oncall
+# Deploy stack (run from the stack dir so relative configs resolve)
+cd docker/swarm/stacks/oncall
+docker stack deploy -c stack-oncall.yml oncall
 ```
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
