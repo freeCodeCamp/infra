@@ -3,6 +3,7 @@ x-port-config: &port-config
   protocol: tcp
   mode: host
 x-deploy-config: &deploy-config
+  stop_grace_period: 30s
   deploy:
     replicas: 3
     update_config:
