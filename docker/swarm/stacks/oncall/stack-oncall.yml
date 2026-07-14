@@ -1,10 +1,10 @@
 x-logging-config: &logging-config
   logging:
-    driver: loki
+    driver: json-file
     options:
-      loki-url: ${LOKI_URL}
-      loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
-      loki-external-labels: stack=oncall
+      max-size: "10m"
+      max-file: "3"
+      compress: "true"
 
 services:
   svc-cronjob:
@@ -15,15 +15,7 @@ services:
       - "TZ=UTC"
       - "LOG_LEVEL=info"
       - "LOG_JSON=true"
-    logging:
-      driver: loki
-      options:
-        loki-url: ${LOKI_URL}
-        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
-        loki-external-labels: container_name={{.Name}},stack=oncall,service=cronjob,app=swarm-cronjob
-        loki-retries: "2"
-        loki-max-backoff: 800ms
-        loki-timeout: 1s
+    <<: *logging-config
     deploy:
       placement:
         constraints:
@@ -48,15 +40,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
-    logging:
-      driver: loki
-      options:
-        loki-url: ${LOKI_URL}
-        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
-        loki-external-labels: container_name={{.Name}},stack=oncall,service=update,app=gantry
-        loki-retries: "2"
-        loki-max-backoff: 800ms
-        loki-timeout: 1s
+    <<: *logging-config
     deploy:
       mode: replicated
       replicas: 0
@@ -86,15 +70,7 @@ services:
       - "until=168h"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-    logging:
-      driver: loki
-      options:
-        loki-url: ${LOKI_URL}
-        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
-        loki-external-labels: container_name={{.Name}},stack=oncall,service=cleanup,app=docker
-        loki-retries: "2"
-        loki-max-backoff: 800ms
-        loki-timeout: 1s
+    <<: *logging-config
     deploy:
       mode: global
       labels:
@@ -128,15 +104,7 @@ services:
       - "/home/freecodecamp/.docker:/root/.docker"
     environment:
       - "WEBHOOK_SECRET=${WEBHOOK_SECRET}"
-    logging:
-      driver: loki
-      options:
-        loki-url: ${LOKI_URL}
-        loki-tenant-id: ${LOKI_TENANT_ID:-fCC-o11y-oncall-v20250113-0001}
-        loki-external-labels: container_name={{.Name}},stack=oncall,service=webhook,app=webhook
-        loki-retries: "2"
-        loki-max-backoff: 800ms
-        loki-timeout: 1s
+    <<: *logging-config
     deploy:
       replicas: 1
       restart_policy:
