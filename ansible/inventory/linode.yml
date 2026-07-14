@@ -17,19 +17,16 @@ groups:
   # Operations Instances
   ops_all: "'ops' in (tags|list)"
 
-  # O11y Cluster
-  o11y_all: "'o11y' in (tags|list)"
-  managers: "'o11y_leader' in (tags|list)" # TODO: Refactor the naming of this group
-  workers: "'o11y_worker' in (tags|list)" # TODO: Refactor the naming of this group
+  # Swarm Cluster (docker-swarm role targets the `managers`/`workers` groups)
+  swarm_all: "'swarm' in (tags|list)"
+  managers: "'swarm_leader' in (tags|list)"
+  workers: "'swarm_worker' in (tags|list)"
 
   # mintworld Cluster
   mintworld_all: "'mintworld' in (tags|list)"
-  mintworld_nomad_servers:
-    "'nomad_svr' in (tags|list) and 'mintworld' in (tags|list)"
-  mintworld_consul_servers:
-    "'consul_svr' in (tags|list) and 'mintworld' in (tags|list)"
-  mintworld_nomad_workers:
-    "'nomad_wkr' in (tags|list) and 'mintworld' in (tags|list)"
+  mintworld_nomad_servers: "'nomad_svr' in (tags|list) and 'mintworld' in (tags|list)"
+  mintworld_consul_servers: "'consul_svr' in (tags|list) and 'mintworld' in (tags|list)"
+  mintworld_nomad_workers: "'nomad_wkr' in (tags|list) and 'mintworld' in (tags|list)"
 
   # Oldeworld Cluster -- ALL
   oldeworld_all: "'oldeworld' in (tags|list)"
