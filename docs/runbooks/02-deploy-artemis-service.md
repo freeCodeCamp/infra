@@ -314,6 +314,8 @@ image:
 
 Both the `# release:` comment and the `tag:` value carry the bare semver (no `v`-prefix). The `@sha256:<digest>` suffix is the immutable anchor — kubelet pulls by digest when both are present. Never ship `tag: X.Y.Z` without the digest, and never ship `tag: latest` in production values.
 
+Then bump the chart `appVersion` to the same bare semver in the **same commit**, so `helm list` reflects what is actually running (they drift otherwise). Edit `k3s/gxy-management/apps/artemis/charts/artemis/Chart.yaml` → set `appVersion: "X.Y.Z"` to match the `tag:` above. Leave the chart `version:` (chart-shape cadence) untouched unless the chart templates changed.
+
 ### 5. Commit
 
 ```bash
