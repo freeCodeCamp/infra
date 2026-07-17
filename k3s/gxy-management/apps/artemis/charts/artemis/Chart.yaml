@@ -22,7 +22,7 @@ version: 0.4.0
 # appVersion tracks the artemis service tag in GHCR — bump alongside
 # image tag rolls in values.production.yaml so `helm list` reflects
 # what is actually running.
-appVersion: "1.5.0"
+appVersion: "1.6.1"
 home: https://github.com/freeCodeCamp/artemis
 sources:
   - https://github.com/freeCodeCamp/artemis
