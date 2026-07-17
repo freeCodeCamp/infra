@@ -64,16 +64,18 @@ spec:
           startupProbe:
             # Gates liveness/readiness until the HTTP server is up.
             # Boot blocks on the PG connect retry window (45s default,
-            # PG_CONNECT_RETRY_WINDOW) + migrations + registry import;
-            # without this gate the liveness probe kills the pod at
-            # ~30s, truncating the retry and re-creating the Sentry
-            # boot-race fatal it exists to absorb (dossier T32).
+            # PG_CONNECT_RETRY_WINDOW) + migrations + registry import +
+            # two sequential Valkey boot-connect retry windows (store +
+            # teamcache, 5s each, VALKEY_CONNECT_RETRY_WINDOW); worst-case
+            # ~95s. failureThreshold*periodSeconds must exceed that or the
+            # liveness probe kills the pod mid-retry, re-creating the
+            # Sentry boot-race fatal it exists to absorb (dossier T32).
             httpGet:
               path: /healthz
               port: http
             periodSeconds: 5
             timeoutSeconds: 2
-            failureThreshold: 18
+            failureThreshold: 24
           livenessProbe:
             # /healthz is the unconditional liveness probe — no upstream
             # calls, can never go red on a Valkey/R2 outage.
