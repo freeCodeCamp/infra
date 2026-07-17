@@ -15,8 +15,8 @@ server_config_yaml: |
   disable-kube-proxy: true
   disable:
     - servicelb
-  cluster-cidr: "10.6.0.0/16"
-  service-cidr: "10.16.0.0/16"
+  cluster-cidr: "10.3.0.0/16"
+  service-cidr: "10.13.0.0/16"
   protect-kernel-defaults: true
   secrets-encryption: true
   kube-apiserver-arg:
