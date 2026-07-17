@@ -1,0 +1,62 @@
+# ADR-008/ADR-011 tenant resource enforcement baseline (2026-07-17).
+# Sized from live usage (caddy: requests 300m/384Mi, limits 3/1.5Gi)
+# with >=3x headroom: guards runaway workloads, never normal ops.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: baseline
+  namespace: caddy
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.cpu: "8"
+    limits.memory: 6Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: baseline
+  namespace: caddy
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1"
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "4"
+        memory: 4Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: baseline
+  namespace: cnpg-system
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: baseline
+  namespace: cnpg-system
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "2"
+        memory: 2Gi

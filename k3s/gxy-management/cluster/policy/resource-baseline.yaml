@@ -1,0 +1,64 @@
+# ADR-008/ADR-011 tenant resource enforcement baseline (2026-07-17).
+# Sized from live usage (requests ~600m/1.4Gi, limits ~5.5/4Gi in artemis ns)
+# with >=3x headroom: guards runaway workloads, never normal ops.
+# LimitRange injects defaults so quota admission cannot reject pods that
+# omit resources (hatchet-engine omits cpu limit).
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: baseline
+  namespace: artemis
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 6Gi
+    limits.cpu: "12"
+    limits.memory: 12Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: baseline
+  namespace: artemis
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1"
+        memory: 1Gi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "4"
+        memory: 4Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: baseline
+  namespace: valkey
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: baseline
+  namespace: valkey
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 96Mi
+      max:
+        cpu: "2"
+        memory: 2Gi

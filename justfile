@@ -175,6 +175,18 @@ configure-kubeconfig cluster:
 configure-secret name:
     sops "{{ secrets_dir }}/{{ name }}/.env.enc"
 
+# Apply cluster policy objects (ResourceQuota/LimitRange baseline) from
+# k3s/<cluster>/cluster/policy/. Idempotent server-side apply.
+[group('configure')]
+configure-policy cluster:
+    #!/usr/bin/env bash
+    set -eu
+    export KUBECONFIG="$(pwd)/k3s/{{ cluster }}/.kubeconfig.yaml"
+    SRC="k3s/{{ cluster }}/cluster/policy"
+    [ -d "$SRC" ] || { echo "Error: $SRC not found"; exit 1; }
+    kubectl apply --server-side -f "$SRC"
+    kubectl get resourcequota,limitrange -A | grep -v kube-system || true
+
 
 # Apply declarative Cloudflare Notifications from cloudflare/notifications.yaml.
 # Use --dry-run to preview without writing.
