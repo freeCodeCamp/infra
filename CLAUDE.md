@@ -69,7 +69,7 @@ just configure-kubeconfig gxy-launchbase
 
 direnv `.envrc` hierarchy still loads:
 
-- root `.envrc` → `$SECRETS_DIR/global/.env.enc` (org-wide tokens, e.g. `DO_API_TOKEN`)
+- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load ONLY with `INFRA_ADMIN=1` (shell export or untracked `.env`) — never auto-loaded (ADR-010, scoped 2026-07-17)
 - `k3s/<galaxy>/.envrc` → sources root + adds galaxy-scoped tokens (e.g. `$SECRETS_DIR/do-universe/.env.enc`) + exports `KUBECONFIG`
 
 The galaxy-scoped `KUBECONFIG` export is now belt-and-suspenders — recipes that need it set it themselves. The galaxy-scoped DO tokens still matter for recipes that hit DO API directly (terraform `provision`, ansible `bootstrap` with DO dynamic inventory) — but those recipes either accept `cluster` as an arg (`provision`) or operate on ansible inventory unrelated to live cluster state (`bootstrap`).

@@ -27,7 +27,8 @@ The 2026-04-21 cluster audit surfaced drift that blocks task #22:
 ```text
 .sops.yaml                       # single path_regex `.*` → platform age key
 README.md                        # existing directory-structure doc
-global/.env.enc                  # platform-wide tokens (CF, Tailscale, HCP, ...)
+global/.env.enc                  # platform-wide tokens (CF, Tailscale, HCP, ...) — opt-in via INFRA_ADMIN=1 (2026-07-17), never auto-loaded
+r2-read/.env.enc                 # read-only R2 keys (added 2026-05-12) — same INFRA_ADMIN gate
 do-primary/.env.enc              # DO API token — legacy account
 do-universe/.env.enc             # DO API token — Universe account
 argocd/.env.sample               # (empty — reserved platform-wide namespace)
@@ -36,7 +37,7 @@ zot/.env.sample                  # (empty — reserved platform-wide namespace)
 appsmith/.env.enc                # LEGACY (oldeworld Swarm)
 outline/.env.enc                 # LEGACY (oldeworld Swarm)
 docker/oldeworld/*.env.{enc,sample}   # LEGACY
-k8s/o11y/*                       # legacy managed k8s cluster
+k8s/o11y/*                       # legacy managed k8s cluster — DELETED 2026-07-14 (infra-secrets ed460a3)
 k3s/<cluster>/<app>.values.yaml.enc         # helm chart overlay
 k3s/<cluster>/<app>.secrets.env.enc         # dotenv → kustomize secretGenerator
 k3s/<cluster>/<app>-backup.secrets.env.enc  # backup-specific dotenv (suffix `-backup`)
