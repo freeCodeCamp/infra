@@ -357,6 +357,8 @@ Empirical status against the three galaxy clusters (all 3/3 nodes Ready, k3s v1.
 
 **GA verdict (2026-07-06):** serve/read plane is GA-shaped (G1/G2/G4/G6 green). GA is **held** on: G11 (registry-backup gap — the one true durability hole), G5 AUTH confirmation, and an operator drill covering G7–G10 + G12. Closing G11 (a Valkey `BGSAVE` RDB→R2 CronJob mirroring `artemis-backup`, or a cross-node registry replica) is the highest-value remaining GA task.
 
+> **G11 re-evaluation note (2026-07-17):** the G11 premise changed the same day it was stamped — artemis v1.4.0 (prod 2026-07-06, artemis@`6807518`) moved the site-registry SoT to artemis Postgres with Valkey demoted to OnChange cache-front (one-shot Valkey→PG import on boot). Registry state now rides the nightly `artemis-backup` `pg_dumpall`→R2 + tested R8 restore. The "durability rests solely on `data-valkey-0` PVC" row above no longer holds; residual G11 exposure is availability (cache-front rebuild on valkey loss), not durability. Re-score G11 before treating it as the GA hold. See ADR-012/ADR-016 2026-07-17 amendments.
+
 ## Section F — Open questions for user
 
 Narrow set; only the items that block flight-manual authoring.

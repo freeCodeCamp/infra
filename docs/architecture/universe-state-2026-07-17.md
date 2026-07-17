@@ -27,15 +27,15 @@ Droplets: 6 galaxy VMs + `exit-node-atlanta` (tailnet exit node). Both galaxies 
 
 ## 2. Live service inventory + image pins (pod-spec reads 2026-07-17)
 
-| Service            | Galaxy / ns              | Live image                                              | Pin state                                                                                                       |
-| ------------------ | ------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| artemis            | gxy-management / artemis | `ghcr.io/freecodecamp/artemis:1.6.1@6bd30695…`          | ✅ digest (rolled 2026-07-17, `b38bbbe1`)                                                                       |
-| hatchet-engine     | gxy-management / artemis | `hatchet-engine:v0.88.6` (no digest in running pod)     | ⚠️ values pin digest (`d532ecb9` 2026-07-06) but pod predates pin (started 2026-06-06) — takes effect next roll |
-| artemis PostgreSQL | gxy-management / artemis | `postgres:16.14-alpine@16bc17c6…`                       | ✅ digest                                                                                                       |
-| Valkey (registry)  | gxy-management / valkey  | `valkey/valkey:8.1.4-alpine` (no digest in running pod) | tag only live (sts 67d old)                                                                                     |
-| postgres-rclone    | artemis ns (backup cron) | `ghcr.io/freecodecamp/postgres-rclone@294e8b27…`        | ✅ digest, nightly 02:00 runs confirmed 07-15/16/17                                                             |
-| caddy-s3           | gxy-cassiopeia / caddy   | `ghcr.io/freecodecamp/caddy-s3:sha-712c6e34…@e024af67…` | ✅ digest                                                                                                       |
-| CNPG operator      | gxy-cassiopeia only      | `ghcr.io/cloudnative-pg/cloudnative-pg:1.29.0`          | ❌ chart-float; **zero `Cluster` CRs** (no orphan — settled 2026-07-17)                                         |
+| Service                       | Galaxy / ns              | Live image                                              | Pin state                                                                                                       |
+| ----------------------------- | ------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| artemis                       | gxy-management / artemis | `ghcr.io/freecodecamp/artemis:1.6.1@6bd30695…`          | ✅ digest (rolled 2026-07-17, `b38bbbe1`)                                                                       |
+| hatchet-engine                | gxy-management / artemis | `hatchet-engine:v0.88.6` (no digest in running pod)     | ⚠️ values pin digest (`d532ecb9` 2026-07-06) but pod predates pin (started 2026-06-06) — takes effect next roll |
+| artemis PostgreSQL            | gxy-management / artemis | `postgres:16.14-alpine@16bc17c6…`                       | ✅ digest                                                                                                       |
+| Valkey (registry cache-front) | gxy-management / valkey  | `valkey/valkey:8.1.4-alpine` (no digest in running pod) | tag only live (sts 67d old); SoT = artemis PG since v1.4.0 (`6807518`), valkey = OnChange cache                 |
+| postgres-rclone               | artemis ns (backup cron) | `ghcr.io/freecodecamp/postgres-rclone@294e8b27…`        | ✅ digest, nightly 02:00 runs confirmed 07-15/16/17                                                             |
+| caddy-s3                      | gxy-cassiopeia / caddy   | `ghcr.io/freecodecamp/caddy-s3:sha-712c6e34…@e024af67…` | ✅ digest                                                                                                       |
+| CNPG operator                 | gxy-cassiopeia only      | `ghcr.io/cloudnative-pg/cloudnative-pg:1.29.0`          | ❌ chart-float; **zero `Cluster` CRs** (no orphan — settled 2026-07-17)                                         |
 
 Ingress: Gateway API only (`artemis-gateway` + HTTPRoute `uploads.freecode.camp`); zero classic Ingress objects on either cluster. Windmill: zero remnants on-cluster (ns/PVC/CRD/DNS all gone).
 
@@ -53,16 +53,16 @@ Ingress: Gateway API only (`artemis-gateway` + HTTPRoute `uploads.freecode.camp`
 | 006 | partial   | send API + scope gating live; email-change flow absent; CAN-SPAM gap untracked (GA blocker)                                                                                                                                                                                                |
 | 007 | drifted   | CLI surface + buildpacks pipeline stale vs amendment snapshot (npm 0.12.0 live)                                                                                                                                                                                                            |
 | 008 | not-built | Rook-Ceph/RGW/Percona/Litestream: nothing exists; mgmt PVCs on `local-path`, zero DO volumes                                                                                                                                                                                               |
-| 009 | drifted   | launchbase CIDR mismatch (10.6/10.16 live-config vs 10.3/10.13 doc); default-deny CNP overstated (`enable-policy: default`); argocd/registry/grafana DNS = NXDOMAIN                                                                                                                        |
+| 009 | drifted   | launchbase CIDR mismatch — **group_vars fixed to 10.3/10.13 2026-07-17** pre-rebuild; default-deny CNP overstated (`enable-policy: default`); argocd/registry/grafana DNS = NXDOMAIN. ADR-009 2026-07-17 amendment records all three                                                       |
 | 010 | drifted   | envelope inventory stale (38→29 prod, 32 incl scratchpad; `k8s/o11y/` deleted 2026-07-14; `r2-read/` undocumented); root `.envrc` loaded `global/` repo-wide contra ADR claim — **fixed 2026-07-17** (`INFRA_ADMIN=1` gate + ADR-010 amendment); veritas envelope residuals operator-gated |
 | 011 | partial   | zero ResourceQuota/LimitRange anywhere; shared VPC + firewall ≠ "separate networks". PSS finding **refuted** — `enforce=baseline` wired at apiserver via ansible bootstrap, Restricted labels on constellation namespaces                                                                  |
-| 012 | drifted   | etcd RPO doc 24h vs actual 6h (`0 */6 * * *` in group_vars); Apollo backup row = dead component; registry "recoverable via Git" stale since Valkey cutover (artemis@f115198, 2026-05-10; audit synthesis misnamed it Postgres — values.production.yaml `VALKEY_ADDR` is ground truth)      |
+| 012 | drifted   | etcd RPO doc 24h vs actual 6h (`0 */6 * * *` in group_vars); Apollo backup row = dead component; registry SoT history Git→Valkey (`f115198` 05-10)→artemis PG (`6807518`, v1.4.0, prod 07-06; Valkey = cache-front). All fixed via ADR-012 2026-07-17 amendment                            |
 | 013 | aligned\* | droplet inventory matches; 3-galaxy run-rate headline overstated (2 live); dollar figures unchecked                                                                                                                                                                                        |
 | 014 | aligned   | correctly still Proposed; gates (D003/D004/D015) unmet                                                                                                                                                                                                                                     |
 | 015 | aligned   | o11y stack parked on unprovisioned gxy-backoffice per own status; zero footprint verified; interim Sentry SaaS posture amendment-acknowledged                                                                                                                                              |
 | 016 | aligned\* | near-exact source/live match; repo-approval queue is Postgres-only in prod (Valkey impl exists but unwired, contra 2026-05-29 amendment)                                                                                                                                                   |
 | 017 | partial   | pillars GHCR-direct ✅; "Zot remains live" false (no release, no chart dir); rehearsal doc at `gxy-management.md` §D.5 not UNIVERSE.md §99, predates current PG shape                                                                                                                      |
-| 018 | drifted   | version cites stale (artemis 1.3.0→1.6.1, cli→0.12.0); "windmill repo archived" false                                                                                                                                                                                                      |
+| 018 | drifted   | version cites stale (artemis 1.3.0→1.6.1, cli→0.12.0); "windmill repo archived" was false 07-07→07-17 — **closed 2026-07-17** (cron disarmed `c99fa1d` + repo archived). ADR-018 amendment records both                                                                                    |
 | 019 | partial   | P1 missing ArgoCD/Atlantis; P2 Veritas absent; venue/backup-floor text correct                                                                                                                                                                                                             |
 | 020 | aligned\* | Hatchet/GC live + correct; both "known limitations" fixed in artemis v1.4.0 (`cf9644a`/`fc72a64`, 2026-07-06) yet 07-07 amendment still lists them open                                                                                                                                    |
 
@@ -75,8 +75,8 @@ Ingress: Gateway API only (`artemis-gateway` + HTTPRoute `uploads.freecode.camp`
 1. **ADR-008 storage layer nonexistent** — no Rook-Ceph/RGW/Percona/Litestream anywhere; gxy-management state on disposable `local-path`, zero DO Block Storage volumes.
 1. **Network isolation weaker than doc** — one shared VPC + one firewall admitting k3s ports from the whole 10.110.0.0/20; Cilium policy mode default-allow; ADR-011 "separate networks" false as stated.
 1. **Secrets** — root `.envrc` auto-loaded `global/.env.enc` + `r2-read/.env.enc` on every `cd` (contradicted ADR-010's own security claim; never was true). **Fixed 2026-07-17**: both gated behind `INFRA_ADMIN=1` (ADR-010 2026-07-17 amendment). Open (operator): veritas prod envelope still carries `GITHUB_CLIENT_*`; staging envelope missing.
-1. **DR doc rot** — RPO 6h not 24h; Apollo backup row dead; registry SoT = Valkey since 2026-05-10, no backup (G11). Fixed by ADR-012 2026-07-17 amendment.
-1. **Windmill IaC teardown incomplete** — repo unarchived, `cleanup_old_deploys` cron committed `enabled: true, dry_run: false` (inert only because cluster is gone). Runbook-12 Phases 2+8 never executed. Cluster side fully clean.
+1. **DR doc rot** — RPO 6h not 24h; Apollo backup row dead; registry SoT history Git→Valkey→artemis PG (v1.4.0) — registry now rides the tested PG backup, G11 premise changed. Fixed by ADR-012 2026-07-17 amendment + RFC G11 re-evaluation note.
+1. **Windmill IaC teardown incomplete** — repo unarchived, `cleanup_old_deploys` cron committed `enabled: true, dry_run: false` (inert only because cluster is gone). Runbook-12 Phases 2+8 never executed. Cluster side fully clean. **Closed 2026-07-17**: cron disarmed (`c99fa1d`), repo archived on GitHub.
 1. **ADR-020/016/018 stale in own favor** — fixed limitations still listed open; version cites lag production by 2–3 releases.
 
 Refuted (do not chase): ADR-011 PSS "unenforced" — verifier proved cluster-wide `enforce=baseline` admission config baked in at bootstrap.
@@ -95,7 +95,7 @@ Refuted (do not chase): ADR-011 PSS "unenforced" — verifier proved cluster-wid
 
 ## 6. Automation posture + gaps
 
-- **Backups:** artemis PostgreSQL nightly → R2 ✅ (runs confirmed 07-15/16/17). **G11 still open:** Valkey site-registry has no backup — single 2Gi local-path PVC, no R2 copy (`rfc-gxy-cassiopeia-ga.md` §E).
+- **Backups:** artemis PostgreSQL nightly → R2 ✅ (runs confirmed 07-15/16/17) — now also carries registry state (PG SoT since v1.4.0). **G11 needs re-score:** premise (registry durability = single valkey PVC) invalidated by PG cutover; residual exposure = cache-front availability, not durability. See RFC §E note 2026-07-17.
 - **Monitoring:** in-cluster scrape parked (gxy-backoffice unbuilt); live paging = artemis Sentry SaaS DSN.
 - **Quotas:** zero ResourceQuota/LimitRange on either cluster — no tenant resource enforcement exists.
 - **Image float:** CNPG chart-float; hatchet + valkey digest pins land on next roll (pinned in values, running pods predate).
@@ -106,7 +106,7 @@ SES DKIM/warm-up (AWS creds) · R2 backup buckets (`wrangler r2 bucket list`, so
 
 ## 8. Open actions
 
-Tracked in-session 2026-07-17 (tasks #2–#9): windmill repo archive + cron disarm · ADR-012 fixes · ADR-010 `.envrc` + veritas envelopes · launchbase CIDR decision pre-rebuild · ADR-004 `/internal/apps` correction · ADR-016/017/018/020 stale-cite batch · ResourceQuota/LimitRange baseline · CAN-SPAM gap filed as GA blocker.
+Closed 2026-07-17: windmill repo archive + cron disarm · ADR-012 fixes · ADR-010 `.envrc` scope-down · launchbase CIDR (group_vars → 10.3/10.13) · ADR-004 `/internal/apps` correction · ADR-006/009/011/016/017/018/020 audit amendments · CAN-SPAM gap filed as GA blocker (ADR-006). Open: ResourceQuota/LimitRange baseline (needs sizing) · G11 re-score (RFC §E) · veritas envelope residuals (deferred until veritas unfreezes, ADR-010).
 
 ## Relationship to other docs
 
