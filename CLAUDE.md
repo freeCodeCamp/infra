@@ -17,9 +17,7 @@ Authoritative model + flow diagram in `~/DEV/fCC-U/Architecture/CLAUDE.md`.
 
 Operator-runnable flight manuals live in `docs/flight-manuals/` (this repo). Index at `docs/flight-manuals/00-index.md`; read order starts with `UNIVERSE.md`.
 
-ADR-vs-reality reconciliation: `docs/architecture/adr-drift-2026-05-10.md`.
-
-Platform-wide live-state + automation-gap + drift snapshot (live-verified 2026-07-06, covers ADR-020 durable-execution): `docs/architecture/universe-state-2026-07-06.md` (supersedes `universe-state-2026-05-29.md`).
+Platform-wide live-state + full 20-ADR-vs-reality audit (live-verified 2026-07-17, adversarially re-verified findings): `docs/architecture/universe-state-2026-07-17.md`. Prior snapshots archived in `docs/architecture/archive/2026-07-17/`; immutable 2026-05-10 provenance record stays at `docs/architecture/adr-drift-2026-05-10.md`.
 
 Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `docs/architecture/rfc-gxy-cassiopeia-ga.md`.
 
@@ -98,7 +96,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Clusters
 
-Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Architecture/spike/spike-plan.md` (canonical, Universe-team-owned). Cluster-vs-ADR reconciliation: `docs/architecture/adr-drift-2026-05-10.md`. Verify reality with `doctl compute droplet list` before acting.
+Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Architecture/spike/spike-plan.md` (canonical, Universe-team-owned). Cluster-vs-ADR reconciliation: `docs/architecture/universe-state-2026-07-17.md`. Verify reality with `doctl compute droplet list` before acting.
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 

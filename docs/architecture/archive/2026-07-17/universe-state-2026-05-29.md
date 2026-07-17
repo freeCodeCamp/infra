@@ -4,7 +4,7 @@
 
 Live-verified snapshot of the freeCodeCamp Universe platform: what is what, what runs, how it is deployed and updated, where automation is missing, and where the docs diverge from reality.
 
-Successor in spirit to [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) (that report = ADR-vs-reality only; all its AD-1..AD-8 actions are closed). This report is broader: ADR design + on-disk code + **live cluster reads** + CI/automation posture, in one place. Design rationale stays in the Universe ADRs (001-019) — not duplicated here.
+Successor in spirit to [`adr-drift-2026-05-10.md`](../../adr-drift-2026-05-10.md) (that report = ADR-vs-reality only; all its AD-1..AD-8 actions are closed). This report is broader: ADR design + on-disk code + **live cluster reads** + CI/automation posture, in one place. Design rationale stays in the Universe ADRs (001-019) — not duplicated here.
 
 > **Freshness (2026-06-01):** dated 2026-05-29 snapshot — version/state specifics drift. Known drift since: artemis `0.7.0` (was 0.3.0), valkey `8.1.7-alpine` (was 8.1.4), universe-cli `0.8.0` (was 0.7.0); drift **D5 + D11 resolved** (repo-create now LIVE — mounted + team-gated, no longer dark). Live re-scout + trim plan: `.scratchpad/dossier/2026-05-29-universe-doc-trim/`. Treat figures below as as-of-2026-05-29.
 
@@ -140,7 +140,7 @@ D2-D4, D6-D11 are **not fixed by this report** — recorded for a follow-up hygi
 
 ## Relationship to other docs
 
-- [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) — prior ADR-vs-reality snapshot; all actions closed. This report supersedes its live-state framing, not its historical record.
+- [`adr-drift-2026-05-10.md`](../../adr-drift-2026-05-10.md) — prior ADR-vs-reality snapshot; all actions closed. This report supersedes its live-state framing, not its historical record.
 - Universe `decisions/018-early-access-baseline.md` + `019-cassiopeia-shared-services.md` — canonical forward design. This report records execution state against them.
 
 ## Out of scope

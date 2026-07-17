@@ -18,7 +18,7 @@ Per-cluster doomsday-rebuild manuals for the Universe Platform. Read order, gala
 | `gxy-launchbase` | [gxy-launchbase.md](gxy-launchbase.md) | Standby — CNPG operator (workload-free)    | Decommissioned 2026-07-07, pending rebuild | DO FRA1 → Hetzner post-M5 (parked) |
 | `gxy-cassiopeia` | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static-apps serve plane — Caddy + R2       | Live                                       | DO FRA1 → Hetzner post-M5 (parked) |
 
-Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are **not** in this manual. When they're provisioned, add a chapter then. Active state for those galaxies lives in `Universe/spike/spike-plan.md` and `docs/architecture/adr-drift-2026-05-10.md`.
+Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are **not** in this manual. When they're provisioned, add a chapter then. Active state for those galaxies lives in `Universe/spike/spike-plan.md` and `docs/architecture/universe-state-2026-07-17.md`.
 
 Retired galaxies:
 
@@ -40,13 +40,14 @@ Operational gotchas that bite once per rebuild — full notes link out.
 
 ## Anchors out (read these before deviating from any step)
 
-| Anchor                                                                                 | Why                                                                                                   |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `Universe/decisions/00{1..18}-*.md`                                                    | 18 ADRs that govern the platform (ADR-017 build-residency 2026-05-11; ADR-018 EA baseline 2026-05-12) |
-| [`../architecture/adr-drift-2026-05-10.md`](../architecture/adr-drift-2026-05-10.md)   | Audit reconciling each ADR with cluster reality                                                       |
-| [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md) | GA hardening RFC — Valkey KV decision, artemis trim, ingress/DNS posture                              |
-| [`../architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md)       | sops+age envelope contract, two-scope model, sample-twin discipline                                   |
-| `Universe/spike/spike-plan.md`                                                         | Galaxy placement, phase status, post-spike trigger conditions                                         |
+| Anchor                                                                                         | Why                                                                                                   |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Universe/decisions/00{1..18}-*.md`                                                            | 18 ADRs that govern the platform (ADR-017 build-residency 2026-05-11; ADR-018 EA baseline 2026-05-12) |
+| [`../architecture/universe-state-2026-07-17.md`](../architecture/universe-state-2026-07-17.md) | Current ADR-vs-reality audit + live-state snapshot (20 ADRs, verified findings)                       |
+| [`../architecture/adr-drift-2026-05-10.md`](../architecture/adr-drift-2026-05-10.md)           | Historical 2026-05-10 ADR-vs-reality record (closed, immutable)                                       |
+| [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md)         | GA hardening RFC — Valkey KV decision, artemis trim, ingress/DNS posture                              |
+| [`../architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md)               | sops+age envelope contract, two-scope model, sample-twin discipline                                   |
+| `Universe/spike/spike-plan.md`                                                                 | Galaxy placement, phase status, post-spike trigger conditions                                         |
 
 ## Operator runbooks (single-purpose)
 
