@@ -97,7 +97,7 @@ Refuted (do not chase): ADR-011 PSS "unenforced" — verifier proved cluster-wid
 
 - **Backups:** artemis PostgreSQL nightly → R2 ✅ (runs confirmed 07-15/16/17) — now also carries registry state (PG SoT since v1.4.0). **G11 needs re-score:** premise (registry durability = single valkey PVC) invalidated by PG cutover; residual exposure = cache-front availability, not durability. See RFC §E note 2026-07-17.
 - **Monitoring:** in-cluster scrape parked (gxy-backoffice unbuilt); live paging = artemis Sentry SaaS DSN.
-- **Quotas:** zero ResourceQuota/LimitRange on either cluster — no tenant resource enforcement exists.
+- **Quotas:** ~~zero ResourceQuota/LimitRange on either cluster~~ **closed 2026-07-18** — baseline quotas + LimitRange defaults live in artemis/valkey/caddy/cnpg-system (`k3s/<cluster>/cluster/policy/`, `just configure-policy`), ≥3× headroom, verified enforcing.
 - **Image float:** CNPG chart-float; hatchet + valkey digest pins land on next roll (pinned in values, running pods predate).
 
 ## 7. Unverifiable (8) — settling checks
@@ -106,7 +106,7 @@ SES DKIM/warm-up (AWS creds) · R2 backup buckets (`wrangler r2 bucket list`, so
 
 ## 8. Open actions
 
-Closed 2026-07-17: windmill repo archive + cron disarm · ADR-012 fixes · ADR-010 `.envrc` scope-down · launchbase CIDR (group_vars → 10.3/10.13) · ADR-004 `/internal/apps` correction · ADR-006/009/011/016/017/018/020 audit amendments · CAN-SPAM gap filed as GA blocker (ADR-006). Open: ResourceQuota/LimitRange baseline (needs sizing) · G11 re-score (RFC §E) · veritas envelope residuals (deferred until veritas unfreezes, ADR-010).
+Closed 2026-07-17/18: windmill repo archive + cron disarm · ADR-012 fixes · ADR-010 `.envrc` scope-down · launchbase CIDR (group_vars → 10.3/10.13) · ADR-004 `/internal/apps` correction · ADR-006/009/011/016/017/018/020 audit amendments · CAN-SPAM gap filed as GA blocker (ADR-006) · ResourceQuota/LimitRange baseline applied both clusters 2026-07-18 (`just configure-policy`, quotas verified enforcing). Open: G11 re-score (RFC §E) · veritas envelope residuals (deferred until veritas unfreezes, ADR-010).
 
 ## Relationship to other docs
 
