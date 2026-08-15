@@ -62,6 +62,12 @@ networkPolicy:
   enabled: true
   postgresPort: 5432
 
+# PDB for the single-replica engine: minAvailable 1 blocks voluntary
+# evictions so durable-exec state moves deliberately (I2).
+pdb:
+  enabled: true
+  minAvailable: 1
+
 # Restricted-PSS pod defaults. Upstream images run as root (no USER in
 # build/package/servers.dockerfile) — the static Go binaries tolerate
 # an arbitrary non-root uid, enforced here.

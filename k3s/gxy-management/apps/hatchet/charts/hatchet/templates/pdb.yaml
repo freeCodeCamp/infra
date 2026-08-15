@@ -1,0 +1,17 @@
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-engine
+  labels:
+    {{- include "hatchet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: engine
+spec:
+  # Single-replica engine: minAvailable 1 blocks voluntary evictions
+  # (node drains) so durable-exec state is moved deliberately, never as
+  # a side effect of cluster maintenance.
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "hatchet.engineSelectorLabels" . | nindent 6 }}
+{{- end }}

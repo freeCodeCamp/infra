@@ -1,0 +1,18 @@
+{{- if and .Values.postgres.enabled .Values.postgres.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-postgresql
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  # Single-replica StatefulSet: minAvailable 1 blocks voluntary
+  # evictions (node drains) outright, forcing the operator to move the
+  # DB deliberately. Involuntary failures are unaffected by a PDB.
+  minAvailable: {{ .Values.postgres.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "artemis.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
+{{- end }}

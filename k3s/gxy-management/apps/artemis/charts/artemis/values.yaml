@@ -262,6 +262,12 @@ postgres:
     limits:
       cpu: "1"
       memory: 512Mi
+  # PDB for the single-replica StatefulSet: minAvailable 1 blocks
+  # voluntary evictions (node drains) outright — the DB moves when the
+  # operator moves it, never as a maintenance side effect (I2).
+  pdb:
+    enabled: true
+    minAvailable: 1
 
 # ---------------------------------------------------------------------
 # Backup CronJob (ADR-019 stateful floor). Logical pg_dumpall of the
