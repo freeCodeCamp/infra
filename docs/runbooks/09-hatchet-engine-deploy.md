@@ -27,6 +27,8 @@ secretEnv:
 
 ## B. Release
 
+Any chart change re-fires all four bootstrap hook Jobs on `helm upgrade` (`helm.sh/hook: pre-install,pre-upgrade` in `bootstrap-jobs.yaml` — quickstart, migrate, seed, plus the post-upgrade create-worker-token). All are idempotent by design (see the header comment in `bootstrap-jobs.yaml`); the keyset secret is generate-once and survives re-runs. Expect the upgrade to take a few minutes while the hooks complete; `helm upgrade --dry-run` first if unsure.
+
 If a previous release attempt FAILED (e.g. revision 1 on 2026-06-06 — hook-ordering bug, fixed since), clean up first; a failed pre-install means zero regular manifests were applied, so uninstall is side-effect-free:
 
 ```

@@ -63,7 +63,7 @@ networkPolicy:
   postgresPort: 5432
 
 # PDB for the single-replica engine: minAvailable 1 blocks voluntary
-# evictions so durable-exec state moves deliberately (I2).
+# evictions so the dispatch outage is operator-timed; state is in Postgres.
 pdb:
   enabled: true
   minAvailable: 1

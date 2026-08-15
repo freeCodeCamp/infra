@@ -11,7 +11,7 @@
 
 replicaCount: 3
 
-# I1: with 3 replicas, keep a serving quorum through node drains.
+# With 3 replicas, keep a serving quorum through node drains.
 pdb:
   minAvailable: 2
 

@@ -3,13 +3,14 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ .Release.Name }}-engine
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "hatchet.labels" . | nindent 4 }}
     app.kubernetes.io/component: engine
 spec:
   # Single-replica engine: minAvailable 1 blocks voluntary evictions
-  # (node drains) so durable-exec state is moved deliberately, never as
-  # a side effect of cluster maintenance.
+  # (node drains) so the dispatch outage window is operator-timed; run
+  # state itself is safe in Postgres.
   minAvailable: {{ .Values.pdb.minAvailable }}
   selector:
     matchLabels:
