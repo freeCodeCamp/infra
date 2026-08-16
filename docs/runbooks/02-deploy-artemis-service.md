@@ -265,7 +265,7 @@ Recipe wraps `make integration` against the deployed artemis (see `docs/runbooks
 
 ## Image update (deploy new artemis release)
 
-Use when a new artemis release lands and must roll into gxy-management. Releases are tag-triggered: an operator with push rights to `freeCodeCamp/artemis` cuts a `vX.Y.Z` annotated tag per artemis `RELEASING.md`; `.github/workflows/docker-ghcr.yml` fires automatically on the tag push, builds the image, publishes to GHCR with tags `X.Y.Z` (bare semver, no `v`-prefix — docker/metadata-action strips it; OCI convention is bare semver), `X.Y`, and `sha-<full-sha>`, and auto-publishes a GitHub Release.
+Use when a new artemis release lands and must roll into gxy-management. Releases are **release-please PR-driven**, not hand-tagged. Every push to `main` runs `.github/workflows/release.yml`, which maintains a standing PR titled `chore(main): release X.Y.Z`. Merging that PR is the release: release-please creates the `vX.Y.Z` tag, publishes the GitHub Release, and gates the `build-and-push` job in the same workflow run. That job publishes to GHCR with tags `X.Y.Z` (bare semver, no `v`-prefix — OCI convention), `X.Y`, `sha-<full-sha>`, and `latest`. **Do not cut a tag by hand** — a manual tag desynchronizes `.release-please-manifest.json` and no image is built.
 
 The image pin lives at `k3s/gxy-management/apps/artemis/values.production.yaml` under `image.tag` (format: `X.Y.Z@sha256:<digest>`). Bootstrap-only path (no semver tag exists yet) uses `sha-<full-sha>@sha256:<digest>` via the `workflow_dispatch` route — see §7.
 
@@ -280,9 +280,9 @@ git -C ~/DEV/fCC/artemis describe --tags --abbrev=0 origin/main
 
 If the deployed semver lags the most-recent tag on artemis `origin/main`, drift is real — proceed.
 
-### 2. Cut + push the artemis tag
+### 2. Merge the artemis release PR
 
-The artemis-side flow (audit unreleased commits, pick the bump, annotated tag, regen CHANGELOG, push) is documented in `~/DEV/fCC/artemis/RELEASING.md`. Operator runs that flow; the tag push fires the GHCR workflow + the GH Release auto-publish step.
+The artemis-side flow (review the standing release PR, optionally override the version with a `Release-As:` footer, merge) is documented in `~/DEV/fCC/artemis/docs/RELEASING.md`. Merging the release PR cuts the tag and fires the `build-and-push` job in the same workflow run.
 
 Watch the build:
 
@@ -379,7 +379,7 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 - ADR-020 — durable-execution model (Hatchet engine, retention GC substrate)
 - ADR-019 §Stateful-pillar backup pattern — RPO/RTO floor for the bundled PG
 - `~/DEV/fCC/artemis/docs/design/0001-durable-execution-model.md` — staged bootstrap rationale (M1 bundled PG)
-- `~/DEV/fCC/artemis/RELEASING.md` — artemis-side release flow (cut, tag, CHANGELOG, push)
+- `~/DEV/fCC/artemis/docs/RELEASING.md` — artemis-side release flow (release-please PR, tag, CHANGELOG, image build)
 - `~/DEV/fCC-U/Architecture/spike/field-notes/infra.md` §2026-04-26 build-residency, §2026-04-27 RUN-residency clause
 - `~/DEV/fCC-U/Architecture/decisions/009-...` — Tailscale Operator rejected
 - [`01-deploy-new-constellation-site.md`](01-deploy-new-constellation-site.md) — staff-side deploy flow against this service
