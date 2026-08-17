@@ -120,20 +120,18 @@ universe sites register test --team staff
 
 The CLI POSTs `/api/site/register` against artemis; staff-team membership gates writes (`REGISTRY_AUTHZ_TEAM` chart env, default `staff`). Cold-start reference: `freeCodeCamp/artemis` `config/sites.yaml` is a **dormant seed** of the historical map — not consumed at runtime; only useful when replaying entries after a full Valkey wipe.
 
-### 7. artemis CI — first GHCR image
+### 7. artemis first GHCR image
+
+There is no way to build an image without cutting a release: `build-and-push` in
+`.github/workflows/release.yml` is gated on `release_created`. Merge the standing
+`chore(main): release X.Y.Z` PR that release-please maintains, then pin the result:
 
 ```bash
-gh workflow run ci.yml --repo freeCodeCamp/artemis --ref main
+docker buildx imagetools inspect ghcr.io/freecodecamp/artemis:X.Y.Z \
+  --format '{{.Manifest.Digest}}'
 ```
 
-Pin tag + digest in `infra/k3s/gxy-management/apps/artemis/values.production.yaml`:
-
-```bash
-docker buildx imagetools inspect ghcr.io/freecodecamp/artemis:<tag>
-# copy the sha256:<digest> line
-```
-
-Update `image.tag` to `sha-<full-sha>@sha256:<digest>` and commit.
+Update `image.tag` to `X.Y.Z@sha256:<digest>` and commit.
 
 ## Deploy
 
@@ -162,7 +160,7 @@ The durable-execution substrate (bundled Postgres + Hatchet engine, ADR-020) com
 | 1     | `true`             | unset (`""`)       | unset                            | PG StatefulSet up, artemis migrations applied, GC **wired but dormant** — no worker, no relay |
 | 2     | `true`             | engine gRPC addr   | sealed engine token              | worker + outbox relay live; retention GC executes                                             |
 
-**Current production state (gxy-management):** stage 2, fully live, since the 2026-06-06 cutover. The production overlay (`apps/artemis/values.production.yaml`) is pinned `v1.2.2` with `postgres.enabled: true`, `env.HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"`, and the sealed `HATCHET_CLIENT_TOKEN` — worker + outbox relay run, retention GC executes for real (`CLEANUP_DRY_RUN: "false"`, `CLEANUP_BLAST_CAP: "10"`), across `replicaCount: 3`. Stage 1 is a transient checkpoint gxy-management has already passed through — the two subsections below document the gate for a fresh galaxy bootstrap or a full DR rebuild, not gxy-management's day-2 posture.
+**Current production state (gxy-management):** stage 2, fully live, since the 2026-06-06 cutover. The production overlay (`apps/artemis/values.production.yaml`) is pinned to the current release with `postgres.enabled: true`, `env.HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"`, and the sealed `HATCHET_CLIENT_TOKEN` — worker + outbox relay run, retention GC executes for real (`CLEANUP_DRY_RUN: "false"`, `CLEANUP_BLAST_CAP: "10"`), across `replicaCount: 3`. Stage 1 is a transient checkpoint gxy-management has already passed through — the two subsections below document the gate for a fresh galaxy bootstrap or a full DR rebuild, not gxy-management's day-2 posture.
 
 ### Stage 1 — Postgres up, migrations applied, worker dormant
 
@@ -188,10 +186,10 @@ Confirm migrations applied and the worker stayed dormant via the artemis pod log
 
 ```bash
 kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
-  | grep -E 'postgres: connected, migrations applied|gc: wired|worker: starting|outbox relay: started'
+  | grep -E 'postgres\.connected|gc\.wired|worker\.starting|outbox\.relay\.started'
 ```
 
-Stage-1 expectation: `postgres: connected, migrations applied` and `gc: wired` appear; `worker: starting` and `outbox relay: started` do **NOT** (they are gated on a non-empty `HATCHET_ADDR`, `cmd/artemis/main.go`).
+Stage-1 expectation: `postgres.connected` and `gc.wired` appear; `worker.starting` and `outbox.relay.started` do **NOT** (they are gated on a non-empty `HATCHET_ADDR`, `cmd/artemis/main.go`).
 
 `/readyz` semantics in stage 1: the readiness probe checks Valkey + R2 + Postgres. With PG up it returns `200 {"ready":true}`. If PG is unreachable while Valkey + R2 are fine, `/readyz` returns `200 {"ready":true,"degraded":true}` — the pod stays in the Service endpoints (deploy/serve still work; only GC is impaired). A `503` from `/readyz` means Valkey or R2 is down, not Postgres (`internal/handler/readyz.go`).
 
@@ -214,14 +212,14 @@ Once the Hatchet engine is deployed into the `artemis` namespace (operator step,
    just release gxy-management artemis
    kubectl -n artemis rollout status deploy/artemis --timeout=120s
    kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
-     | grep -E 'worker: starting|outbox relay: started'
+     | grep -E 'worker\.starting|outbox\.relay\.started'
    ```
 
-Stage-2 expectation: both `worker: starting addr=<HATCHET_ADDR>` and `outbox relay: started` now appear.
+Stage-2 expectation: both `worker.starting` (with `addr=<HATCHET_ADDR>`) and `outbox.relay.started` now appear.
 
 ## RELEASE-CUT CHECKLIST (durable-exec cutover — historical / DR-rebuild reference)
 
-gxy-management already cut over (stage 1 on 2026-06-05, stage 2 on 2026-06-06; current pin `v1.2.2`). This checklist is kept for standing up a fresh galaxy or a full DR rebuild from a stateless (deploy-only) baseline — not needed for day-2 ops on gxy-management. Both items are hard gates — skipping either fails the helm upgrade or boots a worker against the wrong image.
+gxy-management already cut over (stage 1 on 2026-06-05, stage 2 on 2026-06-06; the live pin is whatever `values.production.yaml` carries). This checklist is kept for standing up a fresh galaxy or a full DR rebuild from a stateless (deploy-only) baseline — not needed for day-2 ops on gxy-management. Both items are hard gates — skipping either fails the helm upgrade or boots a worker against the wrong image.
 
 1. **Seal the durable-exec passwords in the overlay.** Add `POSTGRES_PASSWORD`, `ARTEMIS_DB_PASSWORD`, and `HATCHET_DB_PASSWORD` to the dotenv SOT (`infra-secrets/management/artemis.env.enc`), then re-run the §5 mint block (its case-glob now seals all three). The chart hard-requires them when `postgres.enabled` — `secret-env.yaml` fails the upgrade with `.Values.secretEnv.HATCHET_DB_PASSWORD is required when postgres.enabled` if the overlay is missing the key. `DATABASE_URL` is auto-constructed from `ARTEMIS_DB_PASSWORD` unless set explicitly; `HATCHET_CLIENT_TOKEN` is sealed later in stage 2, not now.
 
@@ -244,7 +242,7 @@ kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
   | grep "starting version"
 ```
 
-Expected: `artemis: starting version=<semver-or-sha-or-branch> commit=<full-sha>` one line per replica. `VERSION` reflects the tag that triggered the build (semver on tag push, `sha-<sha>` on `workflow_dispatch`, branch name on branch push); `COMMIT` is the full sha. Both embedded via `-ldflags -X main.version=… -X main.commit=…` at build time.
+Expected: `boot.starting version=<semver> commit=<full-sha>` one line per replica. `VERSION` is release-please's computed version for the merged release; `COMMIT` is the full sha of the release commit. Both embedded via `-ldflags -X main.version=… -X main.commit=…` at build time.
 
 E2E proxy smoke:
 
@@ -267,7 +265,7 @@ Recipe wraps `make integration` against the deployed artemis (see `docs/runbooks
 
 Use when a new artemis release lands and must roll into gxy-management. Releases are **release-please PR-driven**, not hand-tagged. Every push to `main` runs `.github/workflows/release.yml`, which maintains a standing PR titled `chore(main): release X.Y.Z`. Merging that PR is the release: release-please creates the `vX.Y.Z` tag, publishes the GitHub Release, and gates the `build-and-push` job in the same workflow run. That job publishes to GHCR with tags `X.Y.Z` (bare semver, no `v`-prefix — OCI convention), `X.Y`, `sha-<full-sha>`, and `latest`. **Do not cut a tag by hand** — a manual tag desynchronizes `.release-please-manifest.json` and no image is built.
 
-The image pin lives at `k3s/gxy-management/apps/artemis/values.production.yaml` under `image.tag` (format: `X.Y.Z@sha256:<digest>`). Bootstrap-only path (no semver tag exists yet) uses `sha-<full-sha>@sha256:<digest>` via the `workflow_dispatch` route — see §7.
+The image pin lives at `k3s/gxy-management/apps/artemis/values.production.yaml` under `image.tag` (format: `X.Y.Z@sha256:<digest>`). There is no image before the first release: `build-and-push` is gated on `release_created`, so a fresh repo must merge its first release PR to get any image to pin.
 
 ### 1. Confirm drift
 
@@ -348,7 +346,7 @@ kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=15m \
   | grep "starting version"
 ```
 
-Expected: `artemis: starting version=X.Y.Z commit=<full-sha>` one line per replica.
+Expected: `boot.starting version=X.Y.Z commit=<full-sha>` one line per replica.
 
 `verify-artemis` is the authoritative E2E check — green = the new image serves init/upload/finalize/promote correctly against R2 + GH OAuth.
 
@@ -366,7 +364,7 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 | Helm fail with `.Values.secretEnv.X is required`                                         | sops overlay missing key                       | re-run §5 mint block (paste-once)                                                                          |
 | Helm fail with `.Values.secretEnv.HATCHET_DB_PASSWORD is required when postgres.enabled` | durable-exec password not sealed               | RELEASE-CUT CHECKLIST item 1 — seal the three PG passwords, re-run §5                                      |
 | PG StatefulSet up but no migrations + GC never wired                                     | image pinned to pre-durable-exec `0.8.0`       | RELEASE-CUT CHECKLIST item 2 — bump image off `0.8.0`                                                      |
-| Worker stays dormant after stage 2 (no `worker: starting` log)                           | `env.HATCHET_ADDR` empty or engine unreachable | set `HATCHET_ADDR` in `values.production.yaml`; verify engine Service gRPC port matches `hatchet.grpcPort` |
+| Worker stays dormant after stage 2 (no `worker.starting` log)                           | `env.HATCHET_ADDR` empty or engine unreachable | set `HATCHET_ADDR` in `values.production.yaml`; verify engine Service gRPC port matches `hatchet.grpcPort` |
 | `whoami` lists no sites on a freshly bootstrapped cluster                                | Valkey registry not yet seeded                 | `universe sites register <slug> --team <team>` per §6 bootstrap                                            |
 | 503 on `uploads.freecode.camp/healthz`                                                   | Gateway not bound; HTTPRoute not picked up     | `kubectl -n artemis describe gateway,httproute` — check Traefik logs                                       |
 | 502 / "no available server" via CF                                                       | CF zone SSL = Strict + origin no cert          | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)                                         |

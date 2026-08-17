@@ -132,12 +132,12 @@ Expect the StatefulSet ready and both `artemis` + `hatchet` databases present (b
 
 ```sh
 kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=20m \
-  | grep -E 'postgres: connected, migrations applied|gc: wired|worker: starting|outbox relay: started'
+  | grep -E 'postgres\.connected|gc\.wired|worker\.starting|outbox\.relay\.started'
 ```
 
 | Stage                  | Expect present                                         | Expect absent                               |
 | ---------------------- | ------------------------------------------------------ | ------------------------------------------- |
-| 1 (HATCHET_ADDR unset) | `postgres: connected, migrations applied`, `gc: wired` | `worker: starting`, `outbox relay: started` |
+| 1 (HATCHET_ADDR unset) | `postgres.connected`, `gc.wired` | `worker.starting`, `outbox.relay.started` |
 | 2 (HATCHET_ADDR set)   | all four lines                                         | —                                           |
 
 ### 3. Readiness probe (degraded semantics)
@@ -176,8 +176,8 @@ Expect the nightly CronJob (`schedule: 0 2 * * *`). Full backup verify + restore
 | `production: marker not seen` in 2 min            | CF edge cache holding old content; alias path mismatch             | Check `cf-cache-status` header; CF cache purge tool                                                    |
 | `rollback: deployId mismatch`                     | Target deploy prefix swept by cleanup cron (T22, 7-day retention)  | Pick a more recent `deployId` from `/deploys`; or rerun TestDeployFlow twice                           |
 | `/readyz` returns `degraded:true`                 | Postgres unreachable; Valkey + R2 fine                             | `kubectl -n artemis get sts artemis-postgresql`; `kubectl -n artemis logs sts/artemis-postgresql`      |
-| Stage-2 release but no `worker: starting` log     | `env.HATCHET_ADDR` empty or Hatchet engine unreachable             | Check `HATCHET_ADDR` in `values.production.yaml`; verify engine Service gRPC port = `hatchet.grpcPort` |
-| `gc: wired` absent on a `postgres.enabled` deploy | image pinned to pre-durable-exec `0.8.0`                           | RELEASE-CUT CHECKLIST item 2 in runbook 02 — bump image off `0.8.0`                                    |
+| Stage-2 release but no `worker.starting` log     | `env.HATCHET_ADDR` empty or Hatchet engine unreachable             | Check `HATCHET_ADDR` in `values.production.yaml`; verify engine Service gRPC port = `hatchet.grpcPort` |
+| `gc.wired` absent on a `postgres.enabled` deploy | image pinned to pre-durable-exec `0.8.0`                           | RELEASE-CUT CHECKLIST item 2 in runbook 02 — bump image off `0.8.0`                                    |
 
 ## Related
 

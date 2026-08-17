@@ -309,7 +309,7 @@ Public surface `https://uploads.freecode.camp` (NOT `*.freecodecamp.net` — Uni
 | 4   | Sealed dotenv `infra-secrets/management/artemis.env.enc`                       | `sops encrypt --input-type dotenv --output-type dotenv`         |
 | 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` | `docs/runbooks/02-deploy-artemis-service.md` §5                 |
 | 6   | Valkey running (§C.2 green)                                                    | this chapter §C                                                 |
-| 7   | First GHCR image build for artemis                                             | `gh workflow run ci.yml --repo freeCodeCamp/artemis --ref main` |
+| 7   | First GHCR image build for artemis                                             | merge the release-please PR (`chore(main): release X.Y.Z`) |
 
 ### D.2 Deploy
 

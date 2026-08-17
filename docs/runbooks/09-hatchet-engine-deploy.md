@@ -79,7 +79,7 @@ kubectl -n artemis get secret hatchet-client-config -o jsonpath='{.data.HATCHET_
 1. In artemis `values.production.yaml`:
    - `env.HATCHET_ADDR: "hatchet-engine.artemis.svc.cluster.local:7077"`
    - `env.HATCHET_CLIENT_TLS_STRATEGY: "none"` — the Go SDK defaults to TLS (`pkg/config/shared` default "tls") and reads this from pod env; artemis itself does not parse it. Requires the configmap passthrough added with stage-2.
-1. `just release gxy-management artemis` — boot gate: logs show `worker: starting` + `outbox relay: started`, no Sentry boot fatals (T32), startupProbe passes.
+1. `just release gxy-management artemis` — boot gate: logs show `worker.starting` + `outbox.relay.started`, no Sentry boot fatals (T32), startupProbe passes.
 
 ## E. Rollback
 
