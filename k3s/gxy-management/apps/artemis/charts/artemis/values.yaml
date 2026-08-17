@@ -135,10 +135,10 @@ env:
   ENVIRONMENT: "development"
   SENTRY_TRACES_SAMPLE_RATE: "0.2"
   # Durable-execution (rendered only when postgres.enabled). CLEANUP_BLAST_CAP
-  # is the per-run tombstone ceiling (0 = uncapped); CLEANUP_DRY_RUN plans
-  # without deleting. Fail-safe default: dry-run on; going live requires an
-  # explicit override in values.production.yaml.
-  CLEANUP_BLAST_CAP: "0"
+  # is the per-run tombstone ceiling (0 refuses every destructive repair);
+  # CLEANUP_DRY_RUN plans without deleting. Fail-safe default: dry-run on;
+  # going live requires an explicit override in values.production.yaml.
+  CLEANUP_BLAST_CAP: "10"
   CLEANUP_DRY_RUN: "true"
   # HATCHET_ADDR is intentionally EMPTY by default — the worker + relay
   # boot only when it is set. Stage-1 deploy (postgres.enabled, this blank)
