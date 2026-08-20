@@ -1,9 +1,14 @@
 ---
 - name: Check if NGINX is installed
-  stat:
+  ansible.builtin.stat:
     path: /usr/sbin/nginx
   register: nginx_installed
 
 - name: Install NGINX
-  include_tasks: install-nginx.yml
-  when: nginx_installed.stat.exists == false
+  ansible.builtin.include_tasks: install-nginx.yml
+  when: not nginx_installed.stat.exists
+
+# Runs on EVERY role invocation, not only on a fresh install, so hosts that
+# already have nginx pick up the restart policy and the boot enablement.
+- name: Harden the NGINX systemd unit
+  ansible.builtin.include_tasks: harden-unit.yml

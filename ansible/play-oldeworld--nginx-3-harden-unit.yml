@@ -1,0 +1,42 @@
+---
+# ONE-TIME SETUP, and safe to re-run any time.
+#
+# Installs the systemd restart policy for nginx and makes sure the unit is
+# enabled at boot. Run this ONCE against the ingress groups before relying on
+# the housekeeping workflows to keep nginx up -- until it has run, a failed
+# start at boot leaves nginx dead with nothing to retry it.
+#
+#   ansible-playbook -i inventory/linode.yml \
+#     play-oldeworld--nginx-3-harden-unit.yml \
+#     -e variable_host=stg_oldeworld_pxy
+#
+#   ansible-playbook -i inventory/linode.yml \
+#     play-oldeworld--nginx-3-harden-unit.yml \
+#     -e variable_host=prd_oldeworld_pxy
+#
+# Deliberately NOT the full nginx role: no package install, no dns role, no
+# config templating. It writes a drop-in, runs daemon-reload and enables the
+# unit. It does NOT start, stop or reload nginx, so it is safe on a host that
+# is serving traffic right now.
+- name: Harden the NGINX systemd unit
+  hosts: "{{ variable_host | default('null') }}"
+  become: true
+  become_user: root
+  gather_facts: false
+  tasks:
+    # Without this the play would report success on a host that has no nginx
+    # at all, which is most of this fleet -- nginx exists only on the 6 pxy
+    # hosts. Skip those hosts loudly rather than pretending to harden them.
+    - name: Check whether this host runs NGINX
+      ansible.builtin.stat:
+        path: /usr/sbin/nginx
+      register: harden_nginx_installed
+
+    - name: Report hosts that do not run NGINX
+      ansible.builtin.debug:
+        msg: "NGINX is not installed on {{ inventory_hostname }} -- nothing to harden"
+      when: not harden_nginx_installed.stat.exists
+
+    - name: Apply the restart policy and boot enablement
+      ansible.builtin.include_tasks: roles/nginx/tasks/harden-unit.yml
+      when: harden_nginx_installed.stat.exists

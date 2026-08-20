@@ -54,6 +54,59 @@
           reboot_reason }}'
       when: should_reboot
 
+    # Pre-reboot config gate, for NGINX hosts only.
+    #
+    # A running nginx serves from the config it loaded at start, so a broken
+    # config on disk is invisible until the next restart. Reboot that host and
+    # nginx cannot come back -- no restart policy helps, because every attempt
+    # fails on the same parse error. Hold the host back instead and say why.
+    #
+    # This never fails a host. Under serial: 1 a failure here would end the
+    # play and cost every host behind it their reboot.
+    # The systemd module rather than `systemctl is-enabled`: same answer, and
+    # ansible-lint rejects the shell-out at the production profile.
+    # failed_when: false because the module fail_json()s on a unit with a
+    # LoadError, and on the 74 hosts with no NGINX at all it simply reports
+    # LoadState=not-found.
+    - name: Read the NGINX unit state on this host
+      ansible.builtin.systemd:
+        name: nginx
+      register: reboot_nginx_unit
+      changed_when: false
+      failed_when: false
+      when: should_reboot
+
+    - name: Validate the NGINX config before rebooting
+      ansible.builtin.command: nginx -t
+      register: reboot_nginx_config
+      changed_when: false
+      failed_when: false
+      when:
+        - should_reboot
+        - (reboot_nginx_unit.status | default({})).UnitFileState | default('') in
+          ['enabled', 'enabled-runtime', 'static']
+
+    - name: Hold the reboot back when the NGINX config is broken
+      ansible.builtin.set_fact:
+        should_reboot: false
+        reboot_held_back: true
+      when:
+        - should_reboot
+        - reboot_nginx_config.rc is defined
+        - reboot_nginx_config.rc != 0
+
+    # ::warning:: so this surfaces in the GitHub job summary. A -v debug line
+    # is invisible on a green job, and a held-back host IS the run's most
+    # interesting fact. The verify stage reports the same host again later
+    # with config_ok: false.
+    - name: Say why the reboot was held back
+      ansible.builtin.debug:
+        msg: >-
+          ::warning::Reboot HELD BACK on {{ inventory_hostname }}: nginx -t
+          failed, so a reboot would leave NGINX dead with nothing able to
+          restart it. Fix the config, then reboot by hand.
+      when: reboot_held_back | default(false)
+
     - name: Conditionally Reboot
       block:
         - name: Reboot machine

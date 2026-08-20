@@ -1,0 +1,52 @@
+---
+# Make the nginx unit survive a reboot on its own.
+#
+# ROOT CAUSE this fixes: Debian and Ubuntu ship nginx.service with no
+# `Restart=` directive. One failed start at boot -- a config that references a
+# hostname before resolv.conf is ready is the usual trigger -- and systemd
+# marks the unit failed and never tries again. The VM is up, port 80 is dead,
+# and it stays that way until a human logs in. That is the whole outage.
+#
+# Deliberately no network-online.target ordering. On a host with a configured
+# but down interface, systemd-networkd-wait-online adds up to 120s to every
+# boot. The retry policy below rides out the same race for free.
+
+- name: Create the nginx systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/nginx.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the nginx restart policy drop-in
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nginx.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible -- roles/nginx/tasks/harden-unit.yml
+      # Do not edit on the host; edit the role and re-run the play.
+      [Unit]
+      # 10 attempts about 20s apart spans roughly 3 minutes of retries, well
+      # inside the 10-minute window. Long enough to ride out a start that
+      # races DNS, short enough that a real config error still ends in a
+      # visible failed state instead of looping forever.
+      StartLimitIntervalSec=600
+      StartLimitBurst=10
+
+      [Service]
+      Restart=on-failure
+      RestartSec=20s
+
+# enabled: true unconditionally, and not only here. Boot behaviour must not
+# depend on remembering to run play-oldeworld--nginx-2-startup.yml, nor on
+# the apt package happening to enable the unit for us. A unit that is not
+# enabled does not come back after a reboot, and no restart policy changes
+# that -- Restart= only applies to a unit systemd already started.
+- name: Make sure nginx starts at boot
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    daemon_reload: true

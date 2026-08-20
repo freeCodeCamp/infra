@@ -17,13 +17,21 @@
         chdir: /etc/nginx
         cmd: nginx -t
       register: nginx_config_check
-      ignore_errors: true
+      changed_when: false
+      failed_when: false
+
+    # enabled: true runs whatever the config check said. A broken config is a
+    # reason not to START nginx; it is never a reason to leave the unit
+    # disabled at boot, which is how a host silently stops coming back.
+    - name: Make sure NGINX starts at boot
+      ansible.builtin.service:
+        name: nginx
+        enabled: true
 
     - name: Start NGINX
-      service:
+      ansible.builtin.service:
         name: nginx
         state: started
-        enabled: true
       when: nginx_config_check.rc == 0
 
     - name: Reload NGINX
@@ -31,3 +39,30 @@
         chdir: /etc/nginx
         cmd: nginx -s 'reload'
       when: nginx_config_check.rc == 0
+
+    # Record it instead of failing here. Under this play's serial: 1 a hard
+    # failure ends the whole play, so hosts behind the bad one would never be
+    # enabled or started -- worse than the silent success this replaces.
+    # Probed: max_fail_percentage: 100 does NOT rescue it at serial 1.
+    - name: Record that the config does not parse
+      ansible.builtin.set_fact:
+        nginx_config_bad: true
+      when: nginx_config_check.rc != 0
+
+# Second play, deliberately WITHOUT serial: every host is graded in one batch,
+# so the run goes red and names every bad host without any host stealing
+# another's startup.
+- name: Fail the run for hosts whose NGINX config does not parse
+  hosts: "{{ variable_host | default('null') }}"
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Fail when the NGINX config does not parse
+      ansible.builtin.assert:
+        that:
+          - not (nginx_config_bad | default(false))
+        fail_msg: >-
+          nginx -t failed on {{ inventory_hostname }}, so NGINX was NOT
+          started there. The unit is still enabled at boot, so fix the config
+          and start it. This play reported success on this condition before.
+        success_msg: "NGINX config parses on {{ inventory_hostname }}"
