@@ -1,0 +1,74 @@
+name: Notify Google Chat
+description: >-
+  Post a message to a Google Chat space webhook. This action NEVER fails a job.
+  A missing webhook warns, a rejected delivery raises an error annotation, and
+  both exit 0 -- an outage at Google must not make a healthy fleet look broken,
+  and a notifier must never be able to stop the work it reports on. Read the
+  annotations, not the job colour, to tell whether a message landed.
+
+inputs:
+  webhook:
+    description: >-
+      Google Chat incoming webhook URL. The whole URL is the credential.
+      Optional on purpose: callers wire it from a secret declared
+      `required: false`, and an empty value is the documented skip path.
+    required: false
+    default: ""
+  text:
+    description: "The complete message to post."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Post to Google Chat
+      shell: bash
+      env:
+        WEBHOOK: ${{ inputs.webhook }}
+        TEXT: ${{ inputs.text }}
+      run: |
+        # Not an error: the secret may not exist yet, and a workflow must stay
+        # dispatchable before anyone creates it.
+        if [ -z "$WEBHOOK" ]; then
+          echo "::warning::GOOGLE_CHAT_WEBHOOK is empty -- no chat message sent"
+          exit 0
+        fi
+
+        if [ -z "$TEXT" ]; then
+          echo "::warning::notify-chat called with an empty message -- nothing sent"
+          exit 0
+        fi
+
+        # json.dumps, not string interpolation: the message carries newlines,
+        # backticks and non-ASCII, any of which would break hand-built JSON.
+        payload=$(TEXT="$TEXT" python3 -c 'import json,os; print(json.dumps({"text": os.environ["TEXT"]}))')
+
+        # mktemp, not a fixed path: a stale body from an earlier notify step in
+        # the same job would otherwise be printed as if it belonged to this one.
+        response=$(mktemp)
+
+        # -s, not -sS: a curl error on stderr can name the host it dialled.
+        # `|| true`, never `|| echo`: GitHub runs this as `bash -eo pipefail`,
+        # so a transport failure makes the pipeline non-zero AFTER curl has
+        # already written its own "000", and appending a second one makes $code
+        # unusable as a number.
+        code=$(curl -s -o "$response" -w '%{http_code}\n' \
+          -X POST \
+          -H 'Content-Type: application/json; charset=UTF-8' \
+          --max-time 30 \
+          --retry 2 \
+          -d "$payload" \
+          "$WEBHOOK" | tail -n1 || true)
+        case "$code" in
+          '' | *[!0-9]*) code=000 ;;
+        esac
+
+        if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+          echo "Google Chat accepted the message (HTTP $code)"
+          exit 0
+        fi
+
+        echo "::error::Google Chat rejected the message (HTTP $code) -- the run result is unaffected"
+        head -c 500 "$response" || true
+        echo
+        exit 0

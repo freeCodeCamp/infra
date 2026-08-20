@@ -1,0 +1,44 @@
+---
+# Pure. Turns one host's observed NGINX state into a finding row and an
+# anomaly flag. Touches no host, so play-test--4-verify-nginx.yml drives it
+# with stubs and the shipped artifact is what gets tested.
+#
+# In:   verify_load, verify_enabled, verify_active_after, verify_healed,
+#       verify_listener_ok, verify_config_ok, verify_dropin_ok,
+#       verify_nginx_port
+# Out:  verify_finding, verify_anomaly
+#
+# `reasons` is the operator-facing part. It says what is wrong in words, not
+# in systemd vocabulary, because it is what lands in a chat message at 02:00.
+
+- name: Build this host's finding
+  ansible.builtin.set_fact:
+    verify_finding:
+      host: "{{ inventory_hostname }}"
+      load: "{{ verify_load }}"
+      enabled: "{{ verify_enabled }}"
+      active: "{{ verify_active_after }}"
+      healed: "{{ verify_healed | bool }}"
+      listener_ok: "{{ verify_listener_ok | bool }}"
+      config_ok: "{{ verify_config_ok | bool }}"
+      dropin_ok: "{{ verify_dropin_ok | bool }}"
+      reasons: >-
+        {{
+          ([] if verify_load == 'loaded' else
+             ['systemd cannot load the unit (' ~ verify_load ~ ')'])
+          + ([] if verify_enabled in ['enabled', 'enabled-runtime', 'static'] else
+             ['not enabled at boot (' ~ verify_enabled ~ ') -- it will NOT come back after a reboot'])
+          + ([] if verify_active_after in ['active', 'reloading'] else
+             ['not running (' ~ verify_active_after ~ ')'])
+          + (['was down and was restarted by this check'] if verify_healed | bool else [])
+          + ([] if verify_listener_ok | bool else
+             ['not listening on port ' ~ verify_nginx_port])
+          + ([] if verify_config_ok | bool else
+             ['nginx -t failed -- the next restart will not come back'])
+          + ([] if verify_dropin_ok | bool else
+             ['no restart policy installed -- run play-oldeworld--nginx-3-harden-unit.yml'])
+        }}
+
+- name: Flag whether this host is an anomaly
+  ansible.builtin.set_fact:
+    verify_anomaly: "{{ verify_finding.reasons | length > 0 }}"

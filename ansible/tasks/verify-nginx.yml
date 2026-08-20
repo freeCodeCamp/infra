@@ -1,0 +1,122 @@
+---
+# Answers one question per host: will NGINX be serving after this VM reboots?
+#
+# Included by play-any--verify-nginx.yml. The including play must NOT set
+# serial: every host is checked in one batch, so a bad host turns the run red
+# without cancelling the check on the rest.
+#
+# Scoped to the ingress hosts, where NGINX is expected to exist. On this play
+# a missing NGINX is an anomaly, not a benign absence -- that is the whole
+# point of pointing it at pxy groups and nothing else.
+
+- name: Wait for the host to accept connections
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 300
+
+# failed_when: false because the systemd module fail_json()s on a unit with a
+# LoadError -- exactly the error and bad-setting states this check has to
+# grade rather than abort on. A read that fails leaves no status, every field
+# falls back to 'unknown', and 'unknown' is an anomaly below.
+- name: Read the NGINX unit state
+  ansible.builtin.systemd:
+    name: nginx
+  register: verify_unit
+  changed_when: false
+  failed_when: false
+
+- name: Describe the unit
+  ansible.builtin.set_fact:
+    verify_load: "{{ (verify_unit.status | default({})).LoadState | default('unknown') }}"
+    verify_enabled: "{{ (verify_unit.status | default({})).UnitFileState | default('unknown') }}"
+    verify_active: "{{ (verify_unit.status | default({})).ActiveState | default('unknown') }}"
+    verify_sub: "{{ (verify_unit.status | default({})).SubState | default('unknown') }}"
+
+# `activating` is healthy ONLY while the unit is genuinely starting. A unit
+# inside its Restart= backoff also reports activating, with SubState
+# auto-restart -- and the drop-in this repo installs creates exactly that
+# state for roughly 3.3 minutes (10 attempts x RestartSec 20s). Calling it
+# healthy would report green while the site is down.
+- name: Decide whether NGINX is currently up
+  ansible.builtin.set_fact:
+    verify_up: >-
+      {{ verify_active in ['active', 'reloading']
+         or (verify_active == 'activating'
+             and verify_sub not in ['auto-restart', 'auto-restart-queued']) }}
+
+- name: Restart NGINX once when it is down
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  register: verify_restart
+  failed_when: false
+  when:
+    - not (verify_up | bool)
+    - verify_load == 'loaded'
+
+- name: Wait for the restarted unit to come up
+  ansible.builtin.systemd:
+    name: nginx
+  register: verify_recheck
+  changed_when: false
+  failed_when: false
+  retries: 6
+  delay: 10
+  until: (verify_recheck.status | default({})).ActiveState | default('unknown') in ['active', 'reloading']
+  # Same condition as the restart above, not `verify_restart is changed`:
+  # ansible-lint reads the latter as a handler that should be extracted, and
+  # a handler cannot express "retry until it comes up".
+  when:
+    - not (verify_up | bool)
+    - verify_load == 'loaded'
+
+- name: Record the state after the restart attempt
+  ansible.builtin.set_fact:
+    verify_active_after: >-
+      {{ (verify_recheck.status | default({})).ActiveState | default(verify_active) }}
+    verify_healed: "{{ verify_restart is defined and verify_restart is changed }}"
+
+- name: Check that NGINX holds its listener
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ verify_nginx_port }}"
+    state: started
+    timeout: 30
+  register: verify_listener
+  failed_when: false
+  changed_when: false
+  when: verify_nginx_port | int > 0
+
+# The restart policy is the whole root-cause fix, and it ships as a manual
+# play. Without this check a host that was never hardened reports green while
+# still having no recovery behaviour at all -- the original outage, undetected.
+- name: Check that the restart policy drop-in is installed
+  ansible.builtin.stat:
+    path: /etc/systemd/system/nginx.service.d/override.conf
+  register: verify_dropin
+
+- name: Validate the NGINX config on disk
+  ansible.builtin.command: nginx -t
+  register: verify_config
+  changed_when: false
+  failed_when: false
+
+# Normalise the two probe results into plain booleans BEFORE the finding is
+# built, so the finding builder takes a clean contract and can be driven by
+# play-test--4-verify-nginx.yml with stubs.
+- name: Normalise the probe results
+  ansible.builtin.set_fact:
+    verify_listener_ok: >-
+      {{ verify_nginx_port | int == 0
+         or verify_listener.state | default('') == 'started' }}
+    verify_config_ok: "{{ verify_config.rc | default(1) == 0 }}"
+    verify_dropin_ok: "{{ verify_dropin.stat.exists | default(false) }}"
+
+- name: Build this host's finding
+  ansible.builtin.include_tasks: verify-nginx-finding.yml
+
+- name: Report this host
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: {{ 'ANOMALY -- ' ~ (verify_finding.reasons | join('; '))
+         if verify_anomaly | bool else 'nginx active and enabled' }}

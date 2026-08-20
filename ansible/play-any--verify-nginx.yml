@@ -1,0 +1,86 @@
+---
+# Does NGINX survive a reboot on these hosts, right now?
+#
+# Point it at the ingress groups -- NGINX exists on the pxy hosts and nowhere
+# else in this fleet, so a missing unit here is a real finding rather than a
+# host that simply does not run it.
+#
+#   ansible-playbook -i inventory/linode.yml play-any--verify-nginx.yml \
+#     -e variable_host=prd_oldeworld_pxy
+#
+# This play MUTATES: it restarts NGINX once on a host where it is down, then
+# rechecks. It reports the host as an anomaly either way, including when the
+# restart worked -- a night that healed itself is something you should see,
+# not something to hide behind a green tick.
+#
+# No serial on purpose. Every host is checked in one batch, so one bad host
+# turns the run red without cancelling the check on the rest.
+- name: Verify that NGINX is running and will survive a reboot
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: false
+  become: true
+  become_user: root
+  vars:
+    # Set to 0 to skip the listener probe on a host that does not serve on 80.
+    verify_nginx_port: "{{ variable_nginx_port | default(80) }}"
+    # Where the machine-readable findings land on the RUNNER, for the
+    # workflow to turn into annotations and a chat message.
+    verify_report_path: "{{ variable_report_path | default('') }}"
+  tasks:
+    - name: Check NGINX
+      ansible.builtin.include_tasks: tasks/verify-nginx.yml
+
+    # ansible_play_hosts_ALL, not ansible_play_hosts. The latter excludes
+    # hosts Ansible removed from the play, so a pxy host that never came back
+    # from its reboot -- the exact failure this check exists to catch -- would
+    # silently have no row at all, and the report would read "nginx active on
+    # 2/2 hosts" while a third host lay dead.
+    #
+    # A plain map('extract', ...) raises on the missing var, so this loops and
+    # substitutes a finding for every host that dropped out.
+    - name: Collect every host's finding, including hosts that dropped out
+      ansible.builtin.set_fact:
+        verify_all_findings: >-
+          {%- set out = [] -%}
+          {%- for host in ansible_play_hosts_all -%}
+            {%- set _ = out.append(
+                  hostvars[host].verify_finding
+                  | default({'host': host,
+                             'load': 'unknown',
+                             'enabled': 'unknown',
+                             'active': 'unknown',
+                             'healed': false,
+                             'listener_ok': false,
+                             'config_ok': false,
+                             'reasons': ['host dropped out of the check -- unreachable, or it failed before it could be graded']})) -%}
+          {%- endfor -%}
+          {{ out }}
+      run_once: true
+      delegate_to: localhost
+      become: false
+
+    # delegate_to: localhost writes one file on the RUNNER holding every
+    # host's finding. become: false because the runner has no sudo and needs
+    # none to write its own workspace.
+    - name: Write the findings file for the workflow
+      ansible.builtin.copy:
+        dest: "{{ verify_report_path }}"
+        mode: "0644"
+        content: >-
+          {{ {'group': variable_host | default('unknown'),
+              'findings': verify_all_findings} | to_nice_json }}
+      delegate_to: localhost
+      become: false
+      run_once: true
+      when: verify_report_path | length > 0
+
+    # The assert is last so the findings file is always written, including on
+    # the runs where a host is bad. Without that ordering the workflow would
+    # have nothing to report precisely when there is something to report.
+    - name: Fail when any host is an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (verify_anomaly | bool)
+        fail_msg: >-
+          {{ inventory_hostname }}: {{ verify_finding.reasons | join('; ') }}
+        success_msg: "NGINX is healthy on {{ inventory_hostname }}"

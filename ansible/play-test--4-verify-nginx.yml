@@ -1,0 +1,163 @@
+---
+# Unit test for the NGINX finding logic. Runs on localhost with stubbed unit
+# state -- no host, no become, no mutation.
+#
+#   ansible-playbook --check -i localhost, play-test--4-verify-nginx.yml
+#
+# It exists because ansible--test.yml only runs `--syntax-check`, which does
+# not descend into a dynamic include_tasks. Without this, a typo in the
+# reasons logic would first execute against production ingress hosts.
+#
+# COVERS tasks/verify-nginx-finding.yml by including the shipped artifact.
+# DOES NOT cover tasks/verify-nginx.yml -- the systemd reads, the restart and
+# the listener probe all need a host. Do not paper over that with an assert
+# that re-types the rule here; that proves nothing about the copy that ships.
+- name: Test the NGINX finding logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    verify_nginx_port: 80
+  tasks:
+    - name: Healthy host
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active_after: active
+        verify_healed: false
+        verify_listener_ok: true
+        verify_config_ok: true
+        verify_dropin_ok: true
+
+    - name: Assert a healthy host is not an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (verify_anomaly | bool)
+          - verify_finding.reasons == []
+        success_msg: "Healthy host reads clean"
+
+    # The case the whole change exists for: the VM booted, the unit is
+    # enabled, and NGINX is dead with nothing retrying it.
+    - name: Dead after boot
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active_after: failed
+        verify_healed: false
+        verify_listener_ok: false
+        verify_config_ok: true
+        verify_dropin_ok: true
+
+    - name: Assert a dead unit is an anomaly and says so plainly
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - "'not running (failed)' in verify_finding.reasons"
+          - "'not listening on port 80' in verify_finding.reasons"
+        success_msg: "A dead unit is reported"
+
+    # A successful self-heal must still be an anomaly. This is the operator's
+    # explicit call: a night that fixed itself is something to see, not to
+    # hide behind a green tick.
+    - name: Healed by the check
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active_after: active
+        verify_healed: true
+        verify_listener_ok: true
+        verify_config_ok: true
+        verify_dropin_ok: true
+
+    - name: Assert a successful heal is still reported
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - "'was down and was restarted by this check' in verify_finding.reasons"
+        success_msg: "A self-heal is still reported"
+
+    # Running now, but disabled: it will not come back after the next reboot.
+    # Exactly the state a check that only looks at ActiveState would pass.
+    - name: Running but disabled at boot
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: loaded
+        verify_enabled: disabled
+        verify_active_after: active
+        verify_healed: false
+        verify_listener_ok: true
+        verify_config_ok: true
+        verify_dropin_ok: true
+
+    - name: Assert a disabled unit is an anomaly even while it is running
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - verify_finding.reasons | select('search', 'will NOT come back') | list | length == 1
+        success_msg: "A disabled unit is reported while still running"
+
+    # `systemctl mask nginx` reports LoadState=masked, not loaded, so a check
+    # that keys on ActiveState alone would never see it.
+    - name: Masked unit
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: masked
+        verify_enabled: masked
+        verify_active_after: inactive
+        verify_healed: false
+        verify_listener_ok: false
+        verify_config_ok: true
+        verify_dropin_ok: true
+
+    - name: Assert a masked unit is an anomaly
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - "'systemd cannot load the unit (masked)' in verify_finding.reasons"
+        success_msg: "A masked unit is reported"
+
+    # Running fine, but the config on disk no longer parses. Invisible until
+    # the next restart, and then fatal. This is what the pre-reboot gate in
+    # play-any--reboot.yml holds a host back for.
+    - name: Running with a broken config on disk
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active_after: active
+        verify_healed: false
+        verify_listener_ok: true
+        verify_config_ok: false
+        verify_dropin_ok: true
+
+    - name: Assert a broken config is an anomaly while NGINX still serves
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - verify_finding.reasons | select('search', 'nginx -t failed') | list | length == 1
+        success_msg: "A broken config is reported before it bites"
+
+    # The restart policy ships as a manual play, so a host that was never
+    # hardened has no recovery behaviour at all -- and looks perfectly healthy
+    # until the day it needs to recover.
+    - name: Healthy, but never hardened
+      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active_after: active
+        verify_healed: false
+        verify_listener_ok: true
+        verify_config_ok: true
+        verify_dropin_ok: false
+
+    - name: Assert a host with no restart policy is an anomaly
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - verify_finding.reasons | select('search', 'no restart policy') | list | length == 1
+        success_msg: "An unhardened host is reported"

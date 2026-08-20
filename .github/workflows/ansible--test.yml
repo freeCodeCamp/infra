@@ -77,3 +77,15 @@ jobs:
           fi
 
           echo "SUCCESS: All playbooks passed syntax check"
+
+      # --syntax-check does not descend into a dynamic include_tasks, so the
+      # NGINX finding logic is invisible to the step above. This runs the
+      # shipped task file for real against stubbed unit states on localhost.
+      - name: Unit Test the NGINX Finding Logic
+        run: |
+          source .venv/bin/activate
+          # No -i: ansible.cfg does not enable the host_list plugin, so
+          # `-i localhost,` cannot be parsed and the play runs on the implicit
+          # localhost regardless. The flag was doing nothing but printing
+          # three warnings.
+          ansible-playbook --check play-test--4-verify-nginx.yml

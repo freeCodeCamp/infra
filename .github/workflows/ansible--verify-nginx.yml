@@ -1,0 +1,232 @@
+name: Ansible --07- Verify NGINX
+
+# Answers one question for a host group: is NGINX running, and will it still
+# be running after the next reboot?
+#
+# It MUTATES -- a host where NGINX is down gets one restart attempt -- and it
+# reports the host as an anomaly either way, including when the restart
+# worked. A night that healed itself is something to see, not to hide.
+#
+# It is deliberately terminal in the housekeeping chain. Nothing runs after
+# it, so failing here can never stop the fleet being patched.
+
+on:
+  workflow_call:
+    inputs:
+      hosts:
+        description: 'Host group to verify; NGINX is expected on every host in it'
+        type: string
+        required: true
+      verbosity:
+        description: 'The verbosity level for logs'
+        type: string
+      stage:
+        description: 'Label for the chat alert; the calling job name'
+        type: string
+      nginx_port:
+        description: 'Port the listener probe checks; 0 skips the probe'
+        type: number
+        default: 80
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: 'The SSH private key for the Ansible user'
+        required: true
+      LINODE_TOKEN:
+        description: 'The Linode API token'
+        required: true
+      GOOGLE_CHAT_WEBHOOK:
+        description: 'Google Chat webhook URL; alerts are skipped when unset'
+        required: false
+  workflow_dispatch:
+    inputs:
+      hosts:
+        description: 'Host group to verify; NGINX is expected on every host in it'
+        type: string
+        required: true
+        default: 'prd_oldeworld_pxy'
+      verbosity:
+        description: 'The verbosity level for logs'
+        type: choice
+        required: true
+        default: '-v'
+        options:
+          - '-v'
+          - '-vv'
+          - '-vvv'
+      nginx_port:
+        description: 'Port the listener probe checks; 0 skips the probe'
+        type: number
+        required: false
+        default: 80
+
+# The job only needs to read the repo. It holds the SSH key and the Linode
+# token, so GITHUB_TOKEN gets no write scope it cannot use.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: './ansible'
+
+jobs:
+  verify_nginx:
+    name: Verify NGINX
+    runs-on: ubuntu-latest
+    env:
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      REPORT: ${{ github.workspace }}/nginx-verify.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Setup Ansible and Dependencies
+        run: |
+          uv sync
+          source .venv/bin/activate
+          ansible-galaxy install -r requirements.yml
+          ansible --version
+
+      - name: Configure SSH Private Key
+        shell: bash
+        env:
+          # Via env, not inline: printf keeps a key with backslashes intact,
+          # and the secret never becomes shell text.
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh/
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
+
+      - name: Play -- Verify NGINX
+        id: play
+        # shell: bash, NOT the default. GitHub's default run shell is
+        # `bash -e {0}` with NO pipefail, so the `| tee` below would mask a
+        # failed ansible-playbook behind tee's exit 0 and this step would go
+        # green on a failed verify. `shell: bash` is
+        # `bash --noprofile --norc -eo pipefail {0}`.
+        shell: bash
+        env:
+          HOSTS: ${{ inputs.hosts }}
+          VERBOSITY: ${{ inputs.verbosity }}
+          NGINX_PORT: ${{ inputs.nginx_port }}
+        run: |
+          source .venv/bin/activate
+
+          # Ansible lazily Jinja-templates extra-vars, so each `-e` value is a
+          # code path, not data: a lookup in one of them executes here, on a
+          # runner holding the fleet SSH key. Probed -- the lookup does run.
+          # There is deliberately NO check that the group is non-empty: an
+          # empty group is normal in this fleet, staging tiers are not always
+          # deployed, and failing on one would stop housekeeping for a
+          # condition that is not a fault.
+          case "$HOSTS" in
+            '' | *[!A-Za-z0-9_,.:-]*)
+              echo "::error::invalid host pattern -- letters, digits, _ . : , - only"
+              exit 1
+              ;;
+          esac
+          case "$NGINX_PORT" in
+            '' | *[!0-9]*)
+              echo "::error::nginx_port must be a non-negative integer"
+              exit 1
+              ;;
+          esac
+
+          extra_args=()
+          if [ -n "$VERBOSITY" ]; then
+            extra_args+=("$VERBOSITY")
+          fi
+
+          # tee, so the annotate step below can tell "no hosts matched" (normal)
+          # from "the play died before reaching them" (not normal).
+          ansible-playbook -i inventory/linode.yml \
+          play-any--verify-nginx.yml \
+          --private-key=~/.ssh/id_for_ansible.pem \
+          -e variable_host="$HOSTS" \
+          -e variable_nginx_port="$NGINX_PORT" \
+          -e variable_report_path="$REPORT" \
+          "${extra_args[@]}" 2>&1 | tee "$RUNNER_TEMP/play.log"
+
+      # always(), because the findings matter most on the run where the play
+      # failed. The play writes the file before it asserts, precisely so this
+      # step has something to read when there is something to report.
+      - name: Annotate the findings
+        id: findings
+        if: always()
+        env:
+          HOSTS: ${{ inputs.hosts }}
+          STAGE: ${{ inputs.stage }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # No file has two causes and only one is a problem. An empty group
+          # is NORMAL in this fleet -- staging tiers are not always deployed --
+          # and the play exits 0 having matched nothing. A group that DID match
+          # hosts and still wrote no file means the play died early.
+          if [ ! -f "$REPORT" ]; then
+            if grep -q 'skipping: no hosts matched' "$RUNNER_TEMP/play.log" 2>/dev/null; then
+              echo "$HOSTS matched no hosts -- nothing to verify, which is normal for a tier that is not deployed"
+            else
+              echo "::warning::no findings file for $HOSTS -- the play did not reach the hosts"
+            fi
+            echo "anomalies=0" >> "$GITHUB_OUTPUT"
+            echo "checked=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          python3 - "$REPORT" <<'PYEOF'
+          import json, os, sys
+
+          report = json.load(open(sys.argv[1]))
+          findings = report.get("findings") or []
+          bad = [f for f in findings if f.get("reasons")]
+          stage = os.environ.get("STAGE") or "Verify NGINX"
+          group = os.environ.get("HOSTS", "unknown")
+
+          for f in bad:
+              for reason in f["reasons"]:
+                  print(f"::error::{f['host']} nginx {reason}")
+
+          lines = [f"housekeeping · {stage} · {group}", ""]
+          if bad:
+              for f in bad:
+                  lines.append(f["host"])
+                  lines += [f"  {r}" for r in f["reasons"]]
+          else:
+              lines.append(f"nginx active and enabled on {len(findings)}/{len(findings)} hosts")
+          lines += ["", os.environ.get("RUN_URL", "")]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"anomalies={len(bad)}\n")
+              out.write(f"checked={len(findings)}\n")
+              out.write("text<<VERIFY_EOF\n")
+              out.write(("🔴 " if bad else "✅ ") + "\n".join(lines) + "\n")
+              out.write("VERIFY_EOF\n")
+
+          print(f"{len(bad)} anomaly/anomalies across {len(findings)} host(s)")
+          PYEOF
+
+      # Per group, and it fires as soon as THIS group is graded rather than
+      # waiting for the end-of-run report. It is not earlier than the reboot
+      # stages -- the housekeeping chain runs this job after them -- but a
+      # standalone dispatch of this workflow alerts the moment it finds
+      # something, and each group alerts without waiting for the other.
+      - name: Alert Google Chat on an anomaly
+        if: always() && steps.findings.outputs.anomalies != '0' && steps.findings.outputs.text != ''
+        uses: ./.github/actions/notify-chat
+        with:
+          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          text: ${{ steps.findings.outputs.text }}
+
+      # Job outputs cannot carry per-host detail out of a matrix leg -- legs
+      # overwrite each other. The end-of-run report reads these instead.
+      - name: Upload the findings
+        if: always() && hashFiles('nginx-verify.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nginx-verify-${{ inputs.hosts }}
+          path: nginx-verify.json
+          retention-days: 7

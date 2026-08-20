@@ -165,3 +165,139 @@ jobs:
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+  # ---------------------------------------------------------------------
+  # Everything above this line is unchanged. The two jobs below are
+  # APPENDED: no existing job gained a condition, a matrix entry or a
+  # different cadence.
+  # ---------------------------------------------------------------------
+
+  # Terminal by design. Nothing runs after it, so a red verify can never stop
+  # the fleet being patched -- which is the property the rest of this chain
+  # does not have, since every other stage skips everything downstream when it
+  # fails.
+  #
+  # Scoped to the ingress groups: NGINX exists on the 6 pxy hosts and nowhere
+  # else in this fleet, so this is the only place where a missing NGINX is a
+  # finding rather than a normal absence.
+  verify-nginx:
+    name: Verify NGINX
+    needs: reboot
+    # The only new condition in this workflow, and it widens rather than
+    # narrows: it makes the check run even when a stage above failed or was
+    # skipped, which is exactly when a service is most likely to be down.
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        host_groups:
+          - stg_oldeworld_pxy
+          - prd_oldeworld_pxy
+
+    uses: ./.github/workflows/ansible--verify-nginx.yml
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: '-v'
+      stage: Verify NGINX
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+
+  report:
+    name: Report
+    needs: [uptime, update, reboot-web, reboot, verify-nginx]
+    # always(), not success(): the run that most needs a message is the one
+    # that failed. Once this posts on every run, a Wednesday or Saturday with
+    # NO message means the workflow never ran at all -- the one failure no
+    # in-workflow check can catch, because a workflow that does not run cannot
+    # report on itself.
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # Job outputs cannot carry per-host detail out of a matrix job -- the
+      # legs overwrite each other. Each verify leg uploads its findings, and
+      # they are collected here.
+      - name: Collect the NGINX findings
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          pattern: nginx-verify-*
+          path: findings
+
+      - name: Build the run summary
+        id: summary
+        env:
+          UPTIME: ${{ needs.uptime.result }}
+          UPDATE: ${{ needs.update.result }}
+          REBOOT_WEB: ${{ needs.reboot-web.result }}
+          REBOOT: ${{ needs.reboot.result }}
+          VERIFY: ${{ needs.verify-nginx.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PYEOF'
+          import glob, json, os
+
+          stages = [
+              ("uptime", os.environ["UPTIME"]),
+              ("update", os.environ["UPDATE"]),
+              ("reboot-web", os.environ["REBOOT_WEB"]),
+              ("reboot", os.environ["REBOOT"]),
+              ("verify", os.environ["VERIFY"]),
+          ]
+
+          checked, bad = 0, []
+          for path in sorted(glob.glob("findings/*/nginx-verify.json")):
+              try:
+                  report = json.load(open(path))
+              except (OSError, ValueError):
+                  continue
+              for f in report.get("findings") or []:
+                  checked += 1
+                  if f.get("reasons"):
+                      bad.append(f)
+
+          # A skipped stage is not a passing one. Under this chain a failed
+          # update skips every reboot stage, and a tick would hide that.
+          if any(r == "failure" for _, r in stages) or bad:
+              verdict, mark = "ANOMALY", "🔴"
+          elif any(r == "cancelled" for _, r in stages):
+              verdict, mark = "CANCELLED", "⚠️"
+          elif any(r == "skipped" for _, r in stages):
+              verdict, mark = "INCOMPLETE", "⚠️"
+          else:
+              verdict, mark = "OK", "✅"
+
+          lines = [f"{mark} housekeeping · {verdict}", ""]
+          if bad:
+              for f in bad:
+                  lines.append(f["host"])
+                  lines += [f"  {r}" for r in f["reasons"]]
+              lines.append("")
+          elif checked:
+              lines += [f"nginx active and enabled on {checked}/{checked} pxy hosts", ""]
+          else:
+              lines += ["no nginx findings were collected this run", ""]
+
+          lines.append("stages")
+          lines += [f"  {name:<12}{result}" for name, result in stages]
+          lines += ["", os.environ["RUN_URL"]]
+
+          text = "\n".join(lines)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("text<<REPORT_EOF\n")
+              out.write(text + "\n")
+              out.write("REPORT_EOF\n")
+          print(text)
+          PYEOF
+
+      - name: Post the run summary
+        uses: ./.github/actions/notify-chat
+        with:
+          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          text: ${{ steps.summary.outputs.text }}
