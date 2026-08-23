@@ -1,0 +1,81 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pool-baseline
+  namespace: artemis
+  labels:
+    app.kubernetes.io/name: pool-baseline
+    app.kubernetes.io/component: measurement
+    app.kubernetes.io/managed-by: operator
+spec:
+  schedule: "50 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 2400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: pool-baseline
+            app.kubernetes.io/component: measurement
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sample
+              image: postgres:16.14-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: artemis-env-secret
+                      key: POSTGRES_PASSWORD
+                - name: PGHOST
+                  value: artemis-postgresql.artemis.svc.cluster.local
+                - name: PGUSER
+                  value: postgres
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  echo "ts|datname|state|backends"
+                  end=$(( $(date +%s) + 2100 ))
+                  while [ "$(date +%s)" -lt "$end" ]; do
+                    psql -tAF'|' -c "select to_char(now() at time zone 'UTC','HH24:MI:SS'),
+                                            coalesce(datname,'-'),
+                                            coalesce(state,'-'),
+                                            count(*)
+                                     from pg_stat_activity
+                                     where backend_type = 'client backend'
+                                     group by 1,2,3 order by 4 desc" \
+                      || echo "$(date -u +%H:%M:%S)|QUERY_FAILED||"
+                    sleep 30
+                  done
+                  echo "sampling complete"
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+          volumes:
+            - name: tmp
+              emptyDir: {}

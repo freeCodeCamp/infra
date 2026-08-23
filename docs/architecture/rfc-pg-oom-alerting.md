@@ -136,6 +136,23 @@ State between runs lives in a ConfigMap the job updates, so the RBAC is
 `get`/`list` on `pods`, `get` on `pods/log`, and `get`/`update` on that
 one ConfigMap.
 
+## Pool-cap baseline job (separate, temporary)
+
+`k3s/gxy-management/apps/artemis/measure/pool-baseline-cronjob.yaml`
+samples `pg_stat_activity` every 30s across the 03:50-04:25 UTC window
+and prints one row per database per sample to stdout.
+
+```sh
+kubectl -n artemis apply -f k3s/gxy-management/apps/artemis/measure/pool-baseline-cronjob.yaml
+kubectl -n artemis logs -l app.kubernetes.io/name=pool-baseline --tail=300
+kubectl -n artemis delete -f k3s/gxy-management/apps/artemis/measure/pool-baseline-cronjob.yaml
+```
+
+It is deliberately **not** in the Helm chart. Adding a template bumps the
+chart version, which changes the ConfigMap and Secret checksums and rolls
+the artemis pods — too much disturbance for a throwaway probe. Delete it
+once artemis #45 has chosen a cap.
+
 ## Scope boundary
 
 This RFC covers detection only. The memory sizing change is separate and
