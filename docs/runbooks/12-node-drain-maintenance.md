@@ -2,7 +2,7 @@
 
 **Audience:** operator. **Trigger:** kernel patch, DigitalOcean droplet resize, k3s upgrade, or any procedure needing a node drain on a `gxy-vm-management-k3s-*` node.
 
-Read this before draining. Two of the three nodes carry a workload that either **blocks** the drain or is **evicted with no protection**, and neither is visible from `kubectl get nodes`.
+Read this before draining. One node carries two workloads that **block** the drain outright, and that is not visible from `kubectl get nodes`. Which node it is changes with scheduling — check placement first.
 
 ## Why this runbook exists
 
@@ -12,7 +12,7 @@ The `artemis` namespace holds three workloads with three different disruption po
 | --- | --- | --- | --- | --- | --- |
 | `artemis` (deploy proxy) | 3 | all three | `minAvailable: 2` | 1 | Drains cleanly, one node at a time |
 | `artemis-postgresql` | 1 | k3s-2 | `minAvailable: 1` | **0** | **Blocks indefinitely** |
-| `hatchet-engine` | 1 | k3s-3 | **none deployed** | n/a | **Evicted immediately, no warning** |
+| `hatchet-engine` | 1 | k3s-2 | `minAvailable: 1` | **0** | **Blocks indefinitely** (since 2026-08-23) |
 
 Confirm the live numbers before trusting the table:
 
@@ -30,7 +30,7 @@ Pod placement is not pinned, so re-check which node holds Postgres and the engin
 
 **`artemis-postgresql`** — a single replica carrying both tenant databases (`artemis` and `hatchet`). Its PDB permits zero voluntary evictions, so the drain hangs rather than proceeding. This is deliberate: the alternative is an unscheduled control-plane outage. Serving is unaffected while it is down — `/readyz` returns `200 {"ready":true,"degraded":true}` and deploys still write to R2 — but GC, the index and the audit log stop. See [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md) for the rehearsed boundary.
 
-**`hatchet-engine`** — the durable-execution substrate. It has **no PDB in the cluster**, so a drain evicts it instantly. The impact is narrower than it looks:
+**`hatchet-engine`** — the durable-execution substrate. Its PDB permits zero voluntary evictions, so a drain hangs. Before 2026-08-23 it had no PDB and was evicted instantly. The impact of losing it is narrower than it looks:
 
 - **Not affected:** deploy init, upload, finalize, promote, rollback, and serving. Those paths write to R2 and Postgres directly and never touch Hatchet.
 - **Affected:** the scheduled jobs — `tombstone-purge` (03:00 UTC), `drift-detect` (04:00 UTC), and the event-triggered `gc-site`.
@@ -39,16 +39,13 @@ Pod placement is not pinned, so re-check which node holds Postgres and the engin
 
 The engine keeps no local state; its run history lives in the `hatchet` database on `artemis-postgresql-0`, so eviction risks scheduling continuity, not data.
 
-## Known gap — the hatchet PDB is written but not shipped
+## Closed gap — the hatchet PDB shipped 2026-08-23
 
-`k3s/gxy-management/apps/hatchet/charts/hatchet/templates/pdb.yaml` exists and is gated on `pdb.enabled`, but the `hatchet` Helm release is still revision 1 from 2026-06-06. **`just release gxy-management artemis` does not release the hatchet chart**, so the template has never been applied. Verify:
+`just release gxy-management hatchet` took the release to revision 2 and applied `hatchet-engine` at `minAvailable: 1`. **`just release gxy-management artemis` does not release the hatchet chart** — the two charts are separate releases in one namespace. That is why the template sat unapplied from 2026-06-06.
 
-```sh
-helm -n artemis list          # hatchet REVISION 1 => the PDB is not deployed
-kubectl -n artemis get pdb    # only `artemis` and `artemis-postgresql` appear
-```
+The engine now blocks a drain instead of being evicted without warning, which is the intended trade: an outage the operator times beats one the scheduler picks.
 
-Shipping it flips k3s-3 from *surprise eviction* to *blocked drain*, matching Postgres. That is the chart author's stated intent — an outage the operator times beats one the scheduler picks. It is a decision, not a defect: make it deliberately, and if you ship it, expect two of three nodes to need the manual step below.
+Both blocking workloads presently sit on the same node, so today one node needs the manual step and two drain cleanly. Placement is not pinned. Re-check before every drain — if the engine and Postgres land on different nodes, two nodes need it.
 
 ## Procedure
 
@@ -61,13 +58,14 @@ Shipping it flips k3s-3 from *surprise eviction* to *blocked drain*, matching Po
 3. Drain, do the maintenance, uncordon.
 4. Scale back to 1 and verify per [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md) — `postgres.connected` in the artemis logs, `/readyz` no longer `degraded`, and the outbox backlog draining.
 
-**Node holding `hatchet-engine`** — today it needs no action; the pod is evicted and reschedules. Prefer a window outside 03:00–04:30 UTC so the nightly check-ins are not recorded as missed. If the PDB is later shipped, follow the Postgres procedure instead, scaling the engine deployment to zero.
+**Node holding `hatchet-engine`** — the drain will hang, as with Postgres. Scale the deployment to zero, drain, uncordon, then scale back to 1. Prefer a window outside 03:00–04:30 UTC so the nightly check-ins are not recorded as missed. Confirm the workers re-attach afterwards: the engine log reports `listing actions for workers` with a non-zero count.
 
 ## Verify after any drain
 
 ```sh
 kubectl -n artemis get pods -o wide          # all Running, spread across the surviving nodes
 kubectl -n artemis get pdb                   # artemis disruptionsAllowed back to 1
+kubectl -n artemis get pods -o wide          # confirm which node now holds PG + engine
 curl -sS https://uploads.freecode.camp/healthz
 ```
 
