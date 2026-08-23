@@ -34,6 +34,9 @@ spec:
           args:
             - postgres
             {{- range $key, $value := .Values.postgres.parameters }}
+            {{- if kindIs "invalid" $value }}
+            {{- fail (printf "postgres.parameters.%s is null; give it a value or remove the key" $key) }}
+            {{- end }}
             - -c
             - {{ printf "%s=%v" $key $value | quote }}
             {{- end }}

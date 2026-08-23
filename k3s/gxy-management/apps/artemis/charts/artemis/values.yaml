@@ -262,13 +262,15 @@ postgres:
     limits:
       cpu: "1"
       memory: 4Gi
-  # Envelope from artemis docs/design/0002-scalability-capacity.md section 4.
   # Rendered as `postgres -c <key>=<value>`; overrides postgresql.conf.
+  # max_connections: artemis docs/design/0002-scalability-capacity.md s4.
+  # shared_buffers: same doc line 23. Both tenants total 111MB.
   parameters:
     max_connections: "200"
-    shared_buffers: 512MB
+    shared_buffers: 256MB
     effective_cache_size: 3GB
-    work_mem: 2MB
+    work_mem: 4MB
+    log_temp_files: "0"
   # PDB for the single-replica StatefulSet: minAvailable 1 blocks
   # voluntary evictions (node drains) outright — the DB moves when the
   # operator moves it, never as a maintenance side effect (I2).
