@@ -82,16 +82,59 @@ modes to a three-node control plane that has none today. If the platform
 later needs metrics for other reasons, move this alert to a
 `container_memory_failcnt` rule and delete the CronJob.
 
-## Open questions for the operator
+## Decisions (operator, 2026-08-23)
 
-1. Should the alert route to the existing artemis Sentry project, or to a
-   separate infra project? Sharing the project means the DSN is already in
-   the namespace; separating it keeps application errors and platform
-   faults apart.
-2. Is a 15-minute detection latency acceptable? A tighter loop is cheap but
-   raises the log-read rate against the API server.
-3. Does the same alert belong on `valkey`, which carries a PDB and the same
-   class of single-replica exposure?
+1. **Sentry project:** the existing artemis project. The DSN is already in
+   `artemis-env-secret`, so no new secret and no sops round-trip. Events
+   carry a `component=platform-db` tag so Sentry rules can route them
+   apart from application errors.
+2. **Detection latency:** 15 minutes, with a 20-minute log lookback.
+3. **Scope:** any container in the `artemis` namespace, not Postgres
+   alone.
+
+## Scope change: what "any container" costs
+
+Widening to the whole namespace looked expensive and is not, because the
+invisible failure mode does not exist for most containers.
+
+A cgroup OOM kill is only survivable-and-silent when the container runs
+more than one process. The kernel picks the largest process in the
+cgroup; if that is not PID 1, the container keeps running and Kubernetes
+reports nothing. Postgres has a postmaster plus one backend per
+connection, so it can lose a child and stay up — that is exactly the 43
+kills nobody saw. A single-process container cannot fail this way: kill
+its only process and the container restarts, which the API reports.
+
+Probed 2026-08-23 across the namespace:
+
+| Container | Processes | Shell | Detection signal |
+| --------- | --------- | ----- | ---------------- |
+| `artemis` x3 | single Go binary | **none** (distroless) | API `lastState.terminated.reason` |
+| `hatchet-engine` | single Go binary | yes | API `lastState.terminated.reason` |
+| `postgresql` | postmaster + N backends | yes | log markers |
+
+The three artemis containers have no shell, so no exec-based probe could
+ever have read their cgroups. It does not matter: they cannot fail
+silently, so the API signal is complete for them.
+
+## Two signals, both plain API reads
+
+1. **All containers** — GET pods, compare `restartCount` and
+   `lastState.terminated.reason == OOMKilled` against the previous run.
+   Catches every single-process container.
+2. **Postgres only** — GET `pods/log`, match
+   `terminated by signal 9` and `database system was not properly shut
+   down`. Catches the multi-process case, and the `DETAIL:` line names
+   the query that was running.
+
+Both are HTTPS GETs against the kube-apiserver with a namespaced
+ServiceAccount token. **No `pods/exec`, no hostPath, no privileged
+sidecar, no node access** — which keeps the job inside the namespace's
+restricted Pod Security Standard.
+
+State between runs lives in a ConfigMap the job updates, so the RBAC is
+`get`/`list` on `pods`, `get` on `pods/log`, and `get`/`update` on that
+one ConfigMap.
 
 ## Scope boundary
 
