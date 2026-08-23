@@ -265,6 +265,10 @@ postgres:
   # Rendered as `postgres -c <key>=<value>`; overrides postgresql.conf.
   # max_connections: artemis docs/design/0002-scalability-capacity.md s4.
   # shared_buffers: same doc line 23. Both tenants total 111MB.
+  # effective_cache_size: derived from limits.memory, not cited. Measured
+  # inert at this data size; it keeps the planner honest as tables grow.
+  # work_mem + log_temp_files: sized from measured plans, not the doc.
+  # OOM driver is memory.stat `anon` (per-backend), not `shmem`.
   parameters:
     max_connections: "200"
     shared_buffers: 256MB
