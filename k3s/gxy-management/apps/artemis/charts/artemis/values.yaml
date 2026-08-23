@@ -258,10 +258,17 @@ postgres:
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      memory: 1Gi
     limits:
       cpu: "1"
-      memory: 512Mi
+      memory: 4Gi
+  # Envelope from artemis docs/design/0002-scalability-capacity.md section 4.
+  # Rendered as `postgres -c <key>=<value>`; overrides postgresql.conf.
+  parameters:
+    max_connections: "200"
+    shared_buffers: 512MB
+    effective_cache_size: 3GB
+    work_mem: 2MB
   # PDB for the single-replica StatefulSet: minAvailable 1 blocks
   # voluntary evictions (node drains) outright — the DB moves when the
   # operator moves it, never as a maintenance side effect (I2).

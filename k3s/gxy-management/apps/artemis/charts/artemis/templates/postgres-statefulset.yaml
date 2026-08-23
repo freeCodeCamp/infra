@@ -19,6 +19,7 @@ spec:
         {{- include "artemis.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: postgresql
     spec:
+      terminationGracePeriodSeconds: 60
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
@@ -30,6 +31,12 @@ spec:
         - name: postgresql
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
           imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+          args:
+            - postgres
+            {{- range $key, $value := .Values.postgres.parameters }}
+            - -c
+            - {{ printf "%s=%v" $key $value | quote }}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
@@ -69,6 +76,15 @@ spec:
               readOnly: true
           resources:
             {{- toYaml .Values.postgres.resources | nindent 12 }}
+          lifecycle:
+            preStop:
+              exec:
+                # lifecycle exec does NOT expand $(VAR); the shell reads the
+                # container env instead.
+                command:
+                  - sh
+                  - -c
+                  - pg_ctl stop -m fast -W -D "$PGDATA"
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "postgres", "-d", "postgres"]
