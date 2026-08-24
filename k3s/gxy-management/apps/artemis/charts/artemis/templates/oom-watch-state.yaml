@@ -1,0 +1,10 @@
+{{- if .Values.oomWatch.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-oom-watch-state
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oom-watch
+{{- end }}

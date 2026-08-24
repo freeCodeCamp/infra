@@ -1,0 +1,89 @@
+{{- if .Values.oomWatch.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-oom-watch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oom-watch
+spec:
+  schedule: {{ .Values.oomWatch.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: {{ .Values.oomWatch.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "artemis.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: oom-watch
+        spec:
+          serviceAccountName: {{ .Release.Name }}-oom-watch
+          restartPolicy: Never
+          dnsConfig:
+            options:
+              - name: ndots
+                value: "1"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: watch
+              image: {{ .Values.oomWatch.image }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              command: ["python3", "/opt/oom-watch/watch.py"]
+              env:
+                - name: STATE_CONFIGMAP
+                  value: {{ .Release.Name }}-oom-watch-state
+                - name: LOOKBACK_SECONDS
+                  value: {{ .Values.oomWatch.lookbackSeconds | quote }}
+                - name: LOG_COMPONENT
+                  value: {{ .Values.oomWatch.logComponent | quote }}
+                - name: LOG_LIMIT_BYTES
+                  value: {{ .Values.oomWatch.logLimitBytes | quote }}
+                - name: MONITOR_SLUG
+                  value: {{ .Values.oomWatch.monitorSlug | quote }}
+                - name: MONITOR_SCHEDULE
+                  value: {{ .Values.oomWatch.schedule | quote }}
+                - name: MONITOR_CHECKIN_MARGIN
+                  value: {{ .Values.oomWatch.monitorCheckinMargin | quote }}
+                - name: MONITOR_MAX_RUNTIME
+                  value: {{ .Values.oomWatch.monitorMaxRuntime | quote }}
+                - name: MONITOR_FAILURE_THRESHOLD
+                  value: {{ .Values.oomWatch.monitorFailureThreshold | quote }}
+                - name: MONITOR_TIMEZONE
+                  value: {{ .Values.oomWatch.monitorTimezone | quote }}
+                - name: ENVIRONMENT
+                  value: {{ .Values.env.ENVIRONMENT | default "production" | quote }}
+                - name: SENTRY_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: SENTRY_DSN
+                      optional: true
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/oom-watch
+                  readOnly: true
+              resources:
+                {{- toYaml .Values.oomWatch.resources | nindent 16 }}
+          volumes:
+            - name: script
+              configMap:
+                name: {{ .Release.Name }}-oom-watch
+{{- end }}

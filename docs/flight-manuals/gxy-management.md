@@ -344,6 +344,23 @@ curl -fsS https://uploads.freecode.camp/healthz
 # → {"ok":true}
 ```
 
+### D.3a Postgres tuning + OOM watcher
+
+The bundled PostgreSQL takes explicit parameters from `postgres.parameters` in the chart, rendered as `postgres -c <key>=<value>`. Stock defaults were sized for a dedicated host, not a container, and the pod OOM-killed backends 43 times between 2026-06-20 and 2026-08-23 without ever restarting or raising an event.
+
+```bash
+kubectl -n artemis exec artemis-postgresql-0 -c postgresql -- \
+  psql -U postgres -c "show max_connections" -c "show shared_buffers" \
+       -c "show work_mem" -c "show effective_cache_size"
+# 200 / 256MB / 4MB / 3GB, all with source = command line
+```
+
+Container limits are `4Gi` memory (`1Gi` request). The working set measures ~593 MiB at rest against the former `512Mi` ceiling — that gap is why the kills happened. Watch `anon` in `/sys/fs/cgroup/memory.stat`, not `memory.peak`, which folds in a lazily-touched `shared_buffers` reservation.
+
+A `preStop` hook runs `pg_ctl stop -m fast`. Without it, Kubernetes SIGTERM reaches the postmaster as a *smart* shutdown that waits for pooled clients that never disconnect, and every pod replacement ends in SIGKILL plus crash recovery.
+
+`artemis-oom-watch` (CronJob, every 15 min) detects both the invisible backend kills and ordinary container OOMKills, and reports to Sentry. Verify per runbook 03 §4a.
+
 ### D.4 Smoke
 
 ```bash

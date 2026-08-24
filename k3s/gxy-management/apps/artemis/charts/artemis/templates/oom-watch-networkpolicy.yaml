@@ -1,0 +1,50 @@
+{{- if and .Values.oomWatch.enabled .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-oom-watch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oom-watch
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: oom-watch
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              {{- range .Values.oomWatch.sentryFqdnPatterns }}
+              - matchPattern: {{ . | quote }}
+              {{- end }}
+              - matchName: "kubernetes.default.svc.cluster.local"
+              - matchPattern: "*.*.svc.cluster.local"
+    - toEntities:
+        - kube-apiserver
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "6443"
+              protocol: TCP
+    - toFQDNs:
+        {{- range .Values.oomWatch.sentryFqdnPatterns }}
+        - matchPattern: {{ . | quote }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+{{- end }}

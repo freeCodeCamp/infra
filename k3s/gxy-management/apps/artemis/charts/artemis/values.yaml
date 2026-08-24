@@ -282,6 +282,32 @@ postgres:
     enabled: true
     minAvailable: 1
 
+oomWatch:
+  enabled: true
+  schedule: "*/15 * * * *"
+  lookbackSeconds: "1200"
+  activeDeadlineSeconds: 300
+  logComponent: postgresql
+  logLimitBytes: "2000000"
+  monitorSlug: artemis-oom-watch
+  # Minutes. develop.sentry.dev/sdk/telemetry/check-ins: monitor_config
+  # rides the in_progress check-in only, and max_runtime measures
+  # in_progress to terminal.
+  monitorCheckinMargin: 10
+  monitorMaxRuntime: 10
+  monitorFailureThreshold: 2
+  monitorTimezone: UTC
+  image: python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d
+  sentryFqdnPatterns:
+    - "*.ingest.sentry.io"
+    - "*.ingest.*.sentry.io"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
 # ---------------------------------------------------------------------
 # Backup CronJob (ADR-019 stateful floor). Logical pg_dumpall of the
 # shared instance (both tenant DBs: artemis + hatchet) gzipped and

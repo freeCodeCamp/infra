@@ -1,0 +1,323 @@
+{{- if .Values.oomWatch.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-oom-watch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: oom-watch
+data:
+  watch.py: |
+    import json
+    import os
+    import re
+    import ssl
+    import sys
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    from datetime import datetime, timedelta, timezone
+
+    ROOT = "/var/run/secrets/kubernetes.io/serviceaccount"
+    API = "https://{}:{}".format(
+        os.environ["KUBERNETES_SERVICE_HOST"], os.environ["KUBERNETES_SERVICE_PORT"]
+    )
+    NS = open(ROOT + "/namespace").read().strip()
+    TOKEN = open(ROOT + "/token").read().strip()
+    STATE_NAME = os.environ["STATE_CONFIGMAP"]
+    LOOKBACK = int(os.environ["LOOKBACK_SECONDS"])
+    LOG_COMPONENT = os.environ["LOG_COMPONENT"]
+    LOG_LIMIT_BYTES = int(os.environ["LOG_LIMIT_BYTES"])
+    MONITOR_SLUG = os.environ["MONITOR_SLUG"]
+    MONITOR_SCHEDULE = os.environ.get("MONITOR_SCHEDULE", "*/15 * * * *")
+    MONITOR_CHECKIN_MARGIN = int(os.environ.get("MONITOR_CHECKIN_MARGIN", "10"))
+    MONITOR_MAX_RUNTIME = int(os.environ.get("MONITOR_MAX_RUNTIME", "10"))
+    MONITOR_FAILURE_THRESHOLD = int(os.environ.get("MONITOR_FAILURE_THRESHOLD", "2"))
+    MONITOR_TIMEZONE = os.environ.get("MONITOR_TIMEZONE", "UTC")
+    CHECK_IN_ID = os.urandom(16).hex()
+    DSN = os.environ.get("SENTRY_DSN", "").strip()
+    ENVIRONMENT = os.environ.get("ENVIRONMENT", "production")
+
+    CTX = ssl.create_default_context(cafile=ROOT + "/ca.crt")
+    STARTED = datetime.now(timezone.utc)
+    MARKERS = (
+        ("backend_sigkill", re.compile(r"was terminated by signal 9")),
+        ("crash_recovery", re.compile(r"database system was not properly shut down")),
+    )
+
+
+    def api(path, method="GET", body=None, raw=False):
+        req = urllib.request.Request(API + path, method=method)
+        req.add_header("Authorization", "Bearer " + TOKEN)
+        if body is not None:
+            req.add_header("Content-Type", "application/json")
+            body = json.dumps(body).encode()
+        with urllib.request.urlopen(req, body, timeout=30, context=CTX) as r:
+            payload = r.read().decode("utf-8", "replace")
+        return payload if raw else json.loads(payload)
+
+
+    def load_state():
+        try:
+            cm = api("/api/v1/namespaces/{}/configmaps/{}".format(NS, STATE_NAME))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return {}
+            raise
+        try:
+            return json.loads(cm.get("data", {}).get("state.json", "{}"))
+        except ValueError:
+            print("state.json unparseable; starting from empty", file=sys.stderr)
+            return {}
+
+
+    def save_state(state):
+        cm = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {"name": STATE_NAME, "namespace": NS},
+            "data": {"state.json": json.dumps(state, sort_keys=True)},
+        }
+        api("/api/v1/namespaces/{}/configmaps/{}".format(NS, STATE_NAME), "PUT", cm)
+
+
+    def finding(kind, title, fingerprint, extra):
+        return {"kind": kind, "title": title, "fingerprint": fingerprint, "extra": extra}
+
+
+    def scan_restarts(pods, state):
+        findings = []
+        seen = {}
+        previous = state.get("restarts", {})
+        for pod in pods.get("items", []):
+            name = pod["metadata"]["name"]
+            uid = pod["metadata"].get("uid", name)
+            for cs in pod.get("status", {}).get("containerStatuses", []):
+                restart_key = "{}/{}".format(name, cs["name"])
+                count = cs.get("restartCount", 0)
+                seen[restart_key] = count
+                was = previous.get(restart_key)
+                last = (cs.get("lastState") or {}).get("terminated") or {}
+                if was is not None and count > was and last.get("reason") == "OOMKilled":
+                    findings.append(
+                        finding(
+                            "container_oomkilled",
+                            "OOMKilled: {}".format(restart_key),
+                            ["oom-watch", "container_oomkilled", restart_key],
+                            {
+                                "pod": name,
+                                "container": cs["name"],
+                                "restart_count": count,
+                                "previous_restart_count": was,
+                                "exit_code": last.get("exitCode"),
+                                "finished_at": last.get("finishedAt"),
+                            },
+                        )
+                    )
+                current = (cs.get("state") or {}).get("terminated") or {}
+                if current.get("reason") != "OOMKilled":
+                    continue
+                terminal_key = "{}/{}/{}".format(uid, cs["name"], current.get("finishedAt"))
+                seen[terminal_key] = 1
+                if terminal_key in previous:
+                    continue
+                findings.append(
+                    finding(
+                        "container_oomkilled_terminal",
+                        "OOMKilled (not restarted): {}/{}".format(name, cs["name"]),
+                        ["oom-watch", "container_oomkilled_terminal", name, cs["name"]],
+                        {
+                            "pod": name,
+                            "container": cs["name"],
+                            "exit_code": current.get("exitCode"),
+                            "finished_at": current.get("finishedAt"),
+                            "restart_policy": pod["spec"].get("restartPolicy"),
+                        },
+                    )
+                )
+        return findings, seen
+
+
+    def scan_logs(pods, state):
+        findings = []
+        marker = state.get("last_log_marker") or STARTED.isoformat().replace("+00:00", "Z")
+        newest = marker
+        for pod in pods.get("items", []):
+            labels = pod["metadata"].get("labels", {})
+            if labels.get("app.kubernetes.io/component") != LOG_COMPONENT:
+                continue
+            name = pod["metadata"]["name"]
+            for container in pod["spec"]["containers"]:
+                path = (
+                    "/api/v1/namespaces/{}/pods/{}/log"
+                    "?container={}&sinceSeconds={}&timestamps=true&limitBytes={}"
+                ).format(NS, name, container["name"], LOOKBACK, LOG_LIMIT_BYTES)
+                try:
+                    text = api(path, raw=True)
+                except urllib.error.HTTPError:
+                    continue
+                lines = text.splitlines()
+                for index, line in enumerate(lines):
+                    stamp = line.split(" ", 1)[0]
+                    if stamp <= marker:
+                        continue
+                    for label, pattern in MARKERS:
+                        if not pattern.search(line):
+                            continue
+                        detail = ""
+                        for follow in lines[index + 1 : index + 4]:
+                            if "DETAIL:" in follow:
+                                detail = follow.split("DETAIL:", 1)[1].strip()[:400]
+                                break
+                        newest = max(newest, stamp)
+                        findings.append(
+                            finding(
+                                label,
+                                "Postgres {} on {}".format(label, name),
+                                ["oom-watch", label, name],
+                                {
+                                    "pod": name,
+                                    "container": container["name"],
+                                    "timestamp": stamp,
+                                    "line": line[:400],
+                                    "detail": detail,
+                                },
+                            )
+                        )
+        return findings, newest
+
+
+    def scan_gap(state):
+        raw = state.get("last_run")
+        if not raw:
+            return []
+        try:
+            previous = datetime.fromisoformat(raw)
+        except ValueError:
+            return []
+        gap = (STARTED - previous).total_seconds()
+        if gap <= LOOKBACK:
+            return []
+        return [
+            finding(
+                "watch_gap",
+                "oom-watch gap of {}s exceeds the {}s log lookback".format(int(gap), LOOKBACK),
+                ["oom-watch", "watch_gap"],
+                {"last_run": raw, "gap_seconds": int(gap), "lookback_seconds": LOOKBACK},
+            )
+        ]
+
+
+    def dsn_parts():
+        parts = urllib.parse.urlsplit(DSN)
+        project = parts.path.rstrip("/").rsplit("/", 1)[-1]
+        if not parts.username or not parts.hostname or not project:
+            raise ValueError("SENTRY_DSN is not a usable DSN")
+        return parts.username, parts.hostname, project
+
+
+    def post_envelope(items):
+        key, host, project = dsn_parts()
+        body = "\n".join(items).encode()
+        req = urllib.request.Request(
+            "https://{}/api/{}/envelope/".format(host, project), data=body, method="POST"
+        )
+        req.add_header("Content-Type", "application/x-sentry-envelope")
+        req.add_header(
+            "X-Sentry-Auth",
+            "Sentry sentry_version=7, sentry_client=oom-watch/1.0, sentry_key=" + key,
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status
+
+
+    def send(item):
+        event_id = os.urandom(16).hex()
+        now = STARTED.isoformat()
+        event = {
+            "event_id": event_id,
+            "timestamp": now,
+            "platform": "other",
+            "level": "error",
+            "logger": "oom-watch",
+            "environment": ENVIRONMENT,
+            "server_name": item["extra"].get("pod", NS),
+            "message": {"formatted": item["title"]},
+            "fingerprint": item["fingerprint"],
+            "tags": {"component": "platform-db", "oom_kind": item["kind"]},
+            "extra": item["extra"],
+        }
+        return post_envelope(
+            [
+                json.dumps({"event_id": event_id, "sent_at": now, "dsn": DSN}),
+                json.dumps({"type": "event"}),
+                json.dumps(event),
+            ]
+        )
+
+
+    def check_in(status, upsert=False):
+        payload = {
+            "check_in_id": CHECK_IN_ID,
+            "monitor_slug": MONITOR_SLUG,
+            "status": status,
+            "environment": ENVIRONMENT,
+        }
+        if upsert:
+            payload["monitor_config"] = {
+                "schedule": {"type": "crontab", "value": MONITOR_SCHEDULE},
+                "checkin_margin": MONITOR_CHECKIN_MARGIN,
+                "max_runtime": MONITOR_MAX_RUNTIME,
+                "failure_issue_threshold": MONITOR_FAILURE_THRESHOLD,
+                "timezone": MONITOR_TIMEZONE,
+            }
+        return post_envelope(
+            [
+                json.dumps({"sent_at": STARTED.isoformat(), "dsn": DSN}),
+                json.dumps({"type": "check_in"}),
+                json.dumps(payload),
+            ]
+        )
+
+
+    def main():
+        if not DSN:
+            print("SENTRY_DSN is empty; refusing to run blind", file=sys.stderr)
+            return 1
+        dsn_parts()
+        failures = 0
+        try:
+            check_in("in_progress", upsert=True)
+        except (urllib.error.URLError, OSError) as exc:
+            print("upsert check-in failed: {}".format(exc), file=sys.stderr)
+            failures += 1
+        state = load_state()
+        try:
+            pods = api("/api/v1/namespaces/{}/pods".format(NS))
+            restart_findings, seen = scan_restarts(pods, state)
+            log_findings, newest = scan_logs(pods, state)
+            findings = scan_gap(state) + restart_findings + log_findings
+            for item in findings:
+                try:
+                    send(item)
+                    print("sent: " + item["title"])
+                except (urllib.error.URLError, OSError) as exc:
+                    failures += 1
+                    print("send failed ({}): {}".format(exc, item["title"]), file=sys.stderr)
+            state["restarts"] = seen
+            state["last_log_marker"] = newest
+            print("checked {} pods, {} findings".format(len(pods.get("items", [])), len(findings)))
+        finally:
+            state["last_run"] = STARTED.isoformat()
+            save_state(state)
+        try:
+            check_in("error" if failures else "ok")
+        except (urllib.error.URLError, OSError) as exc:
+            print("check-in failed: {}".format(exc), file=sys.stderr)
+            failures += 1
+        return 1 if failures else 0
+
+
+    sys.exit(main())
+{{- end }}

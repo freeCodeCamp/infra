@@ -155,13 +155,33 @@ Expected:
 - `{"ready":true,"degraded":true}` — Postgres unreachable but Valkey + R2 up. HTTP stays `200`, pod stays in rotation; deploy/serve unaffected, GC impaired. Investigate the PG StatefulSet.
 - HTTP `503` — Valkey or R2 down (a hard fault), NOT Postgres.
 
-### 4. Backup CronJob present (durable-exec profile)
+### 4. CronJobs present (durable-exec profile)
 
 ```sh
-kubectl -n artemis get cronjob artemis-backup -o wide
+kubectl -n artemis get cronjob
 ```
 
-Expect the nightly CronJob (`schedule: 0 2 * * *`). Full backup verify + restore drill is runbook 08; this check only confirms the chart rendered it. A missing CronJob on a `backup.enabled` deployment means the overlay did not flip `backup.enabled: true`.
+Expect two chart-managed CronJobs:
+
+| Name                | Schedule       | Gate                  |
+| ------------------- | -------------- | --------------------- |
+| `artemis-backup`    | `0 2 * * *`    | `backup.enabled`      |
+| `artemis-oom-watch` | `*/15 * * * *` | `oomWatch.enabled`    |
+
+Full backup verify + restore drill is runbook 08; this check only confirms the chart rendered them. A missing CronJob on a `backup.enabled` deployment means the overlay did not flip `backup.enabled: true`.
+
+A third CronJob, `pool-baseline`, may also appear. It is **not chart-managed** — an operator applies it by hand from `k3s/gxy-management/apps/artemis/measure/` for the hatchet pool-cap measurement, and deletes it afterwards. Its absence is normal; its presence past that measurement is drift.
+
+### 4a. OOM watcher is alive
+
+```sh
+kubectl -n artemis get cronjob artemis-oom-watch -o jsonpath='{.status.lastSuccessfulTime}{"\n"}'
+kubectl -n artemis get cm artemis-oom-watch-state -o jsonpath='{.data.state\.json}'
+```
+
+`lastSuccessfulTime` must track `lastScheduleTime` within one period. The state ConfigMap must hold `restarts`, `last_log_marker` and `last_run`; empty `data` means the job has never completed a run.
+
+The watcher exists because a cgroup OOM kill of a PostgreSQL *backend* leaves the postmaster alive, so `restartCount` never moves and Kubernetes emits no event. It posts a Sentry check-in on slug `artemis-oom-watch` every run. The first check-in of each run carries `monitor_config`, so Sentry creates the monitor object itself. Alert routing is still a console step. Confirm the monitor exists after the first run; without it a dead watcher is as silent as the fault it watches. Design: [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
 
 ## Failure paths
 
