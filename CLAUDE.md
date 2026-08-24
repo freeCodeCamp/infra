@@ -112,16 +112,6 @@ Retired:
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
 
-## Key directories
-
-| Path             | Purpose                                      |
-| ---------------- | -------------------------------------------- |
-| `ansible/`       | Playbooks, roles, inventory                  |
-| `k3s/<cluster>/` | Per-cluster apps, charts, manifests, configs |
-| `terraform/`     | Terraform workspaces (Linode/DO)             |
-| `docker/swarm/`  | Legacy Docker Swarm stacks                   |
-| `cloud-init/`    | VM bootstrap configs                         |
-
 ## Non-obvious conventions
 
 - Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `just release` falls back to the local chart dir.
