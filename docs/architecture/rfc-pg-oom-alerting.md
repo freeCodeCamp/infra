@@ -136,25 +136,20 @@ State between runs lives in a ConfigMap the job updates, so the RBAC is
 `get`/`list` on `pods`, `get` on `pods/log`, and `get`/`update` on that
 one ConfigMap.
 
-## Pool-cap baseline job (separate, temporary)
+## Pool-cap baseline job (retired 2026-08-24)
 
-`k3s/gxy-management/apps/artemis/measure/pool-baseline-cronjob.yaml`
-samples `pg_stat_activity` every 30s across the 03:50-04:25 UTC window
-and prints one row per database per sample to stdout.
+A hand-applied `pool-baseline` CronJob sampled `pg_stat_activity` every
+30s across the 03:50-04:25 UTC window. It was deliberately kept out of
+the Helm chart: any chart version bump rewrites the ConfigMap labels,
+which changes `checksum/config-env` and rolls the artemis pods — too
+much disturbance for a throwaway probe.
 
-```sh
-kubectl -n artemis apply -f k3s/gxy-management/apps/artemis/measure/pool-baseline-cronjob.yaml
-kubectl -n artemis logs -l app.kubernetes.io/name=pool-baseline --tail=300
-kubectl -n artemis delete -f k3s/gxy-management/apps/artemis/measure/pool-baseline-cronjob.yaml
-```
+It ran once, answered the question below, and was deleted from the
+cluster and the repo on 2026-08-24.
 
-It is deliberately **not** in the Helm chart. Adding a template bumps the
-chart version, which changes the ConfigMap and Secret checksums and rolls
-the artemis pods — too much disturbance for a throwaway probe.
+### Result (2026-08-24)
 
-### Result (2026-08-24) — cap chosen, sampler due for deletion
-
-The first run covered 03:50-04:25Z and returned 70 samples on the
+The single run covered 03:50-04:25Z and returned 70 samples on the
 `hatchet` database: min 18, max 26, mean 21.8. The value 26 appeared in
 one sample. `artemis` peaked at 4 and `postgres` at 1.
 
@@ -176,9 +171,6 @@ its health query on the capped main pool
 errors when a pool is exhausted, so without the explicit threshold three
 10-second probe failures would restart the engine after roughly 30
 seconds of saturation. Six gives 60 seconds.
-
-Delete the sampler now that the cap is chosen; it is live in-cluster and
-is otherwise permanent non-Helm drift.
 
 ## Scope boundary
 

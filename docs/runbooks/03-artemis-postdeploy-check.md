@@ -170,7 +170,7 @@ Expect two chart-managed CronJobs:
 
 Full backup verify + restore drill is runbook 08; this check only confirms the chart rendered them. A missing CronJob on a `backup.enabled` deployment means the overlay did not flip `backup.enabled: true`.
 
-A third CronJob, `pool-baseline`, may also appear. It is **not chart-managed** — an operator applies it by hand from `k3s/gxy-management/apps/artemis/measure/` for the hatchet pool-cap measurement, and deletes it afterwards. Its absence is normal; its presence past that measurement is drift.
+Any third CronJob in this namespace is drift. The hand-applied `pool-baseline` sampler was retired on 2026-08-24; see [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
 
 ### 4a. OOM watcher is alive
 
