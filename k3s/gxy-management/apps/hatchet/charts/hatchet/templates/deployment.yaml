@@ -74,6 +74,8 @@ spec:
               value: warn
             - name: SERVER_LOGGER_FORMAT
               value: json
+            - name: DATABASE_MAX_CONNS
+              value: {{ .Values.engine.database.maxConns | quote }}
             - name: DATABASE_LOGGER_LEVEL
               value: warn
             - name: DATABASE_LOGGER_FORMAT
@@ -96,6 +98,7 @@ spec:
               port: health
             periodSeconds: 10
             timeoutSeconds: 2
+            failureThreshold: {{ .Values.engine.livenessFailureThreshold }}
           readinessProbe:
             httpGet:
               path: /ready

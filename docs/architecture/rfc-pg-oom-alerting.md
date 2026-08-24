@@ -150,14 +150,41 @@ kubectl -n artemis delete -f k3s/gxy-management/apps/artemis/measure/pool-baseli
 
 It is deliberately **not** in the Helm chart. Adding a template bumps the
 chart version, which changes the ConfigMap and Secret checksums and rolls
-the artemis pods — too much disturbance for a throwaway probe. Delete it
-once artemis #45 has chosen a cap.
+the artemis pods — too much disturbance for a throwaway probe.
+
+### Result (2026-08-24) — cap chosen, sampler due for deletion
+
+The first run covered 03:50-04:25Z and returned 70 samples on the
+`hatchet` database: min 18, max 26, mean 21.8. The value 26 appeared in
+one sample. `artemis` peaked at 4 and `postgres` at 1.
+
+The sampler reads `pg_stat_activity` server-side, so it cannot separate
+the engine's main pool from its DDL pool — both dial the same
+`DATABASE_URL` (`pkg/config/loader/loader.go:115` and `:296`). The
+measured 26 therefore covers main plus DDL together, and the main-pool
+peak is at most 26.
+
+Chosen cap: `DATABASE_MAX_CONNS=40`, in chart `hatchet-0.4.0`. That
+lowers the engine's server-side ceiling from 55 (upstream `MaxConns` 50
+plus a DDL pool of 5) to 45, while leaving at least 14 connections of
+headroom above the observed peak.
+
+The same commit sets `livenessProbe.failureThreshold: 6`. `/live` runs
+its health query on the capped main pool
+(`internal/services/health/health.go:42-51` calling
+`pkg/repository/health.go:24-32`), and `pgxpool` blocks rather than
+errors when a pool is exhausted, so without the explicit threshold three
+10-second probe failures would restart the engine after roughly 30
+seconds of saturation. Six gives 60 seconds.
+
+Delete the sampler now that the cap is chosen; it is live in-cluster and
+is otherwise permanent non-Helm drift.
 
 ## Scope boundary
 
 This RFC covers detection only. The memory sizing change is separate and
 already shipped in chart `artemis-0.6.0`. Bounding the hatchet engine
-connection pool is tracked as artemis #45 and needs a measurement at
-04:00 UTC before a cap is chosen — 7 of the 37 kills fall in the
-04:00-04:02 window, against 2 in the 03:00-03:14 window, so `drift-detect`
-is the heavier of the two nightly workloads.
+connection pool was tracked as artemis #45; the measurement it waited on
+landed on 2026-08-24 and the cap is recorded above. 7 of the 37 kills
+fell in the 04:00-04:02 window, against 2 in the 03:00-03:14 window, so
+`drift-detect` is the heavier of the two nightly workloads.

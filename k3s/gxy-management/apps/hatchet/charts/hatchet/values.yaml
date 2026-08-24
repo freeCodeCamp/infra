@@ -32,6 +32,14 @@ engine:
   # token in SERVER_SERVICES — HasService() is an exact string match,
   # "all" does NOT imply it (cmd/hatchet-engine/engine/run.go:161).
   healthPort: 8733
+  # Upstream defaults: MaxConns 50 (pkg/config/database/config.go:26)
+  # and a DDL pool of 5 (config.go:36), both dialling DATABASE_URL.
+  database:
+    maxConns: 40
+  # /live queries the capped main pool (internal/services/health/
+  # health.go:42-51 -> pkg/repository/health.go:24-32), so pool
+  # saturation fails liveness. 6 x 10s tolerates a burst.
+  livenessFailureThreshold: 6
   resources:
     requests:
       cpu: 100m
