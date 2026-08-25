@@ -142,18 +142,23 @@ kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=20m \
 
 ### 3. Readiness probe (degraded semantics)
 
-`/readyz` probes Valkey + R2 + Postgres. It is NOT exposed past the Gateway path that auth-gates `/api/*`, so probe it in-cluster:
+`/readyz` probes Valkey + R2 + Postgres. It is NOT exposed past the Gateway path that auth-gates `/api/*`, so probe it in-cluster.
+
+The artemis image is distroless — no `sh`, no `wget`, no `curl` — so `kubectl exec ... wget` fails with `executable file not found in $PATH`. Reach the port through the API server's pod proxy instead:
 
 ```sh
-kubectl -n artemis exec deploy/artemis -- \
-  wget -qO- http://localhost:8080/readyz
+POD=$(kubectl -n artemis get pods -l app.kubernetes.io/component=deploy-proxy \
+        -o jsonpath='{.items[0].metadata.name}')
+kubectl -n artemis get --raw "/api/v1/namespaces/artemis/pods/$POD:8080/proxy/readyz"
 ```
 
 Expected:
 
 - `{"ready":true}` — all three upstreams healthy.
-- `{"ready":true,"degraded":true}` — Postgres unreachable but Valkey + R2 up. HTTP stays `200`, pod stays in rotation; deploy/serve unaffected, GC impaired. Investigate the PG StatefulSet.
-- HTTP `503` — Valkey or R2 down (a hard fault), NOT Postgres.
+- `{"ready":true,"degraded":true}` — Postgres **or**, from artemis 1.10.0, R2 unreachable while Valkey is up. HTTP stays `200` and the pod stays in rotation. Deploys that need the degraded upstream fail per request with their own `502`; serving is unaffected because Caddy reads R2 directly. Investigate the named upstream.
+- HTTP `503` — Valkey down. That is the only hard fault left.
+
+The R2 case changed in 1.10.0. Before it, an R2 fault answered `503` and took the pod out of the Service; because all three replicas share one bucket they failed together, so a slow-R2 window emptied the endpoint set entirely. That was Sentry `ARTEMIS-B`.
 
 ### 4. CronJobs present (durable-exec profile)
 
@@ -182,6 +187,63 @@ kubectl -n artemis get cm artemis-oom-watch-state -o jsonpath='{.data.state\.jso
 `lastSuccessfulTime` must track `lastScheduleTime` within one period. The state ConfigMap must hold `restarts`, `last_log_marker` and `last_run`; empty `data` means the job has never completed a run.
 
 The watcher exists because a cgroup OOM kill of a PostgreSQL *backend* leaves the postmaster alive, so `restartCount` never moves and Kubernetes emits no event. It posts a Sentry check-in on slug `artemis-oom-watch` every run. The first check-in of each run carries `monitor_config`, so Sentry creates the monitor object itself. Alert routing is still a console step. Confirm the monitor exists after the first run; without it a dead watcher is as silent as the fault it watches. Design: [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
+
+### 5. Site lifecycle — delete, hold, undelete (artemis 1.10.0+)
+
+Nothing in `just verify-artemis` exercises this, and it is the release's headline behaviour change. Run it by hand once per release, on a throwaway slug.
+
+**Only after the §6 rollout gate in runbook 02 passes** — every pod on one image digest. During a mixed-version roll the two versions disagree about what a delete means, and a 1.9.1 pod destroys a reservation a 1.10.0 pod created.
+
+```sh
+BASE=https://uploads.freecode.camp
+SLUG=postdeploy-$(date +%Y%m%d-%H%M%S)
+AUTH="Authorization: Bearer $GH_TOKEN"     # a staff-team GitHub token
+
+# 1. register + publish
+curl -fsS -X POST "$BASE/api/site/register" -H "$AUTH" \
+  -H 'content-type: application/json' -d "{\"slug\":\"$SLUG\",\"teams\":[\"staff\"]}"
+#    deploy through the CLI, which is what staff use:
+#    universe static deploy --site "$SLUG" --promote
+curl -fsS -o /dev/null -w '%{http_code}\n' "https://$SLUG.freecode.camp/"     # expect 200
+
+# 2. delete — this is the behaviour under test
+curl -fsS -X DELETE "$BASE/api/site/$SLUG" -H "$AUTH" -w ' <- %{http_code}\n'  # expect 204
+
+# 3. the site must go dark. Allow the 15s serve cache.
+sleep 20
+curl -s -o /dev/null -w '%{http_code}\n' "https://$SLUG.freecode.camp/"        # expect 404
+
+# 4. the name must be held, not free
+curl -s -X POST "$BASE/api/site/register" -H "$AUTH" \
+  -H 'content-type: application/json' -d "{\"slug\":\"$SLUG\",\"teams\":[\"staff\"]}" \
+  -w ' <- %{http_code}\n'                                                      # expect 409 site_reserved
+
+# 5. undelete returns the name. No CLI verb for this yet — curl only.
+curl -fsS -X POST "$BASE/api/site/$SLUG/undelete" -H "$AUTH"                    # expect 200 + prevProduction/prevPreview
+```
+
+**Save the step-5 response.** `prevProduction` and `prevPreview` are the alias pointers captured at delete time, they are returned exactly once, and the server forgets them in the same statement that returns them.
+
+Undelete restores the **name**, not the published site. Step 6 is a republish:
+
+```sh
+# universe static deploy --site "$SLUG" --promote
+sleep 20
+curl -fsS -o /dev/null -w '%{http_code}\n' "https://$SLUG.freecode.camp/"      # expect 200
+```
+
+Then confirm the audit trail recorded both halves:
+
+```sh
+kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d artemis -tAc \
+  "SELECT action, outcome FROM audit_log WHERE site LIKE '$SLUG%' ORDER BY occurred_at;"
+```
+
+Expect `site.register/success`, `site.delete/success`, `site.undelete/success` and the deploy rows. A `site.delete` with `outcome=failure` carries a `detail.stage` naming how far it got — `unpublish` or `reserve`.
+
+Finally, delete the throwaway slug and let the nightly sweep reclaim it, or leave it held; either is fine, it is a scratch name.
+
+**If step 3 still returns 200 after 20s**, the delete did not unpublish. Stop and check `SELECT slug, state, reserved_until FROM sites WHERE slug = '$SLUG';` before touching anything else — a deregistered-but-serving site is the exact defect this release exists to remove.
 
 ## Failure paths
 
