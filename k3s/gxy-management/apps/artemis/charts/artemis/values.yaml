@@ -325,7 +325,7 @@ backup:
   # (.github/workflows/docker--postgres-rclone.yml). Its pg client MUST
   # match postgres.image.tag above -- see docs/runbooks/08-artemis-pg-
   # restore-drill.md and the Dockerfile header.
-  image: ghcr.io/freecodecamp/postgres-rclone@sha256:294e8b276ee23b44f6a16bcef6239f55e4e93ecad7372af7a079650f8a6583e5
+  image: ghcr.io/freecodecamp/postgres-rclone@sha256:fbedc38a76b25ab22cf2acb986a7538cf46b6bf3d62b30d00b50f94dd7b0335e
   schedule: "0 2 * * *"
   # rclone --min-age threshold for the prune step (objects older than
   # this under the artemis/<galaxy>/ R2 prefix are deleted post-upload).
