@@ -188,7 +188,7 @@ kubectl -n artemis get cm artemis-oom-watch-state -o jsonpath='{.data.state\.jso
 
 The watcher exists because a cgroup OOM kill of a PostgreSQL *backend* leaves the postmaster alive, so `restartCount` never moves and Kubernetes emits no event. It posts a Sentry check-in on slug `artemis-oom-watch` every run. The first check-in of each run carries `monitor_config`, so Sentry creates the monitor object itself. Alert routing is still a console step. Confirm the monitor exists after the first run; without it a dead watcher is as silent as the fault it watches. Design: [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
 
-### 5. Site lifecycle — delete, hold, undelete (artemis 1.10.0+)
+### 5. Site lifecycle — delete, hold, undelete, release (artemis 1.10.0+)
 
 Nothing in `just verify-artemis` exercises this, and it is the release's headline behaviour change. Run it by hand once per release, on a throwaway slug.
 
@@ -241,7 +241,37 @@ kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d artemis -tAc
 
 Expect `site.register/success`, `site.delete/success`, `site.undelete/success` and the deploy rows. A `site.delete` with `outcome=failure` carries a `detail.stage` naming how far it got — `unpublish` or `reserve`.
 
-Finally, delete the throwaway slug and let the nightly sweep reclaim it, or leave it held; either is fine, it is a scratch name.
+Finally, exercise the approver-gated early release, which is the other new endpoint and the one with the irreversible authorization:
+
+```sh
+# 7. delete again, then release. Needs a token for REPO_APPROVE_AUTHZ_TEAM
+#    (gh-artemis-approvers), NOT the staff token used above.
+curl -fsS -X DELETE "$BASE/api/site/$SLUG" -H "$AUTH" -w ' <- %{http_code}\n'   # expect 204
+
+# 7a. the staff token must be refused — this is the whole point of the split gate
+curl -s -X POST "$BASE/api/site/$SLUG/release" -H "$AUTH" \
+  -w ' <- %{http_code}\n'                                                        # expect 403
+
+# 7b. the approver token releases it
+APPROVER="Authorization: Bearer $GH_APPROVER_TOKEN"
+curl -fsS -X POST "$BASE/api/site/$SLUG/release" -H "$APPROVER"                 # expect 200 + status:"released"
+
+# 7c. the name is free again
+curl -s -X POST "$BASE/api/site/register" -H "$AUTH" \
+  -H 'content-type: application/json' -d "{\"slug\":\"$SLUG\",\"teams\":[\"staff\"]}" \
+  -w ' <- %{http_code}\n'                                                        # expect 201
+```
+
+**A 403 at step 7b means the approver team is wrong, not that release is broken.** Check
+`kubectl -n artemis get cm -o yaml | grep REPO_APPROVE_AUTHZ_TEAM` — it must name a team the token's
+owner is on, in the Universe org.
+
+**A 404 at step 7a or 7b on every attempt means the route is not mounted** — the pod is older than
+1.10.0 or the rollout is mixed. Re-check the §6 rollout gate in runbook 02 before investigating
+anything else.
+
+The audit trail gains `site.release/success` with `detail.moved`. Confirm with the same query, then
+delete the throwaway slug and let the nightly sweep reclaim it, or leave it held; either is fine, it is a scratch name.
 
 **If step 3 still returns 200 after 20s**, the delete did not unpublish. Stop and check `SELECT slug, state, reserved_until FROM sites WHERE slug = '$SLUG';` before touching anything else — a deregistered-but-serving site is the exact defect this release exists to remove.
 
