@@ -109,9 +109,25 @@ kubectl -n artemis wait --for=condition=Ready "pod/${SCRATCH}" --timeout=120s
 kubectl -n artemis cp "${TMP}/${TARGET}" "${SCRATCH}:/tmp/${TARGET}"
 kubectl -n artemis exec "$SCRATCH" -- bash -c \
   "gunzip -c /tmp/${TARGET} | psql -U postgres -v ON_ERROR_STOP=0 >/tmp/restore.log 2>&1; tail -5 /tmp/restore.log"
+
+# Error gate. ON_ERROR_STOP=0 lets the replay finish, so the log — not the
+# exit code — is the evidence. Exactly two errors are expected, both from
+# `--clean` replaying as the connecting superuser; anything else is a
+# finding, not noise.
+kubectl -n artemis exec "$SCRATCH" -- bash -c \
+  'grep -c "^ERROR:" /tmp/restore.log; grep "^ERROR:" /tmp/restore.log | sort -u'
 ```
 
-`pg_dumpall` replays into a fresh cluster; expect a clean run. `ON_ERROR_STOP=0` tolerates the leading `DROP`/`REVOKE` lines that `--clean` emits against objects a fresh scratch cluster does not yet have (those are expected, harmless errors on a clean target).
+Expected, and the only two tolerated:
+
+```
+ERROR:  current user cannot be dropped
+ERROR:  role "postgres" already exists
+```
+
+**Any third distinct error fails this drill.** The one that has actually occurred is `ERROR: unrecognized configuration parameter "transaction_timeout"` — emitted when the `postgres-rclone` image's `pg_dumpall` is newer than the server it dumped, so the dump carries a GUC the target does not know. That is a client/server version-skew signal: check `postgresql-client-*` in `docker/images/postgres-rclone/Dockerfile` against `postgres.image.tag` in the artemis chart values.
+
+A row-count gate alone cannot catch this — the data still lands. The error count is the only place the skew shows.
 
 ## D — Row-count sanity gate
 
@@ -137,6 +153,7 @@ Pass criteria:
 
 - Both `artemis` and `hatchet` databases listed by `\l`.
 - All six artemis tables resolve (no `relation does not exist`) — proves the schema restored.
+- The restore log holds no third distinct `ERROR:` beyond the two named in §C.
 - `sites` count is non-zero and roughly matches the live registry size on a populated cluster (cross-check against `universe sites ls --json | jq '.count'`). On a freshly bootstrapped cluster zeros are acceptable — the gate is that the tables exist and the dump replayed.
 - `deploys` is EXPECTED to be zero until the T24 backfill has run and the stage-2 worker is live — the deploy hot path never writes PG (design 0001 §M1 "deploy hot path untouched"); the index populates asynchronously. `outbox` non-zero at stage-1 is likewise expected (site.changed events accumulate until the relay starts).
 
