@@ -255,7 +255,7 @@ verify-secrets:
         # Pre-Universe artemis SoT (audit F42 — flagged for unification)
         management/artemis.env.enc) ;;
         # Legacy (retire post-Universe per RFC)
-        archive/*|docker/oldeworld/*|k3s/ops-backoffice-tools/*) ;;
+        archive/*|k3s/ops-backoffice-tools/*) ;;
         # Operator scratchpad (dev-only)
         scratchpad/*) ;;
         *)
