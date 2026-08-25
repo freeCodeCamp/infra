@@ -1,7 +1,9 @@
 name: Docker -- postgres-rclone
 
-# Manual trigger — image ships with the windmill backup CronJob roll,
-# not on every commit. Once the workflow lives on `main`, dispatch via:
+# Manual trigger — the image ships with an artemis backup CronJob roll,
+# not on every commit. Dispatch after any change to the Dockerfile's
+# postgresql-client version, then re-pin the digest in the artemis
+# chart values. Once the workflow lives on `main`, dispatch via:
 #   gh workflow run docker--postgres-rclone.yml --ref <branch>
 
 on:
