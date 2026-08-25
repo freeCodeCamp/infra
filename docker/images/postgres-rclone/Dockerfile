@@ -1,15 +1,19 @@
-# postgres-rclone image — multi-stage slim build for the windmill
+# postgres-rclone image — multi-stage slim build for the artemis
 # backup CronJob. Pairs the upstream rclone binary (sourced verbatim
 # from rclone's own official image) with a minimal Debian Bookworm
-# rootfs carrying just `postgresql-client-18` from PGDG.
+# rootfs carrying just `postgresql-client-16` from PGDG.
 #
 # Why this shape:
 #  - Image is run-once-and-die inside a CronJob — never interactive.
 #    We need pg_dumpall + rclone + bash. Nothing else.
-#  - postgres-client-18 matches the live windmill-postgresql server
-#    (postgres:18 — verified by kubectl probe). Dump-then-restore
-#    round-trip is the actual DR contract; client/server version
-#    skew breaks that contract silently.
+#  - postgres-client-16 matches the live artemis-postgresql server
+#    (postgres:16.14-alpine, chart values.yaml `postgres.image.tag`).
+#    Dump-then-restore round-trip is the actual DR contract; client
+#    /server version skew breaks that contract quietly. A client-18
+#    dump against this 16 server emits `SET transaction_timeout` (a
+#    PG-17 GUC) and `\restrict` psql meta-commands, so the restore
+#    throws 7 errors psql 16 cannot honour. Re-pin this line whenever
+#    `postgres.image.tag` moves.
 #  - rclone binary comes from `rclone/rclone:1.74.1` via COPY so we
 #    inherit upstream's release engineering (signed builds, no `curl
 #    + unzip` in our final image, no apt cache layer for build-only
@@ -18,8 +22,8 @@
 #    vs ~500 MB for the prior postgres:18-bookworm monolith we
 #    abandoned.
 #
-# Chart contract (k3s/gxy-management/apps/windmill/manifests/base/
-# backup-cronjob.yaml): pod runs UID 999, GID 999, non-root,
+# Chart contract (k3s/gxy-management/apps/artemis/charts/artemis/
+# templates/backup-cronjob.yaml): pod runs UID 999, GID 999, non-root,
 # readOnlyRootFilesystem, drop:[ALL] caps, seccomp RuntimeDefault.
 # This image creates a service-only `backup` user at UID 999 to
 # match the chart's runAsUser.
@@ -35,8 +39,8 @@ FROM debian:bookworm-slim
 # below.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# PGDG apt repo: bookworm stock apt tops out at PG 15; windmill
-# server is PG 18 so we need PGDG to pick up postgresql-client-18.
+# PGDG apt repo: bookworm stock apt tops out at PG 15; the artemis
+# server is PG 16 so we need PGDG to pick up postgresql-client-16.
 # apt-key(8) is deprecated — use /etc/apt/keyrings + signed-by per
 # Debian wiki. curl + gnupg are build-only and purged at end of
 # the RUN. ca-certificates stays — rclone TLS handshake needs it.
@@ -51,7 +55,7 @@ RUN set -eux \
  && echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
       > /etc/apt/sources.list.d/pgdg.list \
  && apt-get update \
- && apt-get install -y --no-install-recommends postgresql-client-18 \
+ && apt-get install -y --no-install-recommends postgresql-client-16 \
  && pg_dumpall --version \
  && apt-get purge -y --auto-remove curl gnupg \
  && rm -rf /var/lib/apt/lists/*
