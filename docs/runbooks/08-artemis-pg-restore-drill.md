@@ -2,7 +2,11 @@
 
 **Type:** Operator. Disaster-recovery rehearsal (read-mostly; writes only to a throwaway scratch pod). **Cluster:** `gxy-management`. Namespace: `artemis`. **Spec:** chart at `k3s/gxy-management/apps/artemis/`. Stateful floor: ADR-019 §Stateful-pillar backup pattern + ADR-020 (durable-execution model).
 
-**Last rehearsed:** 2026-06-05 — R8 drill PASSED (dossier `2026-06-02-artemis-durable-exec-cutover` §S 2026-06-05 11:25; both tenants restored, 6/6 artemis tables present, `sites` count matched the live registry, §F RPO/RTO floor demonstrated).
+**Last rehearsed:** 2026-08-25 — PASSED. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
+
+Prior: 2026-06-05 — R8 drill PASSED (dossier `2026-06-02-artemis-durable-exec-cutover` §S 2026-06-05 11:25; both tenants restored, 6/6 artemis tables present, `sites` count matched the live registry, §F RPO/RTO floor demonstrated).
+
+> The 2026-06-05 rehearsal predated the Windmill retirement (2026-07-07), at which point the artemis backup CronJob inherited an image built for a PG 18 server. The skew went undetected for seven weeks because §C ran `ON_ERROR_STOP=0` and the only gate was §D's row counts — which pass regardless, since the data still lands. The §C error gate exists because of that gap.
 
 The artemis durable-exec substrate is a single-node bundled Postgres StatefulSet (`artemis-postgresql`) shared by two tenants — the `artemis` database (deploy/GC bookkeeping) and the `hatchet` database (engine state). Its availability floor is **not replication** — it is the nightly logical backup to R2 plus this rehearsed restore (chart `values.yaml` `postgres:` block; ADR-020 §3). This runbook restores the newest R2 dump into a throwaway scratch Postgres, sanity-checks row counts, and records the RPO/RTO the artefact actually delivers.
 
