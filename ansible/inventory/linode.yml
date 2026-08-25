@@ -22,12 +22,6 @@ groups:
   managers: "'swarm_leader' in (tags|list)"
   workers: "'swarm_worker' in (tags|list)"
 
-  # mintworld Cluster
-  mintworld_all: "'mintworld' in (tags|list)"
-  mintworld_nomad_servers: "'nomad_svr' in (tags|list) and 'mintworld' in (tags|list)"
-  mintworld_consul_servers: "'consul_svr' in (tags|list) and 'mintworld' in (tags|list)"
-  mintworld_nomad_workers: "'nomad_wkr' in (tags|list) and 'mintworld' in (tags|list)"
-
   # Oldeworld Cluster -- ALL
   oldeworld_all: "'oldeworld' in (tags|list)"
 
