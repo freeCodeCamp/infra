@@ -326,10 +326,37 @@ Operator pushes per infra-repo conventions (small-fix-direct vs PR-with-review t
 
 ### 6. Deploy + watch rollout
 
+`just release` returns as soon as helm accepts the manifest, **not** when the new pods are serving.
+`justfile:110,116` — both branches — run a bare `helm upgrade --install` with no `--wait`, no
+`--atomic` and no `--timeout`. The Deployment is `RollingUpdate` at
+`maxSurge 25% / maxUnavailable 25%` over 3 replicas, which is three sequential pod swaps, each up to
+120 s of `startupProbe` plus readiness. So the fleet runs **mixed versions for one to six minutes**
+after the command returns.
+
 ```bash
 just release gxy-management artemis
-kubectl -n artemis rollout status deploy/artemis --timeout=180s
+
+# Gate. Both must pass before ANY further step.
+kubectl -n artemis rollout status deploy/artemis --timeout=300s
+kubectl -n artemis get pods -l app.kubernetes.io/component=deploy-proxy \
+  -o jsonpath='{range .items[*]}{.spec.containers[0].image}{"\n"}{end}' | sort -u
 ```
+
+The second command must print **exactly one line**, and it must be the digest you pinned in §4. Two
+lines means the roll is still in progress. The `component=deploy-proxy` selector matters:
+`app.kubernetes.io/name=artemis` also matches `artemis-postgresql`, `artemis-backup` and
+`artemis-oom-watch`, so it prints four lines even on a settled fleet.
+
+> **Do not issue `DELETE /api/site/{slug}`, `POST /api/site/register` or
+> `POST /api/site/{slug}/undelete` — and do not run `just verify-artemis` — until that gate passes.**
+> From artemis 1.10.0 the two versions disagree about what a site delete means. A 1.9.1 pod runs an
+> unconditional `DELETE FROM sites WHERE slug = $1`, so it destroys a reservation row a 1.10.0 pod
+> created seconds earlier and answers `204` with no error. The reservation sweep's worklist is
+> `WHERE state = 'reserved'`, and the reserving delete writes no tombstone, so the row cannot be
+> recovered and the site's R2 bytes are left at their origin prefix with nothing to collect them.
+> The reverse case is just as bad: a delete served by a 1.9.1 pod leaves both alias objects in place,
+> so the site keeps serving while deregistered, and the 04:00 `drift-detect` run reports it as an
+> orphaned alias that night.
 
 ### 7. Verify
 
@@ -352,9 +379,35 @@ Expected: `boot.starting version=X.Y.Z commit=<full-sha>` one line per replica.
 
 ### Rollback
 
-Revert the `values.production.yaml` commit and re-run `just release gxy-management artemis`. Image is digest-pinned so rollback is deterministic. No DB / state migration on artemis (stateless svc over R2).
+**Check this first, from artemis 1.10.0 onward:**
 
-Faster path when the regression is acute: `helm -n artemis history artemis` + `helm -n artemis rollback artemis <revision>` — re-pin the file afterward so the next `just release` does not undo the rollback.
+```bash
+kubectl -n artemis exec artemis-postgresql-0 -- \
+  psql -U postgres -d artemis -tAc "SELECT slug, reserved_until FROM sites WHERE state = 'reserved';"
+```
+
+On a schema older than `0010_site_reservations.sql` this answers
+`ERROR: column "reserved_until" does not exist`. That error *is* the safe answer — the column does
+not exist, so no reservation can. Anything else, read the rows.
+
+**If it returns any row, do not roll back to 1.9.1.** 1.9.1 has no `reserved` state and no query
+filters on it, so it reads a held name as an ordinary active site — it will list it, let a caller
+register it, and let a caller deploy to it. Roll forward again later and the reservation sweep sees
+an expired `reserved_until`, reclaims the site, and destroys whatever the intervening owner
+published. Either wait out the hold (`SITE_RESERVATION_GRACE`, 72 h by default), or
+`POST /api/site/{slug}/undelete` each name first, then roll back.
+
+With no reserved rows, revert the `values.production.yaml` commit and re-run
+`just release gxy-management artemis`. The image is digest-pinned, so the image half of the rollback
+is deterministic.
+
+**The schema half is not.** artemis carries forward-only migrations from 1.10.0:
+`internal/pg/migrations/0010_site_reservations.sql` adds six columns, two CHECK constraints and a
+partial index to `sites`. Nothing reverses them, and nothing needs to — they are additive with
+defaults and 1.9.1 names its columns explicitly, so an older binary reads and writes the table
+without error. The hazard is the data those columns hold, which is what the check above is for.
+
+Faster path when the regression is acute: `helm -n artemis history artemis` + `helm -n artemis rollback artemis <revision>` — re-pin the file afterward so the next `just release` does not undo the rollback. **Do not reach for `--atomic` on the upgrade**: it restores the previous image on failure, over an already-migrated schema, which is the state the check above exists to prevent.
 
 ## Failure modes
 
@@ -370,6 +423,7 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 | 502 / "no available server" via CF                                                       | CF zone SSL = Strict + origin no cert          | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)                                         |
 | ERR_SSL_PROTOCOL_ERROR in browser                                                        | CF zone SSL = Off                              | set CF zone SSL to Flexible                                                                                |
 | 429 on bulk upload                                                                       | rate-limit middleware tripped                  | tune `rateLimit.average` / `.burst` in `values.production.yaml`                                            |
+| A site delete answers 204 but the name is registerable again, or a deleted site keeps serving | lifecycle call issued during the mixed-version rollout window | §6 gate — wait for one distinct image digest across all pods before any delete, register or undelete. Check `SELECT slug, state FROM sites WHERE slug = '<slug>';` and re-issue the delete against the settled fleet |
 
 ## Cross-references
 
