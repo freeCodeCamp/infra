@@ -17,8 +17,10 @@ description: |
   (env + TLS), Gateway + HTTPRoute (Traefik gateway class),
   NetworkPolicy. No upstream chart — greenfield.
 type: application
-# Chart version (this chart's release cadence — bump on chart-shape changes).
-version: 0.9.1
+# Chart version — bump on every rollout, chart-shape change or not, so that
+# `helm list` and `helm history` name each deploy on their own without a
+# reader having to correlate the APP VERSION column.
+version: 0.9.2
 # appVersion tracks the artemis service tag in GHCR — bump alongside
 # image tag rolls in values.production.yaml so `helm list` reflects
 # what is actually running.
