@@ -140,6 +140,17 @@ kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=20m \
 | 1 (HATCHET_ADDR unset) | `postgres.connected`, `gc.wired` | `worker.starting`, `outbox.relay.started` |
 | 2 (HATCHET_ADDR set)   | all four lines                                         | —                                           |
 
+**From 1.10.0, read the flags on the `gc.wired` line.** Both must be `true`:
+
+```sh
+kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=20m \
+  | grep 'gc.wired'          # expect siteGCReady=true reservationSweepReady=true
+```
+
+`reservationSweepReady=false` means the registry writer does not satisfy the reservation interface,
+so the nightly sweep no-ops and no deleted name is ever reclaimed. The 03:00 workflow still reports
+success and the Sentry cron monitor stays green, so this line is the only place it surfaces.
+
 ### 3. Readiness probe (degraded semantics)
 
 `/readyz` probes Valkey + R2 + Postgres. It is NOT exposed past the Gateway path that auth-gates `/api/*`, so probe it in-cluster.
@@ -218,19 +229,34 @@ curl -s -X POST "$BASE/api/site/register" -H "$AUTH" \
   -H 'content-type: application/json' -d "{\"slug\":\"$SLUG\",\"teams\":[\"staff\"]}" \
   -w ' <- %{http_code}\n'                                                      # expect 409 site_reserved
 
+# 4a. the hold must be visible on the list, not just on the refusal (new in 1.10.0)
+curl -fsS "$BASE/api/sites" -H "$AUTH" | jq -r ".[] | select(.slug==\"$SLUG\") | .state, .reservedUntil"
+#                                                        expect: reserved, then an RFC3339 deadline
+
 # 5. undelete returns the name. No CLI verb for this yet — curl only.
 curl -fsS -X POST "$BASE/api/site/$SLUG/undelete" -H "$AUTH"                    # expect 200 + prevProduction/prevPreview
 ```
 
 **Save the step-5 response.** `prevProduction` and `prevPreview` are the alias pointers captured at delete time, they are returned exactly once, and the server forgets them in the same statement that returns them.
 
-Undelete restores the **name**, not the published site. Step 6 is a republish:
+**Changed in 1.10.0.** Undelete now restores the alias objects as well as the name, so the site
+returns to service on its own. No republish is needed, and that is the assertion:
 
 ```sh
-# universe static deploy --site "$SLUG" --promote
+# 6. the site must come back WITHOUT a redeploy. Allow the 15s serve cache.
 sleep 20
 curl -fsS -o /dev/null -w '%{http_code}\n' "https://$SLUG.freecode.camp/"      # expect 200
 ```
+
+A `404` here means undelete restored the registry row but not the alias pins. That is the defect
+the release fixed, so treat it as a failed deploy and stop. Confirm with:
+
+```sh
+curl -fsS "$BASE/api/site/$SLUG/alias/production" -H "$AUTH"                   # expect the pre-delete deployId
+```
+
+The pins matter beyond serving: `gc-site` keeps a deploy only when an R2 alias names it, so an
+undelete that restores no alias hands the rescued deploy to the collector.
 
 Then confirm the audit trail recorded both halves:
 
@@ -248,7 +274,9 @@ Finally, exercise the approver-gated early release, which is the other new endpo
 #    (gh-artemis-approvers), NOT the staff token used above.
 curl -fsS -X DELETE "$BASE/api/site/$SLUG" -H "$AUTH" -w ' <- %{http_code}\n'   # expect 204
 
-# 7a. the staff token must be refused — this is the whole point of the split gate
+# 7a. the staff token must be refused — this is the whole point of the split gate.
+#     SKIP THIS STEP unless $GH_TOKEN belongs to someone who is NOT in gh-artemis-approvers.
+#     Check first; see the warning below.
 curl -s -X POST "$BASE/api/site/$SLUG/release" -H "$AUTH" \
   -w ' <- %{http_code}\n'                                                        # expect 403
 
@@ -261,6 +289,21 @@ curl -s -X POST "$BASE/api/site/register" -H "$AUTH" \
   -H 'content-type: application/json' -d "{\"slug\":\"$SLUG\",\"teams\":[\"staff\"]}" \
   -w ' <- %{http_code}\n'                                                        # expect 201
 ```
+
+> **Check team membership before you run step 7a. Step 7a is irreversible when it does not refuse.**
+>
+> ```sh
+> gh api /orgs/freeCodeCamp-Universe/teams/gh-artemis-approvers/members --jq '.[].login'
+> ```
+>
+> `gh-artemis-approvers` currently has exactly one member, and that account is also in `staff`
+> (verified 2026-08-26). If `$GH_TOKEN` belongs to that account, step 7a does **not** return 403.
+> It returns 200, frees the name and trashes the origin prefix — the release you meant to test at
+> step 7b already happened. Step 7b then answers 404 and the paragraph below sends you to
+> investigate the rollout, which is not the cause.
+>
+> With one approver, skip 7a and run 7b only. To test the refusal properly, use a token for a
+> staff account that is not on the approver team.
 
 **A 403 at step 7b means the approver team is wrong, not that release is broken.** Check
 `kubectl -n artemis get cm -o yaml | grep REPO_APPROVE_AUTHZ_TEAM` — it must name a team the token's
