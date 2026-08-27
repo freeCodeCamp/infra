@@ -230,7 +230,10 @@ curl -s -X POST "$BASE/api/site/register" -H "$AUTH" \
   -w ' <- %{http_code}\n'                                                      # expect 409 site_reserved
 
 # 4a. the hold must be visible on the list, not just on the refusal (new in 1.10.0)
-curl -fsS "$BASE/api/sites" -H "$AUTH" | jq -r ".[] | select(.slug==\"$SLUG\") | .state, .reservedUntil"
+#     The unqualified list carries ACTIVE sites only, so the hold is only visible
+#     under ?state=reserved. Querying "$BASE/api/sites" here matches nothing and
+#     jq still exits 0, so the step would pass without proving anything.
+curl -fsS "$BASE/api/sites?state=reserved" -H "$AUTH" | jq -r ".[] | select(.slug==\"$SLUG\") | .state, .reservedUntil"
 #                                                        expect: reserved, then an RFC3339 deadline
 
 # 5. undelete returns the name. No CLI verb for this yet — curl only.
