@@ -20,7 +20,16 @@ images:
   admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6
 
 engine:
-  replicas: 1
+  # Two replicas: v0.88.6 claims each cron schedule with FOR UPDATE OF
+  # cronSchedule SKIP LOCKED gated on a 10s ticker heartbeat
+  # (pkg/repository/sqlcv1/ticker.sql:96-160), so replicas cannot
+  # double-fire a schedule. Interim posture until the platform
+  # re-platform (ADR-023) splits grpc/controllers/scheduler.
+  replicas: 2
+  # Hard anti-affinity: without it both replicas can land on one node,
+  # which buys eviction tolerance but not node tolerance — and the node
+  # that matters also carries artemis-postgresql's local-path PV.
+  antiAffinity: required
   # gRPC contract: 7077 everywhere — artemis values hatchet.grpcPort,
   # the artemis egress netpol, HATCHET_ADDR, and upstream's own
   # docker-compose.release.yml all use 7077. The engine BINARY default
@@ -70,8 +79,8 @@ networkPolicy:
   enabled: true
   postgresPort: 5432
 
-# PDB for the single-replica engine: minAvailable 1 blocks voluntary
-# evictions so the dispatch outage is operator-timed; state is in Postgres.
+# PDB at two replicas: minAvailable 1 permits one voluntary eviction,
+# so a node drain rolls rather than blocks; run state is in Postgres.
 pdb:
   enabled: true
   minAvailable: 1

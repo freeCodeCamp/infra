@@ -16,6 +16,15 @@ spec:
       labels:
         {{- include "hatchet.engineSelectorLabels" . | nindent 8 }}
     spec:
+      {{- if eq .Values.engine.antiAffinity "required" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- include "hatchet.engineSelectorLabels" . | nindent 18 }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

@@ -8,9 +8,8 @@ metadata:
     {{- include "hatchet.labels" . | nindent 4 }}
     app.kubernetes.io/component: engine
 spec:
-  # Single-replica engine: minAvailable 1 blocks voluntary evictions
-  # (node drains) so the dispatch outage window is operator-timed; run
-  # state itself is safe in Postgres.
+  # At two replicas minAvailable 1 permits one voluntary eviction, so a
+  # node drain rolls rather than blocks; run state is safe in Postgres.
   minAvailable: {{ .Values.pdb.minAvailable }}
   selector:
     matchLabels:
