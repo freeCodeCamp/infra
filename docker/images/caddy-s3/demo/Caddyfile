@@ -7,7 +7,7 @@
 
 	filesystem r2 r2 {
 		bucket demo
-		endpoint http://s3mock:9090
+		endpoint http://s3:9090
 		region us-east-1
 		access_key_id demo
 		secret_access_key demo
@@ -18,7 +18,7 @@
 :80 {
 	r2_alias {
 		bucket demo
-		endpoint http://s3mock:9090
+		endpoint http://s3:9090
 		region us-east-1
 		access_key_id demo
 		secret_access_key demo

@@ -681,7 +681,8 @@ build-caddy-s3:
         --platform linux/amd64 \
         --load \
         -t "ghcr.io/freecodecamp/caddy-s3:${TAG}" \
-        docker/images/caddy-s3/
+        -f docker/images/caddy-s3/Dockerfile \
+        .
     echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
 
 # Build the postgres-rclone image locally (postgres:18-bookworm + baked
