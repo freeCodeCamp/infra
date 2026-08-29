@@ -19,11 +19,16 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: "1.26"
-          cache-dependency-path: docker/images/caddy-s3/modules/r2alias/go.sum
+          cache-dependency-path: caddy-r2alias/go.sum
 
       - name: Run module tests
-        working-directory: docker/images/caddy-s3/modules/r2alias
-        run: go test -race -count=1 ./...
+        working-directory: caddy-r2alias
+        shell: bash
+        run: |
+          go test -race -count=1 -v ./... 2>&1 | tee /tmp/module-tests.log
+          # caddytest skips the end-to-end tests when a prerequisite fails, and
+          # an all-skipped run exits 0 — assert nothing was skipped.
+          ! grep -q -- "--- SKIP" /tmp/module-tests.log
 
   build-and-push:
     name: Build + push image
@@ -67,7 +72,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
         with:
-          context: ./docker/images/caddy-s3
+          context: .
           file: ./docker/images/caddy-s3/Dockerfile
           platforms: linux/amd64
           push: true

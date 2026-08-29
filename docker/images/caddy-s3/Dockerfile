@@ -6,10 +6,10 @@ ENV GOTOOLCHAIN=auto
 
 # The in-tree r2alias package registers BOTH http.handlers.r2_alias and
 # caddy.fs.r2 — no third-party Caddy plugins in this build.
-COPY modules/r2alias /src/modules/r2alias
+COPY caddy-r2alias /src/caddy-r2alias
 
 RUN xcaddy build v2.11.3 \
-    --with github.com/freeCodeCamp-Universe/infra/docker/images/caddy-s3/modules/r2alias=/src/modules/r2alias
+    --with github.com/freeCodeCamp-Universe/infra/caddy-r2alias=/src/caddy-r2alias
 
 FROM caddy:2.11.3-alpine
 

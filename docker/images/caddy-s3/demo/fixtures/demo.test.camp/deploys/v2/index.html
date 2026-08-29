@@ -40,6 +40,9 @@
       the same bucket, same Caddy pod, no restart.
     </p>
     <p>Cache TTL in the demo config is <code>2s</code>. In prod it is 15s.</p>
-    <p>Flip back with: <code>docker compose run --rm seed -alias v1</code></p>
+    <p>
+      Flip back with:
+      <code>echo -n v1 &gt; fixtures/demo.test.camp/production</code>
+    </p>
   </body>
 </html>
