@@ -16,12 +16,17 @@ import (
 // Tests assign r.fetcher to control how Open resolves S3 GetObject. No AWS
 // SDK client is constructed.
 func newTestR2FS() *R2FS {
-	return &R2FS{
-		Bucket:   "test-bucket",
-		Endpoint: "https://r2.example",
-		Region:   "auto",
-		logger:   zap.NewNop(),
+	r := &R2FS{
+		Bucket:      "test-bucket",
+		Endpoint:    "https://r2.example",
+		Region:      "auto",
+		MaxFileSize: defaultMaxFileSize,
+		logger:      zap.NewNop(),
 	}
+	r.header = func(ctx context.Context, key string) (*r2Object, error) {
+		return r.fetcher(ctx, key)
+	}
+	return r
 }
 
 func stubFSFetcher(obj *r2Object, err error) func(context.Context, string) (*r2Object, error) {
@@ -279,27 +284,91 @@ func TestR2FS_Open_NotFound_NoIndex(t *testing.T) {
 	}
 }
 
-// Paths with a file extension are full object keys — probing for index.html
-// on scan traffic (e.g. `/wp-admin.php`) would amplify cost. Skip the probe.
-func TestR2FS_Open_NotFound_SkipsProbeForExtensionPath(t *testing.T) {
+func TestR2FS_Open_NotFound_ProbesDottedDirectory(t *testing.T) {
 	t.Parallel()
 	r := newTestR2FS()
 	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
-	r.indexProbe = func(context.Context, string) (bool, error) {
-		t.Fatal("indexProbe should NOT run when path has an extension")
-		return false, nil
+	probed := ""
+	r.indexProbe = func(_ context.Context, dir string) (bool, error) {
+		probed = dir
+		return true, nil
 	}
 
-	_, err := r.Open("site-a.test.camp/deploys/v1/wp-admin.php")
-	if !errors.Is(err, fs.ErrNotExist) {
-		t.Errorf("error should wrap fs.ErrNotExist, got %v", err)
+	f, err := r.Open("site-a.test.camp/deploys/v1/assets.min")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	info, err := f.Stat()
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("a dotted directory must resolve to a virtual directory")
+	}
+	if probed != "site-a.test.camp/deploys/v1/assets.min" {
+		t.Errorf("probe path: got %q", probed)
+	}
+}
+
+func TestR2FS_Open_RejectsOversizeObject(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.MaxFileSize = 1024
+	r.header = stubFSFetcher(&r2Object{Size: 4096}, nil)
+	r.fetcher = func(context.Context, string) (*r2Object, error) {
+		t.Fatal("an oversize object must be rejected before its body is fetched")
+		return nil, nil
+	}
+
+	if _, err := r.Open("site-a.test.camp/deploys/v1/big.bin"); !errors.Is(err, fs.ErrInvalid) {
+		t.Fatalf("error should wrap fs.ErrInvalid, got %v", err)
+	}
+}
+
+func TestR2FS_Open_LoadFailureSurfacesOnRead(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.header = stubFSFetcher(&r2Object{Size: 10}, nil)
+	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+
+	f, err := r.Open("site-a.test.camp/deploys/v1/vanished.html")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if _, readErr := f.Read(make([]byte, 4)); !errors.Is(readErr, fs.ErrNotExist) {
+		t.Fatalf("read after the object vanished: want fs.ErrNotExist, got %v", readErr)
+	}
+}
+
+func TestR2FS_Stat_UsesHeadNotGet(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.fetcher = func(context.Context, string) (*r2Object, error) {
+		t.Fatal("Stat must not download a body")
+		return nil, nil
+	}
+	r.header = stubFSFetcher(&r2Object{Size: 12}, nil)
+
+	info, err := r.Stat("site-a.test.camp/deploys/v1/index.html")
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if info.Size() != 12 {
+		t.Errorf("size: want 12, got %d", info.Size())
+	}
+	if info.IsDir() {
+		t.Error("an object Stat must not report IsDir")
 	}
 }
 
 func TestR2FS_Stat_VirtualDirectory(t *testing.T) {
 	t.Parallel()
 	r := newTestR2FS()
-	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.header = stubFSFetcher(nil, fs.ErrNotExist)
 	r.indexProbe = stubIndexProbe(true, nil)
 
 	info, err := r.Stat("site-a.test.camp/deploys/v1")

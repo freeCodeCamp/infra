@@ -63,6 +63,16 @@ func TestParseSiteAndAlias_TableDriven(t *testing.T) {
 			host:    "preview.freecode.camp",
 			wantErr: true,
 		},
+		{
+			name:    "slash in host rejected",
+			host:    "a/../b.freecode.camp",
+			wantErr: true,
+		},
+		{
+			name:    "backslash in host rejected",
+			host:    `a\..\b.freecode.camp`,
+			wantErr: true,
+		},
 	}
 
 	for _, c := range cases {

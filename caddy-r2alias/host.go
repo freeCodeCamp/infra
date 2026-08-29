@@ -15,6 +15,11 @@ import (
 // — preview and production share the same `{site}/deploys/{id}/*` prefix
 // in R2; only the alias file differs.
 func parseSiteAndAlias(host, rootDomain, previewSubdomain string) (site, alias string, err error) {
+	// site is spliced into the storage path; a separator would add segments.
+	if strings.ContainsAny(host, `/\`) {
+		return "", "", fmt.Errorf("host %q contains a path separator", host)
+	}
+
 	suffix := "." + rootDomain
 	if !strings.HasSuffix(host, suffix) {
 		return "", "", fmt.Errorf("host %q is not under root domain %q", host, rootDomain)

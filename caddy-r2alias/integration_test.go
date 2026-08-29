@@ -1,10 +1,6 @@
-//go:build integration
-
 package r2alias_test
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,21 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/caddyserver/caddy/v2/caddytest"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 
-	_ "github.com/freeCodeCamp-Universe/infra/docker/images/caddy-s3/modules/r2alias"
+	_ "github.com/freeCodeCamp-Universe/infra/caddy-r2alias"
 )
 
-// Pin Adobe S3Mock by major version tag (D30 — no :latest).
-const s3MockImage = "adobe/s3mock:5.0.0"
-
-// testBucket matches the initial bucket provisioned by S3Mock on startup.
 const testBucket = "gxy-cassiopeia-test"
 
 // rootDomain is test-only so production config is never a live target here.
@@ -46,70 +32,10 @@ const (
 	caddyHTTPSPort = 9443
 )
 
-type s3Mock struct {
-	endpoint string
-	client   *s3.Client
-	bucket   string
-}
-
-func startS3Mock(t *testing.T) *s3Mock {
+// The disk layout is independent of the S3 prefix so one fixture set can back
+// multiple site names.
+func uploadDeployFixtures(t *testing.T, stub *s3Stub, site, version string) {
 	t.Helper()
-	testcontainers.SkipIfProviderIsNotHealthy(t)
-	ctx := context.Background()
-
-	req := testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        s3MockImage,
-			ExposedPorts: []string{"9090/tcp"},
-			Env: map[string]string{
-				"COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS": testBucket,
-			},
-			WaitingFor: wait.ForListeningPort("9090/tcp").WithStartupTimeout(60 * time.Second),
-		},
-		Started: true,
-	}
-
-	container, err := testcontainers.GenericContainer(ctx, req)
-	if err != nil {
-		t.Fatalf("start s3mock container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(context.Background()); err != nil {
-			t.Logf("terminate s3mock container: %v", err)
-		}
-	})
-
-	host, err := container.Host(ctx)
-	if err != nil {
-		t.Fatalf("container host: %v", err)
-	}
-	port, err := container.MappedPort(ctx, "9090/tcp")
-	if err != nil {
-		t.Fatalf("mapped port: %v", err)
-	}
-	endpoint := fmt.Sprintf("http://%s:%s", host, port.Port())
-
-	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-	if err != nil {
-		t.Fatalf("aws config: %v", err)
-	}
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
-		o.UsePathStyle = true
-	})
-
-	return &s3Mock{endpoint: endpoint, client: client, bucket: testBucket}
-}
-
-// uploadDeployFixtures uploads testdata/site-a/deploys/<version>/* to the
-// bucket under <site>/deploys/<version>/*. The disk layout is independent of
-// the S3 prefix so one fixture set can back multiple site names.
-func uploadDeployFixtures(t *testing.T, client *s3.Client, bucket, site, version string) {
-	t.Helper()
-	ctx := context.Background()
 
 	srcDir := filepath.Join("testdata", "site-a", "deploys", version)
 	err := filepath.Walk(srcDir, func(path string, info os.FileInfo, walkErr error) error {
@@ -125,34 +51,15 @@ func uploadDeployFixtures(t *testing.T, client *s3.Client, bucket, site, version
 		if readErr != nil {
 			return readErr
 		}
-
-		key := fmt.Sprintf("%s/deploys/%s/%s", site, version, rel)
-		_, putErr := client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:      aws.String(bucket),
-			Key:         aws.String(key),
-			Body:        bytes.NewReader(body),
-			ContentType: aws.String("text/html"),
-		})
-		return putErr
+		stub.put(fmt.Sprintf("%s/deploys/%s/%s", site, version, rel), string(body), "text/html")
+		return nil
 	})
 	if err != nil {
 		t.Fatalf("upload fixtures %s/%s: %v", site, version, err)
 	}
 }
 
-func putAlias(t *testing.T, client *s3.Client, bucket, site, aliasName, deployID string) {
-	t.Helper()
-	_, err := client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(fmt.Sprintf("%s/%s", site, aliasName)),
-		Body:   strings.NewReader(deployID),
-	})
-	if err != nil {
-		t.Fatalf("put alias %s/%s=%s: %v", site, aliasName, deployID, err)
-	}
-}
-
-func startCaddy(t *testing.T, s3mockEndpoint string) *caddytest.Tester {
+func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 	t.Helper()
 	caddyfile := fmt.Sprintf(`
 {
@@ -190,9 +97,9 @@ func startCaddy(t *testing.T, s3mockEndpoint string) *caddytest.Tester {
 }
 `,
 		caddyAdminPort, caddyHTTPPort, caddyHTTPSPort,
-		testBucket, s3mockEndpoint,
+		testBucket, s3Endpoint,
 		caddyHTTPPort,
-		testBucket, s3mockEndpoint,
+		testBucket, s3Endpoint,
 		cacheTTL, rootDomain,
 	)
 	tester := caddytest.NewTester(t)
@@ -234,13 +141,13 @@ func assertBodyContains(t *testing.T, body, want string) {
 }
 
 func TestIntegration_ResolveProduction(t *testing.T) {
-	mock := startS3Mock(t)
+	stub := startS3Stub(t)
 	site := "site-a." + rootDomain
 
-	uploadDeployFixtures(t, mock.client, mock.bucket, site, "v1")
-	putAlias(t, mock.client, mock.bucket, site, "production", "v1")
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
 
-	tester := startCaddy(t, mock.endpoint)
+	tester := startCaddy(t, stub.endpoint())
 
 	status, body := doGet(t, tester, site, "/")
 	if status != http.StatusOK {
@@ -250,14 +157,14 @@ func TestIntegration_ResolveProduction(t *testing.T) {
 }
 
 func TestIntegration_AliasFlip(t *testing.T) {
-	mock := startS3Mock(t)
+	stub := startS3Stub(t)
 	site := "site-a." + rootDomain
 
-	uploadDeployFixtures(t, mock.client, mock.bucket, site, "v1")
-	uploadDeployFixtures(t, mock.client, mock.bucket, site, "v2")
-	putAlias(t, mock.client, mock.bucket, site, "production", "v1")
+	uploadDeployFixtures(t, stub, site, "v1")
+	uploadDeployFixtures(t, stub, site, "v2")
+	stub.putAlias(site, "production", "v1")
 
-	tester := startCaddy(t, mock.endpoint)
+	tester := startCaddy(t, stub.endpoint())
 
 	status, body := doGet(t, tester, site, "/")
 	if status != http.StatusOK {
@@ -265,7 +172,7 @@ func TestIntegration_AliasFlip(t *testing.T) {
 	}
 	assertBodyContains(t, body, "V1")
 
-	putAlias(t, mock.client, mock.bucket, site, "production", "v2")
+	stub.putAlias(site, "production", "v2")
 
 	// Poll past the cache TTL — CI timing jitter makes a single post-TTL
 	// sleep brittle. 5s is generous relative to the 500ms TTL.
@@ -281,14 +188,14 @@ func TestIntegration_AliasFlip(t *testing.T) {
 }
 
 func TestIntegration_PreviewRouting(t *testing.T) {
-	mock := startS3Mock(t)
+	stub := startS3Stub(t)
 	prodSite := "site-a." + rootDomain
 	previewHost := "site-a.preview." + rootDomain
 
-	uploadDeployFixtures(t, mock.client, mock.bucket, prodSite, "v2")
-	putAlias(t, mock.client, mock.bucket, prodSite, "preview", "v2")
+	uploadDeployFixtures(t, stub, prodSite, "v2")
+	stub.putAlias(prodSite, "preview", "v2")
 
-	tester := startCaddy(t, mock.endpoint)
+	tester := startCaddy(t, stub.endpoint())
 
 	status, body := doGet(t, tester, previewHost, "/")
 	if status != http.StatusOK {
@@ -297,9 +204,93 @@ func TestIntegration_PreviewRouting(t *testing.T) {
 	assertBodyContains(t, body, "V2")
 }
 
+func TestIntegration_DottedDirectoryServesIndex(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+	stub.put(site+"/deploys/v1/assets.min/index.html", "<h1>MINIFIED</h1>", "text/html")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	status, body := doGet(t, tester, site, "/assets.min/")
+	if status != http.StatusOK {
+		t.Fatalf("status: want 200, got %d (body=%q)", status, body)
+	}
+	assertBodyContains(t, body, "MINIFIED")
+}
+
+func TestIntegration_DottedDeployIDServesRoot(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	stub.put(site+"/deploys/v1.2.3/index.html", "<h1>V1.2.3</h1>", "text/html")
+	stub.putAlias(site, "production", "v1.2.3")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	status, body := doGet(t, tester, site, "/")
+	if status != http.StatusOK {
+		t.Fatalf("status: want 200, got %d (body=%q)", status, body)
+	}
+	assertBodyContains(t, body, "V1.2.3")
+}
+
+func TestIntegration_ServesIndexWithOneBodyFetch(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	status, body := doGet(t, tester, site, "/")
+	if status != http.StatusOK {
+		t.Fatalf("status: want 200, got %d (body=%q)", status, body)
+	}
+
+	indexKey := site + "/deploys/v1/index.html"
+	ops := stub.opsFor(indexKey)
+	gets := 0
+	for _, op := range ops {
+		if strings.HasPrefix(op, http.MethodGet+" ") {
+			gets++
+		}
+	}
+	if gets != 1 {
+		t.Fatalf("body fetches for %s: want 1, got %d (ops=%v, all=%v)", indexKey, gets, ops, stub.allOps())
+	}
+}
+
+func TestIntegration_BareNotFoundAliasIs404(t *testing.T) {
+	stub := startS3Stub(t)
+	stub.setFailure(http.StatusNotFound)
+
+	tester := startCaddy(t, stub.endpoint())
+
+	status, body := doGet(t, tester, "dead."+rootDomain, "/")
+	if status != http.StatusNotFound {
+		t.Fatalf("status: want 404, got %d (body=%q)", status, body)
+	}
+}
+
+func TestIntegration_UpstreamServerErrorIs503(t *testing.T) {
+	stub := startS3Stub(t)
+	stub.setFailure(http.StatusInternalServerError)
+
+	tester := startCaddy(t, stub.endpoint())
+
+	status, body := doGet(t, tester, "site-a."+rootDomain, "/")
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("status: want 503, got %d (body=%q)", status, body)
+	}
+}
+
 func TestIntegration_MissingSite404(t *testing.T) {
-	mock := startS3Mock(t)
-	tester := startCaddy(t, mock.endpoint)
+	stub := startS3Stub(t)
+	tester := startCaddy(t, stub.endpoint())
 
 	status, _ := doGet(t, tester, "dead."+rootDomain, "/")
 	if status != http.StatusNotFound {
