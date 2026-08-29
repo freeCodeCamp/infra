@@ -19,7 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -185,6 +184,7 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 	}
 
 	if !r.deployIDRe.MatchString(entry.DeployID) ||
+		entry.DeployID == "." ||
 		strings.Contains(entry.DeployID, "..") ||
 		strings.ContainsRune(entry.DeployID, '/') {
 		r.logger.Warn("r2_alias deploy id rejected",
@@ -195,11 +195,11 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 		return caddyhttp.Error(http.StatusNotFound, fmt.Errorf("r2_alias: deploy id rejected"))
 	}
 
-	origPath := req.URL.Path
-	if origPath == "" {
-		origPath = "/"
-	}
+	// Clean before the join: Caddy leaves req.URL.Path raw, and file_server's
+	// SanitizedPathJoin cleans too late to keep `..` inside the deploy prefix.
+	origPath := caddyhttp.CleanPath("/"+req.URL.Path, true)
 	req.URL.Path = "/" + site + "/deploys/" + entry.DeployID + origPath
+	req.URL.RawPath = ""
 
 	return next.ServeHTTP(w, req)
 }
@@ -216,8 +216,7 @@ func (r *R2Alias) fetchAlias(ctx context.Context, cacheKey string) (aliasEntry, 
 		Key:    aws.String(s3Key),
 	})
 	if err != nil {
-		var nsk *s3types.NoSuchKey
-		if errors.As(err, &nsk) {
+		if isNoSuchKey(err) {
 			return aliasEntry{Present: false}, nil
 		}
 		var respErr *awshttp.ResponseError

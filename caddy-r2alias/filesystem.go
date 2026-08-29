@@ -54,6 +54,8 @@ type R2FS struct {
 	// tests swap in a stub so Open/Stat run without an S3 client.
 	fetcher func(ctx context.Context, key string) (*r2Object, error)
 
+	header func(ctx context.Context, key string) (*r2Object, error)
+
 	// indexProbe reports whether a directory's index.html exists. Provision
 	// wires it to r.hasIndex, which issues a HeadObject — matching the Caddy
 	// key's GetObject-only IAM scope (RFC §4.2.4). Backs Open's virtual-
@@ -110,6 +112,9 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 	r.logger = ctx.Logger()
 	if r.fetcher == nil {
 		r.fetcher = r.getObject
+	}
+	if r.header == nil {
+		r.header = r.headObject
 	}
 	if r.indexProbe == nil {
 		r.indexProbe = r.hasIndex
@@ -190,56 +195,118 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
 	defer cancel()
 
-	obj, err := r.fetcher(ctx, name)
-	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+	head, err := r.header(ctx, name)
+	if err == nil {
+		if head.Size > r.MaxFileSize {
+			r.logger.Warn("r2 object exceeds max_file_size",
+				zap.String("path", name), zap.Int64("size", head.Size))
+			return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 		}
-		// Only promote extensionless misses to a virtual-directory probe;
-		// paths with extensions are full object keys and a miss is terminal.
-		if path.Ext(name) == "" && r.indexProbe != nil {
-			has, probeErr := r.indexProbe(ctx, name)
-			if probeErr != nil {
-				r.logger.Warn("r2 index probe failed",
-					zap.String("path", name), zap.Error(probeErr))
-				return nil, &fs.PathError{Op: "open", Path: name, Err: probeErr}
-			}
-			if has {
-				r.logger.Debug("r2 virtual directory", zap.String("path", name))
-				return &r2File{
-					reader: bytes.NewReader(nil),
-					info: &r2FileInfo{
-						name:  path.Base(name),
-						isDir: true,
-					},
-				}, nil
-			}
-		}
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+		return &r2File{
+			info: &r2FileInfo{
+				name:    path.Base(name),
+				size:    head.Size,
+				modTime: head.LastModified,
+			},
+			load: func() ([]byte, error) {
+				loadCtx, loadCancel := context.WithTimeout(context.Background(), opTimeout)
+				defer loadCancel()
+				obj, ferr := r.fetcher(loadCtx, name)
+				if ferr != nil {
+					r.logger.Error("r2 body fetch failed",
+						zap.String("path", name), zap.Error(ferr))
+					return nil, ferr
+				}
+				return obj.Body, nil
+			},
+		}, nil
 	}
-	return &r2File{
-		reader: bytes.NewReader(obj.Body),
-		info: &r2FileInfo{
+	if !errors.Is(err, fs.ErrNotExist) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+	}
+
+	if r.indexProbe != nil {
+		has, probeErr := r.indexProbe(ctx, name)
+		if probeErr != nil {
+			r.logger.Warn("r2 index probe failed",
+				zap.String("path", name), zap.Error(probeErr))
+			return nil, &fs.PathError{Op: "open", Path: name, Err: probeErr}
+		}
+		if has {
+			r.logger.Debug("r2 virtual directory", zap.String("path", name))
+			return &r2File{
+				info: &r2FileInfo{
+					name:  path.Base(name),
+					isDir: true,
+				},
+			}, nil
+		}
+	}
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+}
+
+// Unreachable through file_server: caddy v2.11.3 registers every filesystem in
+// internal/filesystems.wrapperFs, which embeds only fs.FS and hides fs.StatFS.
+func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrInvalid}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
+	defer cancel()
+
+	obj, err := r.header(ctx, name)
+	if err == nil {
+		return &r2FileInfo{
 			name:    path.Base(name),
 			size:    obj.Size,
 			modTime: obj.LastModified,
-		},
-	}, nil
+		}, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return nil, &fs.PathError{Op: "stat", Path: name, Err: err}
+	}
+
+	if r.indexProbe != nil {
+		has, probeErr := r.indexProbe(ctx, name)
+		if probeErr != nil {
+			r.logger.Warn("r2 index probe failed",
+				zap.String("path", name), zap.Error(probeErr))
+			return nil, &fs.PathError{Op: "stat", Path: name, Err: probeErr}
+		}
+		if has {
+			return &r2FileInfo{name: path.Base(name), isDir: true}, nil
+		}
+	}
+	return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
 }
 
-// Stat delegates to Open so both paths share one fetcher. Static-serving
-// traffic opens the file anyway (http.ServeContent calls Stat then reads).
-func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
-	f, err := r.Open(name)
+func (r *R2FS) headObject(ctx context.Context, key string) (*r2Object, error) {
+	out, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(r.Bucket),
+		Key:    aws.String(key),
+	})
 	if err != nil {
-		var pe *fs.PathError
-		if errors.As(err, &pe) {
-			pe.Op = "stat"
+		if isNoSuchKey(err) {
+			return nil, fmt.Errorf("caddy.fs.r2: %w", fs.ErrNotExist)
 		}
-		return nil, err
+		var respErr *awshttp.ResponseError
+		if errors.As(err, &respErr) && respErr.HTTPStatusCode() >= 500 {
+			return nil, fmt.Errorf("caddy.fs.r2: upstream 5xx: %w", err)
+		}
+		return nil, fmt.Errorf("caddy.fs.r2: HeadObject %s: %w", key, err)
 	}
-	defer func() { _ = f.Close() }()
-	return f.Stat()
+
+	obj := &r2Object{}
+	if out.ContentLength != nil {
+		obj.Size = *out.ContentLength
+	}
+	if out.LastModified != nil {
+		obj.LastModified = *out.LastModified
+	}
+	if out.ContentType != nil {
+		obj.ContentType = *out.ContentType
+	}
+	return obj, nil
 }
 
 func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
@@ -290,16 +357,12 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 // — matching the scope granted to the Caddy read-only key (RFC §4.2.4) —
 // where ListObjectsV2 would need s3:ListBucket, which is not granted.
 func (r *R2FS) hasIndex(ctx context.Context, dirPath string) (bool, error) {
-	key := dirPath + "/" + indexFile
-	_, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(r.Bucket),
-		Key:    aws.String(key),
-	})
+	_, err := r.headObject(ctx, dirPath+"/"+indexFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
 	if err != nil {
-		if isNoSuchKey(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("caddy.fs.r2: HeadObject %s: %w", key, err)
+		return false, err
 	}
 	return true, nil
 }
@@ -319,15 +382,76 @@ func isNoSuchKey(err error) bool {
 }
 
 type r2File struct {
-	reader *bytes.Reader
 	info   *r2FileInfo
+	load   func() ([]byte, error)
+	reader *bytes.Reader
+	offset int64
 }
 
-func (f *r2File) Stat() (fs.FileInfo, error)                   { return f.info, nil }
-func (f *r2File) Read(b []byte) (int, error)                   { return f.reader.Read(b) }
-func (f *r2File) Seek(offset int64, whence int) (int64, error) { return f.reader.Seek(offset, whence) }
-func (f *r2File) ReadAt(p []byte, off int64) (int, error)      { return f.reader.ReadAt(p, off) }
-func (f *r2File) Close() error                                 { return nil }
+func (f *r2File) body() (*bytes.Reader, error) {
+	if f.reader != nil {
+		return f.reader, nil
+	}
+	var raw []byte
+	if f.load != nil {
+		var err error
+		if raw, err = f.load(); err != nil {
+			return nil, err
+		}
+	}
+	f.reader = bytes.NewReader(raw)
+	if _, err := f.reader.Seek(f.offset, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return f.reader, nil
+}
+
+func (f *r2File) Stat() (fs.FileInfo, error) { return f.info, nil }
+
+func (f *r2File) Read(p []byte) (int, error) {
+	reader, err := f.body()
+	if err != nil {
+		return 0, err
+	}
+	n, readErr := reader.Read(p)
+	f.offset += int64(n)
+	return n, readErr
+}
+
+func (f *r2File) Seek(offset int64, whence int) (int64, error) {
+	if f.reader != nil {
+		pos, err := f.reader.Seek(offset, whence)
+		f.offset = pos
+		return pos, err
+	}
+
+	var abs int64
+	switch whence {
+	case io.SeekStart:
+		abs = offset
+	case io.SeekCurrent:
+		abs = f.offset + offset
+	case io.SeekEnd:
+		abs = f.info.size + offset
+	default:
+		return 0, fs.ErrInvalid
+	}
+	if abs < 0 {
+		return 0, fs.ErrInvalid
+	}
+	f.offset = abs
+	return abs, nil
+}
+
+func (f *r2File) ReadAt(p []byte, off int64) (int, error) {
+	reader, err := f.body()
+	if err != nil {
+		return 0, err
+	}
+	return reader.ReadAt(p, off)
+}
+
+func (f *r2File) Close() error { return nil }
 
 type r2FileInfo struct {
 	name    string

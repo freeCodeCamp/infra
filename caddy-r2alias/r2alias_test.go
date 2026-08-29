@@ -194,14 +194,16 @@ func newProvisionedForTest(t *testing.T) *R2Alias {
 
 // capturingNext records the path the handler chain sees after the rewrite.
 type capturingNext struct {
-	called bool
-	path   string
+	called  bool
+	path    string
+	rawPath string
 }
 
 func (c *capturingNext) asHandler() caddyhttp.Handler {
 	return caddyhttp.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) error {
 		c.called = true
 		c.path = req.URL.Path
+		c.rawPath = req.URL.RawPath
 		return nil
 	})
 }
@@ -285,6 +287,51 @@ func TestServeHTTP_RootPathRewrite(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_RewriteResolvesDotSegments(t *testing.T) {
+	t.Parallel()
+	const prefix = "/site-a.freecode.camp/deploys/v1/"
+
+	cases := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"parent segments", "/../../../other.freecode.camp/deploys/x/index.html", prefix + "other.freecode.camp/deploys/x/index.html"},
+		{"single parent", "/../staged-not-live/index.html", prefix + "staged-not-live/index.html"},
+		{"encoded parent", "/%2e%2e/%2e%2e/production", prefix + "production"},
+		{"interior parent", "/assets/../../../../etc/passwd", prefix + "etc/passwd"},
+		{"current-dir segment", "/./assets/x.js", prefix + "assets/x.js"},
+		{"empty segments", "//assets//x.js", prefix + "assets/x.js"},
+		{"trailing slash preserved", "/assets/", prefix + "assets/"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			r := newProvisionedForTest(t)
+			r.fetcher = stubFetcher(aliasEntry{DeployID: "v1", Present: true}, nil)
+
+			req := httptest.NewRequest(http.MethodGet, c.path, nil)
+			req.Host = "site-a.freecode.camp"
+			rec := httptest.NewRecorder()
+			next := &capturingNext{}
+
+			if err := r.ServeHTTP(rec, req, next.asHandler()); err != nil {
+				t.Fatalf("ServeHTTP: %v", err)
+			}
+			if next.path != c.want {
+				t.Fatalf("path rewrite: want %q, got %q", c.want, next.path)
+			}
+			if !strings.HasPrefix(next.path, prefix) {
+				t.Fatalf("escaped the deploy prefix: %q", next.path)
+			}
+			if next.rawPath != "" {
+				t.Fatalf("stale RawPath survives the rewrite: %q", next.rawPath)
+			}
+		})
+	}
+}
+
 func TestServeHTTP_HostNotUnderRootDomain(t *testing.T) {
 	t.Parallel()
 	r := newProvisionedForTest(t)
@@ -333,6 +380,7 @@ func TestServeHTTP_DeployIDRejected(t *testing.T) {
 		name     string
 		deployID string
 	}{
+		{"current-dir segment", "."},
 		{"contains dot-dot", "bad..name"},
 		{"contains slash", "v1/etc/passwd"},
 		{"over 64 chars", strings.Repeat("x", 65)},
