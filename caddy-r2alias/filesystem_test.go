@@ -379,3 +379,46 @@ func TestR2FS_Stat_VirtualDirectory(t *testing.T) {
 		t.Error("virtual directory Stat should report IsDir=true")
 	}
 }
+
+func TestR2FS_Open_SeekEndDoesNotFetchTheBody(t *testing.T) {
+	r := newTestR2FS()
+	r.header = stubFSFetcher(&r2Object{Size: 5000}, nil)
+	fetched := false
+	r.fetcher = func(context.Context, string) (*r2Object, error) {
+		fetched = true
+		return &r2Object{Body: []byte("SHORT-BODY")}, nil
+	}
+
+	f, err := r.Open("site-a.test.camp/deploys/v1/index.html")
+	if err != nil {
+		t.Fatalf("Open: unexpected error: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	size, err := f.(io.Seeker).Seek(0, io.SeekEnd)
+	if err != nil {
+		t.Fatalf("Seek: unexpected error: %v", err)
+	}
+	if size != 5000 {
+		t.Errorf("Seek(0, SeekEnd): want the HeadObject size 5000, got %d", size)
+	}
+	if fetched {
+		t.Error("sizing the response must not fetch the body")
+	}
+}
+
+func TestR2FS_Open_SkewedBodyFailsTheRead(t *testing.T) {
+	r := newTestR2FS()
+	r.header = stubFSFetcher(&r2Object{Size: 5000}, nil)
+	r.fetcher = stubFSFetcher(&r2Object{Body: []byte("SHORT-BODY")}, nil)
+
+	f, err := r.Open("site-a.test.camp/deploys/v1/index.html")
+	if err != nil {
+		t.Fatalf("Open: unexpected error: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if _, err := io.ReadAll(f); err == nil {
+		t.Fatal("a body shorter than the declared size must fail, not short-serve")
+	}
+}

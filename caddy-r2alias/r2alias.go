@@ -36,6 +36,16 @@ var errS3ServerError = errors.New("r2_alias: upstream 5xx")
 // or malicious object.
 const maxAliasBodyBytes = 1024
 
+const (
+	defaultCacheMaxEntries  = 10000
+	defaultCacheTTL         = 15 * time.Second
+	defaultFetchTimeout     = 2 * time.Second
+	defaultRegion           = "auto"
+	defaultPreviewSubdomain = "preview"
+	defaultRootDomain       = "freecode.camp"
+	defaultDeployIDRegex    = `^[A-Za-z0-9._-]{1,64}$`
+)
+
 type R2Alias struct {
 	Bucket           string        `json:"bucket"`
 	Endpoint         string        `json:"endpoint"`
@@ -47,6 +57,9 @@ type R2Alias struct {
 	PreviewSubdomain string        `json:"preview_subdomain,omitempty"`
 	RootDomain       string        `json:"root_domain,omitempty"`
 	DeployIDRegex    string        `json:"deploy_id_regex,omitempty"`
+	// FetchTimeout is read once, by Provision, when it builds the cache. Setting
+	// it on a live handler does nothing; rebuild the cache to change it.
+	FetchTimeout time.Duration `json:"fetch_timeout,omitempty"`
 
 	client     *s3.Client
 	cache      *aliasCache
@@ -77,7 +90,36 @@ func (R2Alias) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+// applyDefaults fills every unset field. Provision calls it before building
+// the cache; caddy runs Provision before Validate (context.go:426, :441), so
+// defaults set only in Validate would reach the cache one step too late.
+func (r *R2Alias) applyDefaults() {
+	if r.Region == "" {
+		r.Region = defaultRegion
+	}
+	if r.CacheTTL == 0 {
+		r.CacheTTL = defaultCacheTTL
+	}
+	if r.CacheMaxEntries == 0 {
+		r.CacheMaxEntries = defaultCacheMaxEntries
+	}
+	if r.PreviewSubdomain == "" {
+		r.PreviewSubdomain = defaultPreviewSubdomain
+	}
+	if r.RootDomain == "" {
+		r.RootDomain = defaultRootDomain
+	}
+	if r.DeployIDRegex == "" {
+		r.DeployIDRegex = defaultDeployIDRegex
+	}
+	if r.FetchTimeout == 0 {
+		r.FetchTimeout = defaultFetchTimeout
+	}
+}
+
 func (r *R2Alias) Provision(ctx caddy.Context) error {
+	r.applyDefaults()
+
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(r.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -92,7 +134,7 @@ func (r *R2Alias) Provision(ctx caddy.Context) error {
 		o.UsePathStyle = true
 	})
 
-	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL)
+	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL, r.FetchTimeout)
 	r.logger = ctx.Logger()
 	if r.fetcher == nil {
 		r.fetcher = r.fetchAlias
@@ -108,30 +150,16 @@ func (r *R2Alias) Validate() error {
 		return fmt.Errorf("r2_alias: endpoint is required")
 	}
 
-	if r.Region == "" {
-		r.Region = "auto"
-	}
-	if r.CacheTTL == 0 {
-		r.CacheTTL = 15 * time.Second
-	}
-	if r.CacheMaxEntries == 0 {
-		r.CacheMaxEntries = 10000
-	}
-	if r.PreviewSubdomain == "" {
-		r.PreviewSubdomain = "preview"
-	}
-	if r.RootDomain == "" {
-		r.RootDomain = "freecode.camp"
-	}
-	if r.DeployIDRegex == "" {
-		r.DeployIDRegex = `^[A-Za-z0-9._-]{1,64}$`
-	}
+	r.applyDefaults()
 
 	if r.CacheTTL <= 0 {
 		return fmt.Errorf("r2_alias: cache_ttl must be > 0 (got %s)", r.CacheTTL)
 	}
 	if r.CacheMaxEntries <= 0 {
 		return fmt.Errorf("r2_alias: cache_max_entries must be > 0 (got %d)", r.CacheMaxEntries)
+	}
+	if r.FetchTimeout <= 0 {
+		return fmt.Errorf("r2_alias: fetch_timeout must be > 0 (got %s)", r.FetchTimeout)
 	}
 
 	re, err := regexp.Compile(r.DeployIDRegex)
@@ -170,7 +198,10 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 			zap.String("site", site),
 			zap.String("alias_name", aliasName),
 		}
-		if errors.Is(resolveErr, errS3ServerError) {
+		// A deadline is an upstream-is-not-answering signal, not a bug here, so
+		// it answers 503 with Retry-After like any other upstream failure.
+		if errors.Is(resolveErr, errS3ServerError) ||
+			errors.Is(resolveErr, context.DeadlineExceeded) {
 			w.Header().Set("Retry-After", "30")
 			r.logger.Error("r2_alias upstream 5xx", fields...)
 			return caddyhttp.Error(http.StatusServiceUnavailable, resolveErr)

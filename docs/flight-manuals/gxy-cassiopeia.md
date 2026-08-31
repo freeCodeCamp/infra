@@ -102,6 +102,17 @@ fi
 
 The recipe layers chart defaults → `values.production.yaml` (image SHA pin, hostnames, replicas) → sops overlay `caddy.values.yaml.enc` (R2 credentials). Image pulls from `ghcr.io/freecodecamp/caddy-s3:<sha-tag>@sha256:<digest>` direct (build-residency principle — pillars build outside Universe; never through zot for chicken-egg avoidance).
 
+**The image and the Caddyfile move together.** `charts/caddy/templates/configmap.yaml` holds the Caddyfile, and `templates/deployment.yaml` carries a `checksum/caddyfile` annotation, so any Caddyfile edit restarts all replicas at once. `r2_alias` and `caddy.fs.r2` reject an unknown sub-directive at parse time, so an image that predates a new directive refuses to start and every `*.freecode.camp` site goes down. Adding a directive therefore takes **two releases, never one**: roll the digest first, confirm all replicas are Running on it, then roll the Caddyfile change. One release applies both objects together, and any old-image pod that restarts mid-rollout picks up the already-synced new Caddyfile and crash-loops. A rollback runs the same two steps in reverse — revert the Caddyfile, then the digest, never the image alone. Validate before either roll:
+
+```bash
+docker run --rm --platform linux/amd64 \
+  -e R2_BUCKET=b -e R2_ENDPOINT=https://x \
+  -e AWS_ACCESS_KEY_ID=k -e AWS_SECRET_ACCESS_KEY=s \
+  -v /path/to/rendered/Caddyfile:/etc/caddy/Caddyfile:ro \
+  ghcr.io/freecodecamp/caddy-s3@sha256:<digest> \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
 ### B.2 R2 bucket verify
 
 ```bash

@@ -51,6 +51,9 @@ func TestValidate_DefaultsApplied(t *testing.T) {
 	if r.CacheMaxEntries != 10000 {
 		t.Errorf("CacheMaxEntries default: want 10000, got %d", r.CacheMaxEntries)
 	}
+	if r.FetchTimeout != 2*time.Second {
+		t.Errorf("FetchTimeout default: want 2s, got %s", r.FetchTimeout)
+	}
 	if r.PreviewSubdomain != "preview" {
 		t.Errorf("PreviewSubdomain default: want \"preview\", got %q", r.PreviewSubdomain)
 	}
@@ -81,6 +84,11 @@ func TestValidate_NegativeCacheParams(t *testing.T) {
 			"negative CacheMaxEntries",
 			R2Alias{Bucket: "b", Endpoint: "https://x", CacheMaxEntries: -1},
 			"cache_max_entries must be > 0",
+		},
+		{
+			"negative FetchTimeout",
+			R2Alias{Bucket: "b", Endpoint: "https://x", FetchTimeout: -1 * time.Second},
+			"fetch_timeout must be > 0",
 		},
 	}
 	for _, c := range cases {
@@ -114,6 +122,7 @@ func TestUnmarshalCaddyfile_FullBlock(t *testing.T) {
 		secret_access_key s
 		cache_ttl 15s
 		cache_max_entries 10000
+		fetch_timeout 2s
 		preview_subdomain "preview"
 		root_domain "freecode.camp"
 		deploy_id_regex "^[A-Za-z0-9._-]{1,64}$"
@@ -134,6 +143,9 @@ func TestUnmarshalCaddyfile_FullBlock(t *testing.T) {
 	}
 	if r.CacheMaxEntries != 10000 {
 		t.Errorf("CacheMaxEntries: want 10000, got %d", r.CacheMaxEntries)
+	}
+	if r.FetchTimeout != 2*time.Second {
+		t.Errorf("FetchTimeout: want 2s, got %s", r.FetchTimeout)
 	}
 	if r.PreviewSubdomain != "preview" {
 		t.Errorf("PreviewSubdomain mismatch: %q", r.PreviewSubdomain)
@@ -185,10 +197,11 @@ func newProvisionedForTest(t *testing.T) *R2Alias {
 		DeployIDRegex:    `^[A-Za-z0-9._-]{1,64}$`,
 		CacheTTL:         1 * time.Second,
 		CacheMaxEntries:  10,
+		FetchTimeout:     defaultFetchTimeout,
 		logger:           zap.NewNop(),
 	}
 	r.deployIDRe = regexp.MustCompile(r.DeployIDRegex)
-	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL)
+	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL, r.FetchTimeout)
 	return r
 }
 
@@ -210,6 +223,23 @@ func (c *capturingNext) asHandler() caddyhttp.Handler {
 
 func stubFetcher(entry aliasEntry, err error) func(context.Context, string) (aliasEntry, error) {
 	return func(context.Context, string) (aliasEntry, error) { return entry, err }
+}
+
+// blockingFetcher never returns until its context ends, so a test can observe
+// whichever deadline or cancellation fired first.
+func blockingFetcher(ctx context.Context, _ string) (aliasEntry, error) {
+	<-ctx.Done()
+	return aliasEntry{}, ctx.Err()
+}
+
+// newProvisionedWithFetchTimeout rebuilds the cache, because Provision reads
+// FetchTimeout once when it constructs it; setting the field alone does nothing.
+func newProvisionedWithFetchTimeout(t *testing.T, d time.Duration) *R2Alias {
+	t.Helper()
+	r := newProvisionedForTest(t)
+	r.FetchTimeout = d
+	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL, r.FetchTimeout)
+	return r
 }
 
 func handlerStatus(t *testing.T, err error) int {
@@ -460,5 +490,51 @@ func TestServeHTTP_PanicRecovered(t *testing.T) {
 	err := r.ServeHTTP(rec, req, next.asHandler())
 	if got := handlerStatus(t, err); got != http.StatusInternalServerError {
 		t.Fatalf("status: want 500 after panic recovery, got %d", got)
+	}
+}
+
+func TestServeHTTP_FetchTimeoutIs503(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedWithFetchTimeout(t, 20*time.Millisecond)
+	r.fetcher = blockingFetcher
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "site-a.freecode.camp"
+	rec := httptest.NewRecorder()
+	next := &capturingNext{}
+
+	err := r.ServeHTTP(rec, req, next.asHandler())
+	if got := handlerStatus(t, err); got != http.StatusServiceUnavailable {
+		t.Fatalf("status: want 503, got %d", got)
+	}
+	if got := rec.Header().Get("Retry-After"); got != "30" {
+		t.Errorf("Retry-After: want 30, got %q", got)
+	}
+	if next.called {
+		t.Error("next handler must not run when the alias fetch times out")
+	}
+}
+
+func TestServeHTTP_FetchTimeoutDoesNotOutliveTheRequest(t *testing.T) {
+	t.Parallel()
+	r := newProvisionedWithFetchTimeout(t, time.Hour)
+	r.fetcher = blockingFetcher
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(reqCtx)
+	req.Host = "site-a.freecode.camp"
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = r.ServeHTTP(httptest.NewRecorder(), req, (&capturingNext{}).asHandler())
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a cancelled request must not wait for the fetch timeout")
 	}
 }

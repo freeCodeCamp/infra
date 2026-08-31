@@ -27,6 +27,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 //	    secret_access_key <str>
 //	    cache_ttl <duration>
 //	    cache_max_entries <int>
+//	    fetch_timeout <duration>
 //	    preview_subdomain <str>
 //	    root_domain <str>
 //	    deploy_id_regex <str>
@@ -74,6 +75,15 @@ func (r *R2Alias) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("cache_ttl: %v", err)
 				}
 				r.CacheTTL = dur
+			case "fetch_timeout":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				dur, err := time.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("fetch_timeout: %v", err)
+				}
+				r.FetchTimeout = dur
 			case "cache_max_entries":
 				if !d.NextArg() {
 					return d.ArgErr()

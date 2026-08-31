@@ -89,6 +89,7 @@ func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 		access_key_id test
 		secret_access_key test
 		cache_ttl %s
+		fetch_timeout 2s
 		root_domain %s
 	}
 	file_server {
@@ -111,6 +112,14 @@ func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 // The TCP target is always the caddytest HTTP listener on localhost.
 func doGet(t *testing.T, tester *caddytest.Tester, host, path string) (int, string) {
 	t.Helper()
+	resp, body := doGetResponse(t, tester, host, path)
+	return resp.StatusCode, body
+}
+
+// doGetResponse is doGet for a test that asserts on transport details. The body
+// is already drained and closed; read it from the returned string, not resp.Body.
+func doGetResponse(t *testing.T, tester *caddytest.Tester, host, path string) (*http.Response, string) {
+	t.Helper()
 	url := fmt.Sprintf("http://localhost:%d%s", caddyHTTPPort, path)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -128,7 +137,7 @@ func doGet(t *testing.T, tester *caddytest.Tester, host, path string) (int, stri
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	return resp.StatusCode, string(body)
+	return resp, string(body)
 }
 
 // assertBodyContains checks substring inclusion so tests survive formatter
@@ -295,5 +304,98 @@ func TestIntegration_MissingSite404(t *testing.T) {
 	status, _ := doGet(t, tester, "dead."+rootDomain, "/")
 	if status != http.StatusNotFound {
 		t.Fatalf("status: want 404, got %d", status)
+	}
+}
+
+// TestIntegration_HeadGetSizeSkewNeverLooksComplete covers an object changing
+// between the HeadObject and the GetObject. Sizing the response truthfully would
+// cost a body fetch on every HEAD, so the response is allowed to break — but it
+// must never look like a complete short body.
+//
+// The failure is a truncated 200, not an error status: caddy has already
+// committed the header when the mismatch surfaces, so status-code monitoring
+// sees a healthy 200 and only a body-length check catches it.
+//
+// Reachability: artemis refuses to delete or move a deploy under a live alias
+// (409 deploy_aliased, internal/handler/deploy_delete.go), and GC, reconcile,
+// restore and rollback are all likewise guarded or byte-identical. The one path
+// that can overwrite a served key is the deploy session's own repeatable upload
+// — the deploy JWT outlives finalize, so the uploader can PUT over a key that
+// finalize just aliased. That is a narrow race, and only an authorized session
+// can open it.
+func TestIntegration_HeadGetSizeSkewNeverLooksComplete(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+	stub.putSkewed(site+"/deploys/v1/skew.html", "SHORT-BODY", "text/html", 5000)
+
+	tester := startCaddy(t, stub.endpoint())
+
+	url := fmt.Sprintf("http://localhost:%d/skew.html", caddyHTTPPort)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Host = site
+
+	resp, err := tester.Client.Do(req)
+	if err != nil {
+		// Only a truncated body is an acceptable transport failure here. Any
+		// other error means the server never came up and the test proved nothing.
+		if !strings.Contains(err.Error(), "EOF") {
+			t.Fatalf("GET /skew.html failed for an unrelated reason: %v", err)
+		}
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return
+	}
+	if int64(len(body)) != resp.ContentLength {
+		t.Fatalf("silent short body: declared %d, delivered %d (%q)",
+			resp.ContentLength, len(body), body)
+	}
+}
+
+// TestIntegration_HeadDoesNotFetchTheBody pins the cost of a HEAD. Sizing the
+// response from a lazily-loaded body would make every HEAD pull the whole
+// object from R2 and discard it, which turns a cheap request into an origin
+// fetch bounded only by max_file_size.
+func TestIntegration_HeadDoesNotFetchTheBody(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+	doGet(t, tester, site, "/index.html")
+
+	before := len(stub.allOps())
+	req, err := http.NewRequest(http.MethodHead,
+		fmt.Sprintf("http://localhost:%d/index.html", caddyHTTPPort), nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Host = site
+
+	resp, err := tester.Client.Do(req)
+	if err != nil {
+		t.Fatalf("HEAD /index.html: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
+	}
+
+	for _, op := range stub.allOps()[before:] {
+		if strings.HasPrefix(op, "GET ") {
+			t.Fatalf("a HEAD must not fetch the body; ops were %v", stub.allOps()[before:])
+		}
 	}
 }
