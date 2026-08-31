@@ -89,7 +89,7 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 		return fmt.Errorf("caddy.fs.r2: endpoint is required")
 	}
 	if r.Region == "" {
-		r.Region = "auto"
+		r.Region = defaultRegion
 	}
 	if r.MaxFileSize <= 0 {
 		r.MaxFileSize = defaultMaxFileSize
@@ -398,6 +398,13 @@ func (f *r2File) body() (*bytes.Reader, error) {
 		if raw, err = f.load(); err != nil {
 			return nil, err
 		}
+	}
+	// A HeadObject size that disagrees with the GetObject body means the object
+	// changed between the two calls. ServeContent has already sent the HEAD size
+	// as Content-Length, so fail the read rather than silently under-deliver.
+	if f.load != nil && int64(len(raw)) != f.info.size {
+		return nil, fmt.Errorf("caddy.fs.r2: body %d bytes, HeadObject declared %d",
+			len(raw), f.info.size)
 	}
 	f.reader = bytes.NewReader(raw)
 	if _, err := f.reader.Seek(f.offset, io.SeekStart); err != nil {

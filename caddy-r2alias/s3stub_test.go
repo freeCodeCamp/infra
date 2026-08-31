@@ -15,6 +15,10 @@ type stubObject struct {
 	body        []byte
 	contentType string
 	modTime     time.Time
+	// headSize, when non-zero, is the Content-Length a HEAD reports. It lets a
+	// test reproduce an object replaced between the HeadObject and the
+	// GetObject, where the two sizes disagree.
+	headSize int64
 }
 
 type s3Stub struct {
@@ -38,12 +42,19 @@ func startS3Stub(t *testing.T) *s3Stub {
 func (s *s3Stub) endpoint() string { return s.server.URL }
 
 func (s *s3Stub) put(key, body, contentType string) {
+	s.putSkewed(key, body, contentType, 0)
+}
+
+// putSkewed stores an object whose HEAD reports headSize while its GET
+// delivers body.
+func (s *s3Stub) putSkewed(key, body, contentType string, headSize int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.objects[key] = stubObject{
 		body:        []byte(body),
 		contentType: contentType,
 		modTime:     time.Now().UTC().Truncate(time.Second),
+		headSize:    headSize,
 	}
 }
 
@@ -104,7 +115,11 @@ func (s *s3Stub) serve(w http.ResponseWriter, req *http.Request) {
 	if obj.contentType != "" {
 		w.Header().Set("Content-Type", obj.contentType)
 	}
-	w.Header().Set("Content-Length", strconv.Itoa(len(obj.body)))
+	size := int64(len(obj.body))
+	if req.Method == http.MethodHead && obj.headSize != 0 {
+		size = obj.headSize
+	}
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	w.Header().Set("Last-Modified", obj.modTime.Format(http.TimeFormat))
 	w.WriteHeader(http.StatusOK)
 	if req.Method != http.MethodHead {

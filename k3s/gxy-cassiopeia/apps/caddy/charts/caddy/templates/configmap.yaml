@@ -20,6 +20,11 @@ data:
         access_key_id     {$AWS_ACCESS_KEY_ID}
         secret_access_key {$AWS_SECRET_ACCESS_KEY}
         use_path_style
+        # Code defaults, not set here. Truth lives in the named constants in
+        # caddy-r2alias/filesystem.go.
+        #   max_file_size  100 MiB  defaultMaxFileSize
+        #     A larger object answers the visitor 400, not 413.
+        #   (no knob)      30s      opTimeout, bounds every S3 round trip
       }
     }
 
@@ -46,6 +51,12 @@ data:
         secret_access_key {$AWS_SECRET_ACCESS_KEY}
         cache_ttl         15s
         cache_max_entries 10000
+        # Code defaults, not set here. Truth lives in the named constants in
+        # caddy-r2alias/r2alias.go; grep them before trusting these numbers.
+        #   fetch_timeout    2s                      defaultFetchTimeout
+        #   deploy_id_regex  ^[A-Za-z0-9._-]{1,64}$  defaultDeployIDRegex
+        # These are comments, not directives. An image that predates a
+        # directive refuses to start and takes every site down.
         preview_subdomain "preview"
         root_domain       "freecode.camp"
       }

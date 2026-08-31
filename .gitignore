@@ -74,3 +74,6 @@ loadtest/results/
 
 # dossier: internal scratchpad theater tooling
 .scratchpad/
+
+# per-directory agent state (also covered by a personal global ignore)
+.claude/

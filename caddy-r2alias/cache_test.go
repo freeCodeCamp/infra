@@ -11,7 +11,7 @@ import (
 )
 
 func TestCache_HitAfterMiss(t *testing.T) {
-	c := newAliasCache(10, 1*time.Second)
+	c := newAliasCache(10, 1*time.Second, time.Minute)
 	var calls int32
 	fetch := func(_ context.Context, _ string) (aliasEntry, error) {
 		atomic.AddInt32(&calls, 1)
@@ -39,7 +39,7 @@ func TestCache_HitAfterMiss(t *testing.T) {
 }
 
 func TestCache_TTLExpiry(t *testing.T) {
-	c := newAliasCache(10, 50*time.Millisecond)
+	c := newAliasCache(10, 50*time.Millisecond, time.Minute)
 	var calls int32
 	fetch := func(_ context.Context, _ string) (aliasEntry, error) {
 		atomic.AddInt32(&calls, 1)
@@ -59,7 +59,7 @@ func TestCache_TTLExpiry(t *testing.T) {
 }
 
 func TestCache_LRUEvictionAtCapacity(t *testing.T) {
-	c := newAliasCache(3, 10*time.Second)
+	c := newAliasCache(3, 10*time.Second, time.Minute)
 	var mu sync.Mutex
 	fetchLog := []string{}
 
@@ -99,7 +99,7 @@ func TestCache_LRUEvictionAtCapacity(t *testing.T) {
 }
 
 func TestCache_MissingSentinelCached(t *testing.T) {
-	c := newAliasCache(10, 1*time.Second)
+	c := newAliasCache(10, 1*time.Second, time.Minute)
 	var calls int32
 	fetch := func(_ context.Context, _ string) (aliasEntry, error) {
 		atomic.AddInt32(&calls, 1)
@@ -128,7 +128,7 @@ func TestCache_MissingSentinelCached(t *testing.T) {
 
 func TestCache_Singleflight(t *testing.T) {
 	const concurrency = 1000
-	c := newAliasCache(10, 1*time.Second)
+	c := newAliasCache(10, 1*time.Second, time.Minute)
 
 	var calls int32
 	fetch := func(_ context.Context, _ string) (aliasEntry, error) {
@@ -157,7 +157,7 @@ func TestCache_Singleflight(t *testing.T) {
 
 // Sticky errors would amplify outages, so fetchFn errors are never cached.
 func TestCache_ErrorNotCached(t *testing.T) {
-	c := newAliasCache(10, 1*time.Second)
+	c := newAliasCache(10, 1*time.Second, time.Minute)
 	var calls int32
 	testErr := errors.New("transient r2 failure")
 
@@ -185,7 +185,7 @@ func TestCache_ErrorNotCached(t *testing.T) {
 }
 
 func TestCache_KeyComposition(t *testing.T) {
-	c := newAliasCache(10, 1*time.Second)
+	c := newAliasCache(10, 1*time.Second, time.Minute)
 	var mu sync.Mutex
 	seen := map[string]struct{}{}
 
@@ -217,5 +217,78 @@ func TestCache_KeyComposition(t *testing.T) {
 		if _, ok := seen[k]; !ok {
 			t.Errorf("missing expected key: %q", k)
 		}
+	}
+}
+
+func TestNewAliasCache_ClampsNonPositiveBounds(t *testing.T) {
+	c := newAliasCache(0, 0, time.Minute)
+
+	for i := 0; i < defaultCacheMaxEntries+1; i++ {
+		c.lru.Add(fmt.Sprintf("k%d", i), aliasEntry{DeployID: "d", Present: true})
+	}
+
+	if got := c.lru.Len(); got > defaultCacheMaxEntries {
+		t.Fatalf("a size-0 cache must clamp to %d entries, held %d", defaultCacheMaxEntries, got)
+	}
+}
+
+func TestCache_LeaderExitDoesNotFailWaiters(t *testing.T) {
+	c := newAliasCache(10, time.Minute, time.Minute)
+
+	release := make(chan struct{})
+	var started sync.WaitGroup
+	started.Add(1)
+	var once sync.Once
+	fetch := func(ctx context.Context, _ string) (aliasEntry, error) {
+		once.Do(started.Done)
+		select {
+		case <-release:
+			return aliasEntry{DeployID: "d1", Present: true}, nil
+		case <-ctx.Done():
+			return aliasEntry{}, ctx.Err()
+		}
+	}
+
+	leaderCtx, cancelLeader := context.WithCancel(context.Background())
+	leaderDone := make(chan error, 1)
+	go func() {
+		_, err := c.Resolve(leaderCtx, "b", "site-a", "production", fetch)
+		leaderDone <- err
+	}()
+
+	started.Wait()
+
+	const waiters = 5
+	results := make(chan error, waiters)
+	for i := 0; i < waiters; i++ {
+		go func() {
+			_, err := c.Resolve(context.Background(), "b", "site-a", "production", fetch)
+			results <- err
+		}()
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	cancelLeader()
+	<-leaderDone
+	close(release)
+
+	for i := 0; i < waiters; i++ {
+		select {
+		case err := <-results:
+			if err != nil {
+				t.Fatalf("waiter %d: the leader leaving must not fail it: %v", i, err)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatalf("waiter %d: never returned", i)
+		}
+	}
+}
+
+func TestCache_FetchTimeoutBoundsTheFlight(t *testing.T) {
+	c := newAliasCache(10, time.Minute, 30*time.Millisecond)
+
+	_, err := c.Resolve(context.Background(), "b", "site-a", "production", blockingFetcher)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("want context.DeadlineExceeded, got %v", err)
 	}
 }
