@@ -61,17 +61,49 @@ helm -n artemis list | grep hatchet
 # 2. jobs green
 kubectl -n artemis get jobs -l app.kubernetes.io/instance=hatchet
 
-# 3. engine up + ready (startupProbe budget 120s)
-kubectl -n artemis get pods -l app.kubernetes.io/component=engine
+# 3. BOTH engine replicas up, ready, and on DIFFERENT nodes.
+#    Two distinct nodes is the whole point of the required anti-affinity;
+#    a second Running pod on the same node means the affinity block did
+#    not render and the values file is lying to you.
+kubectl -n artemis get pods -l app.kubernetes.io/component=engine -o wide
+kubectl -n artemis get pods -l app.kubernetes.io/component=engine \
+  -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u | wc -l   # must be 2
 
-# 4. listening on 7077 (NOT 7070) + health
-kubectl -n artemis logs deploy/hatchet-engine | grep -i "grpc\|listen" | head
-kubectl -n artemis port-forward deploy/hatchet-engine 18733:8733 &
-curl -sf http://127.0.0.1:18733/live && curl -sf http://127.0.0.1:18733/ready
+# 4. listening on 7077 (NOT 7070) + health, on EVERY pod.
+#    `logs deploy/` and `port-forward deploy/` each pick ONE pod, so at
+#    two replicas they leave the other unchecked. Loop by pod name.
+for p in $(kubectl -n artemis get pods -l app.kubernetes.io/component=engine -o name); do
+  echo "== $p"
+  kubectl -n artemis logs "$p" | grep -i "grpc\|listen" | head -3
+  kubectl -n artemis port-forward "$p" 18733:8733 >/dev/null 2>&1 &
+  sleep 2; curl -sf http://127.0.0.1:18733/live && curl -sf http://127.0.0.1:18733/ready; echo
+  kill %1 2>/dev/null
+done
 
 # 5. token minted
 kubectl -n artemis get secret hatchet-client-config -o jsonpath='{.data.HATCHET_CLIENT_TOKEN}' | head -c 16
 ```
+
+### 6. The double-fire gate — run this the MORNING AFTER, not at release time
+
+Two replicas both run every service (`SERVER_SERVICES="all"`). Crons are held to one
+fire by `SKIP LOCKED` on the schedule row, and the controllers and scheduler by the tenant
+partitioner. If either mechanism fails, the nightly crons fire twice — and `tombstone-purge`
+performs destructive R2 deletes. Nothing at release time proves this; only a night does.
+
+Baseline measured 2026-08-31, before the two-replica change: a day with no deploys is **exactly
+two** runs, `tombstone-purge` at 03:00 UTC and `drift-detect` at 04:00 UTC, one fire each.
+
+```sh
+kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d hatchet -tAc \
+  "SELECT date_trunc('day', inserted_at)::date, count(*) FROM v1_runs_olap
+   WHERE inserted_at > now() - interval '2 days' GROUP BY 1 ORDER BY 1"
+```
+
+On a day with no deploys this must read `2`. A `4` means the crons double-fired: roll the engine
+back to one replica immediately (section E) and check the `tombstone-purge` audit rows in the
+`artemis` database for duplicate deletes before doing anything else. A count above 2 on a day that
+DID carry deploys is expected — event-driven `gc-site` runs add to it.
 
 ## D. Wire artemis (separate release)
 
@@ -84,5 +116,6 @@ kubectl -n artemis get secret hatchet-client-config -o jsonpath='{.data.HATCHET_
 ## E. Rollback
 
 - artemis side: unset `HATCHET_ADDR` → worker + relay gate off at next boot; deploys/registry unaffected (stage-1 posture).
-- engine side: `helm -n artemis uninstall hatchet` removes engine + netpols. Secrets `hatchet-config`/`hatchet-client-config` are cluster-side artifacts created by the jobs (not helm-owned) and survive uninstall — keep them unless keyset rotation is intended. The hook resources (bootstrap SA/Role/RoleBinding, `hatchet-env-secret`) also survive uninstall (helm never garbage-collects hooks) — delete manually for full teardown.
+- engine side, replica count only: `helm -n artemis upgrade hatchet <chart> --reuse-values --set engine.replicas=1` returns the single-replica posture without a teardown. Note this re-opens the ADR-022 §Prerequisite gate, so any destructive artemis write path depending on the engine is back to a single point of failure — tell the artemis owner.
+- engine side, full: `helm -n artemis uninstall hatchet` removes engine + netpols. Secrets `hatchet-config`/`hatchet-client-config` are cluster-side artifacts created by the jobs (not helm-owned) and survive uninstall — keep them unless keyset rotation is intended. The hook resources (bootstrap SA/Role/RoleBinding, `hatchet-env-secret`) also survive uninstall (helm never garbage-collects hooks) — delete manually for full teardown.
 - GC has been live in gxy-management since the SHIP7 cutover (`CLEANUP_DRY_RUN: "false"`, `CLEANUP_BLAST_CAP: "10"`, `values.production.yaml`) — the worker moves real bytes, capped at 10 tombstoned deploys per run. Rolling back (unset `HATCHET_ADDR`) stops new GC runs immediately but does not undo ones already completed; those stay recoverable under `_trash/` for `CLEANUP_RECOVERY_DAYS` (7d default) before the purge cron hard-deletes.
