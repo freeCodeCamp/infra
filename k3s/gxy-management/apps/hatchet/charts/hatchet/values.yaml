@@ -20,11 +20,21 @@ images:
   admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6
 
 engine:
-  # Two replicas: v0.88.6 claims each cron schedule with FOR UPDATE OF
-  # cronSchedule SKIP LOCKED gated on a 10s ticker heartbeat
-  # (pkg/repository/sqlcv1/ticker.sql:96-160), so replicas cannot
-  # double-fire a schedule. Interim posture until the platform
-  # re-platform (ADR-023) splits grpc/controllers/scheduler.
+  # Two replicas. TWO mechanisms make that safe, and the cron one alone
+  # is not enough — SERVER_SERVICES is "all", so both replicas run every
+  # service, not just the ticker.
+  #   1. Crons: v0.88.6 claims each schedule with FOR UPDATE OF
+  #      cronSchedule SKIP LOCKED gated on a heartbeat check
+  #      (pkg/repository/sqlcv1/ticker.sql:96-160, lock at :124), so a
+  #      schedule cannot double-fire.
+  #   2. Everything else — task, OLAP and retention controllers, and the
+  #      scheduler: the tenant partitioner. Each replica self-registers a
+  #      partition at boot and rebalanceAllControllerPartitions /
+  #      RebalanceAllSchedulerPartitions round-robin tenants across the
+  #      live partitions. runV1Config calls StartControllerPartition and
+  #      StartSchedulerPartition unconditionally; no flag enables it.
+  # Interim posture until the platform re-platform (ADR-023) splits
+  # grpc/controllers/scheduler.
   replicas: 2
   # Hard anti-affinity: without it both replicas can land on one node,
   # which buys eviction tolerance but not node tolerance — and the node
@@ -81,6 +91,8 @@ networkPolicy:
 
 # PDB at two replicas: minAvailable 1 permits one voluntary eviction,
 # so a node drain rolls rather than blocks; run state is in Postgres.
+# A drain landing DURING a rollout is the compound case; the deployment's
+# explicit maxSurge 0 / maxUnavailable 1 is what keeps that from wedging.
 pdb:
   enabled: true
   minAvailable: 1

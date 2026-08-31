@@ -10,6 +10,8 @@ metadata:
 spec:
   # At two replicas minAvailable 1 permits one voluntary eviction, so a
   # node drain rolls rather than blocks; run state is safe in Postgres.
+  # For a drain that lands during a rollout, see the strategy block in
+  # deployment.yaml — maxSurge 0 is what stops the two interacting.
   minAvailable: {{ .Values.pdb.minAvailable }}
   selector:
     matchLabels:
