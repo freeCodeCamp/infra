@@ -12,7 +12,7 @@ The `artemis` namespace holds three workloads with three different disruption po
 | --- | --- | --- | --- | --- | --- |
 | `artemis` (deploy proxy) | 3 | all three | `minAvailable: 2` | 1 | Drains cleanly, one node at a time |
 | `artemis-postgresql` | 1 | k3s-2 | `minAvailable: 1` | **0** | **Blocks indefinitely** |
-| `hatchet-engine` | 1 | k3s-2 | `minAvailable: 1` | **0** | **Blocks indefinitely** (since 2026-08-23) |
+| `hatchet-engine` | 2 | two of three | `minAvailable: 1` | 1 | Drains cleanly, one node at a time (since 2026-08-31) |
 
 Confirm the live numbers before trusting the table:
 
@@ -30,7 +30,7 @@ Pod placement is not pinned, so re-check which node holds Postgres and the engin
 
 **`artemis-postgresql`** — a single replica carrying both tenant databases (`artemis` and `hatchet`). Its PDB permits zero voluntary evictions, so the drain hangs rather than proceeding. This is deliberate: the alternative is an unscheduled control-plane outage. Serving is unaffected while it is down — `/readyz` returns `200 {"ready":true,"degraded":true}` and deploys still write to R2 — but GC, the index and the audit log stop. See [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md) for the rehearsed boundary.
 
-**`hatchet-engine`** — the durable-execution substrate. Its PDB permits zero voluntary evictions, so a drain hangs. Before 2026-08-23 it had no PDB and was evicted instantly. The impact of losing it is narrower than it looks:
+**`hatchet-engine`** — the durable-execution substrate. At two replicas with `minAvailable: 1` it permits one voluntary eviction, so a drain rolls rather than hangs. Required anti-affinity keeps the two pods on different nodes, so a single drain never takes both. Losing one replica is not an outage; the impact below applies only if both go, which needs two nodes down at once:
 
 - **Not affected:** deploy init, upload, finalize, promote, rollback, and serving. Those paths write to R2 and Postgres directly and never touch Hatchet.
 - **Affected:** the scheduled jobs — `tombstone-purge` (03:00 UTC), `drift-detect` (04:00 UTC), and the event-triggered `gc-site`.
@@ -39,13 +39,13 @@ Pod placement is not pinned, so re-check which node holds Postgres and the engin
 
 The engine keeps no local state; its run history lives in the `hatchet` database on `artemis-postgresql-0`, so eviction risks scheduling continuity, not data.
 
-## Closed gap — the hatchet PDB shipped 2026-08-23
+## History — one blocking workload remains
 
-`just release gxy-management hatchet` took the release to revision 2 and applied `hatchet-engine` at `minAvailable: 1`. **`just release gxy-management artemis` does not release the hatchet chart** — the two charts are separate releases in one namespace. That is why the template sat unapplied from 2026-06-06.
+**2026-08-23.** `just release gxy-management hatchet` took the release to revision 2 and applied `hatchet-engine` at `minAvailable: 1`. **`just release gxy-management artemis` does not release the hatchet chart** — the two charts are separate releases in one namespace. That is why the template sat unapplied from 2026-06-06. At one replica that PDB blocked a drain, which was the intended trade at the time: an outage the operator times beats one the scheduler picks.
 
-The engine now blocks a drain instead of being evicted without warning, which is the intended trade: an outage the operator times beats one the scheduler picks.
+**2026-08-31.** The engine went to two replicas with required anti-affinity, per ADR-022 §Prerequisite. That reverses the trade rather than refining it: the engine no longer blocks a drain and no longer needs the manual scale-to-zero step, because one replica always survives. `artemis-postgresql` is now the ONLY workload in this namespace that blocks a drain.
 
-Both blocking workloads presently sit on the same node, so today one node needs the manual step and two drain cleanly. Placement is not pinned. Re-check before every drain — if the engine and Postgres land on different nodes, two nodes need it.
+Placement is not pinned. Re-check before every drain.
 
 ## Procedure
 
@@ -58,14 +58,14 @@ Both blocking workloads presently sit on the same node, so today one node needs 
 3. Drain, do the maintenance, uncordon.
 4. Scale back to 1 and verify per [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md) — `postgres.connected` in the artemis logs, `/readyz` no longer `degraded`, and the outbox backlog draining.
 
-**Node holding `hatchet-engine`** — the drain will hang, as with Postgres. Scale the deployment to zero, drain, uncordon, then scale back to 1. Prefer a window outside 03:00–04:30 UTC so the nightly check-ins are not recorded as missed. Confirm the workers re-attach afterwards: the engine log reports `listing actions for workers` with a non-zero count.
+**Node holding one `hatchet-engine` replica** — no special handling since 2026-08-31; `minAvailable: 1` at two replicas permits the eviction and the drain completes. Do NOT scale to zero: that step belonged to the single-replica posture and now causes an outage the PDB was about to prevent. Two cautions remain. Required anti-affinity means the evicted pod cannot reschedule until a node with no engine pod is free, so it stays `Pending` while the drained node is cordoned — expected, not a fault. And prefer a window outside 03:00–04:30 UTC so the nightly check-ins are not recorded as missed. Confirm the workers re-attach afterwards: the engine log reports `listing actions for workers` with a non-zero count.
 
 ## Verify after any drain
 
 ```sh
 kubectl -n artemis get pods -o wide          # all Running, spread across the surviving nodes
-kubectl -n artemis get pdb                   # artemis disruptionsAllowed back to 1
-kubectl -n artemis get pods -o wide          # confirm which node now holds PG + engine
+kubectl -n artemis get pdb                   # artemis AND hatchet-engine disruptionsAllowed back to 1
+kubectl -n artemis get pods -o wide          # confirm PG's node, and that the two engine pods are on different nodes
 curl -sS https://uploads.freecode.camp/healthz
 ```
 

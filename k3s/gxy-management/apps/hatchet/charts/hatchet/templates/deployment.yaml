@@ -8,6 +8,16 @@ metadata:
     app.kubernetes.io/component: engine
 spec:
   replicas: {{ .Values.engine.replicas }}
+  # Required anti-affinity means a surge pod needs a node holding no
+  # engine pod. The k8s defaults at 2 replicas are maxSurge 1 and
+  # maxUnavailable 0, so a rollout would demand a third free node and
+  # stall for progressDeadlineSeconds when one is cordoned. Replace
+  # rather than surge: the engine is off the serving path.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       {{- include "hatchet.engineSelectorLabels" . | nindent 6 }}
@@ -24,6 +34,18 @@ spec:
                 matchLabels:
                   {{- include "hatchet.engineSelectorLabels" . | nindent 18 }}
               topologyKey: kubernetes.io/hostname
+      {{- else if eq .Values.engine.antiAffinity "preferred" }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "hatchet.engineSelectorLabels" . | nindent 20 }}
+                topologyKey: kubernetes.io/hostname
+      {{- else }}
+      {{- fail (printf "engine.antiAffinity must be \"required\" or \"preferred\", got %q" .Values.engine.antiAffinity) }}
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
