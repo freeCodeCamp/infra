@@ -76,6 +76,9 @@ data:
         @404 expression {err.status_code} == 404
         respond @404 "Not Found" 404
 
+        @400 expression {err.status_code} == 400
+        respond @400 "Bad Request" 400
+
         @503 expression {err.status_code} == 503
         respond @503 "Service Unavailable" 503
 
