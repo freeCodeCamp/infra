@@ -242,7 +242,6 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 					name:  path.Base(name),
 					isDir: true,
 				},
-				reader: bytes.NewReader(nil),
 			}, nil
 		}
 	}
@@ -267,7 +266,7 @@ func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 		}, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		return nil, &fs.PathError{Op: "stat", Path: name, Err: err}
+		return nil, fmt.Errorf("caddy.fs.r2: stat %s: %w", name, err)
 	}
 
 	if r.indexProbe != nil {
@@ -275,7 +274,7 @@ func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 		if probeErr != nil {
 			r.logger.Warn("r2 index probe failed",
 				zap.String("path", name), zap.Error(probeErr))
-			return nil, &fs.PathError{Op: "stat", Path: name, Err: probeErr}
+			return nil, fmt.Errorf("caddy.fs.r2: stat index probe %s: %w", name, probeErr)
 		}
 		if has {
 			return &r2FileInfo{name: path.Base(name), isDir: true}, nil
