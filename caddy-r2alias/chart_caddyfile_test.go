@@ -117,6 +117,12 @@ func TestChartCaddyfileCarriesTheTestedCachePolicy(t *testing.T) {
 		t.Errorf("the serving block must not send %q", errorCacheControl)
 	}
 
+	filesystem := blockAfter(t, body, "filesystem r2 r2 {")
+	if !strings.Contains(filesystem, "max_file_size     "+chartMaxFileSize) {
+		t.Errorf("the chart must cap max_file_size at %s bytes; one in-flight fetch buffers that much per request",
+			chartMaxFileSize)
+	}
+
 	errors := blockAfter(t, body, "handle_errors {")
 	if !strings.Contains(errors, `header Cache-Control "`+errorCacheControl+`"`) {
 		t.Errorf("handle_errors must send %q, the policy the integration tests prove", errorCacheControl)
