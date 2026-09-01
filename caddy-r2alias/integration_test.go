@@ -32,6 +32,11 @@ const (
 	caddyHTTPSPort = 9443
 )
 
+const (
+	documentCacheControl = "public, max-age=0, must-revalidate, s-maxage=86400"
+	errorCacheControl    = "no-store"
+)
+
 // The disk layout is independent of the S3 prefix so one fixture set can back
 // multiple site names.
 func uploadDeployFixtures(t *testing.T, stub *s3Stub, site, version string) {
@@ -82,26 +87,44 @@ func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 }
 
 :%d {
-	r2_alias {
-		bucket %s
-		endpoint %s
-		region us-east-1
-		access_key_id test
-		secret_access_key test
-		cache_ttl %s
-		fetch_timeout 2s
-		root_domain %s
+	handle {
+		header Cache-Control "%s"
+
+		r2_alias {
+			bucket %s
+			endpoint %s
+			region us-east-1
+			access_key_id test
+			secret_access_key test
+			cache_ttl %s
+			fetch_timeout 2s
+			root_domain %s
+		}
+		file_server {
+			fs r2
+		}
 	}
-	file_server {
-		fs r2
+
+	handle_errors {
+		header Cache-Control "%s"
+
+		@404 expression {err.status_code} == 404
+		respond @404 "Not Found" 404
+
+		@503 expression {err.status_code} == 503
+		respond @503 "Service Unavailable" 503
+
+		respond "Server Error" 500
 	}
 }
 `,
 		caddyAdminPort, caddyHTTPPort, caddyHTTPSPort,
 		testBucket, s3Endpoint,
 		caddyHTTPPort,
+		documentCacheControl,
 		testBucket, s3Endpoint,
 		cacheTTL, rootDomain,
+		errorCacheControl,
 	)
 	tester := caddytest.NewTester(t)
 	tester.InitServer(caddyfile, "caddyfile")
@@ -273,6 +296,37 @@ func TestIntegration_ServesIndexWithOneBodyFetch(t *testing.T) {
 	}
 }
 
+func TestIntegration_ServedObjectTellsTheBrowserToRevalidate(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	resp, _ := doGetResponse(t, tester, site, "/index.html")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != documentCacheControl {
+		t.Fatalf("Cache-Control: want %q, got %q", documentCacheControl, got)
+	}
+}
+
+func TestIntegration_ErrorResponseIsNeverStored(t *testing.T) {
+	stub := startS3Stub(t)
+	tester := startCaddy(t, stub.endpoint())
+
+	resp, _ := doGetResponse(t, tester, "dead."+rootDomain, "/")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status: want 404, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != errorCacheControl {
+		t.Fatalf("Cache-Control on a 404: want %q, got %q", errorCacheControl, got)
+	}
+}
+
 func TestIntegration_BareNotFoundAliasIs404(t *testing.T) {
 	stub := startS3Stub(t)
 	stub.setFailure(http.StatusNotFound)
@@ -297,6 +351,36 @@ func TestIntegration_UpstreamServerErrorIs503(t *testing.T) {
 	}
 }
 
+func TestIntegration_BodyFetchFailureNeverServes200(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+	stub.failGetForKeyOnly(site+"/deploys/v1/index.html", http.StatusInternalServerError)
+
+	tester := startCaddy(t, stub.endpoint())
+
+	url := fmt.Sprintf("http://localhost:%d/index.html", caddyHTTPPort)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Host = site
+
+	resp, err := tester.Client.Do(req)
+	if err != nil {
+		t.Fatalf("GET /index.html: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, readErr := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 500 {
+		t.Fatalf("r2 body fetch failed, caddy answered %d (delivered=%d readErr=%v); status monitoring cannot see the outage",
+			resp.StatusCode, len(body), readErr)
+	}
+}
+
 func TestIntegration_MissingSite404(t *testing.T) {
 	stub := startS3Stub(t)
 	tester := startCaddy(t, stub.endpoint())
@@ -307,23 +391,7 @@ func TestIntegration_MissingSite404(t *testing.T) {
 	}
 }
 
-// TestIntegration_HeadGetSizeSkewNeverLooksComplete covers an object changing
-// between the HeadObject and the GetObject. Sizing the response truthfully would
-// cost a body fetch on every HEAD, so the response is allowed to break — but it
-// must never look like a complete short body.
-//
-// The failure is a truncated 200, not an error status: caddy has already
-// committed the header when the mismatch surfaces, so status-code monitoring
-// sees a healthy 200 and only a body-length check catches it.
-//
-// Reachability: artemis refuses to delete or move a deploy under a live alias
-// (409 deploy_aliased, internal/handler/deploy_delete.go), and GC, reconcile,
-// restore and rollback are all likewise guarded or byte-identical. The one path
-// that can overwrite a served key is the deploy session's own repeatable upload
-// — the deploy JWT outlives finalize, so the uploader can PUT over a key that
-// finalize just aliased. That is a narrow race, and only an authorized session
-// can open it.
-func TestIntegration_HeadGetSizeSkewNeverLooksComplete(t *testing.T) {
+func TestIntegration_HeadGetSizeSkewServesTheTrueLength(t *testing.T) {
 	stub := startS3Stub(t)
 	site := "site-a." + rootDomain
 
@@ -333,39 +401,19 @@ func TestIntegration_HeadGetSizeSkewNeverLooksComplete(t *testing.T) {
 
 	tester := startCaddy(t, stub.endpoint())
 
-	url := fmt.Sprintf("http://localhost:%d/skew.html", caddyHTTPPort)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
+	resp, body := doGetResponse(t, tester, site, "/skew.html")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
 	}
-	req.Host = site
-
-	resp, err := tester.Client.Do(req)
-	if err != nil {
-		// Only a truncated body is an acceptable transport failure here. Any
-		// other error means the server never came up and the test proved nothing.
-		if !strings.Contains(err.Error(), "EOF") {
-			t.Fatalf("GET /skew.html failed for an unrelated reason: %v", err)
-		}
-		return
+	if body != "SHORT-BODY" {
+		t.Fatalf("body: want %q, got %q", "SHORT-BODY", body)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		return
-	}
-	if int64(len(body)) != resp.ContentLength {
-		t.Fatalf("silent short body: declared %d, delivered %d (%q)",
-			resp.ContentLength, len(body), body)
+	if resp.ContentLength != int64(len(body)) {
+		t.Fatalf("declared %d, delivered %d", resp.ContentLength, len(body))
 	}
 }
 
-// TestIntegration_HeadDoesNotFetchTheBody pins the cost of a HEAD. Sizing the
-// response from a lazily-loaded body would make every HEAD pull the whole
-// object from R2 and discard it, which turns a cheap request into an origin
-// fetch bounded only by max_file_size.
-func TestIntegration_HeadDoesNotFetchTheBody(t *testing.T) {
+func TestIntegration_HeadCostsOneBodyFetchAndSizesTruthfully(t *testing.T) {
 	stub := startS3Stub(t)
 	site := "site-a." + rootDomain
 
@@ -373,7 +421,7 @@ func TestIntegration_HeadDoesNotFetchTheBody(t *testing.T) {
 	stub.putAlias(site, "production", "v1")
 
 	tester := startCaddy(t, stub.endpoint())
-	doGet(t, tester, site, "/index.html")
+	_, want := doGet(t, tester, site, "/index.html")
 
 	before := len(stub.allOps())
 	req, err := http.NewRequest(http.MethodHead,
@@ -392,10 +440,17 @@ func TestIntegration_HeadDoesNotFetchTheBody(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status: want 200, got %d", resp.StatusCode)
 	}
+	if resp.ContentLength != int64(len(want)) {
+		t.Errorf("Content-Length: want the delivered %d, got %d", len(want), resp.ContentLength)
+	}
 
+	gets := 0
 	for _, op := range stub.allOps()[before:] {
-		if strings.HasPrefix(op, "GET ") {
-			t.Fatalf("a HEAD must not fetch the body; ops were %v", stub.allOps()[before:])
+		if strings.HasPrefix(op, http.MethodGet+" ") {
+			gets++
 		}
+	}
+	if gets != 1 {
+		t.Fatalf("body fetches for one HEAD: want 1, got %d (ops=%v)", gets, stub.allOps()[before:])
 	}
 }

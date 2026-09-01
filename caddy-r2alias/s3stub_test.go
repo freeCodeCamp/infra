@@ -28,12 +28,17 @@ type s3Stub struct {
 	mu         sync.RWMutex
 	objects    map[string]stubObject
 	failStatus int
+	failGet    map[string]int
 	requests   []string
 }
 
 func startS3Stub(t *testing.T) *s3Stub {
 	t.Helper()
-	s := &s3Stub{bucket: testBucket, objects: make(map[string]stubObject)}
+	s := &s3Stub{
+		bucket:  testBucket,
+		objects: make(map[string]stubObject),
+		failGet: make(map[string]int),
+	}
 	s.server = httptest.NewServer(http.HandlerFunc(s.serve))
 	t.Cleanup(s.server.Close)
 	return s
@@ -66,6 +71,12 @@ func (s *s3Stub) setFailure(status int) {
 	s.failStatus = status
 }
 
+func (s *s3Stub) failGetForKeyOnly(key string, status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failGet[key] = status
+}
+
 func (s *s3Stub) putAlias(site, aliasName, deployID string) {
 	s.put(site+"/"+aliasName, deployID, "text/plain")
 }
@@ -96,11 +107,16 @@ func (s *s3Stub) serve(w http.ResponseWriter, req *http.Request) {
 	s.mu.Lock()
 	s.requests = append(s.requests, req.Method+" "+key)
 	fail := s.failStatus
+	getFail := s.failGet[key]
 	obj, found := s.objects[key]
 	s.mu.Unlock()
 
 	if fail != 0 {
 		w.WriteHeader(fail)
+		return
+	}
+	if getFail != 0 && req.Method == http.MethodGet {
+		w.WriteHeader(getFail)
 		return
 	}
 	if !ok {

@@ -212,6 +212,38 @@ func TestR2FS_UnmarshalCaddyfile_FullBlock(t *testing.T) {
 	}
 }
 
+func TestR2FS_UnmarshalCaddyfile_MissingArgument(t *testing.T) {
+	t.Parallel()
+	for _, directive := range []string{
+		"bucket", "endpoint", "region", "access_key_id", "secret_access_key", "max_file_size",
+	} {
+		t.Run(directive, func(t *testing.T) {
+			t.Parallel()
+			d := caddyfile.NewTestDispenser("r2 {\n\t" + directive + "\n}")
+			if err := new(R2FS).UnmarshalCaddyfile(d); err == nil {
+				t.Fatalf("%s with no argument must not parse", directive)
+			}
+		})
+	}
+}
+
+func TestR2FS_UnmarshalCaddyfile_RejectsAnInlineArgument(t *testing.T) {
+	t.Parallel()
+	d := caddyfile.NewTestDispenser("r2 unexpected {\n\tbucket foo\n}")
+	if err := new(R2FS).UnmarshalCaddyfile(d); err == nil {
+		t.Fatal("r2 takes no inline argument")
+	}
+}
+
+func TestR2FS_UnmarshalCaddyfile_RejectsANonNumericMaxFileSize(t *testing.T) {
+	t.Parallel()
+	d := caddyfile.NewTestDispenser("r2 {\n\tmax_file_size lots\n}")
+	err := new(R2FS).UnmarshalCaddyfile(d)
+	if err == nil || !strings.Contains(err.Error(), "max_file_size") {
+		t.Fatalf("expected a max_file_size parse error, got %v", err)
+	}
+}
+
 func TestR2FS_UnmarshalCaddyfile_UnknownToken(t *testing.T) {
 	t.Parallel()
 	const input = `r2 {
@@ -327,20 +359,144 @@ func TestR2FS_Open_RejectsOversizeObject(t *testing.T) {
 	}
 }
 
-func TestR2FS_Open_LoadFailureSurfacesOnRead(t *testing.T) {
+func TestR2FS_Open_UpstreamErrorIsNotAPathError(t *testing.T) {
 	t.Parallel()
 	r := newTestR2FS()
-	r.header = stubFSFetcher(&r2Object{Size: 10}, nil)
-	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.header = stubFSFetcher(nil, errors.New("caddy.fs.r2: upstream 5xx: service unavailable"))
 
-	f, err := r.Open("site-a.test.camp/deploys/v1/vanished.html")
+	_, err := r.Open("site-a.test.camp/deploys/v1/index.html")
+	if err == nil {
+		t.Fatal("Open should fail on an upstream error")
+	}
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		t.Fatalf("caddy maps any *fs.PathError to 400 (staticfiles.go mapDirOpenError), got %T", err)
+	}
+	if errors.Is(err, fs.ErrInvalid) || errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("an upstream error must not read as invalid or missing, got %v", err)
+	}
+}
+
+func TestR2FS_Open_SeekSurfacesTheBodyFetchFailure(t *testing.T) {
+	t.Parallel()
+	fetchErr := errors.New("caddy.fs.r2: upstream 5xx: GetObject failed")
+	r := newTestR2FS()
+	r.header = stubFSFetcher(&r2Object{Size: 4096}, nil)
+	r.fetcher = stubFSFetcher(nil, fetchErr)
+
+	f, err := r.Open("site-a.test.camp/deploys/v1/index.html")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	if _, readErr := f.Read(make([]byte, 4)); !errors.Is(readErr, fs.ErrNotExist) {
-		t.Fatalf("read after the object vanished: want fs.ErrNotExist, got %v", readErr)
+	if _, seekErr := f.(io.Seeker).Seek(0, io.SeekEnd); !errors.Is(seekErr, fetchErr) {
+		t.Fatalf("Seek must surface the fetch failure before ServeContent commits the header, got %v", seekErr)
+	}
+}
+
+func TestR2FS_Open_ReadSurfacesTheBodyFetchFailure(t *testing.T) {
+	t.Parallel()
+	fetchErr := errors.New("caddy.fs.r2: upstream 5xx: GetObject failed")
+	r := newTestR2FS()
+	r.header = stubFSFetcher(&r2Object{Size: 4096}, nil)
+	r.fetcher = stubFSFetcher(nil, fetchErr)
+
+	f, err := r.Open("site-a.test.camp/deploys/v1/index.html")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if _, readErr := f.Read(make([]byte, 4)); !errors.Is(readErr, fetchErr) {
+		t.Fatalf("Read must surface the fetch failure, got %v", readErr)
+	}
+	if _, readErr := f.(io.ReaderAt).ReadAt(make([]byte, 4), 0); !errors.Is(readErr, fetchErr) {
+		t.Fatalf("ReadAt must surface the fetch failure, got %v", readErr)
+	}
+}
+
+func TestR2FS_Open_IndexProbeFailureIsNotAPathError(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.header = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(false, errors.New("caddy.fs.r2: upstream 5xx"))
+
+	_, err := r.Open("site-a.test.camp/deploys/v1")
+	if err == nil {
+		t.Fatal("a failed index probe must fail Open")
+	}
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		t.Fatalf("caddy maps any *fs.PathError to 400, got %T", err)
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("a failed probe must not read as a definite miss, got %v", err)
+	}
+}
+
+func TestR2FS_FileInfo_ModeAndSys(t *testing.T) {
+	t.Parallel()
+	file := &r2FileInfo{name: "index.html", size: 3}
+	if file.Mode() != 0o444 {
+		t.Errorf("file mode: want 0444, got %v", file.Mode())
+	}
+	if file.Sys() != nil {
+		t.Errorf("Sys should carry nothing, got %v", file.Sys())
+	}
+
+	dir := &r2FileInfo{name: "v1", isDir: true}
+	if dir.Mode()&fs.ModeDir == 0 {
+		t.Errorf("directory mode should include ModeDir, got %v", dir.Mode())
+	}
+}
+
+func TestR2FS_Stat_InvalidPath(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.header = func(context.Context, string) (*r2Object, error) {
+		t.Fatal("header should NOT be called on an invalid path")
+		return nil, nil
+	}
+
+	if _, err := r.Stat("/leading-slash"); !errors.Is(err, fs.ErrInvalid) {
+		t.Fatalf("error should wrap fs.ErrInvalid, got %v", err)
+	}
+}
+
+func TestR2FS_Stat_UpstreamErrorPropagates(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.header = stubFSFetcher(nil, errors.New("caddy.fs.r2: upstream 5xx"))
+
+	_, err := r.Stat("site-a.test.camp/deploys/v1/index.html")
+	if err == nil {
+		t.Fatal("Stat should propagate an upstream error")
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("an upstream error must not read as missing, got %v", err)
+	}
+}
+
+func TestR2FS_Stat_ProbeFailurePropagates(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.header = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(false, errors.New("caddy.fs.r2: upstream 5xx"))
+
+	if _, err := r.Stat("site-a.test.camp/deploys/v1"); err == nil {
+		t.Fatal("Stat should propagate a failed index probe")
+	}
+}
+
+func TestR2FS_Stat_NoIndexIsNotExist(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.header = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(false, nil)
+
+	if _, err := r.Stat("site-a.test.camp/deploys/v1/missing"); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("error should wrap fs.ErrNotExist, got %v", err)
 	}
 }
 
@@ -380,14 +536,12 @@ func TestR2FS_Stat_VirtualDirectory(t *testing.T) {
 	}
 }
 
-func TestR2FS_Open_SeekEndDoesNotFetchTheBody(t *testing.T) {
+func TestR2FS_Open_SeekSizeMatchesTheDeliveredBody(t *testing.T) {
+	t.Parallel()
+	body := []byte("SHORT-BODY")
 	r := newTestR2FS()
 	r.header = stubFSFetcher(&r2Object{Size: 5000}, nil)
-	fetched := false
-	r.fetcher = func(context.Context, string) (*r2Object, error) {
-		fetched = true
-		return &r2Object{Body: []byte("SHORT-BODY")}, nil
-	}
+	r.fetcher = stubFSFetcher(&r2Object{Body: body, Size: 5000}, nil)
 
 	f, err := r.Open("site-a.test.camp/deploys/v1/index.html")
 	if err != nil {
@@ -399,26 +553,59 @@ func TestR2FS_Open_SeekEndDoesNotFetchTheBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Seek: unexpected error: %v", err)
 	}
-	if size != 5000 {
-		t.Errorf("Seek(0, SeekEnd): want the HeadObject size 5000, got %d", size)
+	if size != int64(len(body)) {
+		t.Errorf("Seek(0, SeekEnd): want %d, got %d", len(body), size)
 	}
-	if fetched {
-		t.Error("sizing the response must not fetch the body")
+
+	if _, err := f.(io.Seeker).Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("Seek to start: %v", err)
+	}
+	got, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if string(got) != string(body) {
+		t.Errorf("body: want %q, got %q", body, got)
 	}
 }
 
-func TestR2FS_Open_SkewedBodyFailsTheRead(t *testing.T) {
+func TestR2FS_Open_ReadAtServesARange(t *testing.T) {
+	t.Parallel()
 	r := newTestR2FS()
-	r.header = stubFSFetcher(&r2Object{Size: 5000}, nil)
-	r.fetcher = stubFSFetcher(&r2Object{Body: []byte("SHORT-BODY")}, nil)
+	r.fetcher = stubFSFetcher(&r2Object{Body: []byte("abcdefghij")}, nil)
 
-	f, err := r.Open("site-a.test.camp/deploys/v1/index.html")
+	f, err := r.Open("alpha.txt")
 	if err != nil {
-		t.Fatalf("Open: unexpected error: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	if _, err := io.ReadAll(f); err == nil {
-		t.Fatal("a body shorter than the declared size must fail, not short-serve")
+	buf := make([]byte, 3)
+	if _, err := f.(io.ReaderAt).ReadAt(buf, 4); err != nil {
+		t.Fatalf("ReadAt: %v", err)
+	}
+	if string(buf) != "efg" {
+		t.Errorf("ReadAt(4): want %q, got %q", "efg", buf)
+	}
+}
+
+func TestR2FS_Open_VirtualDirectoryReadsEmpty(t *testing.T) {
+	t.Parallel()
+	r := newTestR2FS()
+	r.fetcher = stubFSFetcher(nil, fs.ErrNotExist)
+	r.indexProbe = stubIndexProbe(true, nil)
+
+	f, err := r.Open("site-a.test.camp/deploys/v1")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	got, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatalf("ReadAll on a virtual directory: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("a virtual directory must read empty, got %q", got)
 	}
 }

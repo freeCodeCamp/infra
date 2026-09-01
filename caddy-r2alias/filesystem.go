@@ -36,6 +36,8 @@ const opTimeout = 30 * time.Second
 // so one HeadObject against that key fully decides the directory question.
 const indexFile = "index.html"
 
+var errObjectTooLarge = errors.New("caddy.fs.r2: object exceeds max_file_size")
+
 // R2FS is a Caddy filesystem module (caddy.fs.r2) that serves objects from
 // an S3-compatible bucket.
 type R2FS struct {
@@ -222,7 +224,8 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 		}, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		r.logger.Error("r2 head failed", zap.String("path", name), zap.Error(err))
+		return nil, fmt.Errorf("caddy.fs.r2: open %s: %w", name, err)
 	}
 
 	if r.indexProbe != nil {
@@ -230,7 +233,7 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 		if probeErr != nil {
 			r.logger.Warn("r2 index probe failed",
 				zap.String("path", name), zap.Error(probeErr))
-			return nil, &fs.PathError{Op: "open", Path: name, Err: probeErr}
+			return nil, fmt.Errorf("caddy.fs.r2: index probe %s: %w", name, probeErr)
 		}
 		if has {
 			r.logger.Debug("r2 virtual directory", zap.String("path", name))
@@ -239,6 +242,7 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 					name:  path.Base(name),
 					isDir: true,
 				},
+				reader: bytes.NewReader(nil),
 			}, nil
 		}
 	}
@@ -327,13 +331,17 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 	defer func() { _ = out.Body.Close() }()
 
 	if out.ContentLength != nil && *out.ContentLength > r.MaxFileSize {
-		return nil, fmt.Errorf("caddy.fs.r2: object %s size %d exceeds max_file_size %d",
-			key, *out.ContentLength, r.MaxFileSize)
+		return nil, fmt.Errorf("%w: %s declares %d bytes, limit %d",
+			errObjectTooLarge, key, *out.ContentLength, r.MaxFileSize)
 	}
 
-	body, readErr := io.ReadAll(io.LimitReader(out.Body, r.MaxFileSize))
+	body, readErr := io.ReadAll(io.LimitReader(out.Body, r.MaxFileSize+1))
 	if readErr != nil {
 		return nil, fmt.Errorf("caddy.fs.r2: read body %s: %w", key, readErr)
+	}
+	if int64(len(body)) > r.MaxFileSize {
+		return nil, fmt.Errorf("%w: %s streamed past the %d byte limit",
+			errObjectTooLarge, key, r.MaxFileSize)
 	}
 
 	var modTime time.Time
@@ -385,7 +393,6 @@ type r2File struct {
 	info   *r2FileInfo
 	load   func() ([]byte, error)
 	reader *bytes.Reader
-	offset int64
 }
 
 func (f *r2File) body() (*bytes.Reader, error) {
@@ -399,17 +406,7 @@ func (f *r2File) body() (*bytes.Reader, error) {
 			return nil, err
 		}
 	}
-	// A HeadObject size that disagrees with the GetObject body means the object
-	// changed between the two calls. ServeContent has already sent the HEAD size
-	// as Content-Length, so fail the read rather than silently under-deliver.
-	if f.load != nil && int64(len(raw)) != f.info.size {
-		return nil, fmt.Errorf("caddy.fs.r2: body %d bytes, HeadObject declared %d",
-			len(raw), f.info.size)
-	}
 	f.reader = bytes.NewReader(raw)
-	if _, err := f.reader.Seek(f.offset, io.SeekStart); err != nil {
-		return nil, err
-	}
 	return f.reader, nil
 }
 
@@ -420,34 +417,15 @@ func (f *r2File) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	n, readErr := reader.Read(p)
-	f.offset += int64(n)
-	return n, readErr
+	return reader.Read(p)
 }
 
 func (f *r2File) Seek(offset int64, whence int) (int64, error) {
-	if f.reader != nil {
-		pos, err := f.reader.Seek(offset, whence)
-		f.offset = pos
-		return pos, err
+	reader, err := f.body()
+	if err != nil {
+		return 0, err
 	}
-
-	var abs int64
-	switch whence {
-	case io.SeekStart:
-		abs = offset
-	case io.SeekCurrent:
-		abs = f.offset + offset
-	case io.SeekEnd:
-		abs = f.info.size + offset
-	default:
-		return 0, fs.ErrInvalid
-	}
-	if abs < 0 {
-		return 0, fs.ErrInvalid
-	}
-	f.offset = abs
-	return abs, nil
+	return reader.Seek(offset, whence)
 }
 
 func (f *r2File) ReadAt(p []byte, off int64) (int, error) {
