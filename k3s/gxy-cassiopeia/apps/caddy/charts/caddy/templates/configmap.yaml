@@ -43,29 +43,36 @@ data:
         respond "ok" 200
       }
 
-      r2_alias {
-        bucket            {$R2_BUCKET}
-        endpoint          {$R2_ENDPOINT}
-        region            auto
-        access_key_id     {$AWS_ACCESS_KEY_ID}
-        secret_access_key {$AWS_SECRET_ACCESS_KEY}
-        cache_ttl         15s
-        cache_max_entries 10000
-        # Code defaults, not set here. Truth lives in the named constants in
-        # caddy-r2alias/r2alias.go; grep them before trusting these numbers.
-        #   fetch_timeout    2s                      defaultFetchTimeout
-        #   deploy_id_regex  ^[A-Za-z0-9._-]{1,64}$  defaultDeployIDRegex
-        # These are comments, not directives. An image that predates a
-        # directive refuses to start and takes every site down.
-        preview_subdomain "preview"
-        root_domain       "freecode.camp"
-      }
+      handle {
+        # https://developers.cloudflare.com/cache/how-to/edge-browser-cache-ttl/
+        header Cache-Control "public, max-age=0, must-revalidate, s-maxage=86400"
 
-      file_server {
-        fs r2
+        r2_alias {
+          bucket            {$R2_BUCKET}
+          endpoint          {$R2_ENDPOINT}
+          region            auto
+          access_key_id     {$AWS_ACCESS_KEY_ID}
+          secret_access_key {$AWS_SECRET_ACCESS_KEY}
+          cache_ttl         15s
+          cache_max_entries 10000
+          # Code defaults, not set here. Truth lives in the named constants in
+          # caddy-r2alias/r2alias.go; grep them before trusting these numbers.
+          #   fetch_timeout    2s                      defaultFetchTimeout
+          #   deploy_id_regex  ^[A-Za-z0-9._-]{1,64}$  defaultDeployIDRegex
+          # These are comments, not directives. An image that predates a
+          # directive refuses to start and takes every site down.
+          preview_subdomain "preview"
+          root_domain       "freecode.camp"
+        }
+
+        file_server {
+          fs r2
+        }
       }
 
       handle_errors {
+        header Cache-Control "no-store"
+
         @404 expression {err.status_code} == 404
         respond @404 "Not Found" 404
 
