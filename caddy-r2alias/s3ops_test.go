@@ -79,16 +79,18 @@ func TestGetObject_ServesTheBody(t *testing.T) {
 
 func TestGetObject_RejectsADeclaredOversizeObject(t *testing.T) {
 	t.Parallel()
-	oversize := strings.Repeat("x", int(testMaxFileSize)+1)
+	const withinLimit = "small"
 	r := newWiredR2FS(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Length", strconv.Itoa(len(oversize)))
+		w.Header().Set("Content-Length", strconv.FormatInt(testMaxFileSize+1, 10))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(oversize))
+		_, _ = w.Write([]byte(withinLimit))
+		w.(http.Flusher).Flush()
+		panic(http.ErrAbortHandler)
 	})
 
 	_, err := r.getObject(context.Background(), "site/big.bin")
 	if !errors.Is(err, errObjectTooLarge) {
-		t.Fatalf("want errObjectTooLarge, got %v", err)
+		t.Fatalf("the declared length alone must reject before any read, got %v", err)
 	}
 }
 

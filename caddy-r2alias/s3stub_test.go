@@ -29,6 +29,7 @@ type s3Stub struct {
 	objects    map[string]stubObject
 	failStatus int
 	failGet    map[string]int
+	failAll    map[string]int
 	requests   []string
 }
 
@@ -38,6 +39,7 @@ func startS3Stub(t *testing.T) *s3Stub {
 		bucket:  testBucket,
 		objects: make(map[string]stubObject),
 		failGet: make(map[string]int),
+		failAll: make(map[string]int),
 	}
 	s.server = httptest.NewServer(http.HandlerFunc(s.serve))
 	t.Cleanup(s.server.Close)
@@ -77,6 +79,12 @@ func (s *s3Stub) failGetForKeyOnly(key string, status int) {
 	s.failGet[key] = status
 }
 
+func (s *s3Stub) failEveryMethodForKeyOnly(key string, status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failAll[key] = status
+}
+
 func (s *s3Stub) putAlias(site, aliasName, deployID string) {
 	s.put(site+"/"+aliasName, deployID, "text/plain")
 }
@@ -108,11 +116,16 @@ func (s *s3Stub) serve(w http.ResponseWriter, req *http.Request) {
 	s.requests = append(s.requests, req.Method+" "+key)
 	fail := s.failStatus
 	getFail := s.failGet[key]
+	allFail := s.failAll[key]
 	obj, found := s.objects[key]
 	s.mu.Unlock()
 
 	if fail != 0 {
 		w.WriteHeader(fail)
+		return
+	}
+	if allFail != 0 {
+		w.WriteHeader(allFail)
 		return
 	}
 	if getFail != 0 && req.Method == http.MethodGet {

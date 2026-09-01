@@ -80,14 +80,48 @@ func TestChartCaddyfileAdaptsUnderThisModuleSet(t *testing.T) {
 	}
 }
 
+func blockAfter(t *testing.T, body, opener string) string {
+	t.Helper()
+
+	start := strings.Index(body, opener)
+	if start < 0 {
+		t.Fatalf("the chart Caddyfile has no %q block", opener)
+	}
+	rest := body[start+len(opener):]
+	depth := 1
+	for i, r := range rest {
+		switch r {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return rest[:i]
+			}
+		}
+	}
+	t.Fatalf("the %q block never closes", opener)
+	return ""
+}
+
 func TestChartCaddyfileCarriesTheTestedCachePolicy(t *testing.T) {
 	t.Parallel()
 
 	body := chartCaddyfile(t)
-	if !strings.Contains(body, documentCacheControl) {
-		t.Errorf("the chart must send %q, the policy the integration tests prove", documentCacheControl)
+
+	serving := blockAfter(t, body, "handle {")
+	if !strings.Contains(serving, `header Cache-Control "`+documentCacheControl+`"`) {
+		t.Errorf("the serving block must send %q, the policy the integration tests prove", documentCacheControl)
 	}
-	if !strings.Contains(body, errorCacheControl) {
-		t.Errorf("the chart must send %q on an error, the policy the integration tests prove", errorCacheControl)
+	if strings.Contains(serving, errorCacheControl) {
+		t.Errorf("the serving block must not send %q", errorCacheControl)
+	}
+
+	errors := blockAfter(t, body, "handle_errors {")
+	if !strings.Contains(errors, `header Cache-Control "`+errorCacheControl+`"`) {
+		t.Errorf("handle_errors must send %q, the policy the integration tests prove", errorCacheControl)
+	}
+	if strings.Contains(errors, documentCacheControl) {
+		t.Errorf("handle_errors must not send the serving policy %q", documentCacheControl)
 	}
 }

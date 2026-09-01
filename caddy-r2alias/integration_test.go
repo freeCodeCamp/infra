@@ -66,6 +66,15 @@ func uploadDeployFixtures(t *testing.T, stub *s3Stub, site, version string) {
 
 func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 	t.Helper()
+	return startCaddyWithMaxFileSize(t, s3Endpoint, 0)
+}
+
+func startCaddyWithMaxFileSize(t *testing.T, s3Endpoint string, maxFileSize int64) *caddytest.Tester {
+	t.Helper()
+	sizeDirective := ""
+	if maxFileSize > 0 {
+		sizeDirective = fmt.Sprintf("max_file_size %d", maxFileSize)
+	}
 	caddyfile := fmt.Sprintf(`
 {
 	admin localhost:%d
@@ -83,6 +92,7 @@ func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 		access_key_id test
 		secret_access_key test
 		use_path_style
+		%s
 	}
 }
 
@@ -111,6 +121,9 @@ func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 		@404 expression {err.status_code} == 404
 		respond @404 "Not Found" 404
 
+		@400 expression {err.status_code} == 400
+		respond @400 "Bad Request" 400
+
 		@503 expression {err.status_code} == 503
 		respond @503 "Service Unavailable" 503
 
@@ -119,7 +132,7 @@ func startCaddy(t *testing.T, s3Endpoint string) *caddytest.Tester {
 }
 `,
 		caddyAdminPort, caddyHTTPPort, caddyHTTPSPort,
-		testBucket, s3Endpoint,
+		testBucket, s3Endpoint, sizeDirective,
 		caddyHTTPPort,
 		documentCacheControl,
 		testBucket, s3Endpoint,
@@ -314,6 +327,28 @@ func TestIntegration_ServedObjectTellsTheBrowserToRevalidate(t *testing.T) {
 	}
 }
 
+func TestIntegration_OversizeObjectAnswers400(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+	stub.put(site+"/deploys/v1/big.html", strings.Repeat("x", 512), "text/html")
+
+	tester := startCaddyWithMaxFileSize(t, stub.endpoint(), 64)
+
+	resp, body := doGetResponse(t, tester, site, "/big.html")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d (body=%q)", resp.StatusCode, body)
+	}
+	if body != "Bad Request" {
+		t.Errorf("handle_errors should answer the oversize case, got %q", body)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != errorCacheControl {
+		t.Errorf("Cache-Control on a 400: want %q, got %q", errorCacheControl, got)
+	}
+}
+
 func TestIntegration_ErrorResponseIsNeverStored(t *testing.T) {
 	stub := startS3Stub(t)
 	tester := startCaddy(t, stub.endpoint())
@@ -375,9 +410,66 @@ func TestIntegration_BodyFetchFailureNeverServes200(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	body, readErr := io.ReadAll(resp.Body)
 
-	if resp.StatusCode < 500 {
+	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("r2 body fetch failed, caddy answered %d (delivered=%d readErr=%v); status monitoring cannot see the outage",
 			resp.StatusCode, len(body), readErr)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != "" {
+		t.Errorf("ServeContent writes this error itself, so handle_errors cannot set a header; got %q", got)
+	}
+	if strings.Contains(string(body), "Server Error") {
+		t.Errorf("handle_errors is unreachable on this path; body was %q", body)
+	}
+}
+
+func TestIntegration_HeadFailureReachesTheVisitorAs5xx(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+	stub.failEveryMethodForKeyOnly(site+"/deploys/v1/index.html", http.StatusInternalServerError)
+
+	tester := startCaddy(t, stub.endpoint())
+
+	resp, body := doGetResponse(t, tester, site, "/index.html")
+	if resp.StatusCode < 500 {
+		t.Fatalf("an R2 metadata failure must reach the visitor as 5xx, got %d (body=%q)", resp.StatusCode, body)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		t.Fatal("caddy's mapDirOpenError walk must not downgrade an outage to a 404")
+	}
+}
+
+func TestIntegration_HeadOnASkewedObjectSizesTruthfully(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+	stub.putSkewed(site+"/deploys/v1/skew.html", "SHORT-BODY", "text/html", 5000)
+
+	tester := startCaddy(t, stub.endpoint())
+
+	req, err := http.NewRequest(http.MethodHead,
+		fmt.Sprintf("http://localhost:%d/skew.html", caddyHTTPPort), nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Host = site
+
+	resp, err := tester.Client.Do(req)
+	if err != nil {
+		t.Fatalf("HEAD /skew.html: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
+	}
+	if resp.ContentLength != int64(len("SHORT-BODY")) {
+		t.Fatalf("Content-Length: want the true %d, got the HeadObject %d",
+			len("SHORT-BODY"), resp.ContentLength)
 	}
 }
 
