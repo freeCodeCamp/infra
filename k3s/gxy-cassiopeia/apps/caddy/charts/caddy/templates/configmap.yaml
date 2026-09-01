@@ -20,10 +20,9 @@ data:
         access_key_id     {$AWS_ACCESS_KEY_ID}
         secret_access_key {$AWS_SECRET_ACCESS_KEY}
         use_path_style
+        max_file_size     33554432
         # Code defaults, not set here. Truth lives in the named constants in
         # caddy-r2alias/filesystem.go.
-        #   max_file_size  100 MiB  defaultMaxFileSize
-        #     A larger object answers the visitor 400, not 413.
         #   (no knob)      30s      opTimeout, bounds every S3 round trip
       }
     }
@@ -45,7 +44,7 @@ data:
 
       handle {
         # https://developers.cloudflare.com/cache/how-to/edge-browser-cache-ttl/
-        header Cache-Control "public, max-age=0, must-revalidate, s-maxage=86400"
+        header Cache-Control "public, max-age=0, must-revalidate"
 
         r2_alias {
           bucket            {$R2_BUCKET}
