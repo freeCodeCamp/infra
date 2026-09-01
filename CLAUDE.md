@@ -6,8 +6,7 @@ Related repos:
 
 - `../infra-secrets` — sops+age vault. Hard-coded relative-path sibling (see "infra-secrets coupling" below).
 - `../artemis` — static-apps deploy proxy. Deployed via `docs/runbooks/02-deploy-artemis-service.md`.
-- `~/DEV/fCC-U/Architecture/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 19 ADRs at `decisions/0{01..19}-*.md` and the spike plan at `spike/spike-plan.md`.
-- `~/DEV/fCC-U/windmill/` — Windmill IaC (CLI sync repo for the gxy-management Windmill workspace).
+- `~/DEV/fCC-U/Architecture/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 22 ADRs at `decisions/0{01..22}-*.md` and the spike plan at `spike/spike-plan.md`.
 
 **Design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
@@ -100,11 +99,11 @@ Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Architecture
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
-| Galaxy           | Inventory Group      | Role                                                             |
-| ---------------- | -------------------- | ---------------------------------------------------------------- |
-| `gxy-management` | `gxy_management_k3s` | Control plane — Windmill + artemis (`uploads.freecode.camp`)     |
-| `gxy-launchbase` | `gxy_launchbase_k3s` | Standby (CNPG operator running) — woodpecker retired 2026-05-03  |
-| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2 |
+| Galaxy           | Inventory Group      | Role                                                                 |
+| ---------------- | -------------------- | -------------------------------------------------------------------- |
+| `gxy-management` | `gxy_management_k3s` | Control plane — artemis + Hatchet + Valkey (`uploads.freecode.camp`) |
+| `gxy-launchbase` | `gxy_launchbase_k3s` | Standby (CNPG operator running) — woodpecker retired 2026-05-03      |
+| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2     |
 
 Retired:
 
