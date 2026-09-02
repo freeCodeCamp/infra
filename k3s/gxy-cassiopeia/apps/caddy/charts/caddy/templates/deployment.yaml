@@ -42,6 +42,9 @@ spec:
             - name: metrics
               containerPort: {{ .Values.metrics.port }}
               protocol: TCP
+          env:
+            - name: GOMEMLIMIT
+              value: {{ .Values.goMemLimit | quote }}
           envFrom:
             - secretRef:
                 name: {{ .Release.Name }}-r2-credentials

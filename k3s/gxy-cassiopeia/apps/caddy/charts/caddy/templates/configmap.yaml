@@ -13,9 +13,7 @@ data:
 
       order r2_alias before file_server
 
-      servers {
-        metrics
-      }
+      metrics
 
       filesystem r2 r2 {
         bucket            {env.R2_BUCKET}
@@ -24,7 +22,8 @@ data:
         access_key_id     {env.AWS_ACCESS_KEY_ID}
         secret_access_key {env.AWS_SECRET_ACCESS_KEY}
         use_path_style
-        max_file_size     33554432
+        max_file_size        33554432
+        max_in_flight_bytes  100663296
         # Code defaults, not set here. Truth lives in the named constants in
         # caddy-r2alias/filesystem.go.
         #   (no knob)      30s      opTimeout, bounds every S3 round trip
@@ -41,7 +40,7 @@ data:
         format json
       }
 
-      @apex host freecode.camp www.freecode.camp
+      @apex host freecode.camp www.freecode.camp freecode.camp. www.freecode.camp.
       handle @apex {
         redir https://www.freecodecamp.org{uri} 302
       }

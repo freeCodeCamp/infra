@@ -130,9 +130,16 @@ func TestChartCaddyfileCarriesTheTestedCachePolicy(t *testing.T) {
 	}
 
 	filesystem := blockAfter(t, body, "filesystem r2 r2 {")
-	if !strings.Contains(filesystem, "max_file_size     "+chartMaxFileSize) {
+	if !strings.Contains(filesystem, "max_file_size        "+chartMaxFileSize) {
 		t.Errorf("the chart must cap max_file_size at %s bytes; one in-flight fetch buffers that much per request",
 			chartMaxFileSize)
+	}
+	if !strings.Contains(filesystem, "max_in_flight_bytes  "+chartMaxInFlightBytes) {
+		t.Errorf("the chart must cap max_in_flight_bytes at %s bytes so the budget fits the pod limit",
+			chartMaxInFlightBytes)
+	}
+	if strings.Contains(body, "servers {") {
+		t.Error("the nested servers/metrics option is deprecated on caddy 2.11.3; use the global metrics option")
 	}
 
 	errors := blockAfter(t, body, "handle_errors {")

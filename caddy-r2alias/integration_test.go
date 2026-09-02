@@ -33,10 +33,11 @@ const (
 )
 
 const (
-	documentCacheControl = "public, max-age=0, must-revalidate"
-	errorCacheControl    = "no-store"
-	chartMaxFileSize     = "33554432"
-	chartMetricsPort     = "9180"
+	documentCacheControl  = "public, max-age=0, must-revalidate"
+	errorCacheControl     = "no-store"
+	chartMaxFileSize      = "33554432"
+	chartMetricsPort      = "9180"
+	chartMaxInFlightBytes = "100663296"
 )
 
 // The disk layout is independent of the S3 prefix so one fixture set can back
