@@ -11,13 +11,12 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -38,31 +37,36 @@ const maxAliasBodyBytes = 1024
 
 const (
 	defaultCacheMaxEntries  = 10000
-	defaultCacheTTL         = 15 * time.Second
-	defaultFetchTimeout     = 2 * time.Second
+	defaultCacheTTL         = caddy.Duration(15 * time.Second)
+	defaultFetchTimeout     = caddy.Duration(2 * time.Second)
 	defaultRegion           = "auto"
 	defaultPreviewSubdomain = "preview"
 	defaultRootDomain       = "freecode.camp"
 	defaultDeployIDRegex    = `^[A-Za-z0-9._-]{1,64}$`
+	defaultRetryAfter       = "30"
 )
 
+const aliasRetryAttempts = 2
+
 type R2Alias struct {
-	Bucket           string        `json:"bucket"`
-	Endpoint         string        `json:"endpoint"`
-	Region           string        `json:"region"`
-	AccessKeyID      string        `json:"access_key_id,omitempty"`
-	SecretAccessKey  string        `json:"secret_access_key,omitempty"`
-	CacheTTL         time.Duration `json:"cache_ttl,omitempty"`
-	CacheMaxEntries  int           `json:"cache_max_entries,omitempty"`
-	PreviewSubdomain string        `json:"preview_subdomain,omitempty"`
-	RootDomain       string        `json:"root_domain,omitempty"`
-	DeployIDRegex    string        `json:"deploy_id_regex,omitempty"`
+	Bucket           string         `json:"bucket"`
+	Endpoint         string         `json:"endpoint"`
+	Region           string         `json:"region"`
+	AccessKeyID      string         `json:"access_key_id,omitempty"`
+	SecretAccessKey  string         `json:"secret_access_key,omitempty"`
+	CacheTTL         caddy.Duration `json:"cache_ttl,omitempty"`
+	CacheMaxEntries  int            `json:"cache_max_entries,omitempty"`
+	PreviewSubdomain string         `json:"preview_subdomain,omitempty"`
+	RootDomain       string         `json:"root_domain,omitempty"`
+	DeployIDRegex    string         `json:"deploy_id_regex,omitempty"`
 	// FetchTimeout is read once, by Provision, when it builds the cache. Setting
 	// it on a live handler does nothing; rebuild the cache to change it.
-	FetchTimeout time.Duration `json:"fetch_timeout,omitempty"`
+	FetchTimeout caddy.Duration `json:"fetch_timeout,omitempty"`
 
 	client     *s3.Client
+	clientKey  string
 	cache      *aliasCache
+	cacheKey   string
 	logger     *zap.Logger
 	deployIDRe *regexp.Regexp
 
@@ -81,6 +85,7 @@ type aliasEntry struct {
 func init() {
 	caddy.RegisterModule(R2Alias{})
 	httpcaddyfile.RegisterHandlerDirective("r2_alias", parseCaddyfile)
+	httpcaddyfile.RegisterDirectiveOrder("r2_alias", httpcaddyfile.Before, "file_server")
 }
 
 func (R2Alias) CaddyModule() caddy.ModuleInfo {
@@ -119,27 +124,62 @@ func (r *R2Alias) applyDefaults() {
 
 func (r *R2Alias) Provision(ctx caddy.Context) error {
 	r.applyDefaults()
+	r.logger = ctx.Logger()
+	if err := initMetrics(ctx.GetMetricsRegistry()); err != nil {
+		return fmt.Errorf("r2_alias: %w", err)
+	}
 
-	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(r.Region),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			r.AccessKeyID, r.SecretAccessKey, "",
-		)),
-	)
+	if err := resolvePlaceholders(map[string]*string{
+		"bucket":            &r.Bucket,
+		"endpoint":          &r.Endpoint,
+		"region":            &r.Region,
+		"access_key_id":     &r.AccessKeyID,
+		"secret_access_key": &r.SecretAccessKey,
+		"root_domain":       &r.RootDomain,
+		"preview_subdomain": &r.PreviewSubdomain,
+	}); err != nil {
+		return fmt.Errorf("r2_alias: %w", err)
+	}
+
+	fetchTimeout := time.Duration(r.FetchTimeout)
+	clientCfg := r2ClientConfig{
+		Bucket:          r.Bucket,
+		Endpoint:        r.Endpoint,
+		Region:          r.Region,
+		AccessKeyID:     r.AccessKeyID,
+		SecretAccessKey: r.SecretAccessKey,
+		UsePathStyle:    true,
+		MaxAttempts:     aliasRetryAttempts,
+		MaxBackoff:      fetchTimeout / 4,
+	}
+	client, clientKey, err := sharedS3Client(ctx, clientCfg, r.logger)
 	if err != nil {
 		return fmt.Errorf("r2_alias: load aws config: %w", err)
 	}
-	r.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(r.Endpoint)
-		o.UsePathStyle = true
-	})
+	r.client, r.clientKey = client, clientKey
 
-	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL, r.FetchTimeout)
-	r.logger = ctx.Logger()
+	r.cache, r.cacheKey = sharedAliasCache(
+		clientCfg, r.CacheMaxEntries, time.Duration(r.CacheTTL), fetchTimeout)
+
 	if r.fetcher == nil {
 		r.fetcher = r.fetchAlias
 	}
 	return nil
+}
+
+func (r *R2Alias) Cleanup() error {
+	var errs []error
+	if r.clientKey != "" {
+		if _, err := s3Clients.Delete(r.clientKey); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if r.cacheKey != "" {
+		if _, err := aliasCaches.Delete(r.cacheKey); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (r *R2Alias) Validate() error {
@@ -153,13 +193,13 @@ func (r *R2Alias) Validate() error {
 	r.applyDefaults()
 
 	if r.CacheTTL <= 0 {
-		return fmt.Errorf("r2_alias: cache_ttl must be > 0 (got %s)", r.CacheTTL)
+		return fmt.Errorf("r2_alias: cache_ttl must be > 0 (got %s)", time.Duration(r.CacheTTL))
 	}
 	if r.CacheMaxEntries <= 0 {
 		return fmt.Errorf("r2_alias: cache_max_entries must be > 0 (got %d)", r.CacheMaxEntries)
 	}
 	if r.FetchTimeout <= 0 {
-		return fmt.Errorf("r2_alias: fetch_timeout must be > 0 (got %s)", r.FetchTimeout)
+		return fmt.Errorf("r2_alias: fetch_timeout must be > 0 (got %s)", time.Duration(r.FetchTimeout))
 	}
 
 	re, err := regexp.Compile(r.DeployIDRegex)
@@ -202,8 +242,8 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 		// it answers 503 with Retry-After like any other upstream failure.
 		if errors.Is(resolveErr, errS3ServerError) ||
 			errors.Is(resolveErr, context.DeadlineExceeded) {
-			w.Header().Set("Retry-After", "30")
-			r.logger.Error("r2_alias upstream 5xx", fields...)
+			w.Header().Set("Retry-After", retryAfterFrom(resolveErr))
+			r.logger.Error("r2_alias upstream unavailable", fields...)
 			return caddyhttp.Error(http.StatusServiceUnavailable, resolveErr)
 		}
 		r.logger.Error("r2_alias resolve error", fields...)
@@ -226,6 +266,8 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 		return caddyhttp.Error(http.StatusNotFound, fmt.Errorf("r2_alias: deploy id rejected"))
 	}
 
+	w.Header().Set("Etag", strconv.Quote(entry.DeployID))
+
 	// Clean before the join: Caddy leaves req.URL.Path raw, and file_server's
 	// SanitizedPathJoin cleans too late to keep `..` inside the deploy prefix.
 	origPath := caddyhttp.CleanPath("/"+req.URL.Path, true)
@@ -233,6 +275,25 @@ func (r *R2Alias) ServeHTTP(w http.ResponseWriter, req *http.Request, next caddy
 	req.URL.RawPath = ""
 
 	return next.ServeHTTP(w, req)
+}
+
+func upstreamStatus(err error) (int, bool) {
+	var respErr *awshttp.ResponseError
+	if !errors.As(err, &respErr) {
+		return 0, false
+	}
+	code := respErr.HTTPStatusCode()
+	return code, code >= 500 || code == http.StatusTooManyRequests
+}
+
+func retryAfterFrom(err error) string {
+	var respErr *awshttp.ResponseError
+	if errors.As(err, &respErr) && respErr.Response != nil && respErr.Response.Response != nil {
+		if after := respErr.Response.Header.Get("Retry-After"); after != "" {
+			return after
+		}
+	}
+	return defaultRetryAfter
 }
 
 func (r *R2Alias) fetchAlias(ctx context.Context, cacheKey string) (aliasEntry, error) {
@@ -248,14 +309,16 @@ func (r *R2Alias) fetchAlias(ctx context.Context, cacheKey string) (aliasEntry, 
 	})
 	if err != nil {
 		if isNoSuchKey(err) {
+			recordOperation(opAlias, resultNotFound)
 			return aliasEntry{Present: false}, nil
 		}
-		var respErr *awshttp.ResponseError
-		if errors.As(err, &respErr) && respErr.HTTPStatusCode() >= 500 {
+		recordOperation(opAlias, resultError)
+		if _, upstream := upstreamStatus(err); upstream {
 			return aliasEntry{}, fmt.Errorf("%w: %w", errS3ServerError, err)
 		}
 		return aliasEntry{}, fmt.Errorf("r2_alias: s3 GetObject %s: %w", s3Key, err)
 	}
+	recordOperation(opAlias, resultOK)
 	defer func() { _ = out.Body.Close() }()
 
 	body, readErr := io.ReadAll(io.LimitReader(out.Body, maxAliasBodyBytes))
@@ -273,6 +336,7 @@ func (r *R2Alias) fetchAlias(ctx context.Context, cacheKey string) (aliasEntry, 
 var (
 	_ caddy.Provisioner           = (*R2Alias)(nil)
 	_ caddy.Validator             = (*R2Alias)(nil)
+	_ caddy.CleanerUpper          = (*R2Alias)(nil)
 	_ caddyfile.Unmarshaler       = (*R2Alias)(nil)
 	_ caddyhttp.MiddlewareHandler = (*R2Alias)(nil)
 )

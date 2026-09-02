@@ -12,13 +12,18 @@ image:
   tag: "dev"
   pullPolicy: IfNotPresent
 
+metrics:
+  port: 9180
+
+goMemLimit: 400MiB
+
 resources:
   requests:
     cpu: 50m
     memory: 64Mi
   limits:
     cpu: 500m
-    memory: 256Mi
+    memory: 512Mi
 
 podSecurityContext:
   runAsNonRoot: true

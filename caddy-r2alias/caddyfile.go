@@ -2,8 +2,8 @@ package r2alias
 
 import (
 	"strconv"
-	"time"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
@@ -70,20 +70,20 @@ func (r *R2Alias) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				if !d.NextArg() {
 					return d.ArgErr()
 				}
-				dur, err := time.ParseDuration(d.Val())
+				dur, err := caddy.ParseDuration(d.Val())
 				if err != nil {
 					return d.Errf("cache_ttl: %v", err)
 				}
-				r.CacheTTL = dur
+				r.CacheTTL = caddy.Duration(dur)
 			case "fetch_timeout":
 				if !d.NextArg() {
 					return d.ArgErr()
 				}
-				dur, err := time.ParseDuration(d.Val())
+				dur, err := caddy.ParseDuration(d.Val())
 				if err != nil {
 					return d.Errf("fetch_timeout: %v", err)
 				}
-				r.FetchTimeout = dur
+				r.FetchTimeout = caddy.Duration(dur)
 			case "cache_max_entries":
 				if !d.NextArg() {
 					return d.ArgErr()

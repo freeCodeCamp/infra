@@ -41,4 +41,10 @@ spec:
         - ports:
             - port: "80"
               protocol: TCP
+    - fromEntities:
+        - cluster
+      toPorts:
+        - ports:
+            - port: "{{ .Values.metrics.port }}"
+              protocol: TCP
 {{- end }}

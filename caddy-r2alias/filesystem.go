@@ -13,19 +13,28 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"go.uber.org/zap"
+	"golang.org/x/sync/semaphore"
 )
 
 // defaultMaxFileSize caps the in-memory buffer for any single object.
 // Larger objects return fs.ErrInvalid from Open — ship them out of band
 // rather than streaming through a static-serving cluster.
 const defaultMaxFileSize int64 = 100 * 1024 * 1024
+
+const defaultMaxInFlightBytes int64 = 256 * 1024 * 1024
+
+const objectRetryAttempts = 2
+
+const objectRetryMaxBackoff = 500 * time.Millisecond
+
+const budgetGrowWait = 250 * time.Millisecond
+
+const maxConcurrentGrowWaits = 4
 
 // opTimeout bounds every S3 round-trip from Open. fs.FS has no context
 // parameter, so the ceiling is enforced here rather than by the caller.
@@ -36,19 +45,25 @@ const opTimeout = 30 * time.Second
 // so one HeadObject against that key fully decides the directory question.
 const indexFile = "index.html"
 
+var errObjectTooLarge = errors.New("caddy.fs.r2: object exceeds max_file_size")
+
 // R2FS is a Caddy filesystem module (caddy.fs.r2) that serves objects from
 // an S3-compatible bucket.
 type R2FS struct {
-	Bucket          string `json:"bucket"`
-	Endpoint        string `json:"endpoint"`
-	Region          string `json:"region"`
-	AccessKeyID     string `json:"access_key_id,omitempty"`
-	SecretAccessKey string `json:"secret_access_key,omitempty"`
-	UsePathStyle    bool   `json:"use_path_style,omitempty"`
-	MaxFileSize     int64  `json:"max_file_size,omitempty"`
+	Bucket           string `json:"bucket"`
+	Endpoint         string `json:"endpoint"`
+	Region           string `json:"region"`
+	AccessKeyID      string `json:"access_key_id,omitempty"`
+	SecretAccessKey  string `json:"secret_access_key,omitempty"`
+	UsePathStyle     *bool  `json:"use_path_style,omitempty"`
+	MaxFileSize      int64  `json:"max_file_size,omitempty"`
+	MaxInFlightBytes int64  `json:"max_in_flight_bytes,omitempty"`
 
-	client *s3.Client
-	logger *zap.Logger
+	client    *s3.Client
+	clientKey string
+	budget    *semaphore.Weighted
+	growWaits *semaphore.Weighted
+	logger    *zap.Logger
 
 	// fetcher is the GetObject path. Provision wires it to r.getObject;
 	// tests swap in a stub so Open/Stat run without an S3 client.
@@ -81,35 +96,56 @@ func (R2FS) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-func (r *R2FS) Provision(ctx caddy.Context) error {
-	if r.Bucket == "" {
-		return fmt.Errorf("caddy.fs.r2: bucket is required")
-	}
-	if r.Endpoint == "" {
-		return fmt.Errorf("caddy.fs.r2: endpoint is required")
-	}
+func (r *R2FS) applyDefaults() {
 	if r.Region == "" {
 		r.Region = defaultRegion
+	}
+	if r.UsePathStyle == nil {
+		pathStyle := true
+		r.UsePathStyle = &pathStyle
 	}
 	if r.MaxFileSize <= 0 {
 		r.MaxFileSize = defaultMaxFileSize
 	}
+	if r.MaxInFlightBytes <= 0 {
+		r.MaxInFlightBytes = defaultMaxInFlightBytes
+	}
+}
 
-	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(r.Region),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			r.AccessKeyID, r.SecretAccessKey, "",
-		)),
-	)
+func (r *R2FS) Provision(ctx caddy.Context) error {
+	r.applyDefaults()
+	r.logger = ctx.Logger()
+	if err := initMetrics(ctx.GetMetricsRegistry()); err != nil {
+		return fmt.Errorf("caddy.fs.r2: %w", err)
+	}
+
+	if err := resolvePlaceholders(map[string]*string{
+		"bucket":            &r.Bucket,
+		"endpoint":          &r.Endpoint,
+		"region":            &r.Region,
+		"access_key_id":     &r.AccessKeyID,
+		"secret_access_key": &r.SecretAccessKey,
+	}); err != nil {
+		return fmt.Errorf("caddy.fs.r2: %w", err)
+	}
+
+	client, clientKey, err := sharedS3Client(ctx, r2ClientConfig{
+		Bucket:          r.Bucket,
+		Endpoint:        r.Endpoint,
+		Region:          r.Region,
+		AccessKeyID:     r.AccessKeyID,
+		SecretAccessKey: r.SecretAccessKey,
+		UsePathStyle:    *r.UsePathStyle,
+		MaxAttempts:     objectRetryAttempts,
+		MaxBackoff:      objectRetryMaxBackoff,
+	}, r.logger)
 	if err != nil {
 		return fmt.Errorf("caddy.fs.r2: load aws config: %w", err)
 	}
-	r.client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(r.Endpoint)
-		// R2 requires path-style; bucket-in-hostname would break the target.
-		o.UsePathStyle = true
-	})
-	r.logger = ctx.Logger()
+	r.client, r.clientKey = client, clientKey
+	r.budget = semaphore.NewWeighted(r.MaxInFlightBytes)
+	r.growWaits = semaphore.NewWeighted(maxConcurrentGrowWaits)
+
 	if r.fetcher == nil {
 		r.fetcher = r.getObject
 	}
@@ -120,6 +156,29 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 		r.indexProbe = r.hasIndex
 	}
 	return nil
+}
+
+func (r *R2FS) Validate() error {
+	if r.Bucket == "" {
+		return fmt.Errorf("caddy.fs.r2: bucket is required")
+	}
+	if r.Endpoint == "" {
+		return fmt.Errorf("caddy.fs.r2: endpoint is required")
+	}
+	r.applyDefaults()
+	if r.MaxInFlightBytes < r.MaxFileSize {
+		return fmt.Errorf("caddy.fs.r2: max_in_flight_bytes %d is below max_file_size %d",
+			r.MaxInFlightBytes, r.MaxFileSize)
+	}
+	return nil
+}
+
+func (r *R2FS) Cleanup() error {
+	if r.clientKey == "" {
+		return nil
+	}
+	_, err := s3Clients.Delete(r.clientKey)
+	return err
 }
 
 // UnmarshalCaddyfile parses:
@@ -166,7 +225,15 @@ func (r *R2FS) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				r.SecretAccessKey = d.Val()
 			case "use_path_style":
-				r.UsePathStyle = true
+				pathStyle := true
+				if d.NextArg() {
+					parsed, err := strconv.ParseBool(d.Val())
+					if err != nil {
+						return d.Errf("use_path_style: %v", err)
+					}
+					pathStyle = parsed
+				}
+				r.UsePathStyle = &pathStyle
 			case "max_file_size":
 				if !d.NextArg() {
 					return d.ArgErr()
@@ -176,6 +243,15 @@ func (r *R2FS) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("max_file_size: %v", err)
 				}
 				r.MaxFileSize = n
+			case "max_in_flight_bytes":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				n, err := strconv.ParseInt(d.Val(), 10, 64)
+				if err != nil {
+					return d.Errf("max_in_flight_bytes: %v", err)
+				}
+				r.MaxInFlightBytes = n
 			default:
 				return d.Errf("unknown caddy.fs.r2 sub-directive: %s", d.Val())
 			}
@@ -202,27 +278,51 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 				zap.String("path", name), zap.Int64("size", head.Size))
 			return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 		}
-		return &r2File{
+		file := &r2File{
 			info: &r2FileInfo{
 				name:    path.Base(name),
 				size:    head.Size,
 				modTime: head.LastModified,
 			},
-			load: func() ([]byte, error) {
-				loadCtx, loadCancel := context.WithTimeout(context.Background(), opTimeout)
-				defer loadCancel()
-				obj, ferr := r.fetcher(loadCtx, name)
-				if ferr != nil {
-					r.logger.Error("r2 body fetch failed",
-						zap.String("path", name), zap.Error(ferr))
-					return nil, ferr
-				}
-				return obj.Body, nil
-			},
-		}, nil
+		}
+		file.load = func() ([]byte, error) {
+			loadCtx, loadCancel := context.WithTimeout(context.Background(), opTimeout)
+			defer loadCancel()
+
+			weight := head.Size
+			if weight < 1 {
+				weight = 1
+			}
+			if err := r.acquireBudget(loadCtx, weight); err != nil {
+				r.logger.Error("r2 in-flight budget exhausted",
+					zap.String("path", name), zap.Int64("bytes", weight), zap.Error(err))
+				return nil, err
+			}
+
+			obj, ferr := r.fetcher(loadCtx, name)
+			if ferr != nil {
+				r.releaseBudget(weight)
+				r.logger.Error("r2 body fetch failed",
+					zap.String("path", name), zap.Error(ferr))
+				return nil, ferr
+			}
+
+			held, ferr := r.reweighBudget(weight, int64(len(obj.Body)))
+			if ferr != nil {
+				r.logger.Error("r2 in-flight budget exhausted",
+					zap.String("path", name), zap.Int64("bytes", int64(len(obj.Body))), zap.Error(ferr))
+				return nil, ferr
+			}
+
+			addBufferedBytes(float64(held))
+			file.release = func() { r.releaseBudget(held); addBufferedBytes(-float64(held)) }
+			return obj.Body, nil
+		}
+		return file, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		r.logger.Error("r2 head failed", zap.String("path", name), zap.Error(err))
+		return nil, fmt.Errorf("caddy.fs.r2: open %s: %w", name, err)
 	}
 
 	if r.indexProbe != nil {
@@ -230,7 +330,7 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 		if probeErr != nil {
 			r.logger.Warn("r2 index probe failed",
 				zap.String("path", name), zap.Error(probeErr))
-			return nil, &fs.PathError{Op: "open", Path: name, Err: probeErr}
+			return nil, fmt.Errorf("caddy.fs.r2: index probe %s: %w", name, probeErr)
 		}
 		if has {
 			r.logger.Debug("r2 virtual directory", zap.String("path", name))
@@ -263,7 +363,7 @@ func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 		}, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		return nil, &fs.PathError{Op: "stat", Path: name, Err: err}
+		return nil, fmt.Errorf("caddy.fs.r2: stat %s: %w", name, err)
 	}
 
 	if r.indexProbe != nil {
@@ -271,7 +371,7 @@ func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 		if probeErr != nil {
 			r.logger.Warn("r2 index probe failed",
 				zap.String("path", name), zap.Error(probeErr))
-			return nil, &fs.PathError{Op: "stat", Path: name, Err: probeErr}
+			return nil, fmt.Errorf("caddy.fs.r2: stat index probe %s: %w", name, probeErr)
 		}
 		if has {
 			return &r2FileInfo{name: path.Base(name), isDir: true}, nil
@@ -287,14 +387,16 @@ func (r *R2FS) headObject(ctx context.Context, key string) (*r2Object, error) {
 	})
 	if err != nil {
 		if isNoSuchKey(err) {
+			recordOperation(opHead, resultNotFound)
 			return nil, fmt.Errorf("caddy.fs.r2: %w", fs.ErrNotExist)
 		}
-		var respErr *awshttp.ResponseError
-		if errors.As(err, &respErr) && respErr.HTTPStatusCode() >= 500 {
-			return nil, fmt.Errorf("caddy.fs.r2: upstream 5xx: %w", err)
+		recordOperation(opHead, resultError)
+		if code, upstream := upstreamStatus(err); upstream {
+			return nil, fmt.Errorf("caddy.fs.r2: upstream %d: %w", code, err)
 		}
 		return nil, fmt.Errorf("caddy.fs.r2: HeadObject %s: %w", key, err)
 	}
+	recordOperation(opHead, resultOK)
 
 	obj := &r2Object{}
 	if out.ContentLength != nil {
@@ -316,25 +418,34 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 	})
 	if err != nil {
 		if isNoSuchKey(err) {
+			recordOperation(opGet, resultNotFound)
 			return nil, fmt.Errorf("caddy.fs.r2: %w", fs.ErrNotExist)
 		}
-		var respErr *awshttp.ResponseError
-		if errors.As(err, &respErr) && respErr.HTTPStatusCode() >= 500 {
-			return nil, fmt.Errorf("caddy.fs.r2: upstream 5xx: %w", err)
+		recordOperation(opGet, resultError)
+		if code, upstream := upstreamStatus(err); upstream {
+			return nil, fmt.Errorf("caddy.fs.r2: upstream %d: %w", code, err)
 		}
 		return nil, fmt.Errorf("caddy.fs.r2: GetObject %s: %w", key, err)
 	}
 	defer func() { _ = out.Body.Close() }()
 
 	if out.ContentLength != nil && *out.ContentLength > r.MaxFileSize {
-		return nil, fmt.Errorf("caddy.fs.r2: object %s size %d exceeds max_file_size %d",
-			key, *out.ContentLength, r.MaxFileSize)
+		recordOperation(opGet, resultTooLarge)
+		return nil, fmt.Errorf("%w: %s declares %d bytes, limit %d",
+			errObjectTooLarge, key, *out.ContentLength, r.MaxFileSize)
 	}
 
-	body, readErr := io.ReadAll(io.LimitReader(out.Body, r.MaxFileSize))
+	body, readErr := io.ReadAll(io.LimitReader(out.Body, r.MaxFileSize+1))
 	if readErr != nil {
+		recordOperation(opGet, resultError)
 		return nil, fmt.Errorf("caddy.fs.r2: read body %s: %w", key, readErr)
 	}
+	if int64(len(body)) > r.MaxFileSize {
+		recordOperation(opGet, resultTooLarge)
+		return nil, fmt.Errorf("%w: %s streamed past the %d byte limit",
+			errObjectTooLarge, key, r.MaxFileSize)
+	}
+	recordOperation(opGet, resultOK)
 
 	var modTime time.Time
 	if out.LastModified != nil {
@@ -382,10 +493,10 @@ func isNoSuchKey(err error) bool {
 }
 
 type r2File struct {
-	info   *r2FileInfo
-	load   func() ([]byte, error)
-	reader *bytes.Reader
-	offset int64
+	info    *r2FileInfo
+	load    func() ([]byte, error)
+	release func()
+	reader  *bytes.Reader
 }
 
 func (f *r2File) body() (*bytes.Reader, error) {
@@ -399,17 +510,7 @@ func (f *r2File) body() (*bytes.Reader, error) {
 			return nil, err
 		}
 	}
-	// A HeadObject size that disagrees with the GetObject body means the object
-	// changed between the two calls. ServeContent has already sent the HEAD size
-	// as Content-Length, so fail the read rather than silently under-deliver.
-	if f.load != nil && int64(len(raw)) != f.info.size {
-		return nil, fmt.Errorf("caddy.fs.r2: body %d bytes, HeadObject declared %d",
-			len(raw), f.info.size)
-	}
 	f.reader = bytes.NewReader(raw)
-	if _, err := f.reader.Seek(f.offset, io.SeekStart); err != nil {
-		return nil, err
-	}
 	return f.reader, nil
 }
 
@@ -420,34 +521,15 @@ func (f *r2File) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	n, readErr := reader.Read(p)
-	f.offset += int64(n)
-	return n, readErr
+	return reader.Read(p)
 }
 
 func (f *r2File) Seek(offset int64, whence int) (int64, error) {
-	if f.reader != nil {
-		pos, err := f.reader.Seek(offset, whence)
-		f.offset = pos
-		return pos, err
+	reader, err := f.body()
+	if err != nil {
+		return 0, err
 	}
-
-	var abs int64
-	switch whence {
-	case io.SeekStart:
-		abs = offset
-	case io.SeekCurrent:
-		abs = f.offset + offset
-	case io.SeekEnd:
-		abs = f.info.size + offset
-	default:
-		return 0, fs.ErrInvalid
-	}
-	if abs < 0 {
-		return 0, fs.ErrInvalid
-	}
-	f.offset = abs
-	return abs, nil
+	return reader.Seek(offset, whence)
 }
 
 func (f *r2File) ReadAt(p []byte, off int64) (int, error) {
@@ -458,7 +540,65 @@ func (f *r2File) ReadAt(p []byte, off int64) (int, error) {
 	return reader.ReadAt(p, off)
 }
 
-func (f *r2File) Close() error { return nil }
+func (f *r2File) Close() error {
+	if f.release != nil {
+		f.release()
+		f.release = nil
+	}
+	return nil
+}
+
+func (r *R2FS) acquireBudget(ctx context.Context, weight int64) error {
+	if r.budget == nil {
+		return nil
+	}
+	if err := r.budget.Acquire(ctx, weight); err != nil {
+		return fmt.Errorf("caddy.fs.r2: in-flight budget exhausted: %w", err)
+	}
+	return nil
+}
+
+func (r *R2FS) reweighBudget(held, actual int64) (int64, error) {
+	if actual < 1 {
+		actual = 1
+	}
+	switch {
+	case actual == held:
+		return held, nil
+	case actual < held:
+		r.releaseBudget(held - actual)
+		return actual, nil
+	}
+	r.releaseBudget(held)
+	if r.budget == nil {
+		return actual, nil
+	}
+	if r.budget.TryAcquire(actual) {
+		return actual, nil
+	}
+
+	if r.growWaits != nil && !r.growWaits.TryAcquire(1) {
+		return 0, fmt.Errorf("caddy.fs.r2: too many bodies already waiting to be charged")
+	}
+	defer func() {
+		if r.growWaits != nil {
+			r.growWaits.Release(1)
+		}
+	}()
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), budgetGrowWait)
+	defer cancel()
+	if err := r.budget.Acquire(waitCtx, actual); err != nil {
+		return 0, fmt.Errorf("caddy.fs.r2: in-flight budget exhausted for %d delivered bytes", actual)
+	}
+	return actual, nil
+}
+
+func (r *R2FS) releaseBudget(weight int64) {
+	if r.budget != nil {
+		r.budget.Release(weight)
+	}
+}
 
 type r2FileInfo struct {
 	name    string

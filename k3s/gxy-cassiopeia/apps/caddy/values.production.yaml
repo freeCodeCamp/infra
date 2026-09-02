@@ -26,6 +26,8 @@ resources:
     cpu: 1000m
     memory: 512Mi
 
+goMemLimit: 400MiB
+
 r2:
   bucket: universe-static-apps-01
   # endpoint + accessKeyId + secretAccessKey come from the sops overlay
