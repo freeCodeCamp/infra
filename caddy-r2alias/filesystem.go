@@ -34,6 +34,8 @@ const objectRetryMaxBackoff = 500 * time.Millisecond
 
 const budgetGrowWait = 250 * time.Millisecond
 
+const maxConcurrentGrowWaits = 4
+
 // opTimeout bounds every S3 round-trip from Open. fs.FS has no context
 // parameter, so the ceiling is enforced here rather than by the caller.
 const opTimeout = 30 * time.Second
@@ -60,6 +62,7 @@ type R2FS struct {
 	client    *s3.Client
 	clientKey string
 	budget    *semaphore.Weighted
+	growWaits *semaphore.Weighted
 	logger    *zap.Logger
 
 	// fetcher is the GetObject path. Provision wires it to r.getObject;
@@ -141,6 +144,7 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 	}
 	r.client, r.clientKey = client, clientKey
 	r.budget = semaphore.NewWeighted(r.MaxInFlightBytes)
+	r.growWaits = semaphore.NewWeighted(maxConcurrentGrowWaits)
 
 	if r.fetcher == nil {
 		r.fetcher = r.getObject
@@ -569,6 +573,18 @@ func (r *R2FS) reweighBudget(held, actual int64) (int64, error) {
 	if r.budget == nil {
 		return actual, nil
 	}
+	if r.budget.TryAcquire(actual) {
+		return actual, nil
+	}
+
+	if r.growWaits != nil && !r.growWaits.TryAcquire(1) {
+		return 0, fmt.Errorf("caddy.fs.r2: too many bodies already waiting to be charged")
+	}
+	defer func() {
+		if r.growWaits != nil {
+			r.growWaits.Release(1)
+		}
+	}()
 
 	waitCtx, cancel := context.WithTimeout(context.Background(), budgetGrowWait)
 	defer cancel()

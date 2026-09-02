@@ -480,6 +480,41 @@ func TestR2FS_ReweighBudget_GrowWaitsForAQueueToDrain(t *testing.T) {
 	if elapsed >= budgetGrowWait {
 		t.Errorf("the grow must succeed as soon as the queue clears, took %s", elapsed)
 	}
+	if elapsed < 15*time.Millisecond {
+		t.Errorf("the grow returned before the queue could have cleared, so it never waited: %s", elapsed)
+	}
+}
+
+func TestR2FS_ReweighBudget_CapsConcurrentGrowWaits(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+	r.growWaits = semaphore.NewWeighted(1)
+
+	if err := r.acquireBudget(context.Background(), 64); err != nil {
+		t.Fatalf("fill the budget: %v", err)
+	}
+
+	waiting := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		close(waiting)
+		_, _ = r.reweighBudget(1, 32)
+		close(done)
+	}()
+	<-waiting
+
+	deadline := time.Now().Add(budgetGrowWait)
+	for time.Now().Before(deadline) {
+		if _, err := r.reweighBudget(1, 32); err != nil {
+			if !strings.Contains(err.Error(), "already waiting") {
+				continue
+			}
+			<-done
+			return
+		}
+		t.Fatal("the budget is full, so no grow can succeed")
+	}
+	t.Fatal("a second grow must be refused while the cap is taken, not queued behind it")
 }
 
 func TestR2FS_ReweighBudget_GrowReleasesBeforeItWaits(t *testing.T) {
@@ -542,7 +577,9 @@ func TestR2FS_ReweighBudget_GrowGivesUpItsChargeWhenRefused(t *testing.T) {
 	}
 
 	r.releaseBudget(56)
-	if err := r.acquireBudget(context.Background(), 64); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := r.acquireBudget(ctx, 64); err != nil {
 		t.Fatalf("a refused grow must leave its original charge released: %v", err)
 	}
 }
