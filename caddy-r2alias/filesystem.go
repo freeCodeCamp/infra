@@ -32,6 +32,8 @@ const objectRetryAttempts = 2
 
 const objectRetryMaxBackoff = 500 * time.Millisecond
 
+const budgetGrowWait = 250 * time.Millisecond
+
 // opTimeout bounds every S3 round-trip from Open. fs.FS has no context
 // parameter, so the ceiling is enforced here rather than by the caller.
 const opTimeout = 30 * time.Second
@@ -563,7 +565,13 @@ func (r *R2FS) reweighBudget(held, actual int64) (int64, error) {
 		r.releaseBudget(held - actual)
 		return actual, nil
 	}
-	if r.budget != nil && !r.budget.TryAcquire(actual-held) {
+	if r.budget == nil || r.budget.TryAcquire(actual-held) {
+		return actual, nil
+	}
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), budgetGrowWait)
+	defer cancel()
+	if err := r.budget.Acquire(waitCtx, actual-held); err != nil {
 		r.releaseBudget(held)
 		return 0, fmt.Errorf("caddy.fs.r2: in-flight budget exhausted for %d delivered bytes", actual)
 	}

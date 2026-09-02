@@ -106,6 +106,40 @@ func blockAfter(t *testing.T, body, opener string) string {
 	return ""
 }
 
+func indentOf(line string) int {
+	return len(line) - len(strings.TrimLeft(line, " "))
+}
+
+func limitsMemoryMiB(t *testing.T, path, raw string) int {
+	t.Helper()
+
+	lines := strings.Split(raw, "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "limits:" {
+			continue
+		}
+		for _, next := range lines[i+1:] {
+			if strings.TrimSpace(next) == "" {
+				continue
+			}
+			if indentOf(next) <= indentOf(line) {
+				break
+			}
+			value, ok := strings.CutPrefix(strings.TrimSpace(next), "memory:")
+			if !ok {
+				continue
+			}
+			mib, err := strconv.Atoi(strings.TrimSuffix(strings.TrimSpace(value), "Mi"))
+			if err != nil {
+				t.Fatalf("parse resources.limits.memory in %s: %v", path, err)
+			}
+			return mib
+		}
+	}
+	t.Fatalf("%s declares no resources.limits.memory", path)
+	return 0
+}
+
 func TestChartMemoryLimitsLeaveHeadroomForTheBudget(t *testing.T) {
 	t.Parallel()
 
@@ -133,15 +167,7 @@ func TestChartMemoryLimitsLeaveHeadroomForTheBudget(t *testing.T) {
 			t.Fatalf("read %s: %v", values, readErr)
 		}
 
-		limits := regexp.MustCompile(`(?m)^\s+limits:\n(?:\s+\w+:.*\n)*?\s+memory:\s*(\d+)Mi\s*$`).
-			FindStringSubmatch(string(raw))
-		if limits == nil {
-			t.Fatalf("%s declares no resources.limits.memory", values)
-		}
-		podMiB, convErr := strconv.Atoi(limits[1])
-		if convErr != nil {
-			t.Fatalf("parse memory limit in %s: %v", values, convErr)
-		}
+		podMiB := limitsMemoryMiB(t, values, string(raw))
 
 		soft := regexp.MustCompile(`(?m)^goMemLimit:\s*(\d+)MiB\s*$`).FindStringSubmatch(string(raw))
 		if soft == nil {

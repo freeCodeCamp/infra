@@ -448,15 +448,12 @@ func TestR2FS_ReweighBudget_ShrinkSucceedsWhileAWaiterIsQueued(t *testing.T) {
 		t.Fatalf("another request's charge: %v", err)
 	}
 
-	queued := make(chan struct{})
 	waiterCtx, cancelWaiter := context.WithCancel(context.Background())
 	defer cancelWaiter()
-	go func() {
-		close(queued)
-		_ = r.budget.Acquire(waiterCtx, 32)
-	}()
-	<-queued
-	time.Sleep(50 * time.Millisecond)
+	go func() { _ = r.budget.Acquire(waiterCtx, 32) }()
+	for r.budget.TryAcquire(1) {
+		r.budget.Release(1)
+	}
 
 	held, err := r.reweighBudget(8, 4)
 	if err != nil {
