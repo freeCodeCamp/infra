@@ -333,8 +333,6 @@ func TestCleanup_ReleasesPooledResources(t *testing.T) {
 }
 
 func TestR2FS_Provision_WiresBothLimiters(t *testing.T) {
-	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
-
 	r := &R2FS{Bucket: "b", Endpoint: "https://r2.example", MaxFileSize: 1024}
 	if err := r.Provision(caddy.Context{Context: context.Background()}); err != nil {
 		t.Fatalf("Provision: %v", err)
@@ -345,7 +343,7 @@ func TestR2FS_Provision_WiresBothLimiters(t *testing.T) {
 		t.Error("Provision must wire the in-flight byte budget")
 	}
 	if r.growWaits == nil {
-		t.Error("Provision must wire the grow-wait cap, or production runs unlimited")
+		t.Fatal("Provision must wire the grow-wait cap, or production runs unlimited")
 	}
 	if !r.growWaits.TryAcquire(maxConcurrentGrowWaits) {
 		t.Errorf("the grow-wait cap must start with %d free slots", maxConcurrentGrowWaits)
@@ -603,7 +601,7 @@ func TestR2FS_ReweighBudget_GrowGivesUpItsChargeWhenRefused(t *testing.T) {
 	}
 
 	if !r.growWaits.TryAcquire(maxConcurrentGrowWaits) {
-		t.Error("a refused grow must hand its wait slot back, or the cap erodes to nothing")
+		t.Fatal("a refused grow must hand its wait slot back, or the cap erodes to nothing")
 	}
 	r.growWaits.Release(maxConcurrentGrowWaits)
 
