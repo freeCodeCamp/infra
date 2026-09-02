@@ -35,7 +35,7 @@ var moduleMetrics = struct {
 	inFlight   prometheus.Gauge
 }{}
 
-func initMetrics(registry prometheus.Registerer) error {
+func initMetrics(registry *prometheus.Registry) error {
 	moduleMetrics.once.Do(func() {
 		moduleMetrics.operations = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricNamespace,
