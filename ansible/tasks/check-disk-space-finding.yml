@@ -1,0 +1,68 @@
+---
+# Pure. Turns one host's mount facts into a row per filesystem, a reasons
+# list and an anomaly flag. Touches no host, so play-test--5-check-disk-
+# space.yml drives it with stubs and the shipped artifact is what gets tested.
+#
+# In:   disk_mounts, disk_unmeasured, disk_threshold, inode_threshold,
+#       disk_fstypes
+# Out:  disk_rows, disk_reasons, disk_anomaly
+#
+# `used_pct` counts the root-reserved blocks as used, because statvfs f_bavail
+# is the only free figure ansible reports. It therefore reads a few points
+# above the `df -h` Use% an operator checks by hand -- an idle ext4 root with
+# the default 5% reserve shows about 5% used here, not 0%.
+#
+# `reasons` is the operator-facing part. It says what is full in words and
+# gigabytes, not in statvfs vocabulary, because it is what lands in a chat
+# message at 02:00.
+
+- name: Measure each filesystem
+  ansible.builtin.set_fact:
+    disk_rows: >-
+      {%- set rows = [] -%}
+      {%- for m in disk_mounts -%}
+        {%- set used_pct = (100 * (m.size_total - m.size_available) / m.size_total) | round(1) -%}
+        {%- set inode_total = m.inode_total | default(0) | int -%}
+        {%- set has_inodes = inode_total > 0 -%}
+        {%- set inodes_pct = ((100 * (inode_total - (m.inode_available | default(0) | int)) / inode_total) | round(1))
+                             if has_inodes else 'unknown' -%}
+        {%- set size_gb = (m.size_total / 1073741824) | round(1) -%}
+        {%- set free_gb = (m.size_available / 1073741824) | round(1) -%}
+        {%- set _ = rows.append({
+              'mount': m.mount,
+              'fstype': m.fstype,
+              'size_gb': size_gb,
+              'free_gb': free_gb,
+              'used_pct': used_pct,
+              'inodes_pct': inodes_pct,
+              'over': (used_pct >= (disk_threshold | float))
+                      or (has_inodes and inodes_pct >= (inode_threshold | float)),
+              'reason': m.mount ~ ' at ' ~ used_pct ~ '% used (' ~ free_gb ~ 'G free of '
+                        ~ size_gb ~ 'G)'
+                        ~ ((', inodes at ' ~ inodes_pct ~ '%') if has_inodes
+                           else ', inode facts not reported')}) -%}
+      {%- endfor -%}
+      {{ rows }}
+
+# Silence is not a pass. Fact gathering hands back an entry with no size keys
+# when statvfs fails on a dying disk or the per-mount worker times out, and a
+# filesystem nobody measured must read as a finding, not as a green tick.
+- name: State why this host is a finding
+  ansible.builtin.set_fact:
+    disk_reasons: >-
+      {%- set reasons = [] -%}
+      {%- if disk_rows | length == 0 and disk_unmeasured | length == 0 -%}
+        {%- set _ = reasons.append('no filesystem matched ' ~ (disk_fstypes | join(', '))
+                                   ~ ' -- this host is UNCHECKED, not healthy') -%}
+      {%- endif -%}
+      {%- for name in disk_unmeasured -%}
+        {%- set _ = reasons.append(name ~ ' reported no size -- UNCHECKED, not healthy') -%}
+      {%- endfor -%}
+      {%- for row in disk_rows if row.over -%}
+        {%- set _ = reasons.append(row.reason) -%}
+      {%- endfor -%}
+      {{ reasons }}
+
+- name: Flag whether this host is an anomaly
+  ansible.builtin.set_fact:
+    disk_anomaly: '{{ disk_reasons | length > 0 }}'

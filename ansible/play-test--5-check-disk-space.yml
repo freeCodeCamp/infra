@@ -1,0 +1,170 @@
+---
+# Unit test for the disk-space finding logic. Runs on localhost with stubbed
+# mount facts -- no host, no become, no mutation.
+#
+#   ansible-playbook --check play-test--5-check-disk-space.yml
+#
+# It exists because ansible--test.yml only runs `--syntax-check`, which does
+# not descend into a dynamic include_tasks. Without this, an off-by-one in the
+# percentage math would first execute against production hosts.
+#
+# COVERS tasks/check-disk-space-finding.yml by including the shipped artifact.
+# DOES NOT cover the mount selection in play-any--check-disk-space.yml -- the
+# mapping guard, the fstype whitelist and the dedupe by device all read
+# ansible_facts.mounts, which needs a Linux host. Do not paper over that with
+# an assert that re-types the rule here; that proves nothing about the copy
+# that ships.
+- name: Test the disk-space finding logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    disk_threshold: 80
+    inode_threshold: 80
+    disk_fstypes: ['ext4', 'xfs', 'btrfs']
+    disk_unmeasured: []
+    # 100 GiB root, 50 GiB free -- exactly half used.
+    mount_half_full:
+      mount: /
+      fstype: ext4
+      size_total: 107374182400
+      size_available: 53687091200
+      inode_total: 6553600
+      inode_available: 6291456
+    # 100 GiB root, 5 GiB free -- 95% used, past the threshold.
+    mount_nearly_full:
+      mount: /
+      fstype: ext4
+      size_total: 107374182400
+      size_available: 5368709120
+      inode_total: 6553600
+      inode_available: 6291456
+    # Room on disk, no inodes left. The failure a percentage-only check misses.
+    mount_out_of_inodes:
+      mount: /var/lib/rancher
+      fstype: ext4
+      size_total: 107374182400
+      size_available: 53687091200
+      inode_total: 6553600
+      inode_available: 131072
+    # Some filesystems report no inode totals at all.
+    mount_no_inode_facts:
+      mount: /srv
+      fstype: xfs
+      size_total: 107374182400
+      size_available: 53687091200
+  tasks:
+    - name: Roomy host
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts: ['{{ mount_half_full }}']
+
+    - name: Assert a roomy host is not an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (disk_anomaly | bool)
+          - disk_reasons == []
+          - disk_rows | length == 1
+          - disk_rows[0].used_pct == 50.0
+          - disk_rows[0].size_gb == 100.0
+          - disk_rows[0].free_gb == 50.0
+          - disk_rows[0].inodes_pct == 4.0
+        success_msg: 'A half-full disk reads clean at 50.0%'
+
+    # The case the whole play exists for: the disk fills up overnight.
+    - name: Nearly full host
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts: ['{{ mount_nearly_full }}']
+
+    - name: Assert a nearly full host is an anomaly
+      ansible.builtin.assert:
+        that:
+          - disk_anomaly | bool
+          - disk_rows[0].used_pct == 95.0
+          - disk_reasons | length == 1
+          - "'/ at 95.0% used' in disk_reasons[0]"
+          - "'5.0G free of 100.0G' in disk_reasons[0]"
+        success_msg: 'A 95% full disk is flagged and says so in gigabytes'
+
+    - name: Host out of inodes
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts: ['{{ mount_out_of_inodes }}']
+
+    - name: Assert exhausted inodes are an anomaly on their own
+      ansible.builtin.assert:
+        that:
+          - disk_anomaly | bool
+          - disk_rows[0].used_pct == 50.0
+          - disk_rows[0].inodes_pct == 98.0
+          - "'inodes at 98.0%' in disk_reasons[0]"
+        success_msg: 'Exhausted inodes are flagged on a half-empty disk'
+
+    # Dividing by a missing inode_total would raise and take the whole play
+    # down before a single host was graded. Reporting it as 0% would be worse
+    # still -- it states a measurement nobody took.
+    - name: Host reporting no inode facts
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts: ['{{ mount_no_inode_facts }}']
+
+    - name: Assert missing inode facts neither crash nor claim a number
+      ansible.builtin.assert:
+        that:
+          - not (disk_anomaly | bool)
+          - disk_rows[0].inodes_pct == 'unknown'
+          - "'inode facts not reported' in disk_rows[0].reason"
+          - "'inodes at' not in disk_rows[0].reason"
+        success_msg: 'A filesystem with no inode facts grades on size alone'
+
+    - name: Several filesystems, one of them bad
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts:
+          - '{{ mount_half_full }}'
+          - '{{ mount_out_of_inodes }}'
+          - '{{ mount_no_inode_facts }}'
+
+    - name: Assert only the bad filesystem is reported
+      ansible.builtin.assert:
+        that:
+          - disk_anomaly | bool
+          - disk_rows | length == 3
+          - disk_reasons | length == 1
+          - "'/var/lib/rancher' in disk_reasons[0]"
+        success_msg: 'One bad filesystem out of three reads as one reason'
+
+    # A dying disk answers the mtab read and refuses statvfs, so the play
+    # hands the mount over here with no row at all. Grading the survivors
+    # green would hide the one filesystem that is failing.
+    - name: Host with a filesystem that reported no size
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts: ['{{ mount_half_full }}']
+        disk_unmeasured: ['/var/lib/longhorn']
+
+    - name: Assert an unmeasured filesystem is an anomaly beside a healthy one
+      ansible.builtin.assert:
+        that:
+          - disk_anomaly | bool
+          - disk_rows | length == 1
+          - disk_reasons | length == 1
+          - "'/var/lib/longhorn reported no size' in disk_reasons[0]"
+          - "'UNCHECKED' in disk_reasons[0]"
+        success_msg: 'A filesystem that reported no size reads as UNCHECKED'
+
+    # A host whose facts came back empty must not read as healthy.
+    - name: Host with nothing measurable
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+      vars:
+        disk_mounts: []
+
+    - name: Assert an unmeasured host is an anomaly
+      ansible.builtin.assert:
+        that:
+          - disk_anomaly | bool
+          - disk_reasons | length == 1
+          - "'UNCHECKED' in disk_reasons[0]"
+        success_msg: 'A host with no measurable filesystem reads as UNCHECKED'

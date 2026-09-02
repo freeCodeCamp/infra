@@ -1,0 +1,89 @@
+---
+# How much room is left on these hosts, right now?
+#
+#   ansible-playbook -i inventory/linode.yml play-any--check-disk-space.yml \
+#     -e variable_host=prd_oldeworld_api
+#
+#   just bootstrap any--check-disk-space gxy_management_k3s
+#
+# Read-only. It measures, it never frees anything.
+#
+# Tune the grade with extra-vars. Use the JSON form for the fstype list:
+#
+#   -e '{"variable_disk_threshold": 90, "variable_disk_fstypes": ["ext4","zfs"]}'
+#
+# No serial on purpose. Every host is graded in one batch, so one full disk
+# turns the run red without cancelling the check on the rest.
+#
+# No become. statvfs needs no root.
+- name: Check disk space on virtual machines
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: true
+  become: false
+  vars:
+    disk_threshold: "{{ variable_disk_threshold | default(80) }}"
+    inode_threshold: "{{ variable_inode_threshold | default(80) }}"
+    # Ansible already drops tmpfs, devtmpfs, overlay, proc and cgroup2 -- it
+    # keeps only entries whose device looks like a path. What this whitelist
+    # excludes on top is squashfs, which every snap mounts permanently at
+    # 100% used, plus vfat, nfs and the fuse family.
+    disk_fstypes: '{{ variable_disk_fstypes | default(["ext4", "xfs", "btrfs"]) }}'
+  tasks:
+    # select('mapping') first. Fact gathering replaces a whole entry with the
+    # string 'N/A' when the worker raises, and every attribute filter below
+    # would blow up on that string.
+    #
+    # unique by device, not by mount. A k3s node bind-mounts the same
+    # filesystem under many kubelet subpaths, and each bind repeats the real
+    # capacity as another row and another reason.
+    - name: Select the filesystems worth grading
+      ansible.builtin.set_fact:
+        disk_candidates: >-
+          {{ ansible_facts.mounts | default([])
+             | select('mapping')
+             | selectattr('fstype', 'defined')
+             | selectattr('fstype', 'in', disk_fstypes)
+             | unique(attribute='device')
+             | list }}
+        disk_dropped_entries: >-
+          {{ ansible_facts.mounts | default([]) | reject('mapping') | list | length }}
+
+    # A mount with no size_total is one statvfs refused to answer for -- an
+    # EIO on a dying disk, or a worker that ran out of time. That is the exact
+    # host this play exists to catch, so it is carried forward as a finding
+    # rather than filtered into silence.
+    - name: Separate the filesystems that reported no size
+      ansible.builtin.set_fact:
+        disk_mounts: >-
+          {{ disk_candidates
+             | selectattr('size_total', 'defined')
+             | selectattr('size_total', 'gt', 0)
+             | list }}
+        disk_unmeasured: >-
+          {{ (disk_candidates | rejectattr('size_total', 'defined')
+              | map(attribute='mount') | list)
+             + (disk_candidates | selectattr('size_total', 'defined')
+                | rejectattr('size_total', 'gt', 0) | map(attribute='mount') | list)
+             + (['an unnamed mount entry'] * (disk_dropped_entries | int)) }}
+
+    - name: Grade this host
+      ansible.builtin.include_tasks: tasks/check-disk-space-finding.yml
+
+    - name: Print each filesystem
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} {{ item.mount }} ({{ item.fstype }}):
+          {{ item.used_pct }}% of {{ item.size_gb }}G used, {{ item.free_gb }}G free,
+          inodes {{ item.inodes_pct }}{{ '%' if item.inodes_pct is number else '' }}{{ ' -- OVER THRESHOLD' if item.over else '' }}
+      loop: "{{ disk_rows }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    # The assert is last so the report above prints on the runs that go red.
+    - name: Fail when a host is low on space
+      ansible.builtin.assert:
+        that:
+          - not (disk_anomaly | bool)
+        fail_msg: '{{ inventory_hostname }}: {{ disk_reasons | join("; ") }}'
+        success_msg: >-
+          {{ inventory_hostname }} has room on all {{ disk_rows | length }} filesystem(s)

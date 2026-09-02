@@ -1,0 +1,117 @@
+name: Ansible --08- Check Disk Space
+
+on:
+  workflow_call:
+    inputs:
+      hosts:
+        description: "The value for the variable_host argument"
+        type: string
+        required: true
+      verbosity:
+        description: "The verbosity level for logs"
+        type: string
+        default: "-v"
+      threshold:
+        description: "Percent of disk used that counts as a finding"
+        type: number
+        default: 80
+      inode_threshold:
+        description: "Percent of inodes used that counts as a finding"
+        type: number
+        default: 80
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: "The SSH private key for the Ansible user"
+        required: true
+      LINODE_TOKEN:
+        description: "The Linode API token"
+        required: true
+  workflow_dispatch:
+    inputs:
+      hosts:
+        description: "The value for the variable_host argument"
+        type: string
+        required: true
+        default: "none"
+      verbosity:
+        description: "The verbosity level for logs"
+        type: choice
+        required: true
+        default: "-v"
+        options:
+          - "-v"
+          - "-vv"
+          - "-vvv"
+      threshold:
+        description: "Percent of disk used that counts as a finding"
+        type: number
+        required: true
+        default: 80
+      inode_threshold:
+        description: "Percent of inodes used that counts as a finding"
+        type: number
+        required: true
+        default: 80
+
+defaults:
+  run:
+    working-directory: "./ansible"
+
+jobs:
+  run_playbook:
+    name: Run Play
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup UV
+        run: |
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "Installing uv..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "ERROR: uv installation failed"
+            exit 1
+          fi
+
+          echo "uv version: $(uv --version)"
+
+      - name: Setup Ansible and Dependencies
+        run: |
+          uv sync
+
+          source .venv/bin/activate
+          ansible-galaxy install -r requirements.yml
+
+          ansible --version
+
+      - name: Configure SSH Private Key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
+          chmod 600 ~/.ssh/id_for_ansible.pem
+
+      - name: Play -- Check Disk Space
+        env:
+          HOSTS: ${{ inputs.hosts }}
+          THRESHOLD: ${{ inputs.threshold }}
+          INODE_THRESHOLD: ${{ inputs.inode_threshold }}
+          VERBOSITY: ${{ inputs.verbosity }}
+        run: |
+          source .venv/bin/activate
+          ansible-playbook -i inventory/linode.yml \
+          play-any--check-disk-space.yml \
+          --private-key=~/.ssh/id_for_ansible.pem \
+          -e variable_host="$HOSTS" \
+          -e variable_disk_threshold="$THRESHOLD" \
+          -e variable_inode_threshold="$INODE_THRESHOLD" \
+          "$VERBOSITY"

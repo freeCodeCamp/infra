@@ -11,7 +11,7 @@ on:
 
 defaults:
   run:
-    working-directory: './ansible'
+    working-directory: "./ansible"
 
 jobs:
   test:
@@ -89,3 +89,8 @@ jobs:
           # localhost regardless. The flag was doing nothing but printing
           # three warnings.
           ansible-playbook --check play-test--4-verify-nginx.yml
+
+      - name: Unit Test the Disk Space Finding Logic
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check play-test--5-check-disk-space.yml
