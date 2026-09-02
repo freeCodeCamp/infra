@@ -49,6 +49,30 @@ func TestParseSiteAndAlias_TableDriven(t *testing.T) {
 			wantAlias: "preview",
 		},
 		{
+			name:      "explicit port ignored",
+			host:      "hello-world.freecode.camp:80",
+			wantSite:  "hello-world.freecode.camp",
+			wantAlias: "production",
+		},
+		{
+			name:      "uppercase host folded",
+			host:      "Hello-World.FreeCode.Camp",
+			wantSite:  "hello-world.freecode.camp",
+			wantAlias: "production",
+		},
+		{
+			name:      "fully qualified trailing dot accepted",
+			host:      "hello-world.freecode.camp.",
+			wantSite:  "hello-world.freecode.camp",
+			wantAlias: "production",
+		},
+		{
+			name:      "uppercase preview label folded",
+			host:      "Hello.PREVIEW.freecode.camp:443",
+			wantSite:  "hello.freecode.camp",
+			wantAlias: "preview",
+		},
+		{
 			name:    "non-root domain rejected",
 			host:    "other.com",
 			wantErr: true,

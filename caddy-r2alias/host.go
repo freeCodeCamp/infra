@@ -2,8 +2,19 @@ package r2alias
 
 import (
 	"fmt"
+	"net"
 	"strings"
 )
+
+// https://github.com/caddyserver/caddy/blob/v2.11.3/modules/caddyhttp/matchers.go#L308-L316
+func normaliseHost(host string) string {
+	if bare, _, err := net.SplitHostPort(host); err == nil {
+		host = bare
+	}
+	host = strings.TrimPrefix(host, "[")
+	host = strings.TrimSuffix(host, "]")
+	return strings.ToLower(strings.TrimSuffix(host, "."))
+}
 
 // parseSiteAndAlias extracts (site, alias) from a Host header.
 //
@@ -19,6 +30,10 @@ func parseSiteAndAlias(host, rootDomain, previewSubdomain string) (site, alias s
 	if strings.ContainsAny(host, `/\`) {
 		return "", "", fmt.Errorf("host %q contains a path separator", host)
 	}
+
+	host = normaliseHost(host)
+	rootDomain = strings.ToLower(rootDomain)
+	previewSubdomain = strings.ToLower(previewSubdomain)
 
 	suffix := "." + rootDomain
 	if !strings.HasSuffix(host, suffix) {
