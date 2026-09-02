@@ -125,17 +125,24 @@ func (r *R2Alias) applyDefaults() {
 func (r *R2Alias) Provision(ctx caddy.Context) error {
 	r.applyDefaults()
 	r.logger = ctx.Logger()
-	initMetrics(ctx.GetMetricsRegistry())
+	if err := initMetrics(ctx.GetMetricsRegistry()); err != nil {
+		return fmt.Errorf("r2_alias: %w", err)
+	}
 
-	if err := resolvePlaceholders(
-		&r.Bucket, &r.Endpoint, &r.Region, &r.AccessKeyID, &r.SecretAccessKey,
-		&r.RootDomain, &r.PreviewSubdomain,
-	); err != nil {
+	if err := resolvePlaceholders(map[string]*string{
+		"bucket":            &r.Bucket,
+		"endpoint":          &r.Endpoint,
+		"region":            &r.Region,
+		"access_key_id":     &r.AccessKeyID,
+		"secret_access_key": &r.SecretAccessKey,
+		"root_domain":       &r.RootDomain,
+		"preview_subdomain": &r.PreviewSubdomain,
+	}); err != nil {
 		return fmt.Errorf("r2_alias: %w", err)
 	}
 
 	fetchTimeout := time.Duration(r.FetchTimeout)
-	client, clientKey, err := sharedS3Client(ctx, r2ClientConfig{
+	clientCfg := r2ClientConfig{
 		Bucket:          r.Bucket,
 		Endpoint:        r.Endpoint,
 		Region:          r.Region,
@@ -144,14 +151,15 @@ func (r *R2Alias) Provision(ctx caddy.Context) error {
 		UsePathStyle:    true,
 		MaxAttempts:     aliasRetryAttempts,
 		MaxBackoff:      fetchTimeout / 4,
-	}, r.logger)
+	}
+	client, clientKey, err := sharedS3Client(ctx, clientCfg, r.logger)
 	if err != nil {
 		return fmt.Errorf("r2_alias: load aws config: %w", err)
 	}
 	r.client, r.clientKey = client, clientKey
 
 	r.cache, r.cacheKey = sharedAliasCache(
-		r.Endpoint, r.Bucket, r.CacheMaxEntries, time.Duration(r.CacheTTL), fetchTimeout)
+		clientCfg, r.CacheMaxEntries, time.Duration(r.CacheTTL), fetchTimeout)
 
 	if r.fetcher == nil {
 		r.fetcher = r.fetchAlias

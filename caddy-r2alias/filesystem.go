@@ -105,19 +105,22 @@ func (r *R2FS) applyDefaults() {
 	if r.MaxInFlightBytes <= 0 {
 		r.MaxInFlightBytes = defaultMaxInFlightBytes
 	}
-	if r.MaxInFlightBytes < r.MaxFileSize {
-		r.MaxInFlightBytes = r.MaxFileSize
-	}
 }
 
 func (r *R2FS) Provision(ctx caddy.Context) error {
 	r.applyDefaults()
 	r.logger = ctx.Logger()
-	initMetrics(ctx.GetMetricsRegistry())
+	if err := initMetrics(ctx.GetMetricsRegistry()); err != nil {
+		return fmt.Errorf("caddy.fs.r2: %w", err)
+	}
 
-	if err := resolvePlaceholders(
-		&r.Bucket, &r.Endpoint, &r.Region, &r.AccessKeyID, &r.SecretAccessKey,
-	); err != nil {
+	if err := resolvePlaceholders(map[string]*string{
+		"bucket":            &r.Bucket,
+		"endpoint":          &r.Endpoint,
+		"region":            &r.Region,
+		"access_key_id":     &r.AccessKeyID,
+		"secret_access_key": &r.SecretAccessKey,
+	}); err != nil {
 		return fmt.Errorf("caddy.fs.r2: %w", err)
 	}
 
@@ -298,8 +301,15 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 				return nil, ferr
 			}
 
-			addBufferedBytes(float64(weight))
-			file.release = func() { r.releaseBudget(weight); addBufferedBytes(-float64(weight)) }
+			held, ferr := r.reweighBudget(loadCtx, weight, int64(len(obj.Body)))
+			if ferr != nil {
+				r.logger.Error("r2 in-flight budget exhausted",
+					zap.String("path", name), zap.Int64("bytes", int64(len(obj.Body))), zap.Error(ferr))
+				return nil, ferr
+			}
+
+			addBufferedBytes(float64(held))
+			file.release = func() { r.releaseBudget(held); addBufferedBytes(-float64(held)) }
 			return obj.Body, nil
 		}
 		return file, nil
@@ -540,6 +550,22 @@ func (r *R2FS) acquireBudget(ctx context.Context, weight int64) error {
 		return fmt.Errorf("caddy.fs.r2: in-flight budget exhausted: %w", err)
 	}
 	return nil
+}
+
+func (r *R2FS) reweighBudget(ctx context.Context, held, actual int64) (int64, error) {
+	if actual < 1 {
+		actual = 1
+	}
+	switch {
+	case actual > held:
+		if err := r.acquireBudget(ctx, actual-held); err != nil {
+			r.releaseBudget(held)
+			return 0, err
+		}
+	case actual < held:
+		r.releaseBudget(held - actual)
+	}
+	return actual, nil
 }
 
 func (r *R2FS) releaseBudget(weight int64) {

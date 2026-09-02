@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// https://github.com/caddyserver/caddy/blob/v2.11.3/modules/caddyhttp/matchers.go#L308-L316
+// https://github.com/caddyserver/caddy/blob/v2.11.3/modules/caddyhttp/matchers.go#L308-L315
 func normaliseHost(host string) string {
 	if bare, _, err := net.SplitHostPort(host); err == nil {
 		host = bare

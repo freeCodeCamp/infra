@@ -2,6 +2,7 @@ package r2alias
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -34,7 +35,7 @@ var moduleMetrics = struct {
 	inFlight   prometheus.Gauge
 }{}
 
-func initMetrics(registry prometheus.Registerer) {
+func initMetrics(registry prometheus.Registerer) error {
 	moduleMetrics.once.Do(func() {
 		moduleMetrics.operations = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricNamespace,
@@ -59,7 +60,7 @@ func initMetrics(registry prometheus.Registerer) {
 	})
 
 	if registry == nil {
-		return
+		return nil
 	}
 	for _, c := range []prometheus.Collector{
 		moduleMetrics.operations, moduleMetrics.lookups, moduleMetrics.inFlight,
@@ -67,10 +68,11 @@ func initMetrics(registry prometheus.Registerer) {
 		if err := registry.Register(c); err != nil {
 			var already prometheus.AlreadyRegisteredError
 			if !errors.As(err, &already) {
-				panic(err)
+				return fmt.Errorf("register %T: %w", c, err)
 			}
 		}
 	}
+	return nil
 }
 
 func recordOperation(operation, result string) {

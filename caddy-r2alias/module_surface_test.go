@@ -5,12 +5,13 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/smithy-go/logging"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ func TestResolvePlaceholders_ResolvesEnvAtProvision(t *testing.T) {
 	t.Setenv("R2ALIAS_TEST_BUCKET", "universe-static-apps-01")
 
 	bucket := "{env.R2ALIAS_TEST_BUCKET}"
-	if err := resolvePlaceholders(&bucket); err != nil {
+	if err := resolvePlaceholders(map[string]*string{"bucket": &bucket}); err != nil {
 		t.Fatalf("resolvePlaceholders: %v", err)
 	}
 	if bucket != "universe-static-apps-01" {
@@ -35,14 +36,14 @@ func TestResolvePlaceholders_FailsOnAnEmptyEnvVar(t *testing.T) {
 	t.Setenv("R2ALIAS_TEST_EMPTY", "")
 
 	secret := "{env.R2ALIAS_TEST_EMPTY}"
-	if err := resolvePlaceholders(&secret); err == nil {
+	if err := resolvePlaceholders(map[string]*string{"secret_access_key": &secret}); err == nil {
 		t.Fatal("an unset credential must fail the load, not sign with an empty key")
 	}
 }
 
 func TestResolvePlaceholders_LeavesAPlainValueAlone(t *testing.T) {
 	value := "universe-static-apps-01"
-	if err := resolvePlaceholders(&value); err != nil {
+	if err := resolvePlaceholders(map[string]*string{"endpoint": &value}); err != nil {
 		t.Fatalf("resolvePlaceholders: %v", err)
 	}
 	if value != "universe-static-apps-01" {
@@ -52,7 +53,7 @@ func TestResolvePlaceholders_LeavesAPlainValueAlone(t *testing.T) {
 
 func TestResolvePlaceholders_RejectsARegexQuantifier(t *testing.T) {
 	pattern := defaultDeployIDRegex
-	if err := resolvePlaceholders(&pattern); err == nil {
+	if err := resolvePlaceholders(map[string]*string{"deploy_id_regex": &pattern}); err == nil {
 		t.Fatal("a regex quantifier reads as a placeholder, which is why Provision must never pass one")
 	}
 }
@@ -101,9 +102,9 @@ func TestSharedS3Client_ReusesOneClientPerConfig(t *testing.T) {
 }
 
 func TestSharedAliasCache_KeysOnTheEndpoint(t *testing.T) {
-	first, firstKey := sharedAliasCache("https://a.example", "b", 10, time.Second, time.Second)
+	first, firstKey := sharedAliasCache(r2ClientConfig{Endpoint: "https://a.example", Bucket: "b"}, 10, time.Second, time.Second)
 	t.Cleanup(func() { _, _ = aliasCaches.Delete(firstKey) })
-	second, secondKey := sharedAliasCache("https://b.example", "b", 10, time.Second, time.Second)
+	second, secondKey := sharedAliasCache(r2ClientConfig{Endpoint: "https://b.example", Bucket: "b"}, 10, time.Second, time.Second)
 	t.Cleanup(func() { _, _ = aliasCaches.Delete(secondKey) })
 
 	if first == second {
@@ -261,12 +262,6 @@ func TestMetrics_CountAliasCacheOutcomes(t *testing.T) {
 }
 
 func TestUpstreamStatus_TreatsThrottlingAsUpstream(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Retry-After", "7")
-		w.WriteHeader(http.StatusTooManyRequests)
-	}))
-	t.Cleanup(srv.Close)
-
 	r := newWiredR2FS(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Retry-After", "7")
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -321,7 +316,7 @@ func TestCleanup_ReleasesPooledResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sharedS3Client: %v", err)
 	}
-	cache, cacheKey := sharedAliasCache(cfg.Endpoint, cfg.Bucket, 4, time.Minute, time.Second)
+	cache, cacheKey := sharedAliasCache(cfg, 4, time.Minute, time.Second)
 
 	alias := &R2Alias{client: client, clientKey: clientKey, cache: cache, cacheKey: cacheKey}
 	if err := alias.Cleanup(); err != nil {
@@ -345,6 +340,14 @@ func TestR2FS_Validate_RequiresBucketAndEndpoint(t *testing.T) {
 		t.Error("endpoint is required")
 	}
 
+	tooSmall := &R2FS{
+		Bucket: "b", Endpoint: "https://r2.example",
+		MaxFileSize: 100, MaxInFlightBytes: 1,
+	}
+	if err := tooSmall.Validate(); err == nil {
+		t.Error("a budget below one object must be rejected, not silently widened")
+	}
+
 	valid := &R2FS{Bucket: "b", Endpoint: "https://r2.example"}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
@@ -353,7 +356,92 @@ func TestR2FS_Validate_RequiresBucketAndEndpoint(t *testing.T) {
 		t.Error("R2 needs path-style addressing by default")
 	}
 	if valid.MaxInFlightBytes < valid.MaxFileSize {
-		t.Errorf("the in-flight budget %d must hold at least one object of %d",
+		t.Errorf("the default budget %d must hold at least one object of %d",
 			valid.MaxInFlightBytes, valid.MaxFileSize)
+	}
+}
+
+func TestR2FS_ReweighBudget_ChargesTheDeliveredBody(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+
+	if err := r.acquireBudget(context.Background(), 16); err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	held, err := r.reweighBudget(context.Background(), 16, 64)
+	if err != nil {
+		t.Fatalf("reweigh up: %v", err)
+	}
+	if held != 64 {
+		t.Errorf("held: want the delivered 64, got %d", held)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := r.acquireBudget(ctx, 1); err == nil {
+		t.Fatal("a body larger than its HeadObject size must still be charged in full")
+	}
+
+	r.releaseBudget(held)
+	if err := r.acquireBudget(context.Background(), 64); err != nil {
+		t.Fatalf("the full budget must return: %v", err)
+	}
+	r.releaseBudget(64)
+
+	if err := r.acquireBudget(context.Background(), 64); err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	held, err = r.reweighBudget(context.Background(), 64, 8)
+	if err != nil {
+		t.Fatalf("reweigh down: %v", err)
+	}
+	if held != 8 {
+		t.Errorf("held: want the delivered 8, got %d", held)
+	}
+	if err := r.acquireBudget(context.Background(), 56); err != nil {
+		t.Fatalf("a smaller body must hand the surplus back: %v", err)
+	}
+}
+
+func TestNewBudgetedRetryer_RetriesThrottling(t *testing.T) {
+	retryer := newBudgetedRetryer(2, time.Second)
+
+	throttled := &awshttp.ResponseError{
+		ResponseError: &smithyhttp.ResponseError{
+			Response: &smithyhttp.Response{
+				Response: &http.Response{StatusCode: http.StatusTooManyRequests},
+			},
+			Err: errors.New("TooManyRequests"),
+		},
+	}
+	if !retryer.IsErrorRetryable(throttled) {
+		t.Error("R2 throttling must be retryable; the SDK default set stops at 504")
+	}
+
+	serverError := &awshttp.ResponseError{
+		ResponseError: &smithyhttp.ResponseError{
+			Response: &smithyhttp.Response{
+				Response: &http.Response{StatusCode: http.StatusServiceUnavailable},
+			},
+			Err: errors.New("ServiceUnavailable"),
+		},
+	}
+	if !retryer.IsErrorRetryable(serverError) {
+		t.Error("a 503 must stay retryable")
+	}
+
+	notFound := &awshttp.ResponseError{
+		ResponseError: &smithyhttp.ResponseError{
+			Response: &smithyhttp.Response{
+				Response: &http.Response{StatusCode: http.StatusNotFound},
+			},
+			Err: errors.New("NoSuchKey"),
+		},
+	}
+	if retryer.IsErrorRetryable(notFound) {
+		t.Error("a missing key must not be retried")
+	}
+	if got := retryer.MaxAttempts(); got != 2 {
+		t.Errorf("MaxAttempts: want 2, got %d", got)
 	}
 }

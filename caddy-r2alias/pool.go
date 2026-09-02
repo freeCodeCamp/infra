@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -98,15 +100,16 @@ func newBudgetedRetryer(maxAttempts int, maxBackoff time.Duration) aws.Retryer {
 	})
 }
 
-func resolvePlaceholders(fields ...*string) error {
+func resolvePlaceholders(fields map[string]*string) error {
 	repl := caddy.NewReplacer()
-	for _, field := range fields {
+	for _, name := range slices.Sorted(maps.Keys(fields)) {
+		field := fields[name]
 		if field == nil || !strings.Contains(*field, "{") {
 			continue
 		}
 		resolved, err := repl.ReplaceOrErr(*field, true, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: unresolved placeholder", name)
 		}
 		*field = resolved
 	}
@@ -141,8 +144,10 @@ func sharedS3Client(ctx caddy.Context, cfg r2ClientConfig, logger *zap.Logger) (
 	return value.(pooledS3Client).client, key, nil
 }
 
-func sharedAliasCache(endpoint, bucket string, size int, ttl, fetchTimeout time.Duration) (*aliasCache, string) {
-	key := fmt.Sprintf("r2-alias-cache-%s-%s-%d-%s-%s", endpoint, bucket, size, ttl, fetchTimeout)
+func sharedAliasCache(cfg r2ClientConfig, size int, ttl, fetchTimeout time.Duration) (*aliasCache, string) {
+	sum := sha256.Sum256([]byte(cfg.poolKey() +
+		strconv.Itoa(size) + ttl.String() + fetchTimeout.String()))
+	key := "r2-alias-cache-" + hex.EncodeToString(sum[:])
 	value, _, _ := aliasCaches.LoadOrNew(key, func() (caddy.Destructor, error) {
 		return pooledAliasCache{cache: newAliasCache(size, ttl, fetchTimeout)}, nil
 	})
