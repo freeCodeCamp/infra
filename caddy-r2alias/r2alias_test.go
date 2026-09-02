@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
@@ -45,14 +46,14 @@ func TestValidate_DefaultsApplied(t *testing.T) {
 	if r.Region != "auto" {
 		t.Errorf("Region default: want \"auto\", got %q", r.Region)
 	}
-	if r.CacheTTL != 15*time.Second {
-		t.Errorf("CacheTTL default: want 15s, got %s", r.CacheTTL)
+	if time.Duration(r.CacheTTL) != 15*time.Second {
+		t.Errorf("CacheTTL default: want 15s, got %s", time.Duration(r.CacheTTL))
 	}
 	if r.CacheMaxEntries != 10000 {
 		t.Errorf("CacheMaxEntries default: want 10000, got %d", r.CacheMaxEntries)
 	}
-	if r.FetchTimeout != 2*time.Second {
-		t.Errorf("FetchTimeout default: want 2s, got %s", r.FetchTimeout)
+	if time.Duration(r.FetchTimeout) != 2*time.Second {
+		t.Errorf("FetchTimeout default: want 2s, got %s", time.Duration(r.FetchTimeout))
 	}
 	if r.PreviewSubdomain != "preview" {
 		t.Errorf("PreviewSubdomain default: want \"preview\", got %q", r.PreviewSubdomain)
@@ -77,7 +78,7 @@ func TestValidate_NegativeCacheParams(t *testing.T) {
 	}{
 		{
 			"negative CacheTTL",
-			R2Alias{Bucket: "b", Endpoint: "https://x", CacheTTL: -1 * time.Second},
+			R2Alias{Bucket: "b", Endpoint: "https://x", CacheTTL: caddy.Duration(-1 * time.Second)},
 			"cache_ttl must be > 0",
 		},
 		{
@@ -87,7 +88,7 @@ func TestValidate_NegativeCacheParams(t *testing.T) {
 		},
 		{
 			"negative FetchTimeout",
-			R2Alias{Bucket: "b", Endpoint: "https://x", FetchTimeout: -1 * time.Second},
+			R2Alias{Bucket: "b", Endpoint: "https://x", FetchTimeout: caddy.Duration(-1 * time.Second)},
 			"fetch_timeout must be > 0",
 		},
 	}
@@ -138,14 +139,14 @@ func TestUnmarshalCaddyfile_FullBlock(t *testing.T) {
 	if r.AccessKeyID != "k" || r.SecretAccessKey != "s" {
 		t.Errorf("creds mismatch: %+v", r)
 	}
-	if r.CacheTTL != 15*time.Second {
-		t.Errorf("CacheTTL: want 15s, got %s", r.CacheTTL)
+	if time.Duration(r.CacheTTL) != 15*time.Second {
+		t.Errorf("CacheTTL: want 15s, got %s", time.Duration(r.CacheTTL))
 	}
 	if r.CacheMaxEntries != 10000 {
 		t.Errorf("CacheMaxEntries: want 10000, got %d", r.CacheMaxEntries)
 	}
-	if r.FetchTimeout != 2*time.Second {
-		t.Errorf("FetchTimeout: want 2s, got %s", r.FetchTimeout)
+	if time.Duration(r.FetchTimeout) != 2*time.Second {
+		t.Errorf("FetchTimeout: want 2s, got %s", time.Duration(r.FetchTimeout))
 	}
 	if r.PreviewSubdomain != "preview" {
 		t.Errorf("PreviewSubdomain mismatch: %q", r.PreviewSubdomain)
@@ -195,13 +196,13 @@ func newProvisionedForTest(t *testing.T) *R2Alias {
 		RootDomain:       "freecode.camp",
 		PreviewSubdomain: "preview",
 		DeployIDRegex:    `^[A-Za-z0-9._-]{1,64}$`,
-		CacheTTL:         1 * time.Second,
+		CacheTTL:         caddy.Duration(1 * time.Second),
 		CacheMaxEntries:  10,
 		FetchTimeout:     defaultFetchTimeout,
 		logger:           zap.NewNop(),
 	}
 	r.deployIDRe = regexp.MustCompile(r.DeployIDRegex)
-	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL, r.FetchTimeout)
+	r.cache = newAliasCache(r.CacheMaxEntries, time.Duration(r.CacheTTL), time.Duration(r.FetchTimeout))
 	return r
 }
 
@@ -237,8 +238,8 @@ func blockingFetcher(ctx context.Context, _ string) (aliasEntry, error) {
 func newProvisionedWithFetchTimeout(t *testing.T, d time.Duration) *R2Alias {
 	t.Helper()
 	r := newProvisionedForTest(t)
-	r.FetchTimeout = d
-	r.cache = newAliasCache(r.CacheMaxEntries, r.CacheTTL, r.FetchTimeout)
+	r.FetchTimeout = caddy.Duration(d)
+	r.cache = newAliasCache(r.CacheMaxEntries, time.Duration(r.CacheTTL), time.Duration(r.FetchTimeout))
 	return r
 }
 

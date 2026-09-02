@@ -28,10 +28,10 @@ func newAliasCache(size int, ttl, fetchTimeout time.Duration) *aliasCache {
 		size = defaultCacheMaxEntries
 	}
 	if ttl <= 0 {
-		ttl = defaultCacheTTL
+		ttl = time.Duration(defaultCacheTTL)
 	}
 	if fetchTimeout <= 0 {
-		fetchTimeout = defaultFetchTimeout
+		fetchTimeout = time.Duration(defaultFetchTimeout)
 	}
 	return &aliasCache{
 		lru:          expirable.NewLRU[string, aliasEntry](size, nil, ttl),
@@ -58,8 +58,10 @@ func (c *aliasCache) Resolve(
 	key := cacheKey(bucket, site, aliasName)
 
 	if entry, ok := c.lru.Get(key); ok {
+		recordLookup(resultHit)
 		return entry, nil
 	}
+	recordLookup(resultMiss)
 
 	ch := c.sf.DoChan(key, func() (val any, err error) {
 		// A DoChan flight re-panics on a detached goroutine that no caller

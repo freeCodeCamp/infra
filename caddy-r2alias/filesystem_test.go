@@ -204,7 +204,7 @@ func TestR2FS_UnmarshalCaddyfile_FullBlock(t *testing.T) {
 	if r.AccessKeyID != "kid" || r.SecretAccessKey != "sak" {
 		t.Errorf("creds: %+v", r)
 	}
-	if !r.UsePathStyle {
+	if r.UsePathStyle == nil || !*r.UsePathStyle {
 		t.Errorf("UsePathStyle should be true after flag")
 	}
 	if r.MaxFileSize != 50_000_000 {

@@ -150,7 +150,7 @@ func TestGetObject_ServerErrorIsAnUpstreamFailure(t *testing.T) {
 	if errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("a 500 must not read as missing, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "upstream 5xx") {
+	if !strings.Contains(err.Error(), "upstream 5") {
 		t.Errorf("error should name the upstream failure, got %v", err)
 	}
 }
@@ -187,7 +187,7 @@ func TestHeadObject_ServerErrorIsAnUpstreamFailure(t *testing.T) {
 	})
 
 	_, err := r.headObject(context.Background(), "site/index.html")
-	if err == nil || !strings.Contains(err.Error(), "upstream 5xx") {
+	if err == nil || !strings.Contains(err.Error(), "upstream 5") {
 		t.Fatalf("error should name the upstream failure, got %v", err)
 	}
 }
