@@ -11,6 +11,7 @@ import (
 
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"go.uber.org/zap"
+	"golang.org/x/sync/semaphore"
 )
 
 // Tests assign r.fetcher to control how Open resolves S3 GetObject. No AWS
@@ -21,6 +22,7 @@ func newTestR2FS() *R2FS {
 		Endpoint:    "https://r2.example",
 		Region:      "auto",
 		MaxFileSize: defaultMaxFileSize,
+		growWaits:   semaphore.NewWeighted(maxConcurrentGrowWaits),
 		logger:      zap.NewNop(),
 	}
 	r.header = func(ctx context.Context, key string) (*r2Object, error) {

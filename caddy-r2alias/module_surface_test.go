@@ -490,31 +490,30 @@ func TestR2FS_ReweighBudget_CapsConcurrentGrowWaits(t *testing.T) {
 	r.budget = semaphore.NewWeighted(64)
 	r.growWaits = semaphore.NewWeighted(1)
 
-	if err := r.acquireBudget(context.Background(), 64); err != nil {
+	if err := r.acquireBudget(context.Background(), 1); err != nil {
+		t.Fatalf("our own charge: %v", err)
+	}
+	if err := r.acquireBudget(context.Background(), 63); err != nil {
 		t.Fatalf("fill the budget: %v", err)
 	}
+	if !r.growWaits.TryAcquire(1) {
+		t.Fatal("the only wait slot must start free")
+	}
 
-	waiting := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		close(waiting)
-		_, _ = r.reweighBudget(1, 32)
-		close(done)
-	}()
-	<-waiting
-
-	deadline := time.Now().Add(budgetGrowWait)
-	for time.Now().Before(deadline) {
-		if _, err := r.reweighBudget(1, 32); err != nil {
-			if !strings.Contains(err.Error(), "already waiting") {
-				continue
-			}
-			<-done
-			return
-		}
+	start := time.Now()
+	held, err := r.reweighBudget(1, 32)
+	if err == nil {
 		t.Fatal("the budget is full, so no grow can succeed")
 	}
-	t.Fatal("a second grow must be refused while the cap is taken, not queued behind it")
+	if !strings.Contains(err.Error(), "already waiting") {
+		t.Fatalf("a grow past the wait cap must be refused at once, got %v", err)
+	}
+	if held != 0 {
+		t.Errorf("a refused grow must report nothing held, got %d", held)
+	}
+	if elapsed := time.Since(start); elapsed >= budgetGrowWait {
+		t.Errorf("the refusal must be immediate, took %s", elapsed)
+	}
 }
 
 func TestR2FS_ReweighBudget_GrowReleasesBeforeItWaits(t *testing.T) {
