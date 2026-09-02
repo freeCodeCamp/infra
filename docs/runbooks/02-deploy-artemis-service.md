@@ -357,6 +357,13 @@ lines means the roll is still in progress. The `component=deploy-proxy` selector
 > The reverse case is just as bad: a delete served by a 1.9.1 pod leaves both alias objects in place,
 > so the site keeps serving while deregistered, and the 04:00 `drift-detect` run reports it as an
 > orphaned alias that night.
+>
+> From the release that carries artemis T9 (after 1.10.2), also keep the roll out of the
+> `02:55–03:35 UTC` window. At 03:00 the `tombstone-purge` cron run goes to whichever worker the
+> engine picks. A pod still on the previous image reclaims expired names in-process and writes no
+> `site.reclaim` audit row. A pod on the new image only emits `site.lifecycle` events, and events
+> emitted before a new-image worker is up wait in Hatchet, so nothing is lost. Only the audit trail
+> of that one night is at stake.
 
 ### 7. Verify
 

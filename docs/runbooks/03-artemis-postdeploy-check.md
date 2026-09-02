@@ -140,16 +140,21 @@ kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=20m \
 | 1 (HATCHET_ADDR unset) | `postgres.connected`, `gc.wired` | `worker.starting`, `outbox.relay.started` |
 | 2 (HATCHET_ADDR set)   | all four lines                                         | —                                           |
 
-**From 1.10.0, read the flags on the `gc.wired` line.** Both must be `true`:
+**From 1.10.0, read the flags on the `gc.wired` line.** All must be `true`:
 
 ```sh
 kubectl -n artemis logs -l app.kubernetes.io/name=artemis --since=20m \
-  | grep 'gc.wired'          # expect siteGCReady=true reservationSweepReady=true
+  | grep 'gc.wired'          # expect siteGCReady=true reservationSweepReady=true siteReclaimReady=true
 ```
 
 `reservationSweepReady=false` means the registry writer does not satisfy the reservation interface,
 so the nightly sweep no-ops and no deleted name is ever reclaimed. The 03:00 workflow still reports
 success and the Sentry cron monitor stays green, so this line is the only place it surfaces.
+
+`siteReclaimReady` exists from the release that carries artemis T9 (after 1.10.2). `false` means the
+`site.lifecycle` step has no claimer or no audited releaser, so every reclaim run fails as a wiring
+error: the sweep still emits one event per expired name, and each run reports `site.reclaim` to
+Sentry.
 
 ### 3. Readiness probe (degraded semantics)
 
