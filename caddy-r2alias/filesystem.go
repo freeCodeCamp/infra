@@ -565,14 +565,14 @@ func (r *R2FS) reweighBudget(held, actual int64) (int64, error) {
 		r.releaseBudget(held - actual)
 		return actual, nil
 	}
-	if r.budget == nil || r.budget.TryAcquire(actual-held) {
+	r.releaseBudget(held)
+	if r.budget == nil {
 		return actual, nil
 	}
 
 	waitCtx, cancel := context.WithTimeout(context.Background(), budgetGrowWait)
 	defer cancel()
-	if err := r.budget.Acquire(waitCtx, actual-held); err != nil {
-		r.releaseBudget(held)
+	if err := r.budget.Acquire(waitCtx, actual); err != nil {
 		return 0, fmt.Errorf("caddy.fs.r2: in-flight budget exhausted for %d delivered bytes", actual)
 	}
 	return actual, nil

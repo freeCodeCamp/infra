@@ -215,7 +215,8 @@ func TestR2FS_UnmarshalCaddyfile_FullBlock(t *testing.T) {
 func TestR2FS_UnmarshalCaddyfile_MissingArgument(t *testing.T) {
 	t.Parallel()
 	for _, directive := range []string{
-		"bucket", "endpoint", "region", "access_key_id", "secret_access_key", "max_file_size",
+		"bucket", "endpoint", "region", "access_key_id", "secret_access_key",
+		"max_file_size", "max_in_flight_bytes",
 	} {
 		t.Run(directive, func(t *testing.T) {
 			t.Parallel()

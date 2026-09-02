@@ -391,7 +391,15 @@ func TestR2FS_ReweighBudget_ChargesTheDeliveredBody(t *testing.T) {
 	if err := r.acquireBudget(context.Background(), 64); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	held, err = r.reweighBudget(64, 8)
+	held, err = r.reweighBudget(64, 0)
+	if err != nil {
+		t.Fatalf("reweigh to an empty body: %v", err)
+	}
+	if held != 1 {
+		t.Errorf("an empty body still costs one unit, got %d", held)
+	}
+
+	held, err = r.reweighBudget(held, 8)
 	if err != nil {
 		t.Fatalf("reweigh down: %v", err)
 	}
@@ -434,6 +442,108 @@ func TestR2FS_ReweighBudget_NeverStallsOnAContendedBudget(t *testing.T) {
 	defer cancel()
 	if err := r.acquireBudget(ctx, 64); err != nil {
 		t.Fatalf("every charge must be accounted for once the reweighs settle: %v", err)
+	}
+}
+
+func TestR2FS_ReweighBudget_GrowWaitsForAQueueToDrain(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+
+	if err := r.acquireBudget(context.Background(), 8); err != nil {
+		t.Fatalf("our own charge: %v", err)
+	}
+	if err := r.acquireBudget(context.Background(), 40); err != nil {
+		t.Fatalf("another request's charge: %v", err)
+	}
+
+	waiterCtx, cancelWaiter := context.WithCancel(context.Background())
+	defer cancelWaiter()
+	go func() { _ = r.budget.Acquire(waiterCtx, 60) }()
+	for r.budget.TryAcquire(1) {
+		r.budget.Release(1)
+	}
+
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancelWaiter()
+	}()
+
+	start := time.Now()
+	held, err := r.reweighBudget(8, 16)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("a grow must survive a queue that drains inside the window: %v", err)
+	}
+	if held != 16 {
+		t.Errorf("held: want 16, got %d", held)
+	}
+	if elapsed >= budgetGrowWait {
+		t.Errorf("the grow must succeed as soon as the queue clears, took %s", elapsed)
+	}
+}
+
+func TestR2FS_ReweighBudget_GrowReleasesBeforeItWaits(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+
+	if err := r.acquireBudget(context.Background(), 8); err != nil {
+		t.Fatalf("our own charge: %v", err)
+	}
+	if err := r.acquireBudget(context.Background(), 40); err != nil {
+		t.Fatalf("another request's charge: %v", err)
+	}
+
+	served := make(chan time.Duration, 1)
+	waiterCtx, cancelWaiter := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelWaiter()
+
+	start := time.Now()
+	go func() {
+		if err := r.budget.Acquire(waiterCtx, 24); err != nil {
+			return
+		}
+		served <- time.Since(start)
+	}()
+	for r.budget.TryAcquire(1) {
+		r.budget.Release(1)
+	}
+
+	if _, err := r.reweighBudget(8, 16); err == nil {
+		t.Fatal("this grow cannot fit once the waiter takes the freed capacity")
+	}
+
+	select {
+	case waited := <-served:
+		if waited >= budgetGrowWait {
+			t.Errorf("the queued waiter should be served the moment the grow returns its charge, waited %s", waited)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the queued waiter was never served")
+	}
+}
+
+func TestR2FS_ReweighBudget_GrowGivesUpItsChargeWhenRefused(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+
+	if err := r.acquireBudget(context.Background(), 8); err != nil {
+		t.Fatalf("our own charge: %v", err)
+	}
+	if err := r.acquireBudget(context.Background(), 56); err != nil {
+		t.Fatalf("another request's charge: %v", err)
+	}
+
+	held, err := r.reweighBudget(8, 64)
+	if err == nil {
+		t.Fatal("a grow past the whole budget must fail")
+	}
+	if held != 0 {
+		t.Errorf("a refused grow must report nothing held, got %d", held)
+	}
+
+	r.releaseBudget(56)
+	if err := r.acquireBudget(context.Background(), 64); err != nil {
+		t.Fatalf("a refused grow must leave its original charge released: %v", err)
 	}
 }
 

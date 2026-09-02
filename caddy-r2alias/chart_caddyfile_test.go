@@ -129,7 +129,11 @@ func limitsMemoryMiB(t *testing.T, path, raw string) int {
 			if !ok {
 				continue
 			}
-			mib, err := strconv.Atoi(strings.TrimSuffix(strings.TrimSpace(value), "Mi"))
+			bare, ok := strings.CutSuffix(strings.TrimSpace(value), "Mi")
+			if !ok {
+				t.Fatalf("resources.limits.memory in %s must be written in Mi, got %q", path, value)
+			}
+			mib, err := strconv.Atoi(bare)
 			if err != nil {
 				t.Fatalf("parse resources.limits.memory in %s: %v", path, err)
 			}
