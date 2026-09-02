@@ -556,11 +556,15 @@ func (r *R2FS) reweighBudget(held, actual int64) (int64, error) {
 	if actual < 1 {
 		actual = 1
 	}
-	if actual == held {
+	switch {
+	case actual == held:
 		return held, nil
+	case actual < held:
+		r.releaseBudget(held - actual)
+		return actual, nil
 	}
-	r.releaseBudget(held)
-	if r.budget != nil && !r.budget.TryAcquire(actual) {
+	if r.budget != nil && !r.budget.TryAcquire(actual-held) {
+		r.releaseBudget(held)
 		return 0, fmt.Errorf("caddy.fs.r2: in-flight budget exhausted for %d delivered bytes", actual)
 	}
 	return actual, nil

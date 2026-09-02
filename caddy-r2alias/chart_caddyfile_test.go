@@ -115,6 +115,15 @@ func TestChartMemoryLimitsLeaveHeadroomForTheBudget(t *testing.T) {
 	}
 	inFlightMiB /= 1024 * 1024
 
+	deployment, err := os.ReadFile(filepath.Join("..", "k3s", "gxy-cassiopeia", "apps", "caddy",
+		"charts", "caddy", "templates", "deployment.yaml"))
+	if err != nil {
+		t.Fatalf("read deployment.yaml: %v", err)
+	}
+	if !regexp.MustCompile(`name:\s*GOMEMLIMIT\n\s+value:\s*\{\{\s*\.Values\.goMemLimit`).Match(deployment) {
+		t.Error("the Deployment must wire .Values.goMemLimit into GOMEMLIMIT, or the soft limit never reaches the pod")
+	}
+
 	for _, values := range []string{
 		filepath.Join("..", "k3s", "gxy-cassiopeia", "apps", "caddy", "charts", "caddy", "values.yaml"),
 		filepath.Join("..", "k3s", "gxy-cassiopeia", "apps", "caddy", "values.production.yaml"),
@@ -124,11 +133,12 @@ func TestChartMemoryLimitsLeaveHeadroomForTheBudget(t *testing.T) {
 			t.Fatalf("read %s: %v", values, readErr)
 		}
 
-		limits := regexp.MustCompile(`(?m)^\s+memory:\s*(\d+)Mi\s*$`).FindAllStringSubmatch(string(raw), -1)
-		if len(limits) == 0 {
-			t.Fatalf("%s declares no memory limit", values)
+		limits := regexp.MustCompile(`(?m)^\s+limits:\n(?:\s+\w+:.*\n)*?\s+memory:\s*(\d+)Mi\s*$`).
+			FindStringSubmatch(string(raw))
+		if limits == nil {
+			t.Fatalf("%s declares no resources.limits.memory", values)
 		}
-		podMiB, convErr := strconv.Atoi(limits[len(limits)-1][1])
+		podMiB, convErr := strconv.Atoi(limits[1])
 		if convErr != nil {
 			t.Fatalf("parse memory limit in %s: %v", values, convErr)
 		}

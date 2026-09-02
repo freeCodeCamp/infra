@@ -414,25 +414,56 @@ func TestR2FS_ReweighBudget_NeverStallsOnAContendedBudget(t *testing.T) {
 	}
 
 	start := time.Now()
-	results := make(chan error, 2)
+	results := make(chan int64, 2)
 	for range 2 {
 		go func() {
-			_, err := r.reweighBudget(32, 64)
-			results <- err
+			held, _ := r.reweighBudget(32, 64)
+			results <- held
 		}()
 	}
-
-	failures := 0
 	for range 2 {
-		if err := <-results; err != nil {
-			failures++
+		if held := <-results; held > 0 {
+			r.releaseBudget(held)
 		}
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("two concurrent reweigh-ups must not stall on each other, took %s", elapsed)
 	}
-	if failures == 2 {
-		t.Error("both reweigh attempts failed; one must win the released capacity")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := r.acquireBudget(ctx, 64); err != nil {
+		t.Fatalf("every charge must be accounted for once the reweighs settle: %v", err)
+	}
+}
+
+func TestR2FS_ReweighBudget_ShrinkSucceedsWhileAWaiterIsQueued(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+
+	if err := r.acquireBudget(context.Background(), 8); err != nil {
+		t.Fatalf("our own charge: %v", err)
+	}
+	if err := r.acquireBudget(context.Background(), 40); err != nil {
+		t.Fatalf("another request's charge: %v", err)
+	}
+
+	queued := make(chan struct{})
+	waiterCtx, cancelWaiter := context.WithCancel(context.Background())
+	defer cancelWaiter()
+	go func() {
+		close(queued)
+		_ = r.budget.Acquire(waiterCtx, 32)
+	}()
+	<-queued
+	time.Sleep(50 * time.Millisecond)
+
+	held, err := r.reweighBudget(8, 4)
+	if err != nil {
+		t.Fatalf("a shrink returns capacity and must never fail, even behind a queued waiter: %v", err)
+	}
+	if held != 4 {
+		t.Errorf("held: want 4, got %d", held)
 	}
 }
 
