@@ -26,7 +26,10 @@ engine:
   #   1. Crons: v0.88.6 claims each schedule with FOR UPDATE OF
   #      cronSchedule SKIP LOCKED gated on a heartbeat check
   #      (pkg/repository/sqlcv1/ticker.sql:96-160, lock at :124), so a
-  #      schedule cannot double-fire.
+  #      schedule has one owner while that ticker heartbeats within
+  #      10 s (heartbeat every 5 s). A ticker that misses two heartbeats
+  #      hands over with up to 15 s of dual ownership and no dedup key
+  #      on the fire — hence runbook 09 §C.6, the morning-after gate.
   #   2. Everything else — task, OLAP and retention controllers, and the
   #      scheduler: the tenant partitioner. Each replica self-registers a
   #      partition at boot and rebalanceAllControllerPartitions /
@@ -46,10 +49,11 @@ engine:
   # is 7070 (pkg/config/server/server.go ConfigFileRuntime.GRPCPort),
   # so SERVER_GRPC_PORT is set explicitly in the deployment.
   grpcPort: 7077
-  # Engine healthcheck sidecar-port (pkg/config/server default 8733,
-  # endpoints /live /ready). Requires the literal "health" service
-  # token in SERVER_SERVICES — HasService() is an exact string match,
-  # "all" does NOT imply it (cmd/hatchet-engine/engine/run.go:161).
+  # Engine healthcheck port (pkg/config/server default 8733, endpoints
+  # /live /ready). On the V1 path ("all") the probe server starts from
+  # Runtime.Healthcheck (SERVER_HEALTHCHECK, default true), not from the
+  # service list; "health" in SERVER_SERVICES only matters on the V0
+  # path (cmd/hatchet-engine/engine/run.go:161 vs :561).
   healthPort: 8733
   # Upstream defaults: MaxConns 50 (pkg/config/database/config.go:26)
   # and a DDL pool of 5 (config.go:36), both dialling DATABASE_URL.

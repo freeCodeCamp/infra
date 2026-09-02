@@ -42,6 +42,10 @@ Then:
 just release gxy-management hatchet
 ```
 
+Release outside 02:55–04:05 UTC. The old ticker deactivates on shutdown and the new one claims
+the crons on its next 15 s poll; a missed minute is not backfilled, so a release that straddles
+03:00 or 04:00 skips that night's run.
+
 Hook order (all idempotent):
 
 1. `hatchet-quickstart` (pre, -10) — `hatchet-admin k8s quickstart` generates cookie secrets + 3 encryption keysets into Secret `hatchet-config` (only fills missing keys).
@@ -77,7 +81,7 @@ for p in $(kubectl -n artemis get pods -l app.kubernetes.io/component=engine -o 
   kubectl -n artemis logs "$p" | grep -i "grpc\|listen" | head -3
   kubectl -n artemis port-forward "$p" 18733:8733 >/dev/null 2>&1 &
   sleep 2; curl -sf http://127.0.0.1:18733/live && curl -sf http://127.0.0.1:18733/ready; echo
-  kill %1 2>/dev/null
+  kill $! 2>/dev/null
 done
 
 # 5. token minted
@@ -86,8 +90,10 @@ kubectl -n artemis get secret hatchet-client-config -o jsonpath='{.data.HATCHET_
 
 ### 6. The double-fire gate — run this the MORNING AFTER, not at release time
 
-Two replicas both run every service (`SERVER_SERVICES="all"`). Crons are held to one
-fire by `SKIP LOCKED` on the schedule row, and the controllers and scheduler by the tenant
+Two replicas both run every service (`SERVER_SERVICES="all"`). A cron schedule has one owner
+while that ticker heartbeats within 10 s (`ticker.sql:120`; heartbeat every 5 s, refresh every
+15 s). A ticker that misses two heartbeats hands its schedules over with up to 15 s of dual
+ownership, and a fire carries no dedup key. The controllers and scheduler are held by the tenant
 partitioner. If either mechanism fails, the nightly crons fire twice — and `tombstone-purge`
 performs destructive R2 deletes. Nothing at release time proves this; only a night does.
 
@@ -96,14 +102,18 @@ two** runs, `tombstone-purge` at 03:00 UTC and `drift-detect` at 04:00 UTC, one 
 
 ```sh
 kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d hatchet -tAc \
-  "SELECT date_trunc('day', inserted_at)::date, count(*) FROM v1_runs_olap
-   WHERE inserted_at > now() - interval '2 days' GROUP BY 1 ORDER BY 1"
+  "SELECT date_trunc('hour', r.inserted_at), w.name, count(*)
+   FROM v1_runs_olap r JOIN \"Workflow\" w ON w.id = r.workflow_id
+   WHERE r.inserted_at > now() - interval '2 days'
+     AND w.name IN ('tombstone-purge', 'drift-detect')
+   GROUP BY 1, 2 ORDER BY 1"
 ```
 
-On a day with no deploys this must read `2`. A `4` means the crons double-fired: roll the engine
-back to one replica immediately (section E) and check the `tombstone-purge` audit rows in the
-`artemis` database for duplicate deletes before doing anything else. A count above 2 on a day that
-DID carry deploys is expected — event-driven `gc-site` runs add to it.
+Every row must read `1`: one `tombstone-purge` in the 03:00 bucket and one `drift-detect` in the
+04:00 bucket per day. A `2` on either row means that cron double-fired: roll the engine back to one
+replica immediately (section E) and check the `tombstone-purge` audit rows in the `artemis` database
+for duplicate deletes before doing anything else. `gc-site` is excluded on purpose; its event-driven
+runs vary with deploys and would hide a double fire in a daily total.
 
 ## D. Wire artemis (separate release)
 
@@ -116,6 +126,7 @@ DID carry deploys is expected — event-driven `gc-site` runs add to it.
 ## E. Rollback
 
 - artemis side: unset `HATCHET_ADDR` → worker + relay gate off at next boot; deploys/registry unaffected (stage-1 posture).
+- engine side, immediate: `kubectl -n artemis scale deploy hatchet-engine --replicas=1` takes effect at once. Persist it with the line below, or the next `just release` restores two.
 - engine side, replica count only: `helm -n artemis upgrade hatchet <chart> --reuse-values --set engine.replicas=1` returns the single-replica posture without a teardown. Note this re-opens the ADR-022 §Prerequisite gate, so any destructive artemis write path depending on the engine is back to a single point of failure — tell the artemis owner.
 - engine side, full: `helm -n artemis uninstall hatchet` removes engine + netpols. Secrets `hatchet-config`/`hatchet-client-config` are cluster-side artifacts created by the jobs (not helm-owned) and survive uninstall — keep them unless keyset rotation is intended. The hook resources (bootstrap SA/Role/RoleBinding, `hatchet-env-secret`) also survive uninstall (helm never garbage-collects hooks) — delete manually for full teardown.
 - GC has been live in gxy-management since the SHIP7 cutover (`CLEANUP_DRY_RUN: "false"`, `CLEANUP_BLAST_CAP: "10"`, `values.production.yaml`) — the worker moves real bytes, capped at 10 tombstoned deploys per run. Rolling back (unset `HATCHET_ADDR`) stops new GC runs immediately but does not undo ones already completed; those stay recoverable under `_trash/` for `CLEANUP_RECOVERY_DAYS` (7d default) before the purge cron hard-deletes.
