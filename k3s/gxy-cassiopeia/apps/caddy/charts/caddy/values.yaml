@@ -15,7 +15,7 @@ image:
 metrics:
   port: 9180
 
-goMemLimit: 400MiB
+goMemLimit: 200MiB
 
 resources:
   requests:

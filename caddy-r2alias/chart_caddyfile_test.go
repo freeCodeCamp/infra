@@ -3,6 +3,8 @@ package r2alias_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -102,6 +104,53 @@ func blockAfter(t *testing.T, body, opener string) string {
 	}
 	t.Fatalf("the %q block never closes", opener)
 	return ""
+}
+
+func TestChartMemoryLimitsLeaveHeadroomForTheBudget(t *testing.T) {
+	t.Parallel()
+
+	inFlightMiB, err := strconv.Atoi(chartMaxInFlightBytes)
+	if err != nil {
+		t.Fatalf("parse %s: %v", chartMaxInFlightBytes, err)
+	}
+	inFlightMiB /= 1024 * 1024
+
+	for _, values := range []string{
+		filepath.Join("..", "k3s", "gxy-cassiopeia", "apps", "caddy", "charts", "caddy", "values.yaml"),
+		filepath.Join("..", "k3s", "gxy-cassiopeia", "apps", "caddy", "values.production.yaml"),
+	} {
+		raw, readErr := os.ReadFile(values)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", values, readErr)
+		}
+
+		limits := regexp.MustCompile(`(?m)^\s+memory:\s*(\d+)Mi\s*$`).FindAllStringSubmatch(string(raw), -1)
+		if len(limits) == 0 {
+			t.Fatalf("%s declares no memory limit", values)
+		}
+		podMiB, convErr := strconv.Atoi(limits[len(limits)-1][1])
+		if convErr != nil {
+			t.Fatalf("parse memory limit in %s: %v", values, convErr)
+		}
+
+		soft := regexp.MustCompile(`(?m)^goMemLimit:\s*(\d+)MiB\s*$`).FindStringSubmatch(string(raw))
+		if soft == nil {
+			t.Fatalf("%s sets no goMemLimit, so the soft limit never engages", values)
+		}
+		softMiB, convErr := strconv.Atoi(soft[1])
+		if convErr != nil {
+			t.Fatalf("parse goMemLimit in %s: %v", values, convErr)
+		}
+
+		if softMiB >= podMiB {
+			t.Errorf("%s: goMemLimit %dMiB must sit below the pod limit %dMi or it never engages",
+				values, softMiB, podMiB)
+		}
+		if softMiB <= inFlightMiB {
+			t.Errorf("%s: goMemLimit %dMiB must exceed the %dMiB in-flight budget",
+				values, softMiB, inFlightMiB)
+		}
+	}
 }
 
 func TestChartCaddyfileCarriesTheTestedCachePolicy(t *testing.T) {

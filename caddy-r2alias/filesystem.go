@@ -301,7 +301,7 @@ func (r *R2FS) Open(name string) (fs.File, error) {
 				return nil, ferr
 			}
 
-			held, ferr := r.reweighBudget(loadCtx, weight, int64(len(obj.Body)))
+			held, ferr := r.reweighBudget(weight, int64(len(obj.Body)))
 			if ferr != nil {
 				r.logger.Error("r2 in-flight budget exhausted",
 					zap.String("path", name), zap.Int64("bytes", int64(len(obj.Body))), zap.Error(ferr))
@@ -552,18 +552,16 @@ func (r *R2FS) acquireBudget(ctx context.Context, weight int64) error {
 	return nil
 }
 
-func (r *R2FS) reweighBudget(ctx context.Context, held, actual int64) (int64, error) {
+func (r *R2FS) reweighBudget(held, actual int64) (int64, error) {
 	if actual < 1 {
 		actual = 1
 	}
-	switch {
-	case actual > held:
-		if err := r.acquireBudget(ctx, actual-held); err != nil {
-			r.releaseBudget(held)
-			return 0, err
-		}
-	case actual < held:
-		r.releaseBudget(held - actual)
+	if actual == held {
+		return held, nil
+	}
+	r.releaseBudget(held)
+	if r.budget != nil && !r.budget.TryAcquire(actual) {
+		return 0, fmt.Errorf("caddy.fs.r2: in-flight budget exhausted for %d delivered bytes", actual)
 	}
 	return actual, nil
 }

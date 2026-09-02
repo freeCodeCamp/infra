@@ -368,7 +368,7 @@ func TestR2FS_ReweighBudget_ChargesTheDeliveredBody(t *testing.T) {
 	if err := r.acquireBudget(context.Background(), 16); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	held, err := r.reweighBudget(context.Background(), 16, 64)
+	held, err := r.reweighBudget(16, 64)
 	if err != nil {
 		t.Fatalf("reweigh up: %v", err)
 	}
@@ -391,7 +391,7 @@ func TestR2FS_ReweighBudget_ChargesTheDeliveredBody(t *testing.T) {
 	if err := r.acquireBudget(context.Background(), 64); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	held, err = r.reweighBudget(context.Background(), 64, 8)
+	held, err = r.reweighBudget(64, 8)
 	if err != nil {
 		t.Fatalf("reweigh down: %v", err)
 	}
@@ -400,6 +400,39 @@ func TestR2FS_ReweighBudget_ChargesTheDeliveredBody(t *testing.T) {
 	}
 	if err := r.acquireBudget(context.Background(), 56); err != nil {
 		t.Fatalf("a smaller body must hand the surplus back: %v", err)
+	}
+}
+
+func TestR2FS_ReweighBudget_NeverStallsOnAContendedBudget(t *testing.T) {
+	r := newTestR2FS()
+	r.budget = semaphore.NewWeighted(64)
+
+	for range 2 {
+		if err := r.acquireBudget(context.Background(), 32); err != nil {
+			t.Fatalf("acquire: %v", err)
+		}
+	}
+
+	start := time.Now()
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			_, err := r.reweighBudget(32, 64)
+			results <- err
+		}()
+	}
+
+	failures := 0
+	for range 2 {
+		if err := <-results; err != nil {
+			failures++
+		}
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("two concurrent reweigh-ups must not stall on each other, took %s", elapsed)
+	}
+	if failures == 2 {
+		t.Error("both reweigh attempts failed; one must win the released capacity")
 	}
 }
 
