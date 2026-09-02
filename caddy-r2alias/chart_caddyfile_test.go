@@ -117,6 +117,18 @@ func TestChartCaddyfileCarriesTheTestedCachePolicy(t *testing.T) {
 		t.Errorf("the serving block must not send %q", errorCacheControl)
 	}
 
+	if !strings.Contains(body, ":"+chartMetricsPort+" {") {
+		t.Errorf("the chart must expose the metrics listener on :%s", chartMetricsPort)
+	}
+	values, err := os.ReadFile(filepath.Join("..", "k3s", "gxy-cassiopeia", "apps", "caddy",
+		"charts", "caddy", "values.yaml"))
+	if err != nil {
+		t.Fatalf("read values.yaml: %v", err)
+	}
+	if !strings.Contains(string(values), "port: "+chartMetricsPort) {
+		t.Errorf("values.yaml must publish the same metrics port %s as the Caddyfile", chartMetricsPort)
+	}
+
 	filesystem := blockAfter(t, body, "filesystem r2 r2 {")
 	if !strings.Contains(filesystem, "max_file_size     "+chartMaxFileSize) {
 		t.Errorf("the chart must cap max_file_size at %s bytes; one in-flight fetch buffers that much per request",

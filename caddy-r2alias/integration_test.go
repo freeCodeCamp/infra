@@ -36,6 +36,7 @@ const (
 	documentCacheControl = "public, max-age=0, must-revalidate"
 	errorCacheControl    = "no-store"
 	chartMaxFileSize     = "33554432"
+	chartMetricsPort     = "9180"
 )
 
 // The disk layout is independent of the S3 prefix so one fixture set can back
@@ -118,12 +119,16 @@ func startCaddyWithMaxFileSize(t *testing.T, s3Endpoint string, maxFileSize int6
 
 	handle_errors {
 		header Cache-Control "%s"
+		header -Etag
 
 		@404 expression {err.status_code} == 404
 		respond @404 "Not Found" 404
 
 		@400 expression {err.status_code} == 400
 		respond @400 "Bad Request" 400
+
+		@405 expression {err.status_code} == 405
+		respond @405 "Method Not Allowed" 405
 
 		@503 expression {err.status_code} == 503
 		respond @503 "Service Unavailable" 503
@@ -471,6 +476,109 @@ func TestIntegration_HeadOnASkewedObjectSizesTruthfully(t *testing.T) {
 	if resp.ContentLength != int64(len("SHORT-BODY")) {
 		t.Fatalf("Content-Length: want the true %d, got the HeadObject %d",
 			len("SHORT-BODY"), resp.ContentLength)
+	}
+}
+
+func TestIntegration_ValidatorChangesWithTheDeploy(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	uploadDeployFixtures(t, stub, site, "v2")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	first, _ := doGetResponse(t, tester, site, "/index.html")
+	firstTag := first.Header.Get("Etag")
+	if firstTag == "" {
+		t.Fatal("a served object must carry a validator")
+	}
+
+	stub.putAlias(site, "production", "v2")
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		next, _ := doGetResponse(t, tester, site, "/index.html")
+		if tag := next.Header.Get("Etag"); tag != firstTag {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("the validator never changed after the alias flip: still %s", firstTag)
+}
+
+func TestIntegration_ConditionalRequestAfterAFlipRefetches(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	uploadDeployFixtures(t, stub, site, "v2")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	first, firstBody := doGetResponse(t, tester, site, "/index.html")
+	staleTag := first.Header.Get("Etag")
+	assertBodyContains(t, firstBody, "V1")
+
+	stub.putAlias(site, "production", "v2")
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequest(http.MethodGet,
+			fmt.Sprintf("http://localhost:%d/index.html", caddyHTTPPort), nil)
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		req.Host = site
+		req.Header.Set("If-None-Match", staleTag)
+
+		resp, err := tester.Client.Do(req)
+		if err != nil {
+			t.Fatalf("conditional GET: %v", err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == http.StatusNotModified {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status: want 200, got %d", resp.StatusCode)
+		}
+		assertBodyContains(t, string(body), "V2")
+		return
+	}
+	t.Fatal("a stale validator kept answering 304 after the alias flip")
+}
+
+func TestIntegration_UnsupportedMethodAnswers405(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	req, err := http.NewRequest(http.MethodDelete,
+		fmt.Sprintf("http://localhost:%d/index.html", caddyHTTPPort), nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Host = site
+
+	resp, err := tester.Client.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE /index.html: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("status: want 405, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Etag"); got != "" {
+		t.Errorf("an error response must not carry a validator, got %q", got)
 	}
 }
 

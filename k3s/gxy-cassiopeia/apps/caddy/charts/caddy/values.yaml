@@ -12,6 +12,9 @@ image:
   tag: "dev"
   pullPolicy: IfNotPresent
 
+metrics:
+  port: 9180
+
 resources:
   requests:
     cpu: 50m

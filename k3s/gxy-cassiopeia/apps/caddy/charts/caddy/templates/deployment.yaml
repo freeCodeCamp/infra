@@ -39,6 +39,9 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
           envFrom:
             - secretRef:
                 name: {{ .Release.Name }}-r2-credentials

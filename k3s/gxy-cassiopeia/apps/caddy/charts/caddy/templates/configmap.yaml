@@ -13,18 +13,26 @@ data:
 
       order r2_alias before file_server
 
+      servers {
+        metrics
+      }
+
       filesystem r2 r2 {
-        bucket            {$R2_BUCKET}
-        endpoint          {$R2_ENDPOINT}
+        bucket            {env.R2_BUCKET}
+        endpoint          {env.R2_ENDPOINT}
         region            auto
-        access_key_id     {$AWS_ACCESS_KEY_ID}
-        secret_access_key {$AWS_SECRET_ACCESS_KEY}
+        access_key_id     {env.AWS_ACCESS_KEY_ID}
+        secret_access_key {env.AWS_SECRET_ACCESS_KEY}
         use_path_style
         max_file_size     33554432
         # Code defaults, not set here. Truth lives in the named constants in
         # caddy-r2alias/filesystem.go.
         #   (no knob)      30s      opTimeout, bounds every S3 round trip
       }
+    }
+
+    :9180 {
+      metrics /metrics
     }
 
     :80 {
@@ -47,11 +55,11 @@ data:
         header Cache-Control "public, max-age=0, must-revalidate"
 
         r2_alias {
-          bucket            {$R2_BUCKET}
-          endpoint          {$R2_ENDPOINT}
+          bucket            {env.R2_BUCKET}
+          endpoint          {env.R2_ENDPOINT}
           region            auto
-          access_key_id     {$AWS_ACCESS_KEY_ID}
-          secret_access_key {$AWS_SECRET_ACCESS_KEY}
+          access_key_id     {env.AWS_ACCESS_KEY_ID}
+          secret_access_key {env.AWS_SECRET_ACCESS_KEY}
           cache_ttl         15s
           cache_max_entries 10000
           # Code defaults, not set here. Truth lives in the named constants in
@@ -71,12 +79,16 @@ data:
 
       handle_errors {
         header Cache-Control "no-store"
+        header -Etag
 
         @404 expression {err.status_code} == 404
         respond @404 "Not Found" 404
 
         @400 expression {err.status_code} == 400
         respond @400 "Bad Request" 400
+
+        @405 expression {err.status_code} == 405
+        respond @405 "Method Not Allowed" 405
 
         @503 expression {err.status_code} == 503
         respond @503 "Service Unavailable" 503
