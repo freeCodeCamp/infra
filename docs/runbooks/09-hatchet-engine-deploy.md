@@ -2,13 +2,13 @@
 
 Stands up the Hatchet durable-execution engine for artemis (ADR-020, artemis design 0001). Engine-only footprint: no api, no dashboard. Everything lands in the **artemis namespace**, sharing the bundled Postgres `hatchet` tenant created by the artemis chart.
 
-All facts below were verified against hatchet v0.88.6 source (`pkg/config/server/server.go`, `cmd/hatchet-engine/engine/run.go`, `cmd/hatchet-admin/cli/k8s.go`, upstream `docker-compose.release.yml`).
+All facts below were verified against hatchet v0.91.2 source (re-derived from v0.88.6 on 2026-09-03; every cited line held except `runV1Config` 535→537 and its `Healthcheck` read 561→563) (`pkg/config/server/server.go`, `cmd/hatchet-engine/engine/run.go`, `cmd/hatchet-admin/cli/k8s.go`, upstream `docker-compose.release.yml`).
 
 ## Invariants
 
 | invariant                                                             | why                                                                                                                                                    |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Engine image tag == artemis `go.mod` hatchet version (v0.88.6)        | monorepo lockstep: one git tag builds engine images and the Go SDK                                                                                     |
+| Engine image tag == artemis `go.mod` hatchet version (v0.91.2)        | monorepo lockstep: one git tag builds engine images and the Go SDK                                                                                     |
 | `SERVER_GRPC_PORT=7077` everywhere                                    | binary default is **7070**; platform contract (artemis netpol, `HATCHET_ADDR`, upstream release compose) is 7077                                       |
 | `SERVER_SERVICES="all health"`                                        | `all` routes to `runV1Config`, where `/live` + `/ready` start from `Runtime.Healthcheck` (`SERVER_HEALTHCHECK`, default true), NOT from this list. `health` is inert on v0.88.6; kept so a downgrade to the V0 path, where `HasService()` exact-match does require it, still starts the probes |
 | `SERVER_MSGQUEUE_KIND=postgres`                                       | binary default is rabbitmq; postgres is the supported single-store mode (`oneof=rabbitmq postgres`)                                                    |
@@ -49,7 +49,7 @@ the crons on its next 15 s poll; a missed minute is not backfilled, so a release
 Hook order (all idempotent):
 
 1. `hatchet-quickstart` (pre, -10) — `hatchet-admin k8s quickstart` generates cookie secrets + 3 encryption keysets into Secret `hatchet-config` (only fills missing keys).
-1. `hatchet-migrate` (pre, -5) — schema migrations on the hatchet DB.
+1. `hatchet-migrate` (pre, -5) — schema migrations on the hatchet DB. The v0.88.6 → v0.91.2 bump applies four (`v1_0_116` to `v1_0_119`, `cmd/hatchet-migrate/migrate/migrations`, 201 → 205 files).
 1. `hatchet-seed` (pre, -4) — creates the default tenant `707d0855-80ab-4e1f-a156-f1c4546cbf52` if absent.
 1. engine Deployment rolls out.
 1. `hatchet-worker-token` (post, +5) — mints `HATCHET_CLIENT_TOKEN` into Secret `hatchet-client-config` (100y expiry; broadcast address claim = `hatchet-engine.artemis.svc.cluster.local:7077`).
@@ -129,4 +129,5 @@ runs vary with deploys and would hide a double fire in a daily total.
 - engine side, immediate: `kubectl -n artemis scale deploy hatchet-engine --replicas=1` takes effect at once. Persist it with the line below, or the next `just release` restores two.
 - engine side, replica count only: `helm -n artemis upgrade hatchet <chart> --reuse-values --set engine.replicas=1` returns the single-replica posture without a teardown. Note this re-opens the ADR-022 §Prerequisite gate, so any destructive artemis write path depending on the engine is back to a single point of failure — tell the artemis owner.
 - engine side, full: `helm -n artemis uninstall hatchet` removes engine + netpols. Secrets `hatchet-config`/`hatchet-client-config` are cluster-side artifacts created by the jobs (not helm-owned) and survive uninstall — keep them unless keyset rotation is intended. The hook resources (bootstrap SA/Role/RoleBinding, `hatchet-env-secret`) also survive uninstall (helm never garbage-collects hooks) — delete manually for full teardown.
+- engine side, after the v0.91.2 bump: prefer scale-to-one on the new image. An image downgrade to v0.88.6 leaves `v1_0_116`–`v1_0_119` applied. 116–118 are additive (an index swap on `v1_runs_olap`, two defaulted columns on `v1_durable_event_log_entry`, the new `tenant_entitlement` table) and the old engine runs against them. 119 replaces `convert_duration_to_interval` with a superset parser that keeps the legacy `d`/`w`/`y` forms; the v0.88.6 engine's nine call sites run against the new body unproven. Reverse the schema with the goose `Down` sections of those four files before an image downgrade.
 - GC has been live in gxy-management since the SHIP7 cutover (`CLEANUP_DRY_RUN: "false"`, `CLEANUP_BLAST_CAP: "10"`, `values.production.yaml`) — the worker moves real bytes, capped at 10 tombstoned deploys per run. Rolling back (unset `HATCHET_ADDR`) stops new GC runs immediately but does not undo ones already completed; those stay recoverable under `_trash/` for `CLEANUP_RECOVERY_DAYS` (7d default) before the purge cron hard-deletes.

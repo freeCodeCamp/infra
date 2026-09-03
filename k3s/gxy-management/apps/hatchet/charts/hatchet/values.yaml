@@ -15,15 +15,15 @@ namespace: artemis
 images:
   # Digest-pin at release time (tags float). All three MUST carry the
   # same version.
-  engine: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.88.6
-  migrate: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.88.6
-  admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.88.6
+  engine: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.91.2
+  migrate: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.91.2
+  admin: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.91.2
 
 engine:
   # Two replicas. TWO mechanisms make that safe, and the cron one alone
   # is not enough — SERVER_SERVICES is "all", so both replicas run every
   # service, not just the ticker.
-  #   1. Crons: v0.88.6 claims each schedule with FOR UPDATE OF
+  #   1. Crons: v0.91.2 claims each schedule with FOR UPDATE OF
   #      cronSchedule SKIP LOCKED gated on a heartbeat check
   #      (pkg/repository/sqlcv1/ticker.sql:96-160, lock at :124), so a
   #      schedule has one owner while that ticker heartbeats within
@@ -53,7 +53,7 @@ engine:
   # /live /ready). On the V1 path ("all") the probe server starts from
   # Runtime.Healthcheck (SERVER_HEALTHCHECK, default true), not from the
   # service list; "health" in SERVER_SERVICES only matters on the V0
-  # path (cmd/hatchet-engine/engine/run.go:161 vs :561).
+  # path (cmd/hatchet-engine/engine/run.go:161 vs :563).
   healthPort: 8733
   # Upstream defaults: MaxConns 50 (pkg/config/database/config.go:26)
   # and a DDL pool of 5 (config.go:36), both dialling DATABASE_URL.

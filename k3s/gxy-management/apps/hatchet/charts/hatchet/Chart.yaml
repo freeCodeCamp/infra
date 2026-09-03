@@ -7,5 +7,5 @@ description: >-
   Engine image tag MUST stay in lockstep with the artemis go.mod
   hatchet module version (monorepo single-tag releases).
 type: application
-version: 0.5.0
-appVersion: "0.88.6"
+version: 0.5.1
+appVersion: "0.91.2"

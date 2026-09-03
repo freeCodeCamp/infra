@@ -89,7 +89,7 @@ Windmill retired 2026-07-07 — this section covered its helm install / PG resto
 
 ### B.1 Helm install
 
-Hatchet engine (v0.88.6) lands entirely in the **`artemis` namespace**, sharing the artemis-bundled PostgreSQL `hatchet` tenant — no separate `hatchet` namespace, no dashboard/API surface (engine-only, ClusterIP, no ingress). Full deploy detail, invariants, and hook ordering: [`../runbooks/09-hatchet-engine-deploy.md`](../runbooks/09-hatchet-engine-deploy.md).
+Hatchet engine (v0.91.2) lands entirely in the **`artemis` namespace**, sharing the artemis-bundled PostgreSQL `hatchet` tenant — no separate `hatchet` namespace, no dashboard/API surface (engine-only, ClusterIP, no ingress). Full deploy detail, invariants, and hook ordering: [`../runbooks/09-hatchet-engine-deploy.md`](../runbooks/09-hatchet-engine-deploy.md).
 
 ```bash
 cd ~/DEV/fCC/infra

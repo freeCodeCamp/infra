@@ -90,7 +90,7 @@ spec:
             # egress CNP drops it (PG+DNS only); disable at source.
             - name: SERVER_SECURITY_CHECK_ENABLED
               value: "false"
-            # "health" is INERT on v0.88.6 and kept only so a downgrade
+            # "health" is INERT on v0.91.2 (run.go:161 vs :563) and kept only so a downgrade
             # to the V0 path still starts the probes. "all" routes to
             # runV1Config, where /live + /ready come from
             # Runtime.Healthcheck (SERVER_HEALTHCHECK, default true) and
