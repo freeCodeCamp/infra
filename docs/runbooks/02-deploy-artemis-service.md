@@ -79,7 +79,7 @@ sops -d --input-type dotenv --output-type dotenv "$SOT" > "$TMP_DOT"
   echo "secretEnv:"
   while IFS='=' read -r KEY VAL; do
     case "$KEY" in
-      R2_ENDPOINT|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|GH_CLIENT_ID|JWT_SIGNING_KEY|VALKEY_PASSWORD|SENTRY_DSN|POSTGRES_PASSWORD|ARTEMIS_DB_PASSWORD|HATCHET_DB_PASSWORD)
+      R2_ENDPOINT|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|GH_CLIENT_ID|JWT_SIGNING_KEY|VALKEY_PASSWORD|SENTRY_DSN|POSTGRES_PASSWORD|ARTEMIS_DB_PASSWORD|HATCHET_DB_PASSWORD|CLOUDFLARE_ZONE_ID|CLOUDFLARE_API_TOKEN)
         ESC=$(printf '%s' "$VAL" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
         printf '  %s: "%s"\n' "$KEY" "$ESC"
         ;;
@@ -95,7 +95,7 @@ echo "Sealed $TGT"
 
 No TLS material — CF Flexible SSL on `freecode.camp` (see §2).
 
-The glob seals ten keys. The first six (`R2_*`, `GH_CLIENT_ID`, `JWT_SIGNING_KEY`, `VALKEY_PASSWORD`) are the always-required deploy-proxy secrets. `SENTRY_DSN` is optional — supply it (recommended in production) to enable external Sentry; if omitted, artemis runs with Sentry disabled (empty DSN = SDK off, per `internal/config` in the artemis repo). The chart never fails on a missing DSN; instead `NOTES.txt` prints a warning on `helm upgrade` when `env.ENVIRONMENT` is non-development. The last three (`POSTGRES_PASSWORD`, `ARTEMIS_DB_PASSWORD`, `HATCHET_DB_PASSWORD`) are durable-execution secrets the chart hard-requires once `postgres.enabled` is true — the `secret-env.yaml` template wraps them in `{{- if .Values.postgres.enabled }}` `required` guards, so a missing key fails the helm upgrade with `.Values.secretEnv.<KEY> is required when postgres.enabled`. Add all three to the dotenv SOT (`management/artemis.env.enc`) before sealing if you are deploying the durable-exec profile (production overlay flips `postgres.enabled: true`). `HATCHET_CLIENT_TOKEN` is NOT sealed here at mint time — it is minted from the live Hatchet engine in stage-2 (see §Staged durable-exec bootstrap).
+The glob seals twelve keys. The first six (`R2_*`, `GH_CLIENT_ID`, `JWT_SIGNING_KEY`, `VALKEY_PASSWORD`) are the always-required deploy-proxy secrets. `SENTRY_DSN` is optional — supply it (recommended in production) to enable external Sentry; if omitted, artemis runs with Sentry disabled (empty DSN = SDK off, per `internal/config` in the artemis repo). The chart never fails on a missing DSN; instead `NOTES.txt` prints a warning on `helm upgrade` when `env.ENVIRONMENT` is non-development. The last three (`POSTGRES_PASSWORD`, `ARTEMIS_DB_PASSWORD`, `HATCHET_DB_PASSWORD`) are durable-execution secrets the chart hard-requires once `postgres.enabled` is true — the `secret-env.yaml` template wraps them in `{{- if .Values.postgres.enabled }}` `required` guards, so a missing key fails the helm upgrade with `.Values.secretEnv.<KEY> is required when postgres.enabled`. Add all three to the dotenv SOT (`management/artemis.env.enc`) before sealing if you are deploying the durable-exec profile (production overlay flips `postgres.enabled: true`). `HATCHET_CLIENT_TOKEN` is NOT sealed here at mint time — it is minted from the live Hatchet engine in stage-2 (see §Staged durable-exec bootstrap).
 
 After it succeeds, commit the new `.enc` from infra-secrets:
 
