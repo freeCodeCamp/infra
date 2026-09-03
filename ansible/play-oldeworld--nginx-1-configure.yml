@@ -3,7 +3,12 @@
   hosts: '{{ variable_host | default("null") }}'
   become: true
   vars:
-    pxy_env: '{{ variable_pxy_env }}'
+    pxy_env: '{{ variable_pxy_env | default("<unset>") }}'
+
+  pre_tasks:
+    - name: Check the upstream environment
+      include_tasks: roles/nginx/tasks/assert-pxy-env.yml
+
   roles:
     - dns # Configure ansible facts for networking info lookup
 

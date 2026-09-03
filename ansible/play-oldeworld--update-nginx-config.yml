@@ -3,6 +3,12 @@
   hosts: '{{ variable_host | default("null") }}'
   become: true
   serial: "{{ ansible_play_batch | length }}"
+  vars:
+    pxy_env: '{{ variable_pxy_env | default("<unset>") }}'
+
+  pre_tasks:
+    - name: Check the upstream environment
+      include_tasks: roles/nginx/tasks/assert-pxy-env.yml
 
   tasks:
     - name: Update Git Repository
@@ -17,10 +23,12 @@
         accept_hostkey: true
       register: git_update
 
+    - name: Link the upstreams to the tracked config
+      include_tasks: roles/nginx/tasks/link-upstreams.yml
+
     - name: Check if Git Repository was Updated
       debug:
-        msg:
-          'Git Repository was updated, will run NGINX config check and reload.'
+        msg: "Git Repository was updated, will run NGINX config check and reload."
       when: git_update.changed
 
     - name: Check NGINX Config

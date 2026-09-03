@@ -1,0 +1,5 @@
+---
+- name: Check the upstream environment
+  assert:
+    that: pxy_env in ["prd", "stg"]
+    fail_msg: "variable_pxy_env must be prd or stg, got: {{ pxy_env }}"

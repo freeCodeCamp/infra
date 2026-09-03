@@ -43,10 +43,5 @@
     group: root
     mode: 0644
 
-- name: Copy the Upstream configs directory from the local machine
-  copy:
-    src: "{{ playbook_dir }}/files/nginx/configs/{{ pxy_env }}/upstreams.conf"
-    dest: /etc/nginx/configs/
-    owner: root
-    group: root
-    mode: 0644
+- name: Link the upstreams to the tracked config
+  include_tasks: link-upstreams.yml
