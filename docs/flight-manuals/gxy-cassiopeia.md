@@ -278,16 +278,13 @@ G5 (Valkey running), G6 (artemis with `REGISTRY_BACKEND=valkey`), G9-G11 (regist
 
 ### CF cache shows old deploy after promote
 
-CF edge caches the alias-resolved bytes for the cache TTL. Targeted purge via CF API is the surgical option:
+Caddy sends `Cache-Control: public, max-age=0, must-revalidate` on every served object (`charts/caddy/templates/configmap.yaml`), so the Cloudflare edge revalidates each request against the origin and answers `cf-cache-status: REVALIDATED` (assets) or `DYNAMIC` (HTML). The only cache in the path is Caddy's own `r2_alias` lookup, 15 s. Stale content past 15 s means the alias object in R2 still points at the old deploy, not an edge cache. Check the alias, not the CDN:
 
 ```
-curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
-  -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data '{"files":["https://test.freecode.camp/index.html"]}'
+curl -sI https://<site>.freecode.camp/<asset> | grep -iE 'cache-control|cf-cache-status|etag'
 ```
 
-Zone-wide purge is available in CF dashboard → Caching → Purge Everything. Use sparingly.
+The ETag is the deploy id the serve plane resolved.
 
 ### Cilium / MTU pinning regression
 

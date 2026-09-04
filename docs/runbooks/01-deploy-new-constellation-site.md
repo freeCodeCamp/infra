@@ -194,7 +194,7 @@ ______________________________________________________________________
 | Preview URL returns 502                      | artemis pod unhealthy or rate-limited               | check `https://uploads.freecode.camp/healthz`; ping ops                                        |
 | `build.command` fails                        | command not present, deps missing                   | run command locally first; install deps in CI step                                             |
 | 429 on bulk upload                           | Traefik middleware rate-limit tripped               | retry after 1 second; tune `rateLimit.average` in chart values                                 |
-| Production URL stale after `promote`         | CF edge cache still hot                             | wait 30 seconds; if persistent, purge CF cache for the site                                    |
+| Production URL stale after `promote`         | Caddy alias cache (15s TTL)                         | wait 30 seconds; if persistent, check `cf-cache-status` is `REVALIDATED`, then the alias object in R2 |
 
 ## Cross-references
 
