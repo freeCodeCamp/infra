@@ -1,0 +1,44 @@
+# Grafana — ops-o11y.
+# Chart: grafana 13.1.0 (https://grafana-community.github.io/helm-charts).
+# The grafana/helm-charts copy is deprecated at 10.5.15; always pass --repo.
+
+rbac:
+  create: false
+
+automountServiceAccountToken: false
+
+service:
+  type: NodePort
+  nodePort: 30300
+
+persistence:
+  enabled: true
+  storageClassName: local-path
+  size: 2Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 300Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+plugins:
+  - victoriametrics-logs-datasource@0.31.0@https://grafana.com/api/plugins/victoriametrics-logs-datasource/versions/0.31.0/download
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: VictoriaMetrics
+        type: prometheus
+        uid: victoriametrics
+        access: proxy
+        url: http://victoria-metrics-victoria-metrics-single-server.o11y.svc:8428
+        isDefault: true
+      - name: VictoriaLogs
+        type: victoriametrics-logs-datasource
+        uid: victorialogs
+        access: proxy
+        url: http://victoria-logs-victoria-logs-single-server.o11y.svc:9428

@@ -1,0 +1,16 @@
+# k3s CoreDNS imports /etc/coredns/custom/*.server from this optional ConfigMap.
+# https://docs.k3s.io/advanced#coredns-custom-configuration-imports
+# Scrape targets are MagicDNS names, so the cluster resolver must forward
+# ts.net to the Tailscale resolver at 100.100.100.100.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  ts.net.server: |
+    ts.net:53 {
+        errors
+        cache 30
+        forward . 100.100.100.100
+    }

@@ -1,0 +1,172 @@
+# VictoriaMetrics single-node — ops-o11y.
+# Chart: victoria-metrics-single 0.45.0 (https://victoriametrics.github.io/helm-charts).
+# Chart version pin is set at install time — see docs/runbooks/14-o11y-node-bringup.md.
+
+rbac:
+  create: false
+
+serviceAccount:
+  automountToken: false
+
+server:
+  image:
+    # Chart 0.45.0 ships appVersion v1.150.0; the resolved app version is v1.151.0.
+    tag: v1.151.0
+
+  retentionPeriod: 12
+
+  persistentVolume:
+    enabled: true
+    storageClassName: local-path
+    size: 50Gi
+
+  # 3Gi is the node's share, not a downgrade: -memory.allowedPercent=60 sizes
+  # the caches from the cgroup limit, so 3Gi still yields ~1.8 GiB of cache
+  # against ~98k active series. The 8 GB node must also hold k3s and Grafana.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1800Mi
+    limits:
+      cpu: 3000m
+      memory: 3Gi
+
+  extraArgs:
+    storage.minFreeDiskSpaceBytes: "20GB"
+    storage.maxDailySeries: "500000"
+    promscrape.config.strictParse: "true"
+    search.maxConcurrentRequests: "2"
+    search.maxMemoryPerQuery: "512MB"
+    search.logQueryMemoryUsage: "256MB"
+
+  extraVolumes:
+    - name: linode-sd-token
+      secret:
+        secretName: vm-linode-sd
+
+  extraVolumeMounts:
+    - name: linode-sd-token
+      mountPath: /etc/vm/secrets
+      readOnly: true
+
+  scrape:
+    enabled: true
+    config:
+      global:
+        scrape_interval: 60s
+        scrape_timeout: 15s
+        external_labels:
+          cluster: ops-o11y
+
+      scrape_configs:
+        - job_name: vmsingle
+          static_configs:
+            - targets:
+                - 127.0.0.1:8428
+              labels:
+                instance: ops-vm-o11y-k3s-fra1-01
+                provider: digitalocean
+                region: fra1
+
+        - job_name: o11y-node
+          static_configs:
+            - targets:
+                - ops-vm-o11y-k3s-fra1-01.batfish-ray.ts.net:9100
+              labels:
+                instance: ops-vm-o11y-k3s-fra1-01
+                provider: digitalocean
+                region: fra1
+                role: o11y
+
+        - job_name: node
+          scheme: http
+          metrics_path: /metrics
+
+          linode_sd_configs:
+            - port: 9100
+              tag_separator: ","
+              authorization:
+                type: Bearer
+                credentials_file: /etc/vm/secrets/LINODE_API_TOKEN
+
+          # Hetzner bare metal joins this same job so job="node" spans the
+          # provider migration on one dashboard. The `robot` role requires
+          # basic_auth; `hcloud` requires authorization. The mounted Secret
+          # carries only LINODE_API_TOKEN today: recreate vm-linode-sd with
+          # HETZNER_ROBOT_USER and HETZNER_ROBOT_PASS before uncommenting.
+          # Uncomment together with the __meta_hetzner_* relabel rules at the
+          # end of this job, once the estate is on the tailnet and runs
+          # node_exporter.
+          # hetzner_sd_configs:
+          #   - role: robot
+          #     port: 9100
+          #     basic_auth:
+          #       username_file: /etc/vm/secrets/HETZNER_ROBOT_USER
+          #       password_file: /etc/vm/secrets/HETZNER_ROBOT_PASS
+
+          relabel_configs:
+            - source_labels: [__meta_linode_instance_label]
+              regex: (.+)
+              target_label: __address__
+              replacement: ${1}.batfish-ray.ts.net:9100
+
+            - source_labels: [__meta_linode_instance_label]
+              regex: (.+)
+              target_label: instance
+
+            - source_labels: [__meta_linode_instance_id]
+              regex: (.+)
+              target_label: provider
+              replacement: linode
+
+            - source_labels: [__meta_linode_region]
+              regex: (.+)
+              target_label: region
+
+            - source_labels: [__meta_linode_tags]
+              regex: .*,(prd|stg|ops),.*
+              target_label: env
+              replacement: $1
+
+            - source_labels: [__meta_linode_tags]
+              regex: .*,(clt|api|jms|pxy|nws|backoffice),.*
+              target_label: role
+              replacement: $1
+
+            - source_labels: [__meta_linode_tags]
+              regex: .*,(ara|chn|cnt|eng|esp|ger|ita|jpn|kor|por|swa|ukr),.*
+              target_label: language
+              replacement: $1
+
+            - source_labels: [__meta_linode_tags]
+              regex: .*,(new_api|old_api),.*
+              target_label: variant
+              replacement: $1
+
+            - source_labels: [__meta_linode_tags]
+              regex: .*,oldeworld,.*
+              target_label: estate
+              replacement: oldeworld
+
+            # - source_labels: [__meta_hetzner_server_name]
+            #   regex: (.+)
+            #   target_label: __address__
+            #   replacement: ${1}.batfish-ray.ts.net:9100
+            # - source_labels: [__meta_hetzner_server_name]
+            #   regex: (.+)
+            #   target_label: instance
+            # - source_labels: [__meta_hetzner_server_id]
+            #   regex: (.+)
+            #   target_label: provider
+            #   replacement: hetzner
+            # - source_labels: [__meta_hetzner_robot_datacenter]
+            #   regex: (.+)
+            #   target_label: region
+
+            # Security invariant: node_exporter binds the tailnet address only,
+            # and Linode SD yields a Linode-routable address. This rule runs
+            # last, after every provider rewrite, so a target the rewrites
+            # missed is dropped rather than scraped over a public path.
+            - source_labels: [__address__]
+              regex: '.+\.batfish-ray\.ts\.net:9100'
+              action: keep
