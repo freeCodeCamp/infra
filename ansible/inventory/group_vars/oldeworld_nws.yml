@@ -1,3 +1,2 @@
 ---
-node_exporter_systemd_unit_include:
-  "^(cron|ghost_.+|node_exporter|ssh|tailscaled)[.]service"
+node_exporter_systemd_unit_include: "^(cron|ghost_.+|node_exporter|ssh|tailscaled)[.]service"

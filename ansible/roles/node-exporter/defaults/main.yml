@@ -10,10 +10,8 @@ node_exporter_port: 9100
 node_exporter_user: node_exporter
 node_exporter_group: node_exporter
 
-node_exporter_archive_path:
-  "/usr/local/src/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-node_exporter_unpack_dir:
-  "/usr/local/lib/node_exporter-{{ node_exporter_version }}"
+node_exporter_archive_path: "/usr/local/src/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+node_exporter_unpack_dir: "/usr/local/lib/node_exporter-{{ node_exporter_version }}"
 node_exporter_binary: /usr/local/bin/node_exporter
 node_exporter_launcher: /usr/local/bin/node-exporter-launch
 node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector

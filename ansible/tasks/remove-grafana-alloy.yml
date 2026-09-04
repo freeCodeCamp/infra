@@ -12,8 +12,7 @@
 
 - name: Record whether this host carries Grafana Alloy
   ansible.builtin.set_fact:
-    alloy_present:
-      "{{ alloy_artefacts.results | selectattr('stat.exists') | list | length > 0 }}"
+    alloy_present: "{{ alloy_artefacts.results | selectattr('stat.exists') | list | length > 0 }}"
 
 - name: Stop and disable Grafana Alloy
   ansible.builtin.systemd:
