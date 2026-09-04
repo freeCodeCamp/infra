@@ -1,0 +1,127 @@
+---
+# Deploy the observability stack onto the ops-o11y cluster.
+#
+# Idempotent. Reconciles CoreDNS, the namespace, the Linode service-discovery
+# Secret and every Helm release named in group_vars.
+#
+# Prerequisites:
+#   - play-k3s--single-node.yml has run, so k3s/<cluster>/.kubeconfig.yaml exists
+#   - LINODE_API_TOKEN in the environment (direnv)
+#
+# Usage:
+#   ansible-playbook -i inventory/digitalocean.yml play-o11y--0-deploy.yml \
+#     -e variable_host=ops_o11y
+#
+#   Add -e o11y_deploy_logs=true to include VictoriaLogs.
+
+- name: o11y - Deploy the stack
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
+  become: false
+  connection: local
+  vars:
+    cluster_dir: "{{ playbook_dir }}/../k3s/{{ cluster_name }}"
+    kubeconfig: "{{ cluster_dir }}/.kubeconfig.yaml"
+    linode_api_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
+    releases: "{{ o11y_releases + (o11y_log_releases if o11y_deploy_logs | bool else []) }}"
+
+  tasks:
+    - name: Check the kubeconfig exists
+      stat:
+        path: "{{ kubeconfig }}"
+      register: kubeconfig_file
+
+    - name: Check the cluster is reachable
+      assert:
+        that: kubeconfig_file.stat.exists
+        fail_msg: >-
+          {{ kubeconfig }} is missing. Run play-k3s--single-node.yml first.
+
+    - name: Check the Linode token is present
+      assert:
+        that: linode_api_token | length > 0
+        fail_msg: >-
+          LINODE_API_TOKEN is empty. It lives in the INFRA_ADMIN-gated
+          global/.env.enc envelope; export INFRA_ADMIN=1 and reload direnv, or
+          move it to a scoped envelope that ansible/.envrc loads.
+
+    - name: Forward ts.net queries to the tailnet resolver
+      kubernetes.core.k8s:
+        src: "{{ cluster_dir }}/cluster/coredns/coredns-custom.yaml"
+        state: present
+        kubeconfig: "{{ kubeconfig }}"
+
+    - name: Restart CoreDNS to pick up the forward
+      kubernetes.core.k8s:
+        api_version: apps/v1
+        kind: Deployment
+        name: coredns
+        namespace: kube-system
+        state: patched
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          spec:
+            template:
+              metadata:
+                annotations:
+                  fcc.dev/coredns-custom: "{{ lookup('file', cluster_dir ~ '/cluster/coredns/coredns-custom.yaml') | hash('sha1') }}"
+
+    - name: Create the namespace
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ o11y_namespace }}"
+        state: present
+        kubeconfig: "{{ kubeconfig }}"
+
+    # The Secret key becomes the mounted filename. The scrape config reads
+    # /etc/vm/secrets/LINODE_API_TOKEN; renaming the key breaks discovery.
+    - name: Create the service-discovery secret
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          apiVersion: v1
+          kind: Secret
+          type: Opaque
+          metadata:
+            name: "{{ o11y_sd_secret }}"
+            namespace: "{{ o11y_namespace }}"
+          stringData:
+            LINODE_API_TOKEN: "{{ linode_api_token }}"
+      no_log: true
+      diff: false
+
+    - name: Deploy the releases
+      kubernetes.core.helm:
+        name: "{{ item.name }}"
+        chart_ref: "{{ item.chart }}"
+        chart_repo_url: "{{ item.repo }}"
+        chart_version: "{{ item.version }}"
+        release_namespace: "{{ o11y_namespace }}"
+        release_state: present
+        values_files:
+          - "{{ cluster_dir }}/{{ item.values }}"
+        kubeconfig: "{{ kubeconfig }}"
+        wait: true
+        wait_timeout: 5m
+      loop: "{{ releases }}"
+      loop_control:
+        label: "{{ item.name }} {{ item.chart }}-{{ item.version }}"
+
+    - name: Wait for the workloads to roll out
+      command: >-
+        kubectl -n {{ o11y_namespace }} rollout status {{ item.rollout }}
+        --timeout=300s
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      loop: "{{ releases }}"
+      loop_control:
+        label: "{{ item.rollout }}"
+      changed_when: false
+
+    - name: Report
+      debug:
+        msg: >-
+          {{ o11y_namespace }} ready —
+          {{ releases | map(attribute='name') | join(', ') }}

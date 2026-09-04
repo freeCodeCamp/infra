@@ -29,7 +29,7 @@ Every command below pastes into a bare shell from the repo root. No `direnv`, no
 | 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                | mint at <https://cloud.linode.com/profile/tokens>  |
 | 6   | `helm` >= 3.14 and `kubectl` on PATH                                                            | `helm version --short && kubectl version --client` |
 | 7   | Root shell on the node, by Tailscale SSH grant or key                                           | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
-| 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                | separate Ansible task; step 5 counts it            |
+| 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100               | separate Ansible task; step 5 counts it            |
 
 Precondition 8 is easy to skip. This node is the one host whose disk and memory the whole design turns on, and without its own node_exporter it is the only machine in the estate that the monitoring cannot see.
 
@@ -38,6 +38,26 @@ Preconditions 2, 3, 4 and 8 are outside this repo. Confirm them before starting;
 Precondition 7 is easy to miss. Tailscale SSH refuses any identity the tailnet policy does not grant, and `/etc/rancher/k3s/k3s.yaml` is mode 0600 root-owned, so a non-root login needs `sudo cat` in step 1. Steps 1, 6, the disk-budget reading and teardown all need this shell.
 
 ## Steps
+
+> **The playbooks are the mechanism. These steps are the explanation and the fallback.**
+>
+> ```sh
+> ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml -e variable_host=ops_o11y
+> ansible-playbook -i inventory/digitalocean.yml play-o11y--0-deploy.yml   -e variable_host=ops_o11y
+> ```
+>
+> The first bootstraps the node and writes the kubeconfig, superseding **step 1** and
+> **step 6** — do not apply step 6's config block by hand, because
+> `play-k3s--single-node.yml` owns `/etc/rancher/k3s/config.yaml` and will revert it.
+> The second reconciles CoreDNS, the namespace, the service-discovery Secret and every
+> Helm release, superseding **steps 2, 3, 4, 7** and **9**. Add
+> `-e o11y_deploy_logs=true` for VictoriaLogs.
+>
+> **Step 5 needs T38.** It verifies fleet targets are up, and nothing has `node_exporter`
+> until the rollout playbook has run. Expect 80 targets down before then.
+>
+> Read the steps below to understand what the playbooks do, to verify afterwards, or to
+> recover by hand when a playbook cannot run.
 
 ### 1. Kubeconfig
 
@@ -183,7 +203,7 @@ print("off-tailnet:", len(bad), [x["scrapeUrl"] for x in bad][:5])
 
 Expect `by job: {'node': 80, 'o11y-node': 1, 'vmsingle': 1}`, `health: {'up': 82}`, `dropped: 0` and `off-tailnet: 0`.
 
-`off-tailnet` proves the invariant is armed rather than catching a leak: Linode SD hands out the public IPv4, a relabel rule rewrites it to the tailnet name, and a final `keep` rule drops any target that rewrite missed. A miss therefore shows up as a *missing* target and a non-zero `dropped` count, never as a scrape over a Linode-routable path.
+`off-tailnet` proves the invariant is armed rather than catching a leak: Linode SD hands out the public IPv4, a relabel rule rewrites it to the tailnet name, and a final `keep` rule drops any target that rewrite missed. A miss therefore shows up as a _missing_ target and a non-zero `dropped` count, never as a scrape over a Linode-routable path.
 
 Sanity-check the label set that the relabel rules produce:
 
@@ -199,14 +219,14 @@ kill "$PF_PID"
 
 **Reading a failure:**
 
-| Symptom                                     | Cause                                                                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| no `node` targets                           | Token wrong, expired, or missing the `ips:read_only` scope. Query `vm_promscrape_discovery_linode_failures_total` — the `vmsingle` self-scrape job stores it. |
-| 80 `node` targets, all down, `no such host` | Step 2 did not take. Re-run the `nslookup` check.                                                                  |
-| 80 `node` targets down, refused or timing out | Tailnet ACL blocks node → fleet tcp/9100, or node_exporter is not installed yet (precondition 3 or 4).            |
-| Fewer than 80 `node` targets, `dropped: 0`  | Real estate drift. That is the discovery working, not a fault.                                                     |
-| Fewer than 80 `node` targets, `dropped` > 0 | The tailnet `keep` rule removed a target whose Linode label was empty, so `__address__` was never rewritten. Read `droppedTargets[].discoveredLabels` in the same JSON. |
-| `o11y-node` down, the 80 fleet targets up   | Precondition 8 — node_exporter is not on this node yet. Expected on a first run before the Ansible task has covered it. |
+| Symptom                                       | Cause                                                                                                                                                                   |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| no `node` targets                             | Token wrong, expired, or missing the `ips:read_only` scope. Query `vm_promscrape_discovery_linode_failures_total` — the `vmsingle` self-scrape job stores it.           |
+| 80 `node` targets, all down, `no such host`   | Step 2 did not take. Re-run the `nslookup` check.                                                                                                                       |
+| 80 `node` targets down, refused or timing out | Tailnet ACL blocks node → fleet tcp/9100, or node_exporter is not installed yet (precondition 3 or 4).                                                                  |
+| Fewer than 80 `node` targets, `dropped: 0`    | Real estate drift. That is the discovery working, not a fault.                                                                                                          |
+| Fewer than 80 `node` targets, `dropped` > 0   | The tailnet `keep` rule removed a target whose Linode label was empty, so `__address__` was never rewritten. Read `droppedTargets[].discoveredLabels` in the same JSON. |
+| `o11y-node` down, the 80 fleet targets up     | Precondition 8 — node_exporter is not on this node yet. Expected on a first run before the Ansible task has covered it.                                                 |
 
 ### 6. Node config — NodePort binding and reserved memory
 
@@ -242,7 +262,7 @@ Then the reservation:
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl describe node ops-vm-o11y-k3s-fra1-01 | grep -A8 -E '^(Capacity|Allocatable)'
 ```
 
-Allocatable memory must sit exactly 1.5 GiB below Capacity. Nothing else is subtracted: k3s v1.36.4 sets `EvictionHard` to `imagefs.available: 5%` and `nodefs.available: 5%` only (`pkg/daemons/agent/agent.go`), and that map *replaces* the kubelet default, so there is no `memory.available` threshold to reserve. Before this change the two figures are therefore identical — if they still are, the restart did not pick the file up.
+Allocatable memory must sit exactly 1.5 GiB below Capacity. Nothing else is subtracted: k3s v1.36.4 sets `EvictionHard` to `imagefs.available: 5%` and `nodefs.available: 5%` only (`pkg/daemons/agent/agent.go`), and that map _replaces_ the kubelet default, so there is no `memory.available` threshold to reserve. Before this change the two figures are therefore identical — if they still are, the restart did not pick the file up.
 
 ### 7. Grafana
 
@@ -311,27 +331,27 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install victoria-logs vi
   -f k3s/ops-o11y/apps/victoria-logs/charts/victoria-logs-single/values.yaml
 ```
 
-The values set `retentionMaxDiskUsagePercent: 80` and deliberately leave `retentionDiskSpaceUsage` empty. The two are mutually exclusive — setting both makes VictoriaLogs refuse to start — and percent is chosen *because* it measures the whole filesystem holding `-storageDataPath`. Both databases share the 160 GB root disk, and VictoriaMetrics stops accepting writes at `--storage.minFreeDiskSpaceBytes=20GB`. At 80% used VictoriaLogs begins dropping its oldest per-day partitions with ~32 GB still free, comfortably above that floor, so logs yield before metrics ingestion stops. A bytes-only cap would have given VictoriaLogs no awareness of the filesystem at all.
+The values set `retentionMaxDiskUsagePercent: 80` and deliberately leave `retentionDiskSpaceUsage` empty. The two are mutually exclusive — setting both makes VictoriaLogs refuse to start — and percent is chosen _because_ it measures the whole filesystem holding `-storageDataPath`. Both databases share the 160 GB root disk, and VictoriaMetrics stops accepting writes at `--storage.minFreeDiskSpaceBytes=20GB`. At 80% used VictoriaLogs begins dropping its oldest per-day partitions with ~32 GB still free, comfortably above that floor, so logs yield before metrics ingestion stops. A bytes-only cap would have given VictoriaLogs no awareness of the filesystem at all.
 
-Accept the trade knowingly: the percent cap counts *total* filesystem usage, not VictoriaLogs' share. If VictoriaMetrics data and its index alone ever push the disk past 80%, VictoriaLogs deletes every partition it has and still does not clear the threshold. That is the intended priority — metrics outrank logs — but it should not be a surprise when it happens.
+Accept the trade knowingly: the percent cap counts _total_ filesystem usage, not VictoriaLogs' share. If VictoriaMetrics data and its index alone ever push the disk past 80%, VictoriaLogs deletes every partition it has and still does not clear the threshold. That is the intended priority — metrics outrank logs — but it should not be a surprise when it happens.
 
 ## Disk budget
 
 The 160 GB root filesystem is shared by the OS, containerd and both databases. `local-path` ignores PVC capacity, so the PVC sizes below are the design expectation, not enforcement. The real guards are the retention flags, and one of the four rows is a reservation rather than a consumer.
 
-| Consumer / reservation      | Setting                                | Budget  | Guard                                                                            |
-| --------------------------- | -------------------------------------- | ------- | -------------------------------------------------------------------------------- |
-| VictoriaMetrics             | `retentionPeriod: 12`, PVC `50Gi`      | 53.7 GB | `--storage.minFreeDiskSpaceBytes=20GB` stops ingestion before full                |
-| VictoriaLogs                | `retentionMaxDiskUsagePercent: 80`, PVC `32Gi` | 34.4 GB | the percent flag, not the PVC — see below                                 |
-| Grafana                     | `persistence 2Gi`                      | 2.1 GB  | none needed                                                                       |
-| OS + containerd + k3s       | —                                      | ~20 GB  | —                                                                                 |
-| VictoriaMetrics free-space reserve | `--storage.minFreeDiskSpaceBytes=20GB` | 20 GB   | space nothing may ever occupy; it must be in the sum, not only in the Guard column |
+| Consumer / reservation             | Setting                                        | Budget  | Guard                                                                              |
+| ---------------------------------- | ---------------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| VictoriaMetrics                    | `retentionPeriod: 12`, PVC `50Gi`              | 53.7 GB | `--storage.minFreeDiskSpaceBytes=20GB` stops ingestion before full                 |
+| VictoriaLogs                       | `retentionMaxDiskUsagePercent: 80`, PVC `32Gi` | 34.4 GB | the percent flag, not the PVC — see below                                          |
+| Grafana                            | `persistence 2Gi`                              | 2.1 GB  | none needed                                                                        |
+| OS + containerd + k3s              | —                                              | ~20 GB  | —                                                                                  |
+| VictoriaMetrics free-space reserve | `--storage.minFreeDiskSpaceBytes=20GB`         | 20 GB   | space nothing may ever occupy; it must be in the sum, not only in the Guard column |
 
 That totals ~130.2 GB of 160 GB, leaving ~30 GB of real margin.
 
 The VictoriaLogs row is a budget, not a ceiling. The percent guard fires on total filesystem usage, so VictoriaLogs can legitimately grow past 32 GiB while the disk is quiet and will be forced back below it once metrics grow. Do not read `kubectl get pvc` as a capacity statement.
 
-~98,400 active series at a 60s interval is ~1,640 samples/s, ~142M samples/day. 12 months retention means up to 13 months on disk. At 0.75 B/sample that is ~42 GB of *samples* — and zero bytes of inverted index. The index is the part nobody budgets: `-retentionTimezoneOffset` documents that indexdb rotation happens once per `-retentionPeriod`, so at 12 months the index rotates once a year and the previous generation is held alongside the current one. Every unique series minted in that window stays indexed for up to two years, and the Docker Swarm hosts mint series that never repeat — veth device names are per container instance, so each deploy adds ~35 series that never merge back.
+~98,400 active series at a 60s interval is ~1,640 samples/s, ~142M samples/day. 12 months retention means up to 13 months on disk. At 0.75 B/sample that is ~42 GB of _samples_ — and zero bytes of inverted index. The index is the part nobody budgets: `-retentionTimezoneOffset` documents that indexdb rotation happens once per `-retentionPeriod`, so at 12 months the index rotates once a year and the previous generation is held alongside the current one. Every unique series minted in that window stays indexed for up to two years, and the Docker Swarm hosts mint series that never repeat — veth device names are per container instance, so each deploy adds ~35 series that never merge back.
 
 **Measure before extending, and measure the index separately.** Take a reading after seven days and again after thirty:
 
@@ -347,7 +367,7 @@ Extending `retentionPeriod` on existing data is safe and is the intended path on
 
 If the filesystem does fill, the node cannot recover on its own. This is worth stating plainly because the usual Kubernetes safety net does not apply here.
 
-The kubelet reclaims *node-level* resources under disk pressure — it deletes unused images and evicts pods. PersistentVolume bytes under `/var/lib/rancher/k3s/storage/` are neither ephemeral storage nor reclaimable that way. k3s sets `nodefs.available: 5%` rather than the kubelet's own default, so the taint lands at ~8 GB free on this filesystem, and `EvictionMinimumReclaim` then asks for another 10% the kubelet cannot take from a PV. The node taints `DiskPressure:NoSchedule`, deletes images, evicts pods, and the pressure never clears, because evicting a database pod frees none of that database's bytes. That 5% is not a safety net on this node.
+The kubelet reclaims _node-level_ resources under disk pressure — it deletes unused images and evicts pods. PersistentVolume bytes under `/var/lib/rancher/k3s/storage/` are neither ephemeral storage nor reclaimable that way. k3s sets `nodefs.available: 5%` rather than the kubelet's own default, so the taint lands at ~8 GB free on this filesystem, and `EvictionMinimumReclaim` then asks for another 10% the kubelet cannot take from a PV. The node taints `DiskPressure:NoSchedule`, deletes images, evicts pods, and the pressure never clears, because evicting a database pod frees none of that database's bytes. That 5% is not a safety net on this node.
 
 Ordered by free space on the 160 GB filesystem, the guards fire like this: at 32 GB free VictoriaLogs drops its oldest partitions (80% used); at 20 GB free VictoriaMetrics goes read-only and metrics ingestion stops; at 8 GB free the kubelet declares DiskPressure and cannot fix it; at 0 the SQLite datastore behind k3s and containerd start taking ENOSPC. Only the first two are recoveries; the last two are damage.
 
