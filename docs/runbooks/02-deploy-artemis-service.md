@@ -333,6 +333,10 @@ Operator pushes per infra-repo conventions (small-fix-direct vs PR-with-review t
 120 s of `startupProbe` plus readiness. So the fleet runs **mixed versions for one to six minutes**
 after the command returns.
 
+Before the command: stay outside 02:55–04:05 UTC (the `tombstone-purge` and `drift-detect` crons,
+runbook 09 §C.6), and confirm Sentry `artemis` shows no R2 or readiness event in the last hour —
+`readyz` pings R2, so an R2 flap during the roll stalls every new pod at readiness.
+
 ```bash
 just release gxy-management artemis
 

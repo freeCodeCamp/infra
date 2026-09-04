@@ -104,6 +104,9 @@ Edge cases:
 - Setup log: `[setup] healthz green at <ARTEMIS_URL>` and `[setup] captured baseline: site=test deployId=<id>`
 - Final test line: `OK — full deploy flow green for site=test deployId=<id>`
 - Teardown log: `[teardown] restored prod alias: site=test deployId=<id>`
+- Version header, ten times, one answer:
+  `for i in $(seq 10); do curl -s -o /dev/null -D - https://uploads.freecode.camp/healthz | grep -i x-artemis-version; done | sort | uniq -c`
+  prints one line with the released version (artemis 1.11.0+). Two lines means the roll is still mixed; stop and wait for the §6 gate in runbook 02.
 
 ## Durable-exec substrate check
 
@@ -296,6 +299,23 @@ curl -fsS -X POST "$BASE/api/site/$SLUG/release" -H "$APPROVER"                 
 curl -s -X POST "$BASE/api/site/register" -H "$AUTH" \
   -H 'content-type: application/json' -d "{\"slug\":\"$SLUG\",\"teams\":[\"staff\"]}" \
   -w ' <- %{http_code}\n'                                                        # expect 201
+```
+
+```sh
+# 8. reclaim canary (artemis 1.11.0+). Nothing above exercises the 72 h reclaim: step 7 released
+#    the name by hand. Leave a second throwaway slug deleted and unreleased so `site.lifecycle`
+#    reclaims it on the first 03:00 UTC run after RESERVATION_GRACE (72 h) passes.
+CANARY=postdeploy-canary-$(date +%Y%m%d)
+curl -fsS -X POST "$BASE/api/site/register" -H "$AUTH" \
+  -H 'content-type: application/json' -d "{\"slug\":\"$CANARY\",\"teams\":[\"staff\"]}"
+#    deploy once through the CLI so the prefix holds bytes, then:
+curl -fsS -X DELETE "$BASE/api/site/$CANARY" -H "$AUTH" -w ' <- %{http_code}\n'  # expect 204
+# On day 4, after 03:00 UTC:
+kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d artemis -tAc \
+  "SELECT action, outcome, occurred_at FROM audit_log WHERE site LIKE '$CANARY%' AND action='site.reclaim'"
+#    expect one success row; the name registers again with 201; the bytes sit under _trash/.
+#    No row by day 5 → the reclaim did not run: check `site.lifecycle` runs in the hatchet db and
+#    `sites.reclaim_started_at` for a stuck claim before touching anything.
 ```
 
 > **Check team membership before you run step 7a. Step 7a is irreversible when it does not refuse.**
