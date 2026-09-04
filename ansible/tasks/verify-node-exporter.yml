@@ -7,6 +7,7 @@
   ansible.builtin.command: tailscale ip -4
   register: verify_ne_tailscale
   changed_when: false
+  check_mode: false
 
 - name: Record the address node_exporter must bind
   ansible.builtin.set_fact:
@@ -40,6 +41,7 @@
   ansible.builtin.command: ss -Hltn sport = :{{ verify_ne_port }}
   register: verify_ne_listeners
   changed_when: false
+  check_mode: false
 
 - name: Prove the exporter listens on the Tailscale address and on no other
   ansible.builtin.assert:

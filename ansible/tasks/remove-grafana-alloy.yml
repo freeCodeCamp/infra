@@ -1,40 +1,52 @@
 ---
-- name: Look for a Grafana Alloy unit file
+- name: Look for Grafana Alloy artefacts
   ansible.builtin.stat:
     path: "{{ item }}"
-  register: alloy_units
+  register: alloy_artefacts
   loop:
     - /etc/systemd/system/alloy.service
-    - /lib/systemd/system/alloy.service
     - /usr/lib/systemd/system/alloy.service
+    - /usr/local/bin/alloy-linux-amd64
+    - /usr/bin/alloy
+    - /etc/alloy
+
+- name: Record whether this host carries Grafana Alloy
+  ansible.builtin.set_fact:
+    alloy_present:
+      "{{ alloy_artefacts.results | selectattr('stat.exists') | list | length > 0 }}"
 
 - name: Stop and disable Grafana Alloy
   ansible.builtin.systemd:
     name: alloy
     state: stopped
     enabled: false
-  when: alloy_units.results | selectattr('stat.exists') | list | length > 0
+  ignore_errors: true
+  when: alloy_present
 
 - name: Purge the Grafana Alloy package
   ansible.builtin.apt:
     name: alloy
     state: absent
     purge: true
+  when: alloy_present
 
 - name: Remove the Grafana Labs apt key from the legacy trusted keyring
   ansible.builtin.apt_key:
     id: B53AE77BADB630A683046005963FA27710458545
     state: absent
+  when: alloy_present
 
 - name: Remove the Grafana Alloy user
   ansible.builtin.user:
     name: alloy
     state: absent
+  when: alloy_present
 
 - name: Remove the Grafana Alloy group
   ansible.builtin.group:
     name: alloy
     state: absent
+  when: alloy_present
 
 - name: Remove every remaining Grafana Alloy artefact
   ansible.builtin.file:
@@ -43,6 +55,7 @@
   loop:
     - /etc/systemd/system/alloy.service
     - /etc/systemd/system/alloy.service.d
+    - /usr/lib/systemd/system/alloy.service
     - /usr/local/bin/alloy-linux-amd64
     - /usr/bin/alloy
     - /etc/alloy
@@ -52,8 +65,9 @@
     - /var/mail/alloy
     - /etc/apt/sources.list.d/grafana.list
     - /etc/apt/keyrings/grafana.gpg
+  when: alloy_present
 
 - name: Reload systemd after removing Grafana Alloy
   ansible.builtin.systemd:
     daemon_reload: true
-  when: alloy_units.results | selectattr('stat.exists') | list | length > 0
+  when: alloy_present

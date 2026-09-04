@@ -24,6 +24,10 @@
     owner: root
     group: root
     mode: "0644"
+  register: node_exporter_download
+  until: node_exporter_download is succeeded
+  retries: 3
+  delay: 10
 
 - name: Create the node_exporter unpack directory
   ansible.builtin.file:

@@ -16,6 +16,7 @@ groups:
 
   # Operations Instances
   ops_all: "'ops' in (tags|list)"
+  ops_backoffice: "'ops_backoffice' in (tags|list)"
 
   # Swarm Cluster (docker-swarm role targets the `managers`/`workers` groups)
   swarm_all: "'swarm' in (tags|list)"
@@ -58,7 +59,8 @@ groups:
     "'stg_oldeworld_jms' in (tags|list) or 'prd_oldeworld_jms' in (tags|list)"
 
   # Every Linode VM the observability plane scrapes
-  fleet_all: "'oldeworld' in (tags|list) or 'ops' in (tags|list)"
+  fleet_all:
+    "'oldeworld' in (tags|list) or 'ops_backoffice' in (tags|list)"
 
   # Oldeworld Cluster -- Clients by Language - STG
   stg_oldeworld_clt_eng:

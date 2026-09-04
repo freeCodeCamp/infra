@@ -1,16 +1,28 @@
 ---
-- name: Install node_exporter on the tailnet address and remove Grafana Alloy
+- name: Prove every target host answers before the fleet is touched
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Ping every target host
+      ansible.builtin.ping:
+
+- name: Install node_exporter on the tailnet address
   hosts: "{{ variable_host | default('null') }}"
   serial: "{{ variable_serial | default([1, 5, 10]) }}"
   max_fail_percentage: 0
   gather_facts: true
   become: true
   become_user: root
+  pre_tasks:
+    - name: Refuse to touch more than one proxy host in a batch
+      ansible.builtin.assert:
+        that:
+          - not ('oldeworld_pxy' in group_names and ansible_play_batch | length > 1)
+        fail_msg: >-
+          {{ inventory_hostname }} fronts live traffic; run the proxy hosts
+          with -e variable_serial=1
   tasks:
-    - name: Remove Grafana Alloy
-      ansible.builtin.include_tasks: tasks/remove-grafana-alloy.yml
-      when: variable_remove_alloy | default(true) | bool
-
     - name: Install and configure node_exporter
       ansible.builtin.include_role:
         name: node-exporter
