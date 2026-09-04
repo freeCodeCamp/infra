@@ -20,22 +20,44 @@ Every command below pastes into a bare shell from the repo root. No `direnv`, no
 
 ## Preconditions
 
-| #   | Requirement                                                                                     | Check                                              |
-| --- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | Droplet `ops-vm-o11y-k3s-fra1-01` up, K3s v1.36.4+k3s1, `--disable traefik --disable servicelb` | `tailscale status \| grep o11y`                    |
-| 2   | Tailnet ACL permits operator → node on tcp/6443                                                 | step 1 below fails without it                      |
-| 3   | Tailnet ACL permits node → fleet on tcp/9100                                                    | step 5 verification fails without it               |
-| 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                   | separate Ansible task; not this runbook            |
-| 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                | mint at <https://cloud.linode.com/profile/tokens>  |
-| 6   | `helm` >= 3.14 and `kubectl` on PATH                                                            | `helm version --short && kubectl version --client` |
-| 7   | Root shell on the node, by Tailscale SSH grant or key                                           | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
-| 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100               | separate Ansible task; step 5 counts it            |
+| #   | Requirement                                                                                                                         | Check                                              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | `tofu` 1.12.x on PATH, `infra-secrets/tfstate/.env.enc` and `do-universe/.env.enc` decrypt, R2 bucket `freecodecamp-tfstate` exists | `cd terraform/ops-o11y && tofu init`               |
+| 1a  | A pre-authorised Tailscale auth key with `tag:added-by-ops`, exported as `TAILSCALE_AUTH_KEY`                                       | `test -n "$TAILSCALE_AUTH_KEY"`                    |
+| 2   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
+| 3   | Tailnet ACL permits node → fleet on tcp/9100                                                                                        | step 5 verification fails without it               |
+| 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
+| 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
+| 6   | `helm` >= 3.14 and `kubectl` on PATH                                                                                                | `helm version --short && kubectl version --client` |
+| 7   | Root shell on the node, by Tailscale SSH grant or key                                                                               | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
+| 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                                                   | separate Ansible task; step 5 counts it            |
 
 Precondition 8 is easy to skip. This node is the one host whose disk and memory the whole design turns on, and without its own node_exporter it is the only machine in the estate that the monitoring cannot see.
 
 Preconditions 2, 3, 4 and 8 are outside this repo. Confirm them before starting; each one fails late and looks like a different problem.
 
 Precondition 7 is easy to miss. Tailscale SSH refuses any identity the tailnet policy does not grant, and `/etc/rancher/k3s/k3s.yaml` is mode 0600 root-owned, so a non-root login needs `sudo cat` in step 1. Steps 1, 6, the disk-budget reading and teardown all need this shell.
+
+## Provision
+
+The node is code. OpenTofu creates the droplet, its tag-attached firewall and the project link; Ansible joins the tailnet and installs K3s. Every line runs from the repo root.
+
+```sh
+cd terraform/ops-o11y && tofu init && tofu apply && cd ../..
+```
+
+State lives in R2 (`freecodecamp-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
+
+The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/`:
+
+```sh
+ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-o11y--0-deploy.yml       -e variable_host=ops_o11y
+```
+
+The tagged auth key joins the node as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
 
 ## Steps
 
@@ -426,6 +448,12 @@ Then revert the node changes: remove both the `kube-proxy-arg` and the `kubelet-
 
 If the Hetzner estate has joined by then, its Robot credentials are a separate credential with a separate revocation path: retire them at <https://robot.hetzner.com> as well. They are higher value than a read-only Linode token.
 
+To remove the node itself, destroy it from the root that created it, then delete the device in the tailnet admin console:
+
+```sh
+cd terraform/ops-o11y && tofu destroy && cd ../..
+```
+
 Confirm nothing survives:
 
 ```sh
@@ -452,5 +480,5 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get ns o11y
 ## Cross-doc references
 
 - [`00-index.md`](00-index.md) — runbook index
-- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — sops envelopes for the other clusters; ops-o11y uses none
+- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — sops envelopes; this node loads `tfstate/` and `do-universe/` through `terraform/ops-o11y/.envrc`
 - <https://docs.victoriametrics.com/victoriametrics/sd_configs/> — `linode_sd_configs` and `hetzner_sd_configs` reference
