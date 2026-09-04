@@ -1,0 +1,11 @@
+---
+# https://github.com/freeformz/ansible/blob/v0.4.0/plugins/inventory/tailscale.py
+
+plugin: freeformz.ansible.tailscale
+api_key: "{{ lookup('ansible.builtin.pipe', './inventory/tailscale-api-token.sh') }}"
+tailnet: "-"
+ansible_host: ipv4
+strip_tag: true
+tag_groups: true
+os_groups: true
+include_online_offline_groups: true
