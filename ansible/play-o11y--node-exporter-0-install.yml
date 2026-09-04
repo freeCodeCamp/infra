@@ -1,0 +1,22 @@
+---
+- name: Install node_exporter on the tailnet address and remove Grafana Alloy
+  hosts: "{{ variable_host | default('null') }}"
+  serial: "{{ variable_serial | default([1, 5, 10]) }}"
+  max_fail_percentage: 0
+  gather_facts: true
+  become: true
+  become_user: root
+  tasks:
+    - name: Remove Grafana Alloy
+      ansible.builtin.include_tasks: tasks/remove-grafana-alloy.yml
+      when: variable_remove_alloy | default(true) | bool
+
+    - name: Install and configure node_exporter
+      ansible.builtin.include_role:
+        name: node-exporter
+
+    - name: Apply pending restarts before the batch is graded
+      ansible.builtin.meta: flush_handlers
+
+    - name: Prove the tailnet-only bind on this host
+      ansible.builtin.include_tasks: tasks/verify-node-exporter.yml

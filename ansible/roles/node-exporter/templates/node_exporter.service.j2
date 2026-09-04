@@ -1,0 +1,42 @@
+# SECURITY INVARIANT: every host has a public IPv4; node_exporter must never
+# fall back to the 0.0.0.0 default. The ExecStartPre script resolves the tailnet
+# address at each start and exits non-zero when it is missing or malformed, so
+# systemd never runs ExecStart -- no tailnet means no listener, not a public one.
+# IPAddressDeny/Allow closes the weak-host path from eth0 to the tailnet socket.
+[Unit]
+Description=Prometheus node_exporter {{ node_exporter_version }}
+Documentation=https://github.com/prometheus/node_exporter
+After=tailscaled.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ node_exporter_user }}
+Group={{ node_exporter_group }}
+RuntimeDirectory={{ node_exporter_runtime_dir }}
+RuntimeDirectoryMode=0750
+ExecStartPre={{ node_exporter_tailscale_binary }} wait --timeout={{ node_exporter_tailscale_wait_timeout }}
+ExecStartPre={{ node_exporter_address_script }}
+EnvironmentFile=-/run/{{ node_exporter_runtime_dir }}/listen.env
+{% set collector_args = (node_exporter_disabled_collectors | map('regex_replace', '^', '--no-collector.') | list)
+   + ['--collector.processes',
+      '--collector.systemd',
+      '--collector.systemd.unit-include=' ~ node_exporter_systemd_unit_include,
+      '--collector.textfile.directory=' ~ node_exporter_textfile_dir,
+      '--collector.netclass.ignored-devices=' ~ node_exporter_net_device_exclude,
+      '--collector.netdev.device-exclude=' ~ node_exporter_net_device_exclude]
+   + node_exporter_extra_args -%}
+ExecStart={{ node_exporter_binary }} \
+    --web.listen-address=${NODE_EXPORTER_LISTEN_ADDRESS} \
+    {{ collector_args | join(' \\\n    ') }}
+Restart=on-failure
+RestartSec=15s
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+IPAddressDeny=any
+IPAddressAllow={{ node_exporter_tailnet_cidr }}
+
+[Install]
+WantedBy=multi-user.target

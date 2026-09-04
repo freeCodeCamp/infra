@@ -1,0 +1,59 @@
+---
+- name: Look for a Grafana Alloy unit file
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: alloy_units
+  loop:
+    - /etc/systemd/system/alloy.service
+    - /lib/systemd/system/alloy.service
+    - /usr/lib/systemd/system/alloy.service
+
+- name: Stop and disable Grafana Alloy
+  ansible.builtin.systemd:
+    name: alloy
+    state: stopped
+    enabled: false
+  when: alloy_units.results | selectattr('stat.exists') | list | length > 0
+
+- name: Purge the Grafana Alloy package
+  ansible.builtin.apt:
+    name: alloy
+    state: absent
+    purge: true
+
+- name: Remove the Grafana Labs apt key from the legacy trusted keyring
+  ansible.builtin.apt_key:
+    id: B53AE77BADB630A683046005963FA27710458545
+    state: absent
+
+- name: Remove the Grafana Alloy user
+  ansible.builtin.user:
+    name: alloy
+    state: absent
+
+- name: Remove the Grafana Alloy group
+  ansible.builtin.group:
+    name: alloy
+    state: absent
+
+- name: Remove every remaining Grafana Alloy artefact
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/alloy.service
+    - /etc/systemd/system/alloy.service.d
+    - /usr/local/bin/alloy-linux-amd64
+    - /usr/bin/alloy
+    - /etc/alloy
+    - /etc/default/alloy
+    - /var/lib/alloy
+    - /home/alloy
+    - /var/mail/alloy
+    - /etc/apt/sources.list.d/grafana.list
+    - /etc/apt/keyrings/grafana.gpg
+
+- name: Reload systemd after removing Grafana Alloy
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: alloy_units.results | selectattr('stat.exists') | list | length > 0

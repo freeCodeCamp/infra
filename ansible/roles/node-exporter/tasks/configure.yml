@@ -1,0 +1,25 @@
+---
+- name: Install the node_exporter tailnet address resolver
+  ansible.builtin.template:
+    src: node-exporter-listen-address.j2
+    dest: "{{ node_exporter_address_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart node_exporter
+
+- name: Install the node_exporter systemd unit
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart node_exporter
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,63 @@
+---
+- name: Create the node_exporter group
+  ansible.builtin.group:
+    name: "{{ node_exporter_group }}"
+    system: true
+    state: present
+
+- name: Create the node_exporter user
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+    password_lock: true
+    state: present
+
+- name: Download the pinned node_exporter release
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_archive_url }}"
+    dest: "{{ node_exporter_archive_path }}"
+    checksum: "{{ node_exporter_archive_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the node_exporter unpack directory
+  ansible.builtin.file:
+    path: "{{ node_exporter_unpack_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Unpack the node_exporter release
+  ansible.builtin.unarchive:
+    src: "{{ node_exporter_archive_path }}"
+    dest: "{{ node_exporter_unpack_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    owner: root
+    group: root
+    creates: "{{ node_exporter_unpack_dir }}/node_exporter"
+
+- name: Install the node_exporter binary
+  ansible.builtin.copy:
+    src: "{{ node_exporter_unpack_dir }}/node_exporter"
+    dest: "{{ node_exporter_binary }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart node_exporter
+
+- name: Create the node_exporter textfile collector directory
+  ansible.builtin.file:
+    path: "{{ node_exporter_textfile_dir }}"
+    state: directory
+    owner: root
+    group: "{{ node_exporter_group }}"
+    mode: "0755"

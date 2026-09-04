@@ -1,0 +1,9 @@
+---
+- name: Verify the node_exporter tailnet-only bind
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: true
+  become: true
+  become_user: root
+  tasks:
+    - name: Check node_exporter
+      ansible.builtin.include_tasks: tasks/verify-node-exporter.yml
