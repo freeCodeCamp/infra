@@ -17,6 +17,8 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 10  | [10-rotate-cf-origin-cert.md](10-rotate-cf-origin-cert.md)                 | Operator  | Rotate the `freecodecamp.net` CF origin cert       |
 | 11  | [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md)             | Operator  | Rehearse R7 — PG outage, serve plane unaffected    |
 | 12  | [12-node-drain-maintenance.md](12-node-drain-maintenance.md)               | Operator  | Drain a k3s node — PDB posture differs per node     |
+| 13  | [13-purge-orphaned-sites.md](13-purge-orphaned-sites.md)                   | Operator  | Take down a deregistered site that still serves    |
+| 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)                         | Operator  | Stand up / rebuild the ops-o11y observability node |
 
 ## Reading order by scenario
 
@@ -36,6 +38,8 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 
 **Drain a node for maintenance:** 12 (per-node PDB posture, the blocked-drain procedure for Postgres, and the undeployed hatchet PDB; links to 11 internally).
 
+**Stand up the observability node (ops-o11y):** 14 (kubeconfig, CoreDNS ts.net forward, Linode-SD token, VictoriaMetrics, Grafana over Tailscale NodePort; VictoriaLogs deferred).
+
 **Rehearse the artemis PG-outage boundary (R7):** 11 (scale bundled PG to 0, assert serve plane + degraded readyz, restore; links to 03 + 08 internally; operator-only, destructive to control plane).
 
 ## Block ordering rationale
@@ -50,6 +54,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 09    | 09    | Durable-exec engine stand-up (Hatchet); wires into 02 |
 | 10    | 10    | CF origin-cert rotation; foundation-adjacent to 04/05 |
 | 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08       |
+| 14    | 14    | ops-o11y observability node bringup; standalone       |
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
