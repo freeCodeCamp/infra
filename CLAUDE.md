@@ -87,6 +87,8 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 `just` lists recipes. Run from repo root — recipes carry the galaxy as an arg and self-export `KUBECONFIG`. See Working-directory rule above.
 
+**New work adds no `just` recipes (operator 2026-09-03).** The recipes are brittle and abstract too much. Write standard-toolchain commands instead: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. The existing recipes and the docs that reference them stay as they are — they serve `gxy-*`, artemis and the legacy estate.
+
 ## Ansible
 
 - Per-galaxy config: `ansible/inventory/group_vars/<group>.yml`
