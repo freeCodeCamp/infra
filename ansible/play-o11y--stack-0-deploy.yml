@@ -9,7 +9,7 @@
 #   - LINODE_API_TOKEN in the environment (direnv)
 #
 # Usage:
-#   ansible-playbook -i inventory/digitalocean.yml play-o11y--0-deploy.yml \
+#   ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml \
 #     -e variable_host=ops_o11y
 #
 #   Add -e o11y_deploy_logs=true to include VictoriaLogs.

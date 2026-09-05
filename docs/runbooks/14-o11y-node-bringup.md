@@ -54,7 +54,7 @@ The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node o
 ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
 ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
 ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-o11y--0-deploy.yml       -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml -e variable_host=ops_o11y
 ```
 
 The tagged auth key joins the node as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
@@ -64,8 +64,8 @@ The tagged auth key joins the node as `ops-vm-o11y-k3s-fra1-01` with no key expi
 > **The playbooks are the mechanism. These steps are the explanation and the fallback.**
 >
 > ```sh
-> ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml -e variable_host=ops_o11y
-> ansible-playbook -i inventory/digitalocean.yml play-o11y--0-deploy.yml   -e variable_host=ops_o11y
+> ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e variable_host=ops_o11y
+> ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml -e variable_host=ops_o11y
 > ```
 >
 > The first bootstraps the node and writes the kubeconfig, superseding **step 1** and
