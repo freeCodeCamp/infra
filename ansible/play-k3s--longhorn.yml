@@ -75,11 +75,13 @@
       delay: 10
       changed_when: false
 
-    - name: Wait for Longhorn manager
-      command: >
-        k3s kubectl -n longhorn-system wait --for=condition=Available
-        deployment/longhorn-driver-deployer --timeout=300s
-      changed_when: false
+    - name: Wait for the Longhorn rollout
+      ansible.builtin.include_tasks: tasks/wait-rollout.yml
+      vars:
+        rollout_kubeconfig: /etc/rancher/k3s/k3s.yaml
+        rollout_namespace: longhorn-system
+        rollout_targets:
+          - deployment/longhorn-driver-deployer
 
     - name: Verify StorageClass
       command: k3s kubectl get storageclass longhorn

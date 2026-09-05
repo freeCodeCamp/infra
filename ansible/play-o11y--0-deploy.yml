@@ -110,15 +110,11 @@
         label: "{{ item.name }} {{ item.chart }}-{{ item.version }}"
 
     - name: Wait for the workloads to roll out
-      command: >-
-        kubectl -n {{ o11y_namespace }} rollout status {{ item.rollout }}
-        --timeout=300s
-      environment:
-        KUBECONFIG: "{{ kubeconfig }}"
-      loop: "{{ releases }}"
-      loop_control:
-        label: "{{ item.rollout }}"
-      changed_when: false
+      ansible.builtin.include_tasks: tasks/wait-rollout.yml
+      vars:
+        rollout_kubeconfig: "{{ kubeconfig }}"
+        rollout_namespace: "{{ o11y_namespace }}"
+        rollout_targets: "{{ releases | map(attribute='rollout') | list }}"
 
     - name: Report
       debug:

@@ -53,27 +53,15 @@
     path: /etc/rancher/k3s/cilium-values.yaml
     state: absent
 
-- name: Wait for Cilium agent DaemonSet rollout
-  ansible.builtin.command:
-    cmd: kubectl -n kube-system rollout status daemonset/cilium --timeout=180s
-  environment:
-    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-  changed_when: false
-  retries: 3
-  delay: 15
-  register: cilium_agent_rollout
-  until: cilium_agent_rollout.rc == 0
-
-- name: Wait for Cilium operator Deployment rollout
-  ansible.builtin.command:
-    cmd: kubectl -n kube-system rollout status deployment/cilium-operator --timeout=180s
-  environment:
-    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-  changed_when: false
-  retries: 3
-  delay: 15
-  register: cilium_operator_rollout
-  until: cilium_operator_rollout.rc == 0
+- name: Wait for the Cilium rollout
+  ansible.builtin.include_tasks: ../../../tasks/wait-rollout.yml
+  vars:
+    rollout_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    rollout_namespace: kube-system
+    rollout_timeout: 180s
+    rollout_targets:
+      - daemonset/cilium
+      - deployment/cilium-operator
 
 - name: Verify Cilium status
   ansible.builtin.command:
