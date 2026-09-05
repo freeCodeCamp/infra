@@ -1,6 +1,6 @@
 terraform {
   backend "s3" {
-    bucket = "freecodecamp-tfstate"
+    bucket = "infra-tfstate"
     key    = "ops-o11y/terraform.tfstate"
     region = "auto"
 

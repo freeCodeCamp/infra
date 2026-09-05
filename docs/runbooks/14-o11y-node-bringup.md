@@ -22,7 +22,7 @@ Every command below pastes into a bare shell from the repo root. No `direnv`, no
 
 | #   | Requirement                                                                                                                         | Check                                              |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | `tofu` 1.12.x on PATH, `infra-secrets/tfstate/.env.enc` and `do-universe/.env.enc` decrypt, R2 bucket `freecodecamp-tfstate` exists | `cd terraform/ops-o11y && tofu init`               |
+| 1   | `tofu` 1.12.x on PATH, `infra-secrets/tfstate/.env.enc` and `do-universe/.env.enc` decrypt, R2 bucket `infra-tfstate` exists | `cd terraform/ops-o11y && tofu init`               |
 | 1a  | A pre-authorised Tailscale auth key with `tag:added-by-ops`, exported as `TAILSCALE_AUTH_KEY`                                       | `test -n "$TAILSCALE_AUTH_KEY"`                    |
 | 2   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
 | 3   | Tailnet ACL permits node → fleet on tcp/9100                                                                                        | step 5 verification fails without it               |
@@ -46,7 +46,7 @@ The node is code. OpenTofu creates the droplet, its tag-attached firewall and th
 cd terraform/ops-o11y && tofu init && tofu apply && cd ../..
 ```
 
-State lives in R2 (`freecodecamp-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
+State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
 
 The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/`:
 
