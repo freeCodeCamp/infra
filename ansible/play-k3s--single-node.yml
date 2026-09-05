@@ -36,11 +36,7 @@
           hosts matched {{ variable_host }}. Use play-k3s--cluster.yml for HA.
 
     - name: Validate Tailscale connected
-      assert:
-        that:
-          - ansible_tailscale0 is defined
-          - ansible_tailscale0.ipv4 is defined
-        fail_msg: "Tailscale not connected. Run play-tailscale--0-install.yml then play-tailscale--1a-up.yml."
+      ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
     - name: Set network facts
       set_fact:

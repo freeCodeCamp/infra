@@ -50,11 +50,7 @@
         fail_msg: "VPC interface eth1 not found or IP not in 10.x.x.x range."
 
     - name: Validate Tailscale connected
-      assert:
-        that:
-          - ansible_tailscale0 is defined
-          - ansible_tailscale0.ipv4 is defined
-        fail_msg: "Tailscale not connected."
+      ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
     - name: Set network facts
       set_fact:

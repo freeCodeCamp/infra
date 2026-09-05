@@ -31,13 +31,8 @@
           - ansible_eth1.ipv4.address is defined
         fail_msg: "VPC interface eth1 not found. Ensure VM is attached to DO VPC."
 
-    - name: Validate Tailscale is connected
-      assert:
-        that:
-          - ansible_tailscale0 is defined
-          - ansible_tailscale0.ipv4 is defined
-          - ansible_tailscale0.ipv4.address is defined
-        fail_msg: "Tailscale interface not found. Ensure Tailscale is installed and connected."
+    - name: Validate Tailscale connected
+      ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
     - name: Validate VPC IP is in expected range
       assert:
