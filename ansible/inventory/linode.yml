@@ -33,7 +33,6 @@ groups:
   stg_oldeworld_api_new: "'stg_oldeworld_api' in (tags|list) and 'new_api' in (tags|list)"
   stg_oldeworld_clt: "'stg_oldeworld_clt' in (tags|list)"
   stg_oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list)"
-  stg_oldeworld_nws: "'stg_oldeworld_nws' in (tags|list)"
   stg_oldeworld_jms: "'stg_oldeworld_jms' in (tags|list)"
 
   # Oldeworld Cluster -- PRD
@@ -46,14 +45,17 @@ groups:
   prd_oldeworld_nws: "'prd_oldeworld_nws' in (tags|list)"
   prd_oldeworld_jms: "'prd_oldeworld_jms' in (tags|list)"
 
-  # Oldeworld Cluster -- role families across STG and PRD
+  # Oldeworld Cluster -- role families across STG and PRD (nws is PRD only)
   oldeworld_api: "'stg_oldeworld_api' in (tags|list) or 'prd_oldeworld_api' in (tags|list)"
   oldeworld_clt: "'stg_oldeworld_clt' in (tags|list) or 'prd_oldeworld_clt' in (tags|list)"
   oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list) or 'prd_oldeworld_pxy' in (tags|list)"
-  oldeworld_nws: "'stg_oldeworld_nws' in (tags|list) or 'prd_oldeworld_nws' in (tags|list)"
+  oldeworld_nws: "'prd_oldeworld_nws' in (tags|list)"
   oldeworld_jms: "'stg_oldeworld_jms' in (tags|list) or 'prd_oldeworld_jms' in (tags|list)"
 
-  # Every Linode VM the observability plane scrapes
+  # Every Linode VM that carries node_exporter: oldeworld_all plus ops_backoffice.
+  # Roll it in two passes: fleet_all:!oldeworld_pxy, then oldeworld_pxy with
+  # -e variable_serial=1 (play-o11y--node-exporter-0-install.yml refuses any
+  # batch larger than one that contains a proxy host).
   fleet_all: "'oldeworld' in (tags|list) or 'ops_backoffice' in (tags|list)"
 
   # Oldeworld Cluster -- Clients by Language - STG
