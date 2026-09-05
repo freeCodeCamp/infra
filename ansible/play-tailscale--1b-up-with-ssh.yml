@@ -4,7 +4,7 @@
 #     -e variable_host=<group>
 #
 # The device is tagged at enrolment. Override the default tag list with
-#   -e variable_tags=tag:added-by-ops,tag:o11y
+#   -e variable_tags=tag:added-by-ops,tag:<extra>
 # Repeat the same -e variable_tags on every re-run of a host that carries more
 # than the default tag; tailscale up keeps no flags between runs.
 - name: Tailscale - Connect to Tailscale Network
