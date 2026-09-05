@@ -8,6 +8,8 @@
 cluster_name: ops-o11y
 k3s_version: v1.36.4+k3s1
 
+node_exporter_systemd_unit_include: "^(cron|k3s|node_exporter|ssh|tailscaled)[.]service"
+
 k3s_config:
   write-kubeconfig-mode: "0600"
   disable:
