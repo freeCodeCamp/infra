@@ -31,4 +31,6 @@
       ansible.builtin.meta: flush_handlers
 
     - name: Prove the tailnet-only bind on this host
-      ansible.builtin.include_tasks: tasks/verify-node-exporter.yml
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify

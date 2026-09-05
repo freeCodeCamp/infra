@@ -6,4 +6,6 @@
   become_user: root
   tasks:
     - name: Check node_exporter
-      ansible.builtin.include_tasks: tasks/verify-node-exporter.yml
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify
