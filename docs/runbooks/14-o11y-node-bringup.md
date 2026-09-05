@@ -23,9 +23,9 @@ Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` an
 | #   | Requirement                                                                                                                         | Check                                              |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | 1   | `tofu` 1.12.x on PATH, `infra-secrets/tfstate/.env.enc` and `do-universe/.env.enc` decrypt, R2 bucket `infra-tfstate` exists | `cd terraform/ops-o11y && tofu init`               |
-| 1a  | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc`, owned by `tag:added-by-ops` and not expired (check under Settings, Keys in the admin console) | `test -n "$TAILSCALE_AUTH_KEY"`                    |
+| 1a  | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (auth keys live 1 to 90 days; replaced 2026-09-05). Tags come from the play, not the key: `play-tailscale--1a-up.yml` passes `--advertise-tags` from `variable_tags`, default `tag:added-by-ops` | `test -n "$TAILSCALE_AUTH_KEY"` |
 | 2   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
-| 3   | `../tailscale-acls/policy.hujson` grants `tag:o11y` → `tag:added-by-ops` on 9100, and the node's auth key carries `tag:o11y` as well as `tag:added-by-ops` (no such grant exists today) | step 5 verification fails without it |
+| 3   | `../tailscale-acls/policy.hujson` defines `tag:o11y` under `tagOwners` (owner `group:ops`) and grants `tag:o11y` → `tag:added-by-ops` on 9100. Neither exists today | without the owner entry the enrolment play fails at `tailscale up`; without the grant step 5 verification fails |
 | 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
 | 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
 | 6   | `helm` >= 3.14 and `kubectl` on PATH                                                                                                | `helm version --short && kubectl version --client` |
@@ -52,12 +52,12 @@ The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node o
 
 ```sh
 ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y -e variable_tags=tag:added-by-ops,tag:o11y
 ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e variable_host=ops_o11y
 ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml -e variable_host=ops_o11y
 ```
 
-The key's tag owns the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
+The advertised tags own the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
 
 ## Steps
 
