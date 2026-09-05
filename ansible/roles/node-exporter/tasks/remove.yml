@@ -1,38 +1,13 @@
 ---
-- name: Look for the node_exporter unit
-  ansible.builtin.stat:
-    path: /etc/systemd/system/node_exporter.service
-  register: node_exporter_unit_file
-
-- name: Stop and disable node_exporter
-  ansible.builtin.systemd:
-    name: node_exporter
-    state: stopped
-    enabled: false
-  when: node_exporter_unit_file.stat.exists
-
-- name: Remove every node_exporter artefact
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /etc/systemd/system/node_exporter.service
-    - "{{ node_exporter_launcher }}"
-    - "{{ node_exporter_binary }}"
-    - "{{ node_exporter_unpack_dir }}"
-    - "{{ node_exporter_archive_path }}"
-    - "{{ node_exporter_textfile_dir | dirname }}"
-
-- name: Remove the node_exporter user
-  ansible.builtin.user:
-    name: "{{ node_exporter_user }}"
-    state: absent
-
-- name: Remove the node_exporter group
-  ansible.builtin.group:
-    name: "{{ node_exporter_group }}"
-    state: absent
-
-- name: Reload systemd after removing node_exporter
-  ansible.builtin.systemd:
-    daemon_reload: true
+- name: Remove node_exporter
+  ansible.builtin.include_tasks: ../../../tasks/remove-systemd-service.yml
+  vars:
+    svc_unit: node_exporter
+    svc_user: "{{ node_exporter_user }}"
+    svc_group: "{{ node_exporter_group }}"
+    svc_paths:
+      - "{{ node_exporter_launcher }}"
+      - "{{ node_exporter_binary }}"
+      - "{{ node_exporter_unpack_dir }}"
+      - "{{ node_exporter_archive_path }}"
+      - "{{ node_exporter_textfile_dir | dirname }}"

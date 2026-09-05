@@ -1,0 +1,47 @@
+---
+- name: Look for the unit files of {{ svc_unit }}
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: svc_unit_files
+  loop:
+    - /etc/systemd/system/{{ svc_unit }}.service
+    - /usr/lib/systemd/system/{{ svc_unit }}.service
+
+- name: Stop and disable {{ svc_unit }}
+  ansible.builtin.systemd:
+    name: "{{ svc_unit }}"
+    state: stopped
+    enabled: false
+  when: svc_unit_files.results | selectattr('stat.exists') | list | length > 0
+
+- name: Purge the package of {{ svc_unit }}
+  ansible.builtin.apt:
+    name: "{{ svc_apt_package }}"
+    state: absent
+    purge: true
+  when: svc_apt_package is defined
+
+- name: Remove the user of {{ svc_unit }}
+  ansible.builtin.user:
+    name: "{{ svc_user }}"
+    state: absent
+
+- name: Remove the group of {{ svc_unit }}
+  ansible.builtin.group:
+    name: "{{ svc_group }}"
+    state: absent
+
+- name: Remove every artefact of {{ svc_unit }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ svc_unit_paths + svc_paths | default([]) }}"
+  vars:
+    svc_unit_paths:
+      - /etc/systemd/system/{{ svc_unit }}.service
+      - /etc/systemd/system/{{ svc_unit }}.service.d
+      - /usr/lib/systemd/system/{{ svc_unit }}.service
+
+- name: Reload systemd after removing {{ svc_unit }}
+  ansible.builtin.systemd:
+    daemon_reload: true
