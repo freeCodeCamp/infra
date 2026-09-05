@@ -14,7 +14,7 @@
 #
 #   Add -e o11y_deploy_logs=true to include VictoriaLogs.
 
-- name: o11y - Deploy the stack
+- name: O11y - Deploy the stack
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: false
   become: false
@@ -27,18 +27,18 @@
 
   tasks:
     - name: Check the kubeconfig exists
-      stat:
+      ansible.builtin.stat:
         path: "{{ kubeconfig }}"
       register: kubeconfig_file
 
     - name: Check the cluster is reachable
-      assert:
+      ansible.builtin.assert:
         that: kubeconfig_file.stat.exists
         fail_msg: >-
           {{ kubeconfig }} is missing. Run play-k3s--single-node.yml first.
 
     - name: Check the Linode token is present
-      assert:
+      ansible.builtin.assert:
         that: linode_api_token | length > 0
         fail_msg: >-
           LINODE_API_TOKEN is empty. It lives in the INFRA_ADMIN-gated
@@ -117,7 +117,7 @@
         rollout_targets: "{{ releases | map(attribute='rollout') | list }}"
 
     - name: Report
-      debug:
+      ansible.builtin.debug:
         msg: >-
           {{ o11y_namespace }} ready —
           {{ releases | map(attribute='name') | join(', ') }}

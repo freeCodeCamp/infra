@@ -21,7 +21,7 @@
 
   tasks:
     - name: Validate group_vars
-      assert:
+      ansible.builtin.assert:
         that:
           - cluster_name is defined and cluster_name | length > 0
           - k3s_version is defined and k3s_version | length > 0
@@ -29,7 +29,7 @@
         fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
     - name: Validate a single target host
-      assert:
+      ansible.builtin.assert:
         that: ansible_play_hosts | length == 1
         fail_msg: >-
           This playbook builds a single-node server. {{ ansible_play_hosts | length }}
@@ -39,7 +39,7 @@
       ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
     - name: Set network facts
-      set_fact:
+      ansible.builtin.set_fact:
         tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
 
 - name: K3s single node - Deploy
@@ -49,13 +49,13 @@
 
   tasks:
     - name: Ensure the k3s config directory exists
-      file:
+      ansible.builtin.file:
         path: /etc/rancher/k3s
         state: directory
         mode: "0755"
 
     - name: Write the k3s server config
-      copy:
+      ansible.builtin.copy:
         content: >-
           {{ k3s_config
              | combine({'tls-san': [tailscale_ip, inventory_hostname]})
@@ -67,14 +67,14 @@
       register: k3s_config_file
 
     - name: Read the installed k3s version
-      command: k3s --version
+      ansible.builtin.command: k3s --version
       register: k3s_installed
       changed_when: false
       failed_when: false
       check_mode: false
 
     - name: Install k3s
-      shell:
+      ansible.builtin.shell:
         cmd: >-
           curl -sfL https://get.k3s.io |
           INSTALL_K3S_VERSION={{ k3s_version }} sh -s -
@@ -82,7 +82,7 @@
       when: k3s_version not in (k3s_installed.stdout | default(''))
 
     - name: Restart k3s when the config changed
-      systemd:
+      ansible.builtin.systemd:
         name: k3s
         state: restarted
         daemon_reload: true
@@ -99,7 +99,7 @@
 
   tasks:
     - name: Wait for the node to report Ready
-      command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      ansible.builtin.command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
       register: node_ready
       retries: 3
       delay: 20
@@ -107,13 +107,13 @@
       changed_when: false
 
     - name: Read the kubeconfig
-      slurp:
+      ansible.builtin.slurp:
         src: /etc/rancher/k3s/k3s.yaml
       register: kubeconfig_raw
       no_log: true
 
     - name: Ensure the cluster directory exists
-      file:
+      ansible.builtin.file:
         path: "{{ cluster_config_dir }}"
         state: directory
         mode: "0755"
@@ -121,7 +121,7 @@
       become: false
 
     - name: Write the kubeconfig locally
-      copy:
+      ansible.builtin.copy:
         content: "{{ kubeconfig_raw.content | b64decode }}"
         dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         mode: "0600"
@@ -131,7 +131,7 @@
       diff: false
 
     - name: Point the kubeconfig at the tailnet name
-      replace:
+      ansible.builtin.replace:
         path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         regexp: 'https://127\.0\.0\.1:6443'
         replace: "https://{{ inventory_hostname }}:6443"
@@ -140,7 +140,7 @@
       diff: false
 
     - name: Name the context after the cluster
-      replace:
+      ansible.builtin.replace:
         path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         regexp: '(\s+)(name|cluster|user|current-context): default'
         replace: '\1\2: {{ cluster_name }}'
@@ -149,7 +149,7 @@
       diff: false
 
     - name: Verify kubectl reaches the cluster
-      command: kubectl get nodes -o wide
+      ansible.builtin.command: kubectl get nodes -o wide
       environment:
         KUBECONFIG: "{{ cluster_config_dir }}/.kubeconfig.yaml"
       register: kubectl_result
@@ -158,7 +158,7 @@
       become: false
 
     - name: Done
-      debug:
+      ansible.builtin.debug:
         msg:
           - "{{ cluster_name }} ready — kubeconfig at k3s/{{ cluster_name }}/.kubeconfig.yaml"
           - "{{ kubectl_result.stdout_lines }}"
