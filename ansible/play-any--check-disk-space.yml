@@ -4,6 +4,11 @@
 #   ansible-playbook -i inventory/linode.yml play-any--check-disk-space.yml \
 #     -e variable_host=prd_oldeworld_api
 #
+# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
+# in the environment, and it selects hosts by name, not by group:
+#   ansible-playbook -i inventory/tailscale.yml play-any--check-disk-space.yml \
+#     -e variable_host='prd-vm-oldeworld-api-*'
+#
 #   just bootstrap any--check-disk-space gxy_management_k3s
 #
 # Read-only. It measures, it never frees anything.

@@ -1,4 +1,13 @@
 ---
+# Usage:
+#   ansible-playbook -i inventory/linode.yml play-any--reboot.yml \
+#     -e variable_host=stg_oldeworld_clt
+#
+# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
+# in the environment, and it selects hosts by name, not by group:
+#   ansible-playbook -i inventory/tailscale.yml play-any--reboot.yml \
+#     -e variable_host='stg-vm-oldeworld-clt-*'
+
 - name: Reboot a machine and wait for it to come back
   hosts: "{{ variable_host | default('null') }}"
   serial: '{{ variable_serial | default(1) }}'

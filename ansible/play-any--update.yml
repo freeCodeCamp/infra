@@ -1,4 +1,13 @@
 ---
+# Usage:
+#   ansible-playbook -i inventory/linode.yml play-any--update.yml \
+#     -e variable_host=stg_oldeworld_clt
+#
+# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
+# in the environment, and it selects hosts by name, not by group:
+#   ansible-playbook -i inventory/tailscale.yml play-any--update.yml \
+#     -e variable_host='stg-vm-oldeworld-clt-*'
+
 - name: Update virtual machines
   hosts: "{{ variable_host | default('null') }}"
   serial: '{{ variable_serial | default(1) }}'
