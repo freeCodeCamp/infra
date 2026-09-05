@@ -34,3 +34,11 @@
       ansible.builtin.include_role:
         name: node-exporter
         tasks_from: verify
+
+    - name: Fail when this host is an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (verify_anomaly | bool)
+        fail_msg: >-
+          {{ inventory_hostname }}: {{ verify_finding.reasons | join('; ') }}
+        success_msg: "node_exporter is healthy on {{ inventory_hostname }}"

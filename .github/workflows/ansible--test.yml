@@ -94,3 +94,8 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check play-test--5-check-disk-space.yml
+
+      - name: Unit Test the node_exporter Finding Logic
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check play-test--6-verify-node-exporter.yml
