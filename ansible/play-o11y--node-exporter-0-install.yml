@@ -23,8 +23,8 @@
             node_exporter_batch_max | default(0) | int == 0
             or ansible_play_batch | length <= node_exporter_batch_max | int
         fail_msg: >-
-          {{ inventory_hostname }} allows a batch of {{ node_exporter_batch_max }};
-          run this group with -e variable_serial={{ node_exporter_batch_max }}
+          {{ inventory_hostname }} allows a batch of {{ node_exporter_batch_max | default(0) }};
+          run this group with -e variable_serial={{ node_exporter_batch_max | default(0) }}
   tasks:
     - name: Install and configure node_exporter
       ansible.builtin.include_role:
