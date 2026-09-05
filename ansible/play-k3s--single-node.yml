@@ -122,30 +122,16 @@
 
     - name: Write the kubeconfig locally
       ansible.builtin.copy:
-        content: "{{ kubeconfig_raw.content | b64decode }}"
+        content: >-
+          {{ kubeconfig_raw.content | b64decode
+             | replace('https://127.0.0.1:6443', 'https://' ~ inventory_hostname ~ ':6443')
+             | regex_replace('(\s+)(name|cluster|user|current-context): default',
+                             '\1\2: ' ~ galaxy_name) }}
         dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         mode: "0600"
       delegate_to: localhost
       become: false
       no_log: true
-      diff: false
-
-    - name: Point the kubeconfig at the tailnet name
-      ansible.builtin.replace:
-        path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
-        regexp: 'https://127\.0\.0\.1:6443'
-        replace: "https://{{ inventory_hostname }}:6443"
-      delegate_to: localhost
-      become: false
-      diff: false
-
-    - name: Name the context after the cluster
-      ansible.builtin.replace:
-        path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
-        regexp: '(\s+)(name|cluster|user|current-context): default'
-        replace: '\1\2: {{ galaxy_name }}'
-      delegate_to: localhost
-      become: false
       diff: false
 
     - name: Verify kubectl reaches the cluster
