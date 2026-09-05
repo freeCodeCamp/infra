@@ -4,7 +4,7 @@
 
 This node is freeCodeCamp's first infrastructure observability plane. It pulls node_exporter metrics from ~80 Linode VMs over Tailscale, keeps 12 months of history, and later scrapes the Hetzner bare-metal estate under the same `job="node"` so one dashboard spans the provider migration.
 
-Every command below pastes into a bare shell from the repo root. No `direnv`, no `just`. Each `kubectl` and `helm` line carries its own `KUBECONFIG=`.
+Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files that load their envelopes, so the OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and the Ansible lines run from `ansible/` with `INFRA_ADMIN=1`, which loads `global/.env.enc` and with it the tailnet auth key. Each `kubectl` and `helm` line carries its own `KUBECONFIG=`.
 
 ## Topology, and why
 
@@ -23,7 +23,7 @@ Every command below pastes into a bare shell from the repo root. No `direnv`, no
 | #   | Requirement                                                                                                                         | Check                                              |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | 1   | `tofu` 1.12.x on PATH, `infra-secrets/tfstate/.env.enc` and `do-universe/.env.enc` decrypt, R2 bucket `infra-tfstate` exists | `cd terraform/ops-o11y && tofu init`               |
-| 1a  | A pre-authorised Tailscale auth key with `tag:added-by-ops`, exported as `TAILSCALE_AUTH_KEY`                                       | `test -n "$TAILSCALE_AUTH_KEY"`                    |
+| 1a  | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc`, owned by `tag:added-by-ops` and not expired (check under Settings, Keys in the admin console) | `test -n "$TAILSCALE_AUTH_KEY"`                    |
 | 2   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
 | 3   | Tailnet ACL permits node → fleet on tcp/9100                                                                                        | step 5 verification fails without it               |
 | 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
@@ -43,12 +43,12 @@ Precondition 7 is easy to miss. Tailscale SSH refuses any identity the tailnet p
 The node is code. OpenTofu creates the droplet, its tag-attached firewall and the project link; Ansible joins the tailnet and installs K3s. Every line runs from the repo root.
 
 ```sh
-cd terraform/ops-o11y && tofu init && tofu apply && cd ../..
+cd terraform/ops-o11y && direnv exec . tofu init && direnv exec . tofu apply && cd ../..
 ```
 
 State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
 
-The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/`:
+The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/` with `INFRA_ADMIN=1` in the environment:
 
 ```sh
 ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
@@ -57,7 +57,7 @@ ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e 
 ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml -e variable_host=ops_o11y
 ```
 
-The tagged auth key joins the node as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
+The key's tag owns the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
 
 ## Steps
 
