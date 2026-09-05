@@ -32,6 +32,7 @@
     port: "{{ node_exporter_port }}"
     state: started
     timeout: 90
+  check_mode: false
 
 - name: Read every listener on the exporter port
   ansible.builtin.command: ss -Hltn sport = :{{ node_exporter_port }}
@@ -58,6 +59,7 @@
     status_code: 200
   register: verify_ne_metrics
   changed_when: false
+  check_mode: false
 
 - name: Prove the exporter port refuses every non-tailnet address of this host
   ansible.builtin.wait_for:
@@ -65,6 +67,7 @@
     port: "{{ node_exporter_port }}"
     state: stopped
     timeout: 10
+  check_mode: false
   loop: >-
     {{ ansible_all_ipv4_addresses | default([])
        | difference([verify_ne_address]) | union(['127.0.0.1']) }}
