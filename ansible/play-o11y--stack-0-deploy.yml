@@ -1,12 +1,12 @@
 ---
 # Deploy the observability stack onto the ops-o11y cluster.
 #
-# Idempotent. Reconciles CoreDNS, the namespace, the Linode service-discovery
-# Secret and every Helm release named in group_vars.
+# Idempotent. Reconciles CoreDNS, the namespaces, the service-discovery
+# Secrets and every Helm release named in group_vars.
 #
 # Prerequisites:
 #   - play-k3s--single-node.yml has run, so k3s/<cluster>/.kubeconfig.yaml exists
-#   - LINODE_API_TOKEN in the environment (direnv)
+#   - every env key named in o11y_sd_secrets is in the environment (direnv)
 #
 # Usage:
 #   ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml \
@@ -22,8 +22,14 @@
   vars:
     cluster_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
     kubeconfig: "{{ cluster_dir }}/.kubeconfig.yaml"
-    linode_api_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
     releases: "{{ o11y_releases + (o11y_log_releases if o11y_deploy_logs | bool else []) }}"
+    release_namespaces: >-
+      {{ ([o11y_namespace]
+          + (releases | selectattr('namespace', 'defined')
+             | map(attribute='namespace') | list)
+          + (o11y_sd_secrets | selectattr('namespace', 'defined')
+             | map(attribute='namespace') | list))
+         | unique }}
 
   tasks:
     - name: Check the kubeconfig exists
@@ -37,13 +43,14 @@
         fail_msg: >-
           {{ kubeconfig }} is missing. Run play-k3s--single-node.yml first.
 
-    - name: Check the Linode token is present
+    - name: Check every service-discovery env key is present
       ansible.builtin.assert:
-        that: linode_api_token | length > 0
+        that: lookup('env', item) | length > 0
         fail_msg: >-
-          LINODE_API_TOKEN is empty. It lives in the INFRA_ADMIN-gated
+          {{ item }} is empty. It lives in the INFRA_ADMIN-gated
           global/.env.enc envelope; export INFRA_ADMIN=1 and reload direnv, or
           move it to a scoped envelope that ansible/.envrc loads.
+      loop: "{{ o11y_sd_secrets | map(attribute='env') | flatten }}"
 
     - name: Forward ts.net queries to the tailnet resolver
       kubernetes.core.k8s:
@@ -66,17 +73,18 @@
                 annotations:
                   fcc.dev/coredns-custom: "{{ lookup('file', cluster_dir ~ '/cluster/coredns/coredns-custom.yaml') | hash('sha1') }}"
 
-    - name: Create the namespace
+    - name: Create the namespaces
       kubernetes.core.k8s:
         api_version: v1
         kind: Namespace
-        name: "{{ o11y_namespace }}"
+        name: "{{ item }}"
         state: present
         kubeconfig: "{{ kubeconfig }}"
+      loop: "{{ release_namespaces }}"
 
-    # The Secret key becomes the mounted filename. The scrape config reads
-    # /etc/vm/secrets/LINODE_API_TOKEN; renaming the key breaks discovery.
-    - name: Create the service-discovery secret
+    # Each Secret key becomes a mounted filename under /etc/vm/secrets/, which
+    # is where the scrape config reads it; renaming a key breaks discovery.
+    - name: Create the service-discovery secrets
       kubernetes.core.k8s:
         state: present
         kubeconfig: "{{ kubeconfig }}"
@@ -85,10 +93,17 @@
           kind: Secret
           type: Opaque
           metadata:
-            name: "{{ o11y_sd_secret }}"
-            namespace: "{{ o11y_namespace }}"
-          stringData:
-            LINODE_API_TOKEN: "{{ linode_api_token }}"
+            name: "{{ item.name }}"
+            namespace: "{{ item.namespace | default(o11y_namespace) }}"
+          stringData: >-
+            {%- set out = {} -%}
+            {%- for key in item.env -%}
+              {%- set _ = out.update({key: lookup('env', key)}) -%}
+            {%- endfor -%}
+            {{ out }}
+      loop: "{{ o11y_sd_secrets }}"
+      loop_control:
+        label: "{{ item.name }}"
       no_log: true
       diff: false
 
@@ -98,7 +113,7 @@
         chart_ref: "{{ item.chart }}"
         chart_repo_url: "{{ item.repo }}"
         chart_version: "{{ item.version }}"
-        release_namespace: "{{ o11y_namespace }}"
+        release_namespace: "{{ item.namespace | default(o11y_namespace) }}"
         release_state: present
         values_files:
           - "{{ cluster_dir }}/{{ item.values }}"
@@ -113,11 +128,15 @@
       ansible.builtin.include_tasks: tasks/wait-rollout.yml
       vars:
         rollout_kubeconfig: "{{ kubeconfig }}"
-        rollout_namespace: "{{ o11y_namespace }}"
-        rollout_targets: "{{ releases | map(attribute='rollout') | list }}"
+        rollout_namespace: "{{ release.namespace | default(o11y_namespace) }}"
+        rollout_targets: ["{{ release.rollout }}"]
+      loop: "{{ releases }}"
+      loop_control:
+        loop_var: release
+        label: "{{ release.rollout }}"
 
     - name: Report
       ansible.builtin.debug:
         msg: >-
-          {{ o11y_namespace }} ready —
+          {{ release_namespaces | join(', ') }} ready —
           {{ releases | map(attribute='name') | join(', ') }}

@@ -15,13 +15,16 @@
   become: true
   become_user: root
   pre_tasks:
-    - name: Refuse to touch more than one proxy host in a batch
+    - name: Refuse a batch larger than this host allows
       ansible.builtin.assert:
         that:
-          - not ('oldeworld_pxy' in group_names and ansible_play_batch | length > 1)
+          - node_exporter_batch_max | default(0) | string is match('^[0-9]+$')
+          - >-
+            node_exporter_batch_max | default(0) | int == 0
+            or ansible_play_batch | length <= node_exporter_batch_max | int
         fail_msg: >-
-          {{ inventory_hostname }} fronts live traffic; run the proxy hosts
-          with -e variable_serial=1
+          {{ inventory_hostname }} allows a batch of {{ node_exporter_batch_max }};
+          run this group with -e variable_serial={{ node_exporter_batch_max }}
   tasks:
     - name: Install and configure node_exporter
       ansible.builtin.include_role:

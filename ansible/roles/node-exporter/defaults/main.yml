@@ -18,7 +18,11 @@ node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
 
 node_exporter_tailscale_binary: /usr/bin/tailscale
 node_exporter_tailscale_wait_timeout: 60s
-node_exporter_tailnet_cidr: 100.64.0.0/10
+node_exporter_tailnet_cidr: "{{ tailnet_cidr | default('100.64.0.0/10') }}"
+
+node_exporter_enabled_collectors:
+  - processes
+  - systemd
 
 node_exporter_disabled_collectors:
   - bcache

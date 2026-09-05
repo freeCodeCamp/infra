@@ -19,10 +19,13 @@ server_config_yaml: |
     - system-reserved=cpu=500m,memory=1536Mi
     - eviction-hard=memory.available<500Mi,nodefs.available<10%
   kube-proxy-arg:
-    - nodeport-addresses=100.64.0.0/10
+    - nodeport-addresses={{ tailnet_cidr }}
 
 o11y_namespace: o11y
-o11y_sd_secret: vm-linode-sd
+o11y_sd_secrets:
+  - name: vm-linode-sd
+    env:
+      - LINODE_API_TOKEN
 
 o11y_releases:
   - name: victoria-metrics
