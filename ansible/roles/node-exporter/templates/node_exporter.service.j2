@@ -2,7 +2,8 @@
 Description=Prometheus node_exporter {{ node_exporter_version }}
 Documentation=https://github.com/prometheus/node_exporter
 After=tailscaled.service
-StartLimitIntervalSec=0
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
