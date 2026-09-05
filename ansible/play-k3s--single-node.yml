@@ -1,12 +1,17 @@
 ---
 # Bootstrap a single-node K3s server.
 #
-# Idempotent. Safe to re-run against a live node; it converges config and
-# restarts k3s only when /etc/rancher/k3s/config.yaml changes.
+# Idempotent. Safe to re-run against a live node; k3s.orchestration.k3s_server
+# converges /etc/rancher/k3s/config.yaml from server_config_yaml and restarts
+# k3s only when the config or the unit changes. The role adds the tailnet SAN
+# from api_endpoint; this play adds the hostname SAN as a server flag. The
+# kubeconfig var keeps the role away from ~/.kube/config; the fetch task
+# below owns k3s/<galaxy>/.kubeconfig.yaml.
 #
 # Prerequisites:
 #   - Ubuntu host reachable by Ansible as the freecodecamp user
 #   - Tailscale installed and connected (play-tailscale--0-install.yml, then 1a-up)
+#   - variable_host is an inventory group that holds exactly one host
 #
 # Config lives in inventory/group_vars/<group>.yml, not here.
 #
@@ -44,51 +49,17 @@
 
 - name: K3s single node - Deploy
   hosts: '{{ variable_host | default("null") }}'
-  gather_facts: false
+  gather_facts: true
   become: true
-
-  tasks:
-    - name: Ensure the k3s config directory exists
-      ansible.builtin.file:
-        path: /etc/rancher/k3s
-        state: directory
-        mode: "0755"
-
-    - name: Write the k3s server config
-      ansible.builtin.copy:
-        content: >-
-          {{ server_config_yaml | from_yaml
-             | combine({'tls-san': [tailscale_ip, inventory_hostname]})
-             | to_nice_yaml(indent=2) }}
-        dest: /etc/rancher/k3s/config.yaml
-        owner: root
-        group: root
-        mode: "0600"
-      register: k3s_config_file
-
-    - name: Read the installed k3s version
-      ansible.builtin.command: k3s --version
-      register: k3s_installed
-      changed_when: false
-      failed_when: false
-      check_mode: false
-
-    - name: Install k3s
-      ansible.builtin.shell:
-        cmd: >-
-          curl -sfL https://get.k3s.io |
-          INSTALL_K3S_VERSION={{ k3s_version }} sh -s -
-        executable: /bin/bash
-      when: k3s_version not in (k3s_installed.stdout | default(''))
-
-    - name: Restart k3s when the config changed
-      ansible.builtin.systemd:
-        name: k3s
-        state: restarted
-        daemon_reload: true
-      when:
-        - k3s_config_file is changed
-        - k3s_version in (k3s_installed.stdout | default(''))
+  vars:
+    api_endpoint: "{{ tailscale_ip }}"
+    extra_server_args: "--tls-san={{ inventory_hostname }}"
+    server_group: "{{ variable_host }}"
+    user_kubectl: false
+    kubeconfig: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+  roles:
+    - role: k3s.orchestration.prereq
+    - role: k3s.orchestration.k3s_server
 
 - name: K3s single node - Verify
   hosts: '{{ variable_host | default("null") }}'
