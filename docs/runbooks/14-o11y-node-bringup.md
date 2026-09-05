@@ -25,7 +25,7 @@ Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` an
 | 1   | `tofu` 1.12.x on PATH, `infra-secrets/tfstate/.env.enc` and `do-universe/.env.enc` decrypt, R2 bucket `infra-tfstate` exists | `cd terraform/ops-o11y && tofu init`               |
 | 1a  | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc`, owned by `tag:added-by-ops` and not expired (check under Settings, Keys in the admin console) | `test -n "$TAILSCALE_AUTH_KEY"`                    |
 | 2   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
-| 3   | Tailnet ACL permits node → fleet on tcp/9100                                                                                        | step 5 verification fails without it               |
+| 3   | `../tailscale-acls/policy.hujson` grants `tag:o11y` → `tag:added-by-ops` on 9100, and the node's auth key carries `tag:o11y` as well as `tag:added-by-ops` (no such grant exists today) | step 5 verification fails without it |
 | 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
 | 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
 | 6   | `helm` >= 3.14 and `kubectl` on PATH                                                                                                | `helm version --short && kubectl version --client` |
