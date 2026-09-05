@@ -106,33 +106,12 @@
       until: node_ready.rc == 0
       changed_when: false
 
-    - name: Read the kubeconfig
-      ansible.builtin.slurp:
-        src: /etc/rancher/k3s/k3s.yaml
-      register: kubeconfig_raw
-      no_log: true
-
-    - name: Ensure the cluster directory exists
-      ansible.builtin.file:
-        path: "{{ cluster_config_dir }}"
-        state: directory
-        mode: "0755"
-      delegate_to: localhost
-      become: false
-
-    - name: Write the kubeconfig locally
-      ansible.builtin.copy:
-        content: >-
-          {{ kubeconfig_raw.content | b64decode
-             | replace('https://127.0.0.1:6443', 'https://' ~ inventory_hostname ~ ':6443')
-             | regex_replace('(\s+)(name|cluster|user|current-context): default',
-                             '\1\2: ' ~ galaxy_name) }}
-        dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
-        mode: "0600"
-      delegate_to: localhost
-      become: false
-      no_log: true
-      diff: false
+    - name: Fetch the kubeconfig
+      ansible.builtin.include_tasks: tasks/fetch-kubeconfig.yml
+      vars:
+        kubeconfig_dir: "{{ cluster_config_dir }}"
+        kubeconfig_server: "{{ inventory_hostname }}"
+        kubeconfig_context: "{{ galaxy_name }}"
 
     - name: Verify kubectl reaches the cluster
       ansible.builtin.command: kubectl get nodes -o wide
