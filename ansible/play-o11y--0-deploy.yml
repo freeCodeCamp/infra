@@ -20,7 +20,7 @@
   become: false
   connection: local
   vars:
-    cluster_dir: "{{ playbook_dir }}/../k3s/{{ cluster_name }}"
+    cluster_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
     kubeconfig: "{{ cluster_dir }}/.kubeconfig.yaml"
     linode_api_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
     releases: "{{ o11y_releases + (o11y_log_releases if o11y_deploy_logs | bool else []) }}"

@@ -23,9 +23,9 @@
     - name: Validate group_vars
       ansible.builtin.assert:
         that:
-          - cluster_name is defined and cluster_name | length > 0
+          - galaxy_name is defined and galaxy_name | length > 0
           - k3s_version is defined and k3s_version | length > 0
-          - k3s_config is defined and k3s_config | length > 0
+          - server_config_yaml is defined and server_config_yaml | length > 0
         fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
     - name: Validate a single target host
@@ -57,7 +57,7 @@
     - name: Write the k3s server config
       ansible.builtin.copy:
         content: >-
-          {{ k3s_config
+          {{ server_config_yaml | from_yaml
              | combine({'tls-san': [tailscale_ip, inventory_hostname]})
              | to_nice_yaml(indent=2) }}
         dest: /etc/rancher/k3s/config.yaml
@@ -95,7 +95,7 @@
   gather_facts: false
   become: true
   vars:
-    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ cluster_name }}"
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
 
   tasks:
     - name: Wait for the node to report Ready
@@ -143,7 +143,7 @@
       ansible.builtin.replace:
         path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
         regexp: '(\s+)(name|cluster|user|current-context): default'
-        replace: '\1\2: {{ cluster_name }}'
+        replace: '\1\2: {{ galaxy_name }}'
       delegate_to: localhost
       become: false
       diff: false
@@ -160,5 +160,5 @@
     - name: Done
       ansible.builtin.debug:
         msg:
-          - "{{ cluster_name }} ready — kubeconfig at k3s/{{ cluster_name }}/.kubeconfig.yaml"
+          - "{{ galaxy_name }} ready — kubeconfig at k3s/{{ galaxy_name }}/.kubeconfig.yaml"
           - "{{ kubectl_result.stdout_lines }}"

@@ -5,12 +5,12 @@
 # Single-node K3s on DO FRA1, s-4vcpu-8gb-amd. Not HA by decision — a dead
 # collector loses samples, not service. Reached over Tailscale only.
 
-cluster_name: ops-o11y
+galaxy_name: ops-o11y
 k3s_version: v1.36.4+k3s1
 
 node_exporter_systemd_unit_include: "^(cron|k3s|node_exporter|ssh|tailscaled)[.]service"
 
-k3s_config:
+server_config_yaml: |
   write-kubeconfig-mode: "0600"
   disable:
     - traefik
