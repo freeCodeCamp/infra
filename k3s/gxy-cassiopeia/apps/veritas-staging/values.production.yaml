@@ -1,0 +1,107 @@
+# Staging overlay for the veritas chart on gxy-cassiopeia.
+# Loaded by `just release gxy-cassiopeia veritas-staging` between chart
+# defaults and the sops sealed overlay so the layering is:
+#
+#   chart values.yaml  <  THIS FILE  <  infra-secrets/k3s/gxy-cassiopeia/veritas-staging.values.yaml.enc
+#
+# Secret credentials live in the sops overlay only (T3se row in
+# veritas-v0-deploy dossier). No TLS PEM here — `*.freecodecamp.dev`
+# origin cert ships via the envelope. Anything in this file is
+# git-tracked and may be inspected publicly.
+#
+# Recipe convention: every overlay file is named `values.production.yaml`
+# regardless of conceptual environment (the just release recipe loads
+# that exact filename). "Production" here means "the production overlay
+# for the staging app on cassiopeia."
+
+namespace: veritas-staging
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/freecodecamp/veritas
+  # Moving pointer, pushed by hand (docker buildx --push, or a manual
+  # workflow_dispatch of docker-ghcr.yml from main). Staging trades the
+  # prod digest pin for fast feedback; pullPolicy Always re-pulls each roll.
+  tag: "main"
+  pullPolicy: Always
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+# Staging env (non-secret). Match apps/api/src/env.ts schema.
+env:
+  NODE_ENV: "production"
+  LOG_LEVEL: "debug"
+  PORT: "3000"
+  HOST: "0.0.0.0"
+  LOGIN_URL: "https://login.freecodecamp.dev"
+  ACCOUNT_URL: "https://account.freecodecamp.dev"
+  CONSOLE_URL: "https://auth-console.freecodecamp.dev"
+  # The temp constellation (examples/minimal-constellation) on staging; its
+  # silent-SSO iframe and CORS need this origin trusted.
+  TRUSTED_ORIGINS: "https://test.freecode.camp"
+  PASSKEY_RP_ID: "freecodecamp.dev"
+  # SES SMTP in us-east-1. Verify the freecodecamp.dev identity there before
+  # the first staging send; SMTP_USER / SMTP_PASS live in the staging envelope.
+  EMAIL_TRANSPORT: "smtp"
+  SMTP_HOST: "email-smtp.us-east-1.amazonaws.com"
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  EMAIL_FROM: "noreply@freecodecamp.dev"
+  # Chosen by the operator before the one-time bootstrap call (T32).
+  ACCOUNT_CLIENT_ID: ""
+  CONTROL_CLIENT_ID: ""
+  EMAIL_SEND_CLIENT_IDS: ""
+  SENTRY_ENVIRONMENT: "staging"
+
+rateLimit:
+  average: 20
+  burst: 60
+  period: "1s"
+
+gateway:
+  hostnames:
+    login: "login.freecodecamp.dev"
+    account: "account.freecodecamp.dev"
+    console: "auth-console.freecodecamp.dev"
+
+networkPolicy:
+  enabled: true
+  # The temp constellation registers a backchannel_logout_uri on this host.
+  relyingPartyFQDNs:
+    - test.freecode.camp
+
+cnpg:
+  image: ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  # Single-instance — staging trades HA for footprint. No replica,
+  # no synchronous-quorum semantics. Acceptable for ephemeral test data.
+  instances: 1
+  storage:
+    size: 5Gi
+  bootstrap:
+    database: veritas
+    owner: veritas
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Backup disabled — staging is ephemeral. No barmanObjectStore in the
+  # Cluster CR, no cnpg-r2-creds Secret rendered, no R2 bucket dep.
+  # Chart-side gate added on `cnpg.backup.enabled` to support this overlay.
+  backup:
+    enabled: false
+  scheduledBackup:
+    enabled: false
+
+# TLS material supplied entirely via the sops overlay
+# (infra-secrets/k3s/gxy-cassiopeia/veritas-staging.values.yaml.enc).
+# Origin cert is the wildcard `*.freecodecamp.dev` (15-yr CF Origin CA); it covers the three hosts.

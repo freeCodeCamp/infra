@@ -79,7 +79,7 @@ release cluster app:
     export KUBECONFIG="$(pwd)/k3s/{{ cluster }}/.kubeconfig.yaml"
 
     # ---------------- Helm phase (if apps/<app>/charts/<chart>/) -----------
-    CHART_DIR=$(find "$APP_DIR/charts" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+    CHART_DIR=$(find -L "$APP_DIR/charts" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
     if [ -n "${CHART_DIR:-}" ] && [ -d "$CHART_DIR" ]; then
       CHART_NAME=$(basename "$CHART_DIR")
       VALUES="$CHART_DIR/values.yaml"
@@ -406,6 +406,8 @@ verify-manifests version="1.32.0":
       "gxy-management:valkey:--set,secretEnv.VALKEY_PASSWORD=x" \
       "gxy-management:hatchet:--set,secretEnv.DATABASE_URL=postgres://x" \
       "gxy-cassiopeia:caddy:--set,r2.accessKeyId=x,--set,r2.secretAccessKey=y,--set,r2.bucket=z,--set,r2.endpoint=https://example" \
+      "gxy-cassiopeia:veritas:--set,secretEnv.BETTER_AUTH_SECRET=x,--set,secretEnv.GITHUB_CLIENT_ID=x,--set,secretEnv.GITHUB_CLIENT_SECRET=x,--set,secretEnv.GOOGLE_CLIENT_ID=x,--set,secretEnv.GOOGLE_CLIENT_SECRET=x,--set,cnpgR2.endpoint=https://example.r2.cloudflarestorage.com,--set,cnpgR2.accessKeyId=x,--set,cnpgR2.secretAccessKey=x,--set,tls.crt=PEMSTUB,--set,tls.key=PEMSTUB" \
+      "gxy-cassiopeia:veritas-staging:--set,secretEnv.BETTER_AUTH_SECRET=x,--set,secretEnv.GITHUB_CLIENT_ID=x,--set,secretEnv.GITHUB_CLIENT_SECRET=x,--set,secretEnv.GOOGLE_CLIENT_ID=x,--set,secretEnv.GOOGLE_CLIENT_SECRET=x,--set,tls.crt=PEMSTUB,--set,tls.key=PEMSTUB" \
       ; do
       galaxy="${entry%%:*}"
       rest="${entry#*:}"
@@ -561,6 +563,7 @@ verify-caddy-s3:
 #   caddy-serve-preview high-RPS GET against preview alias
 #   artemis-whoami      moderate-RPS GH-bearer probe of /api/whoami
 #   artemis-deploy      sustained init+upload+finalize bursts (write-heavy)
+#   veritas-abuse       rate-limit + abuse probes against a deployed Veritas
 #
 # Required env: see `loadtest/README.md` per scenario.
 [group('test')]
