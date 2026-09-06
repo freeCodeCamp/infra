@@ -6,7 +6,7 @@ This node is freeCodeCamp's first infrastructure observability plane. It pulls n
 
 Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files that load their envelopes, so the OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and the Ansible lines run from `ansible/` with `INFRA_ADMIN=1`, which loads `global/.env.enc` and with it the tailnet auth key and the Linode token. Each `kubectl` and `helm` line carries its own `KUBECONFIG=`.
 
-Four layers, one tool each: OpenTofu builds the machine, Ansible configures the node, one `helm` line installs Argo CD, and Argo CD installs everything else from `main`. Argo CD reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be merged before the GitOps section runs.
+Four layers, one tool each: OpenTofu builds the machine, Ansible configures the node, one `helm` line installs Argo CD, and Argo CD installs everything else from `main`. Argo CD reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be pushed on the pinned branch before the GitOps section runs. Every Application pins `feat/bare-metal` today; flip the five `targetRevision` lines to `main` when the branch merges.
 
 ## Topology, and why
 
@@ -32,7 +32,7 @@ Four layers, one tool each: OpenTofu builds the machine, Ansible configures the 
 | 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
 | 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
 | 6   | `helm` 3.14 or newer and `kubectl` on PATH                                                                                          | `helm version --short && kubectl version --client` |
-| 6a  | The files under `k3s/ops-o11y/apps/` and `k3s/ops-o11y/argocd/` are on `main`; Argo CD reads them from GitHub                       | `git log origin/main -1 -- k3s/ops-o11y/argocd/root.yaml` prints a commit |
+| 6a  | The files under `k3s/ops-o11y/apps/` and `k3s/ops-o11y/argocd/` are pushed on the branch every Application pins (`feat/bare-metal` today, `main` after the merge); Argo CD reads GitHub, never a checkout | `git ls-remote --heads origin feat/bare-metal` prints a commit |
 | 7   | Root shell on the node, by Tailscale SSH grant or key                                                                               | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
 | 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                                                   | separate Ansible task; step 5 counts it            |
 

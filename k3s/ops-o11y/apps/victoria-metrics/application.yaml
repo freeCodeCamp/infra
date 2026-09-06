@@ -16,7 +16,7 @@ spec:
         valueFiles:
           - $values/k3s/ops-o11y/apps/victoria-metrics/charts/victoria-metrics-single/values.yaml
     - repoURL: https://github.com/freeCodeCamp/infra.git
-      targetRevision: main
+      targetRevision: feat/bare-metal
       ref: values
   destination:
     server: https://kubernetes.default.svc
