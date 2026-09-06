@@ -1,0 +1,29 @@
+{{- if .Values.cnpg.scheduledBackup.enabled -}}
+{{/*
+CNPG ScheduledBackup CR — periodic full backup. WAL archive runs
+continuously via the Cluster CR (PITR support). This CR triggers
+the full data-dump cadence.
+
+Cron format is CNPG-specific 6-field (second minute hour day month weekday).
+Default 04:00 UTC = off-peak vs FRA1 + IST traffic.
+
+`backupOwnerReference: self` makes the Backup objects owned by this
+ScheduledBackup — deleting the ScheduledBackup cleans up its Backup
+history (PVCs and R2 objects retained per Cluster.retentionPolicy).
+
+`immediate: true` triggers one backup at CR creation so first deploy
+proves the R2 path end-to-end before the cron window arrives.
+*/}}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ include "veritas.cnpg.name" . }}-daily
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  schedule: {{ required ".Values.cnpg.scheduledBackup.schedule is required" .Values.cnpg.scheduledBackup.schedule | quote }}
+  cluster:
+    name: {{ include "veritas.cnpg.name" . }}
+  backupOwnerReference: self
+  immediate: true
+{{- end }}

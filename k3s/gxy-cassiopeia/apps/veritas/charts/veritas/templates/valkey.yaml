@@ -1,0 +1,149 @@
+{{- if .Values.valkey.deploy -}}
+# In-namespace Valkey for rate-limit counters + secondary session storage.
+# Cache tier only — Postgres is the source of truth, so this runs ephemeral
+# (emptyDir, save "", allkeys-lru eviction). A distinct app.kubernetes.io/name
+# (`<name>-valkey`) keeps it out of the app CiliumNetworkPolicy's selector.
+# For a managed/HA endpoint instead, set valkey.deploy=false + valkey.url.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-valkey
+  labels:
+    helm.sh/chart: {{ include "veritas.chart" . }}
+    app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: valkey
+    app.kubernetes.io/part-of: universe-platform
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: valkey
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: valkey
+          image: "{{ .Values.valkey.image.repository }}:{{ .Values.valkey.image.tag }}"
+          imagePullPolicy: {{ .Values.valkey.image.pullPolicy }}
+          # Cache config: no persistence, LRU eviction, protected-mode off
+          # (no password; the CiliumNetworkPolicy gates access to app pods only).
+          args:
+            - --dir
+            - /data
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --protected-mode
+            - "no"
+            - --maxmemory
+            - "200mb"
+            - --maxmemory-policy
+            - allkeys-lru
+          ports:
+            - name: valkey
+              containerPort: 6379
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: valkey
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.valkey.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-valkey
+  labels:
+    helm.sh/chart: {{ include "veritas.chart" . }}
+    app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: valkey
+    app.kubernetes.io/part-of: universe-platform
+spec:
+  type: ClusterIP
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: valkey
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- if .Values.networkPolicy.enabled }}
+---
+# Valkey ingress: app pods (name=veritas) + host (kubelet probes) on :6379.
+# Egress: cluster DNS only. Matches the Cilium-native policy style of the
+# app policy (templates/networkpolicy.yaml).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-valkey
+  labels:
+    helm.sh/chart: {{ include "veritas.chart" . }}
+    app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: valkey
+    app.kubernetes.io/part-of: universe-platform
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "veritas.name" . }}-valkey
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/name": {{ include "veritas.name" . }}
+            "k8s:app.kubernetes.io/instance": {{ .Release.Name }}
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    - fromEntities:
+        - host
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+  # Cache server initiates nothing — deny all egress (least privilege).
+  egress: []
+{{- end }}
+{{- end }}

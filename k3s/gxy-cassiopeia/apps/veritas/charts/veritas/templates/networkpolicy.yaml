@@ -1,0 +1,163 @@
+{{- if .Values.networkPolicy.enabled -}}
+# Cilium-native NetworkPolicy. CiliumNetworkPolicy (NOT vanilla
+# networking.k8s.io/v1 NetworkPolicy) because the CNI is Cilium and
+# Traefik runs hostNetwork — vanilla `namespaceSelector` doesn't
+# resolve hostNetwork pods back to their k8s namespace and would
+# silently block Traefik (mirrors artemis + caddy pattern).
+#
+# Ingress: any in-cluster entity to TCP :3000 (veritas HTTP). Traefik
+#          hostNetwork → matches `host` entity reliably.
+# Egress:  cluster DNS (Cilium DNS proxy); Google OAuth; GitHub and Apple
+#          OAuth when their credential pairs are set; the SES SMTP relay
+#          when EMAIL_TRANSPORT=smtp; every relying-party host listed in
+#          networkPolicy.relyingPartyFQDNs on :443 (back-channel logout
+#          + jwks_uri); ghcr.io (image pulls happen at kubelet, listed
+#          for future probe paths); CNPG Postgres on :5432; in-namespace
+#          Valkey on :6379. Each FQDN needs both halves: the DNS-proxy
+#          allow and the toFQDNs rule (docs/infra-guides/cilium-cnp.md).
+#
+# Note: veritas app pods do NOT egress to R2 directly. CNPG operator
+# pods (in cnpg-system ns) handle Barman uploads — separate policy
+# scope.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  ingress:
+    - fromEntities:
+        - cluster
+        - host
+      toPorts:
+        - ports:
+            - port: "{{ .Values.service.targetPort }}"
+              protocol: TCP
+  egress:
+    # DNS — Cilium DNS proxy on kube-dns. L7 dns rules required so
+    # toFQDNs entries below are populated (FQDN egress silently drops
+    # with empty IP set otherwise).
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "accounts.google.com"
+              - matchPattern: "oauth2.googleapis.com"
+              - matchPattern: "openidconnect.googleapis.com"
+              {{- if and .Values.secretEnv.GITHUB_CLIENT_ID .Values.secretEnv.GITHUB_CLIENT_SECRET }}
+              - matchPattern: "github.com"
+              - matchPattern: "api.github.com"
+              {{- end }}
+              {{- if and .Values.secretEnv.APPLE_CLIENT_ID .Values.secretEnv.APPLE_CLIENT_SECRET }}
+              - matchPattern: "appleid.apple.com"
+              {{- end }}
+              {{- if eq .Values.env.EMAIL_TRANSPORT "smtp" }}
+              - matchName: {{ required "env.SMTP_HOST is required" .Values.env.SMTP_HOST | quote }}
+              {{- end }}
+              {{- range .Values.networkPolicy.relyingPartyFQDNs }}
+              - matchName: {{ . | quote }}
+              {{- end }}
+              {{- if .Values.secretEnv.SENTRY_DSN }}
+              - matchName: {{ default (urlParse .Values.secretEnv.SENTRY_DSN).hostname .Values.networkPolicy.sentryFQDN | quote }}
+              {{- end }}
+              - matchPattern: "ghcr.io"
+              # In-cluster service DNS — CNPG cluster Service (TCP 5432).
+              # CNPG creates `<cluster>-rw` / `<cluster>-ro` / `<cluster>-r`
+              # Services in the veritas ns; app resolves via -rw (primary).
+              - matchPattern: "*.{{ .Values.namespace }}.svc.cluster.local"
+              - matchPattern: "*.*.svc.cluster.local"
+    # Google OAuth — code-exchange + JWKS + user-info.
+    - toFQDNs:
+        - matchName: "accounts.google.com"
+        - matchName: "oauth2.googleapis.com"
+        - matchName: "openidconnect.googleapis.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    {{- if and .Values.secretEnv.GITHUB_CLIENT_ID .Values.secretEnv.GITHUB_CLIENT_SECRET }}
+    # GitHub OAuth — token exchange (github.com) + user + emails (api.github.com).
+    - toFQDNs:
+        - matchName: "github.com"
+        - matchName: "api.github.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    {{- end }}
+    {{- if and .Values.secretEnv.APPLE_CLIENT_ID .Values.secretEnv.APPLE_CLIENT_SECRET }}
+    # Sign in with Apple — token exchange + public keys.
+    - toFQDNs:
+        - matchName: "appleid.apple.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    {{- end }}
+    {{- if eq .Values.env.EMAIL_TRANSPORT "smtp" }}
+    # SMTP relay (AWS SES) — magic links, OTP codes, new-device notices.
+    - toFQDNs:
+        - matchName: {{ .Values.env.SMTP_HOST | quote }}
+      toPorts:
+        - ports:
+            - port: {{ default "587" .Values.env.SMTP_PORT | quote }}
+              protocol: TCP
+    {{- end }}
+    {{- if .Values.secretEnv.SENTRY_DSN }}
+    # Sentry ingest — errors + traces; host derived from the DSN.
+    - toFQDNs:
+        - matchName: {{ default (urlParse .Values.secretEnv.SENTRY_DSN).hostname .Values.networkPolicy.sentryFQDN | quote }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    {{- end }}
+    {{- if .Values.networkPolicy.relyingPartyFQDNs }}
+    # Relying parties — back-channel logout pushes + jwks_uri fetches.
+    - toFQDNs:
+        {{- range .Values.networkPolicy.relyingPartyFQDNs }}
+        - matchName: {{ . | quote }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    {{- end }}
+    # CNPG primary Postgres — in-namespace pod-to-pod on :5432.
+    # CNPG operator labels its primary pod with `cnpg.io/cluster: <name>`
+    # + `role: primary`. Selecting on cluster label authorizes egress to
+    # both primary + replicas (replicas demote/promote during failover;
+    # connection should follow the -rw Service which always points at
+    # the current primary).
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:cnpg.io/cluster": {{ include "veritas.cnpg.name" . }}
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    {{- if .Values.valkey.deploy }}
+    # In-namespace Valkey (rate-limit counters + session cache) on :6379.
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/name": {{ include "veritas.name" . }}-valkey
+            "k8s:app.kubernetes.io/instance": {{ .Release.Name }}
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    {{- end }}
+{{- end }}

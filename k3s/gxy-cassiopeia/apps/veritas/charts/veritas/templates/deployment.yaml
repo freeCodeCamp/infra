@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "veritas.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "veritas.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll pods on env / secret changes. CNPG-managed app secret
+        # changes independently (CNPG rotates on demand) — those don't
+        # need to roll the Deployment since the secret is mounted via
+        # secretKeyRef (kubelet picks new value on container restart).
+        checksum/config-env:  {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret-env:  {{ include (print $.Template.BasePath "/secret-env.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "veritas.selectorLabels" . | nindent 20 }}
+      containers:
+        - name: veritas
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-env
+            - secretRef:
+                name: {{ .Release.Name }}-env-secret
+          env:
+            # DATABASE_URL wired from CNPG-generated app-user secret.
+            # CNPG creates `<cluster>-app` with `uri` key on bootstrap
+            # (key format: `postgres://user:pass@host:port/dbname`).
+            # See templates/_helpers.tpl `veritas.cnpg.appSecret`.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "veritas.cnpg.appSecret" . }}
+                  key: uri
+          volumeMounts:
+            # Writable tmp for read-only-root-fs Node binary scratch
+            # (pino log rotation, etc.).
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            # /healthz is the unconditional liveness probe.
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            # /readyz checks DB connectivity. Pod removed from Service
+            # endpoints when DB unreachable. failureThreshold gives ~30s
+            # grace before takeout — matches artemis precedent.
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

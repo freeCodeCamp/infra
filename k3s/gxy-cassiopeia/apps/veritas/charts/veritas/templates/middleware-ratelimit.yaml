@@ -1,0 +1,23 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-ratelimit
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  rateLimit:
+    # Average requests-per-second per source IP, sliding 1s window.
+    # OAuth callback bursts + magic-link verify spikes shape the
+    # default. Tune via values overlay if real traffic shifts.
+    # E2 in v0-build §G deferred registry will harden /api/token
+    # specifically — chart-internal Middleware is the broad-spectrum
+    # gate.
+    average: {{ .Values.rateLimit.average | default 20 }}
+    burst:   {{ .Values.rateLimit.burst   | default 60 }}
+    period:  {{ .Values.rateLimit.period  | default "1s" | quote }}
+    sourceCriterion:
+      ipStrategy:
+        # CF rewrites X-Forwarded-For with the real client IP.
+        # depth=1 trusts the CF hop as the immediate proxy. Skipping
+        # this would group all CF traffic into one bucket.
+        depth: 1

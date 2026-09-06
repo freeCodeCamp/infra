@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Values.middlewares.secureHeaders }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  headers:
+    # CF terminates client HTTPS at the edge (Universal SSL); CF→origin
+    # is HTTPS under Full/Strict on freecodecamp.org (origin cert mounted
+    # on Gateway listener via veritas-tls Secret). Both hops are HTTPS,
+    # but Traefik strips X-Forwarded-* on hostNetwork — re-assert here
+    # so BetterAuth sees the correct scheme for trustHost cookie issuance
+    # + OAuth callback URL builders.
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"

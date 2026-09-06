@@ -1,0 +1,70 @@
+{{- if .Values.migrate.enabled -}}
+# Drizzle migrations from the same image (dist/migrate.js, apps/api/src/migrate.ts).
+# post-install (the CNPG Cluster and its app Secret do not exist before the
+# first install, so pre-install cannot connect; on a first install the pods
+# can pass /readyz before the schema lands) and pre-upgrade (schema moves
+# before the new pods roll). Helm deletes the Job on success. Selector labels match the app so the
+# CiliumNetworkPolicy grants the Job the same Postgres egress.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrate.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "veritas.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Wait for the CNPG primary Service inside the pod (5 s polls, ~8 min
+      # ceiling, under the 10 m Helm timeout in .deploy-flags.sh) so the
+      # migrator's single connect attempt does not burn Job retries.
+      initContainers:
+        - name: wait-for-postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: PGHOST
+              value: {{ include "veritas.cnpg.name" . }}-rw
+          args:
+            - "-e"
+            - >-
+              const net = require("node:net"); let n = 0;
+              const t = () => { const s = net.connect(5432, process.env.PGHOST);
+              s.once("connect", () => { s.end(); process.exit(0); });
+              s.once("error", () => { s.destroy(); if (++n >= 96) process.exit(1);
+              setTimeout(t, 5000); }); }; t();
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          args: ["dist/migrate.js"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "veritas.cnpg.appSecret" . }}
+                  key: uri
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

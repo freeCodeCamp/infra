@@ -1,0 +1,58 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Release.Name }}-gateway
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: traefik
+  # CF zone `freecodecamp.org` is Full/Strict (UNIVERSE.md §1.1 marks the
+  # zone as "separate fCC scope; not Universe" — owning team chose Strict
+  # zone-wide). CF Edge terminates client HTTPS with Universal SSL; CF→origin
+  # is HTTPS with cert validation. Origin cert mounted as veritas-tls Secret
+  # (templates/secret-tls.yaml) — value supplied via sops overlay.
+  #
+  # THREE HTTPS listeners — veritas surface split per ADR-004:
+  #   - login.freecodecamp.org        → IdP (sign-in, OIDC discovery, oauth2/authorize, JWKS)
+  #   - account.freecodecamp.org      → account app + user-data API (/api/me, /api/profile, opaque scoped bearer)
+  #   - auth-console.freecodecamp.org → developer console + control API (/api/control/*, /internal/bootstrap)
+  # Per-listener hostname required by Gateway API for SNI dispatch.
+  # Host-based routing inside veritas (apps/api/src T12 host middleware)
+  # handles the IdP-vs-API split once the request reaches the pod.
+  listeners:
+    - name: web-secure-login
+      protocol: HTTPS
+      port: 443
+      hostname: {{ required ".Values.gateway.hostnames.login is required" .Values.gateway.hostnames.login }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: veritas-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: web-secure-account
+      protocol: HTTPS
+      port: 443
+      hostname: {{ required ".Values.gateway.hostnames.account is required" .Values.gateway.hostnames.account }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: veritas-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: web-secure-console
+      protocol: HTTPS
+      port: 443
+      hostname: {{ required ".Values.gateway.hostnames.console is required" .Values.gateway.hostnames.console }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: veritas-tls
+      allowedRoutes:
+        namespaces:
+          from: Same

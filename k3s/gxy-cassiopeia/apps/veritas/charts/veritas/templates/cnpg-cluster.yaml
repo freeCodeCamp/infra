@@ -1,0 +1,72 @@
+{{/*
+CloudNativePG Cluster CR — owns the Postgres primary + replicas.
+Lives in the veritas namespace (V3 invariant: same ns as app).
+
+Operator (cnpg-system) is pre-installed via apps/cnpg-system on this
+cluster (T1, commit f0ed63d). CRD `clusters.postgresql.cnpg.io`
+auto-installed by the operator chart.
+
+Operator-managed pods are PSS-restricted-compliant by default (uid 26,
+RuntimeDefault seccomp, ALL caps dropped, no privilege escalation) —
+no extra securityContext nudge needed at the Cluster CR level.
+
+Backup → Barman → R2 (V3: R2 only, no aws-s3 fallback). Creds wired
+via the cnpg-r2-creds Secret (templates/secret-cnpg-r2.yaml).
+*/}}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "veritas.cnpg.name" . }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.cnpg.instances }}
+
+  # e.g. ghcr.io/cloudnative-pg/postgresql:<major>.<minor>-standard-trixie
+  imageName: {{ required "cnpg.image is required" .Values.cnpg.image | quote }}
+
+  postgresql:
+    parameters:
+      # Conservative defaults for first deploy. Tunable via values overlay.
+      max_connections: "100"
+      shared_buffers: "128MB"
+
+  bootstrap:
+    initdb:
+      database: {{ required ".Values.cnpg.bootstrap.database is required" .Values.cnpg.bootstrap.database }}
+      owner:    {{ required ".Values.cnpg.bootstrap.owner is required" .Values.cnpg.bootstrap.owner }}
+
+  storage:
+    size: {{ required ".Values.cnpg.storage.size is required" .Values.cnpg.storage.size }}
+    {{- with .Values.cnpg.storage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+
+  resources:
+    {{- toYaml .Values.cnpg.resources | nindent 4 }}
+
+  {{- if .Values.cnpg.backup.enabled }}
+  # ---------------------------------------------------------------------
+  # Backup — Barman Cloud → R2 (S3-compatible). R2 endpoint provided via
+  # Secret cnpg-r2-creds (ENDPOINT key) to keep the account-id portion
+  # of the URL out of git. Wal + data both compressed (gzip).
+  # Gated on .Values.cnpg.backup.enabled so staging overlays can opt out
+  # (staging skips backup per veritas-staging values.production.yaml).
+  # ---------------------------------------------------------------------
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://{{ required ".Values.cnpg.backup.bucket is required" .Values.cnpg.backup.bucket }}/{{ required ".Values.cnpg.backup.pathPrefix is required" .Values.cnpg.backup.pathPrefix }}"
+      endpointURL: {{ required ".Values.cnpgR2.endpoint is required" .Values.cnpgR2.endpoint | quote }}
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-r2-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-r2-creds
+          key: SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: {{ required ".Values.cnpg.backup.retentionPolicy is required" .Values.cnpg.backup.retentionPolicy | quote }}
+  {{- end }}

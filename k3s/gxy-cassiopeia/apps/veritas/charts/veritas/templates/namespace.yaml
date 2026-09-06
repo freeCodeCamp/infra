@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+    # PSS restricted — veritas pod + CNPG-managed Postgres pods all run
+    # non-root, readOnlyRootFilesystem (where supported), RuntimeDefault
+    # seccomp, ALL caps dropped, no privilege escalation. Matches the
+    # artemis + valkey + caddy precedent on the broader Universe plane.
+    # CNPG operator-managed pods declare matching SecurityContext via
+    # the Cluster CR (charts/veritas/templates/cnpg-cluster.yaml).
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

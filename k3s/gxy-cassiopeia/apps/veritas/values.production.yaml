@@ -1,0 +1,137 @@
+# Production overlay for the veritas chart on gxy-cassiopeia.
+# Loaded by `just release gxy-cassiopeia veritas` between chart defaults
+# and the sops sealed overlay so the layering is:
+#
+#   chart values.yaml  <  THIS FILE  <  infra-secrets/k3s/gxy-cassiopeia/veritas.values.yaml.enc
+#
+# Secret credentials live in the sops overlay only. No TLS PEM here —
+# origin cert + key for CF Full/Strict on `freecodecamp.org` ride in the
+# sops envelope per `infra/docs/architecture/rfc-secrets-layout.md`
+# §Helm-bundled. Anything in THIS file is git-tracked and publicly
+# inspectable.
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/freecodecamp/veritas
+  # Pin = tag + digest. Digest is load-bearing (OCI: when both present,
+  # digest wins → containerd pulls immutable). The build workflow in
+  # freeCodeCamp/veritas (.github/workflows/docker-ghcr.yml) runs on a
+  # v<semver> tag push or a manual workflow_dispatch and always emits
+  # `sha-<full git sha>`; pin that shape, `sha-<fullsha>@sha256:<digest>`
+  # (same as apps/caddy). The 0.1.0 digest below predates the current app
+  # (it lacks public/ and dist/migrate.js) and MUST be re-pinned from a
+  # fresh build before the first release.
+  tag: "0.1.0@sha256:f6fcc712278f0d9ebab651f4ba6d4f42a7854aacf5e4d5545d0888783a0954d1"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+# Production env (non-secret). Match apps/api/src/env.ts schema.
+env:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  PORT: "3000"
+  HOST: "0.0.0.0"
+  LOGIN_URL: "https://login.freecodecamp.org"
+  ACCOUNT_URL: "https://account.freecodecamp.org"
+  CONSOLE_URL: "https://auth-console.freecodecamp.org"
+  # Relying-party origins beyond the three first-party hosts. No temp
+  # constellation in production.
+  TRUSTED_ORIGINS: ""
+  PASSKEY_RP_ID: "freecodecamp.org"
+  # SES SMTP in us-east-1, where the freecodecamp.org identity is verified.
+  # SMTP_USER / SMTP_PASS live in the sealed secrets envelope.
+  EMAIL_TRANSPORT: "smtp"
+  SMTP_HOST: "email-smtp.us-east-1.amazonaws.com"
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  EMAIL_FROM: "noreply@freecodecamp.org"
+  # Chosen by the operator before the one-time bootstrap call; bootstrap
+  # creates the account and console clients under these ids.
+  ACCOUNT_CLIENT_ID: ""
+  CONTROL_CLIENT_ID: ""
+  EMAIL_SEND_CLIENT_IDS: ""
+  SENTRY_ENVIRONMENT: "production"
+  # Cloudflare edge ranges (ips-v4 + ips-v6, fetched 2026-09-03): the app
+  # walks X-Forwarded-For past trusted hops, and the hop Traefik appends is
+  # the Cloudflare edge. Node VPC IPs never appear in the header. Keep in
+  # step with cluster/traefik-config.yaml forwardedHeaders.trustedIPs.
+  TRUSTED_PROXIES:
+    - 173.245.48.0/20
+    - 103.21.244.0/22
+    - 103.22.200.0/22
+    - 103.31.4.0/22
+    - 141.101.64.0/18
+    - 108.162.192.0/18
+    - 190.93.240.0/20
+    - 188.114.96.0/20
+    - 197.234.240.0/22
+    - 198.41.128.0/17
+    - 162.158.0.0/15
+    - 104.16.0.0/13
+    - 104.24.0.0/14
+    - 172.64.0.0/13
+    - 131.0.72.0/22
+    - 2400:cb00::/32
+    - 2606:4700::/32
+    - 2803:f800::/32
+    - 2405:b500::/32
+    - 2405:8100::/32
+    - 2a06:98c0::/29
+    - 2c0f:f248::/32
+
+# Rate-limit counters + secondary session storage. In-namespace single-replica
+# Valkey day-0; flip deploy=false + set url for a managed/HA endpoint later.
+valkey:
+  deploy: true
+
+rateLimit:
+  average: 20
+  burst: 60
+  period: "1s"
+
+gateway:
+  hostnames:
+    login: "login.freecodecamp.org"
+    account: "account.freecodecamp.org"
+    console: "auth-console.freecodecamp.org"
+
+networkPolicy:
+  enabled: true
+  # Every host that registered a backchannel_logout_uri or jwks_uri; empty
+  # until first-party apps are registered (docs/PROVISIONING.md).
+  relyingPartyFQDNs: []
+
+cnpg:
+  image: ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  instances: 2
+  storage:
+    size: 10Gi
+  bootstrap:
+    database: veritas
+    owner: veritas
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  backup:
+    bucket: cassiopeia-cnpg-backups
+    pathPrefix: veritas
+    retentionPolicy: "30d"
+  scheduledBackup:
+    enabled: true
+    schedule: "0 0 4 * * *"
+
+# TLS material is supplied entirely via the sops overlay
+# (infra-secrets/k3s/gxy-cassiopeia/veritas.values.yaml.enc).
+# No PEM here — this file is git-tracked and publicly inspectable.

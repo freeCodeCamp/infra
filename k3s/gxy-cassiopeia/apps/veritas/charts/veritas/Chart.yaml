@@ -1,0 +1,41 @@
+apiVersion: v2
+name: veritas
+description: |
+  Veritas — freeCodeCamp identity service (IdP, account app, developer console).
+  BetterAuth-powered. Three public surfaces on the `freecodecamp.org` zone:
+    - login.freecodecamp.org        — IdP (email OTP, magic-link, Google/GitHub/Apple,
+      passkeys; OIDC discovery, JWKS, /api/auth/oauth2/authorize)
+    - account.freecodecamp.org      — account app + user-data API (/api/me, /api/profile,
+      sessions, connected apps; opaque scoped bearer)
+    - auth-console.freecodecamp.org — developer console + control API (/api/control/*,
+      one-time /internal/bootstrap)
+  Backed by CNPG-managed Postgres in the same namespace.
+
+  ADR-004 (auth-identity) + ADR-019 (cassiopeia-shared-services) bind
+  the deployment shape: two-domain split, CNPG HA primary+1-replica,
+  R2 WAL archive, PSS restricted.
+
+  Image source: ghcr.io/freecodecamp/veritas (built from freeCodeCamp/veritas).
+  Build/push pipeline: veritas repo `.github/workflows/docker-ghcr.yml`.
+
+  Chart owns: Namespace, Deployment, migration hook Job, Service, ConfigMap
+  (non-secret env), Secret (secret env via the sealed overlay), Gateway (2
+  listeners) + HTTPRoute (1 per hostname), CiliumNetworkPolicy, in-namespace
+  Valkey, CNPG Cluster CR, CNPG ScheduledBackup CR. No upstream chart — greenfield, mirrors
+  artemis 0.2.0 shape.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/freeCodeCamp/veritas
+sources:
+  - https://github.com/freeCodeCamp/veritas
+keywords:
+  - universe
+  - veritas
+  - auth
+  - idp
+  - betterauth
+  - cnpg
+maintainers:
+  - name: freeCodeCamp Infra Team
+    url: https://github.com/freeCodeCamp/infra

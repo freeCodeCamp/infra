@@ -1,0 +1,341 @@
+# Default values for the veritas chart.
+# Production overlay at ../../values.production.yaml.
+# Secret credentials overlay at (sops) infra-secrets/k3s/gxy-cassiopeia/veritas.values.yaml.enc.
+# Consumed by `just release gxy-cassiopeia veritas`.
+#
+# Layer order (lowest → highest precedence):
+#   1. THIS FILE (chart defaults)
+#   2. apps/veritas/values.production.yaml (production overlay — image pin, replicas, non-secret env, CNPG sizing)
+#   3. infra-secrets/k3s/gxy-cassiopeia/veritas.values.yaml.enc (sops sealed — app secretEnv + CNPG R2 creds)
+
+namespace: veritas
+
+# ---------------------------------------------------------------------
+# Image
+# ---------------------------------------------------------------------
+# Per ADR-008 / Universe RUN-residency: veritas pulls from
+# ghcr.io/freecodecamp/veritas direct. Tag + digest pin in
+# values.production.yaml. The bare chart does not render (NODE_ENV=production
+# + EMAIL_TRANSPORT=console is refused), so every helm-template run needs an
+# overlay; `dev` is a placeholder, never a deployable tag.
+image:
+  repository: ghcr.io/freecodecamp/veritas
+  tag: "dev"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ---------------------------------------------------------------------
+# Workload sizing
+# ---------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+# ---------------------------------------------------------------------
+# Pod & container security context (PSS restricted-compliant).
+# Veritas distroless base runs as nonroot uid 65532.
+# ---------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------
+# Service
+# ---------------------------------------------------------------------
+# veritas listens on PORT=3000 (apps/api/Dockerfile ENV PORT=3000).
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+# ---------------------------------------------------------------------
+# Application env (non-secret) — defaults per apps/api/src/env.ts.
+# Flows into the ConfigMap mounted via envFrom.
+# Secret env (BETTER_AUTH_SECRET, OAuth client_id+secret pairs) live
+# under `secretEnv:` and come from the sops overlay. DATABASE_URL is
+# wired via env: array from the CNPG-generated `<cluster>-app` Secret
+# (see templates/deployment.yaml) — NOT in secretEnv to keep cluster
+# bootstrap idempotent (envelope never holds rotated CNPG creds).
+# ---------------------------------------------------------------------
+env:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  PORT: "3000"
+  HOST: "0.0.0.0"
+  LOGIN_URL: "https://login.freecodecamp.org"
+  ACCOUNT_URL: "https://account.freecodecamp.org"
+  # Developer console host (apps/api/src/env.ts CONSOLE_URL; https required
+  # in production). The API trusts LOGIN_URL, ACCOUNT_URL and CONSOLE_URL
+  # origins by itself.
+  CONSOLE_URL: "https://auth-console.freecodecamp.org"
+  # TRUSTED_ORIGINS: relying-party origins (comma-sep) beyond the three
+  # first-party hosts: the temp constellation per overlay. Empty in
+  # production day-0.
+  TRUSTED_ORIGINS: ""
+  # WebAuthn relying-party id shared by the three hosts (apps/api/src/env.ts
+  # PASSKEY_RP_ID); the parent zone per overlay. Unset lets the app derive it.
+  PASSKEY_RP_ID: "freecodecamp.org"
+  # Email transport. `console` is refused under NODE_ENV=production
+  # (apps/api/src/mailer.ts); the ConfigMap template fails the render for
+  # that pair, so a production overlay must set `smtp` + SMTP_HOST. AWS SES:
+  # email-smtp.<region>.amazonaws.com, port 587, SMTP_SECURE=false (STARTTLS,
+  # enforced by the app in production). SMTP_USER/SMTP_PASS live in secretEnv.
+  # The app default SMTP_PORT is 1025 (local Mailpit); the chart pins 587.
+  EMAIL_TRANSPORT: "console"
+  EMAIL_FROM: "noreply@freecodecamp.org"
+  SMTP_HOST: ""
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  # client_ids of the two first-party clients, chosen by the operator before
+  # the one-time /internal/bootstrap call creates them (docs/PROVISIONING.md
+  # in freeCodeCamp/veritas). The account-host resource routes pin bearer
+  # tokens to ACCOUNT_CLIENT_ID; the console-host control routes pin to
+  # CONTROL_CLIENT_ID. Not secrets; never enter the sealed envelope.
+  ACCOUNT_CLIENT_ID: ""
+  CONTROL_CLIENT_ID: ""
+  # client_ids allowed to call POST /api/email/send; empty in production refuses every call.
+  EMAIL_SEND_CLIENT_IDS: ""
+  # Step-up re-auth window in seconds (apps/api/src/env.ts STEPUP_MAX_AGE);
+  # null = app default.
+  STEPUP_MAX_AGE: null
+  # Rate-limit budget per client IP per window (apps/api/src/env.ts
+  # RATE_LIMIT_MAX); the oauth-provider authorize/token budgets scale with it.
+  RATE_LIMIT_MAX: "100"
+  # Hold in seconds before a lost-email / lost-passkey recovery completes
+  # (apps/api/src/env.ts RECOVERY_HOLD_SECONDS); null = app default (86400).
+  RECOVERY_HOLD_SECONDS: null
+  # Sentry environment tag; DSN lives in secretEnv.SENTRY_DSN.
+  SENTRY_ENVIRONMENT: null
+  # Sentry traces sample rate 0..1 and debug flag (apps/api/src/env.ts);
+  # null = app defaults (0.2, false). 0 and false are honoured when set.
+  SENTRY_TRACES_SAMPLE_RATE: null
+  SENTRY_DEBUG: null
+  # Reverse-proxy IP/CIDR allowlist (comma-separated). REQUIRED in production —
+  # apps/api/src/env.ts exits 78 when empty. The app resolves the client IP from
+  # X-Forwarded-For right-to-left, skipping trusted hops (request-meta.ts).
+  # Traefik (hostNetwork) appends the address of ITS peer — the Cloudflare
+  # edge — so the trusted set is Cloudflare's published ranges, not the node
+  # VPC range (node IPs never appear in the header). Companion setting:
+  # k3s/gxy-cassiopeia/cluster/traefik-config.yaml forwardedHeaders.trustedIPs,
+  # or Traefik discards the header Cloudflare sends.
+  # Source: https://www.cloudflare.com/ips-v4 + /ips-v6, fetched 2026-09-03.
+  # Refresh both lists together when Cloudflare publishes a change.
+  TRUSTED_PROXIES:
+    - 173.245.48.0/20
+    - 103.21.244.0/22
+    - 103.22.200.0/22
+    - 103.31.4.0/22
+    - 141.101.64.0/18
+    - 108.162.192.0/18
+    - 190.93.240.0/20
+    - 188.114.96.0/20
+    - 197.234.240.0/22
+    - 198.41.128.0/17
+    - 162.158.0.0/15
+    - 104.16.0.0/13
+    - 104.24.0.0/14
+    - 172.64.0.0/13
+    - 131.0.72.0/22
+    - 2400:cb00::/32
+    - 2606:4700::/32
+    - 2803:f800::/32
+    - 2405:b500::/32
+    - 2405:8100::/32
+    - 2a06:98c0::/29
+    - 2c0f:f248::/32
+
+# Required secret env keys — populated by sops overlay
+# (infra-secrets/k3s/gxy-cassiopeia/veritas.values.yaml.enc).
+# Chart fail-fasts via `required` helpers if the overlay is missing
+# or incomplete.
+# Social providers are pair-gated: a provider mounts only when both keys of
+# its pair are present (Google, GitHub, Apple — all live per ADR-004
+# 2026-07-29). APPLE_APP_BUNDLE_IDENTIFIER is optional.
+secretEnv:
+  BETTER_AUTH_SECRET: null
+  GOOGLE_CLIENT_ID: null
+  GOOGLE_CLIENT_SECRET: null
+  GITHUB_CLIENT_ID: null
+  GITHUB_CLIENT_SECRET: null
+  APPLE_CLIENT_ID: null
+  APPLE_CLIENT_SECRET: null
+  APPLE_APP_BUNDLE_IDENTIFIER: null
+  # SES SMTP credentials — both or neither (EMAIL_TRANSPORT=smtp).
+  SMTP_USER: null
+  SMTP_PASS: null
+  # Sentry DSN (optional).
+  SENTRY_DSN: null
+  # Bearer for the one-time POST /internal/bootstrap on the account host: it
+  # grants the first admin membership and creates the account-portal client,
+  # and refuses once any membership exists. Optional — bootstrap fails closed
+  # when absent. Supply via sops overlay for the first release, then rotate.
+  INTERNAL_API_TOKEN: null
+  # External Valkey URL when it carries auth (valkey.deploy=false only). Set
+  # via sops so the password never lands in the git-tracked ConfigMap. Leave
+  # null for the in-namespace Valkey (unauthed) or a credential-free endpoint.
+  VALKEY_URL: null
+
+# ---------------------------------------------------------------------
+# Valkey — rate-limit counters + secondary session storage (cache tier;
+# Postgres remains the source of truth, so this store is ephemeral-safe).
+# deploy=true renders an in-namespace single-replica Valkey (templates/
+# valkey.yaml) and wires VALKEY_URL to it. deploy=false uses `url` as an
+# external endpoint (e.g. a managed/HA Valkey) — the operator's topology
+# choice, flippable without touching templates.
+# ---------------------------------------------------------------------
+valkey:
+  deploy: true
+  url: ""
+  image:
+    repository: valkey/valkey
+    tag: "8.1.8-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------
+# Gateway / HTTPRoute (Traefik gatewayClassName) — THREE public surfaces.
+# CF zone `freecodecamp.org` is on Full/Strict per ADR-004: CF Edge
+# terminates client HTTPS via Universal SSL; CF→origin is HTTPS with
+# origin-cert validation. Gateway listens HTTPS :443 only with
+# `tls.mode: Terminate` against the `veritas-tls` Secret (origin cert +
+# key supplied by sops overlay per rfc-secrets-layout.md §Helm-bundled).
+# ---------------------------------------------------------------------
+gateway:
+  hostnames:
+    login: "login.freecodecamp.org"
+    account: "account.freecodecamp.org"
+    console: "auth-console.freecodecamp.org"
+
+# Traefik middleware reference, rendered per release by
+# templates/middleware-secure-headers.yaml. Name matches artemis / windmill /
+# zot usage for parity.
+middlewares:
+  secureHeaders: secure-headers
+
+# ---------------------------------------------------------------------
+# Rate limit (Traefik Middleware — chart-internal). Per source IP
+# (CF X-Forwarded-For depth=1). Production overlay tunes.
+# OAuth callback bursts + magic-link verify spikes shape the defaults.
+# ---------------------------------------------------------------------
+rateLimit:
+  average: 20
+  burst: 60
+  period: "1s"
+
+# ---------------------------------------------------------------------
+# NetworkPolicy
+# ---------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Relying-party hosts the app must reach on TCP 443: every registered
+  # backchannel_logout_uri and jwks_uri host. Both halves of the Cilium policy
+  # (DNS proxy allow + toFQDNs) render from this list; a host missing here
+  # fails closed (docs/PROVISIONING.md in freeCodeCamp/veritas).
+  relyingPartyFQDNs: []
+  # Sentry ingest host is derived from secretEnv.SENTRY_DSN (urlParse) so the
+  # egress cannot drift from the DSN; set this only for a self-hosted collector
+  # whose ingest host differs from the DSN host.
+  sentryFQDN: null
+
+# Drizzle migrations run as a Helm hook Job (templates/job-migrate.yaml)
+# before each upgrade and after the first install, from the same image
+# (node dist/migrate.js). An initContainer waits for the CNPG primary, so a
+# non-zero migrator exit is a real migration error: fail fast.
+migrate:
+  enabled: true
+  backoffLimit: 2
+
+# ---------------------------------------------------------------------
+# CloudNativePG cluster (templates/cnpg-cluster.yaml). Operator pre-installed
+# in cnpg-system ns (apps/cnpg-system). Cluster lives in veritas ns
+# alongside app pods (V3 invariant).
+# ---------------------------------------------------------------------
+cnpg:
+  # Postgres image pinned explicitly (the Cluster CR sets imageName); without
+  # a pin the operator default decides the major and can move on upgrade.
+  # PostgreSQL 17 matches the app's docker-compose. Bump minors here.
+  image: ghcr.io/cloudnative-pg/postgresql:17.11-standard-trixie
+  # Replica count: primary + (instances-1) replicas. 2 = primary + 1
+  # synchronous replica (ADR-019 T1+T2 floor — RPO≤5min, RTO≤60min).
+  instances: 2
+  # Local-path PV size on cassiopeia worker (k3s default storageClass).
+  storage:
+    size: 10Gi
+    # storageClass left unset → uses cluster default (k3s = local-path).
+  # initdb owner = veritas → CNPG creates user `veritas`, db `veritas`,
+  # grants ownership. App connects via that user (DDL allowed on owned db).
+  bootstrap:
+    database: veritas
+    owner: veritas
+  # postgresql container resources — CNPG default is conservative.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  # Backup configuration — Barman → R2 (bucket created in T2).
+  # Bucket-scoped R2 credentials provided via sops overlay → renders
+  # Secret `cnpg-r2-creds` (templates/secret-cnpg-r2.yaml). Endpoint URL
+  # is the public R2 S3 API surface; account-id portion of host is not
+  # a secret by itself (matches artemis R2_ENDPOINT precedent — held in
+  # sops overlay for defense-in-depth, NOT chart values).
+  #
+  # `enabled: false` disables the barmanObjectStore block in the Cluster
+  # CR + skips the cnpg-r2-creds Secret render. Staging overlay opts out
+  # (apps/veritas-staging/values.production.yaml) — single-instance
+  # ephemeral CNPG, no WAL archive.
+  backup:
+    enabled: true
+    bucket: cassiopeia-cnpg-backups
+    pathPrefix: veritas
+    retentionPolicy: "30d"
+  # ScheduledBackup CR (templates/cnpg-scheduledbackup.yaml).
+  # Full backup nightly at 04:00 UTC (off-peak vs FRA1 + IST traffic).
+  scheduledBackup:
+    enabled: true
+    # Cron format: "second minute hour day month weekday" (CNPG-specific 6-field).
+    schedule: "0 0 4 * * *"
+
+# Secret env keys for CNPG backup R2 creds — populated by sops overlay.
+# Chart renders a Secret named `cnpg-r2-creds` in the veritas ns; the
+# CNPG Cluster references it via `backup.barmanObjectStore.s3Credentials`.
+cnpgR2:
+  endpoint: null
+  accessKeyId: null
+  secretAccessKey: null
+
+# ---------------------------------------------------------------------
+# TLS — CF Origin cert for Full/Strict mode on freecodecamp.org zone.
+# Chart renders a kubernetes.io/tls Secret (templates/secret-tls.yaml)
+# referenced by the three HTTPS Gateway listeners. The wildcard CF Origin
+# certificate for the zone (*.freecodecamp.org) covers login, account and
+# auth-console.
+# Supplied via sops overlay; chart fail-fasts via required helpers.
+# ---------------------------------------------------------------------
+tls:
+  crt: null
+  key: null

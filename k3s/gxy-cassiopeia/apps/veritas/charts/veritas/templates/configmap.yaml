@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-env
+  labels:
+    {{- include "veritas.labels" . | nindent 4 }}
+data:
+  NODE_ENV:        {{ required ".Values.env.NODE_ENV is required" .Values.env.NODE_ENV | quote }}
+  LOG_LEVEL:       {{ default "info" .Values.env.LOG_LEVEL | quote }}
+  PORT:            {{ required ".Values.env.PORT is required" .Values.env.PORT | quote }}
+  HOST:            {{ required ".Values.env.HOST is required" .Values.env.HOST | quote }}
+  LOGIN_URL:       {{ required ".Values.env.LOGIN_URL is required (must be https in production per env.ts refine)" .Values.env.LOGIN_URL | quote }}
+  ACCOUNT_URL:     {{ required ".Values.env.ACCOUNT_URL is required (must be https in production per env.ts refine)" .Values.env.ACCOUNT_URL | quote }}
+  CONSOLE_URL:     {{ required ".Values.env.CONSOLE_URL is required (must be https in production per env.ts refine)" .Values.env.CONSOLE_URL | quote }}
+  TRUSTED_ORIGINS: {{ default "" .Values.env.TRUSTED_ORIGINS | quote }}
+  EMAIL_TRANSPORT: {{ required ".Values.env.EMAIL_TRANSPORT is required" .Values.env.EMAIL_TRANSPORT | quote }}
+  EMAIL_FROM:      {{ required ".Values.env.EMAIL_FROM is required" .Values.env.EMAIL_FROM | quote }}
+  # Reverse-proxy IP/CIDR allowlist so X-Forwarded-For cannot be spoofed.
+  # apps/api/src/env.ts exits 78 in production when this is empty. The app
+  # walks the header right-to-left past trusted hops; the hop Traefik
+  # (hostNetwork) appends is the Cloudflare edge, so the list is Cloudflare's
+  # published ranges (values.yaml), not the node VPC range. Accepts a list.
+  {{- $tp := .Values.env.TRUSTED_PROXIES }}
+  {{- if kindIs "slice" $tp }}{{ $tp = join "," $tp }}{{ end }}
+  TRUSTED_PROXIES: {{ required "env.TRUSTED_PROXIES is required in production (apps/api/src/env.ts)" $tp | quote }}
+  # apps/api/src/mailer.ts throws at boot on EMAIL_TRANSPORT=console under
+  # NODE_ENV=production; refuse at render time instead of crash-looping.
+  {{- if and (eq .Values.env.NODE_ENV "production") (eq .Values.env.EMAIL_TRANSPORT "console") }}
+  {{- fail (print "EMAIL_TRANSPORT=console is refused in production (apps/api/src/mailer.ts): "
+      "set env.EMAIL_TRANSPORT=smtp and env.SMTP_HOST") }}
+  {{- end }}
+  {{- if eq .Values.env.EMAIL_TRANSPORT "smtp" }}
+  # SMTP relay (AWS SES in production). Port 587 + SMTP_SECURE=false means
+  # STARTTLS, which the app requires in production; 465 needs SMTP_SECURE=true.
+  # Credentials (SMTP_USER / SMTP_PASS) live in secret-env.yaml.
+  SMTP_HOST:       {{ required "env.SMTP_HOST is required when EMAIL_TRANSPORT=smtp" .Values.env.SMTP_HOST | quote }}
+  SMTP_PORT:       {{ default "587" .Values.env.SMTP_PORT | quote }}
+  SMTP_SECURE:     {{ default "false" .Values.env.SMTP_SECURE | quote }}
+  {{- end }}
+  # client_id pins for the account-host resource routes and the console-host
+  # control routes; empty until the operator chooses them (behaves as unset,
+  # and /internal/bootstrap answers 503 until both are set).
+  ACCOUNT_CLIENT_ID: {{ default "" .Values.env.ACCOUNT_CLIENT_ID | quote }}
+  CONTROL_CLIENT_ID: {{ default "" .Values.env.CONTROL_CLIENT_ID | quote }}
+  {{- with .Values.env.PASSKEY_RP_ID }}
+  PASSKEY_RP_ID:   {{ . | quote }}
+  {{- end }}
+  EMAIL_SEND_CLIENT_IDS: {{ default "" .Values.env.EMAIL_SEND_CLIENT_IDS | quote }}
+  {{- with .Values.env.STEPUP_MAX_AGE }}
+  STEPUP_MAX_AGE:  {{ . | quote }}
+  {{- end }}
+  # Per-IP rate-limit budget; the oauth-provider authorize/token budgets scale
+  # with it (apps/api/src/env.ts RATE_LIMIT_MAX, default 100).
+  RATE_LIMIT_MAX:  {{ default "100" .Values.env.RATE_LIMIT_MAX | quote }}
+  # kindIs "invalid" = unset/null; a bare `with` would drop a legal 0 or false.
+  {{- if not (kindIs "invalid" .Values.env.RECOVERY_HOLD_SECONDS) }}
+  RECOVERY_HOLD_SECONDS: {{ .Values.env.RECOVERY_HOLD_SECONDS | quote }}
+  {{- end }}
+  {{- with .Values.env.SENTRY_ENVIRONMENT }}
+  SENTRY_ENVIRONMENT: {{ . | quote }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.env.SENTRY_TRACES_SAMPLE_RATE) }}
+  SENTRY_TRACES_SAMPLE_RATE: {{ .Values.env.SENTRY_TRACES_SAMPLE_RATE | quote }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.env.SENTRY_DEBUG) }}
+  SENTRY_DEBUG:    {{ .Values.env.SENTRY_DEBUG | quote }}
+  {{- end }}
+  # In-namespace Valkey → its Service. External Valkey → valkey.url here when
+  # credential-free, or secretEnv.VALKEY_URL (secret-env) when it carries auth.
+  {{- if .Values.valkey.deploy }}
+  VALKEY_URL:      {{ printf "redis://%s-valkey:6379" .Release.Name | quote }}
+  {{- else if not .Values.secretEnv.VALKEY_URL }}
+  VALKEY_URL:      {{ required "valkey.url is required when valkey.deploy=false and secretEnv.VALKEY_URL is unset" .Values.valkey.url | quote }}
+  {{- end }}
