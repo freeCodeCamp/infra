@@ -1,3 +1,5 @@
 ---
 node_exporter_systemd_unit_include: "^(cron|nginx|node_exporter|ssh|tailscaled)[.]service"
 node_exporter_batch_max: 1
+secrets_dir: "{{ lookup('ansible.builtin.env', 'SECRETS_DIR') | default(playbook_dir ~ '/../../infra-secrets', true) }}"
+nginx_upstreams: "{{ (lookup('community.sops.sops', secrets_dir ~ '/docker/oldeworld/pxy-upstreams-' ~ pxy_tier ~ '.yaml.enc', input_type='yaml', output_type='yaml') | from_yaml).nginx_upstreams }}"
