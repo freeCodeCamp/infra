@@ -43,5 +43,5 @@
     group: root
     mode: 0644
 
-- name: Link the upstreams to the tracked config
-  include_tasks: link-upstreams.yml
+- name: Write the listed upstream blocks
+  include_tasks: render-upstreams.yml

@@ -1,0 +1,26 @@
+---
+- name: Read the upstreams on the host
+  ansible.builtin.slurp:
+    path: /etc/nginx/configs/upstreams.conf
+  register: upstreams_on_host
+
+- name: Check every listed upstream block exists on the host
+  ansible.builtin.assert:
+    that: (upstreams_on_host.content | b64decode) is regex('^upstream ' ~ (item.name | regex_escape) ~ ' \{', multiline=true)
+    fail_msg: "upstream {{ item.name }} is not in /etc/nginx/configs/upstreams.conf on {{ inventory_hostname }}"
+  loop: "{{ nginx_upstreams }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Write the listed upstream blocks
+  ansible.builtin.replace:
+    path: /etc/nginx/configs/upstreams.conf
+    regexp: '^upstream {{ item.name | regex_escape }} \{[^}]*\}'
+    replace: |-
+      upstream {{ item.name }} {
+      {% if item.least_conn | default(false) %}  least_conn;
+      {% endif %}{% for server in item.servers %}  server {{ server }};
+      {% endfor %}}
+  loop: "{{ nginx_upstreams }}"
+  loop_control:
+    label: "{{ item.name }}"
