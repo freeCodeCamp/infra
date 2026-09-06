@@ -33,6 +33,10 @@ resource "digitalocean_droplet" "ops_o11y" {
 
   ssh_keys  = [for key in data.digitalocean_ssh_key.ops_o11y : key.id]
   user_data = file("${path.root}/../../cloud-init/basic.yml")
+
+  lifecycle {
+    ignore_changes = [image, ssh_keys, user_data]
+  }
 }
 
 moved {

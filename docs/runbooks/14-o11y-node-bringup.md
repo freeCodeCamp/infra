@@ -47,7 +47,7 @@ The node is code. OpenTofu creates the droplet, its tag-attached firewall and th
 cd terraform/ops-o11y && direnv exec . tofu init && direnv exec . tofu apply && cd ../..
 ```
 
-`node_count` in `terraform/ops-o11y/variables.tf` sets the node total (default 1); node `NN` is named `ops-vm-o11y-k3s-<region>-NN`, and every node shares the tag, the firewall and the project link. `play-k3s--single-node.yml` requires exactly one host in `ops_o11y`, so a count above 1 needs `play-k3s--cluster.yml` and is outside this runbook.
+`node_count` in `terraform/ops-o11y/variables.tf` sets the node total (default 1); node `NN` is named `ops-vm-o11y-k3s-<region>-NN`, and every node shares the tag, the firewall and the project link. `play-k3s--single-node.yml` requires exactly one host in `ops_o11y`, so a count above 1 needs `play-k3s--cluster.yml` and is outside this runbook. The droplet ignores later changes to `image`, `ssh_keys` and `user_data`, because each one replaces the node and its disk; a bump reaches new nodes only. Rebuild a node on purpose with `direnv exec . tofu apply -replace='digitalocean_droplet.ops_o11y["01"]'`, after the device is removed from the tailnet. The public IPv4 is static for the life of the droplet and changes only on such a replacement; nothing here depends on it, the tailnet name is the address.
 
 State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
 
