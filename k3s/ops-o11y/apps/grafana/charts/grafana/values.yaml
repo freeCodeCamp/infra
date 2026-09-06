@@ -68,7 +68,7 @@ dashboards:
          ],
          "timezone": "utc",
          "schemaVersion": 39,
-         "version": 1,
+         "version": 2,
          "editable": true,
          "refresh": "5m",
          "time": {
@@ -493,6 +493,93 @@ dashboards:
              "expr": "avg by (role) (node_load1{job=\"node\",env=~\"$env\",role=~\"$role\"} / count by (instance,role) (node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\",mode=\"idle\"}))",
              "legendFormat": "{{role}}",
              "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 11,
+           "type": "table",
+           "title": "Clients per host: allocated vs p95 and peak (role clt)",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 49,
+            "w": 24,
+            "h": 12
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "bytes"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=\"clt\"}",
+             "legendFormat": "allocated",
+             "refId": "A",
+             "instant": true,
+             "format": "table"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "quantile_over_time(0.95, (node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=\"clt\"} - node_memory_MemAvailable_bytes{job=\"node\",env=~\"$env\",role=\"clt\"})[$__range])",
+             "legendFormat": "p95 used",
+             "refId": "B",
+             "instant": true,
+             "format": "table"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "max_over_time((node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=\"clt\"} - node_memory_MemAvailable_bytes{job=\"node\",env=~\"$env\",role=\"clt\"})[$__range])",
+             "legendFormat": "peak used",
+             "refId": "C",
+             "instant": true,
+             "format": "table"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "1 - avg by (instance,env) (rate(node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=\"clt\",mode=\"idle\"}[5m]))",
+             "legendFormat": "cpu busy",
+             "refId": "D",
+             "instant": true,
+             "format": "table"
+            }
+           ],
+           "transformations": [
+            {
+             "id": "merge",
+             "options": {}
+            },
+            {
+             "id": "organize",
+             "options": {
+              "excludeByName": {
+               "Time": true
+              },
+              "renameByName": {
+               "Value #A": "allocated",
+               "Value #B": "p95 used",
+               "Value #C": "peak used",
+               "Value #D": "cpu busy"
+              }
+             }
             }
            ]
           }
