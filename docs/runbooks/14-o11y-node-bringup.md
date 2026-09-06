@@ -4,7 +4,9 @@
 
 This node is freeCodeCamp's first infrastructure observability plane. It pulls node_exporter metrics from ~80 Linode VMs over Tailscale, keeps 12 months of history, and later scrapes the Hetzner bare-metal estate under the same `job="node"` so one dashboard spans the provider migration.
 
-Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files that load their envelopes, so the OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and the Ansible lines run from `ansible/` with `INFRA_ADMIN=1`, which loads `global/.env.enc` and with it the tailnet auth key. Each `kubectl` and `helm` line carries its own `KUBECONFIG=`.
+Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files that load their envelopes, so the OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and the Ansible lines run from `ansible/` with `INFRA_ADMIN=1`, which loads `global/.env.enc` and with it the tailnet auth key and the Linode token. Each `kubectl` and `helm` line carries its own `KUBECONFIG=`.
+
+Four layers, one tool each: OpenTofu builds the machine, Ansible configures the node, one `helm` line installs Argo CD, and Argo CD installs everything else from `main`. Argo CD reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be merged before the GitOps section runs.
 
 ## Topology, and why
 
@@ -29,7 +31,8 @@ Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` an
 | 3   | `../tailscale-acls/policy.hujson` grants `tag:added-by-ops` → `tag:added-by-ops` on 9100 (branch `feat/o11y-scrape-grant`, applied on merge). The collector carries the same tag as the fleet | step 5 verification fails without it |
 | 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
 | 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
-| 6   | `helm` >= 3.14 and `kubectl` on PATH                                                                                                | `helm version --short && kubectl version --client` |
+| 6   | `helm` 3.14 or newer and `kubectl` on PATH                                                                                          | `helm version --short && kubectl version --client` |
+| 6a  | The files under `k3s/ops-o11y/apps/` and `k3s/ops-o11y/argocd/` are on `main`; Argo CD reads them from GitHub                       | `git log origin/main -1 -- k3s/ops-o11y/argocd/root.yaml` prints a commit |
 | 7   | Root shell on the node, by Tailscale SSH grant or key                                                                               | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
 | 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                                                   | separate Ansible task; step 5 counts it            |
 
@@ -54,35 +57,96 @@ State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-na
 The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/` with `INFRA_ADMIN=1` in the environment:
 
 ```sh
-ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml        -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml            -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml            -e variable_host=ops_o11y
+ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
-The advertised tags own the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving.
+The advertised tags own the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving. The single-node play writes `k3s/ops-o11y/.kubeconfig.yaml`; the node_exporter play covers precondition 8.
+
+## GitOps
+
+Argo CD runs on this node and owns every release from git. The bootstrap is one `helm` line, one Secret, and one `kubectl apply`. Run it from the repo root with `INFRA_ADMIN=1` in the environment.
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install argocd argo-cd \
+  --repo https://argoproj.github.io/argo-helm --version 10.8.1 \
+  -n argocd --create-namespace \
+  -f k3s/ops-o11y/apps/argocd/charts/argo-cd/values.yaml
+```
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl create namespace o11y --dry-run=client -o yaml \
+  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
+```
+
+The Linode token is the one input Argo CD does not own. `LINODE_API_TOKEN` is in the environment from `global/.env.enc`; the temporary file holds the key name only, so the value reaches neither argv nor disk (a line with no `=` makes `kubectl` read that key from the environment).
+
+```sh
+umask 077; TOKEN_FILE=$(mktemp); printf 'LINODE_API_TOKEN\n' > "$TOKEN_FILE"
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y create secret generic vm-linode-sd \
+  --from-env-file="$TOKEN_FILE" --dry-run=client -o yaml \
+  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
+rm -f "$TOKEN_FILE"
+```
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/argocd/root.yaml
+```
+
+`root` is the app of apps: it syncs every `k3s/ops-o11y/apps/*/application.yaml`, and each of those pins one chart version and takes its values from this repo. Argo CD adopts the namespace, the `coredns-custom` ConfigMap and its own helm-installed resources on the first sync. The Secret is not in git, so Argo CD never tracks it and never prunes it.
+
+Argo CD applies the CoreDNS ConfigMap but cannot restart CoreDNS. Once the `cluster-dns` app is Synced, restart it and prove `ts.net` resolves from the pod network:
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system rollout restart deployment coredns
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system run dnscheck --rm -it --restart=Never \
+  --image=busybox:1.37 -- nslookup ops-vm-o11y-k3s-fra1-01.batfish-ray.ts.net
+```
+
+Rules of the road:
+
+- A change to a release is a change to its `values.yaml` on `main`. A manual `helm upgrade` is reverted by self-heal on the next reconcile.
+- If a values change breaks Argo CD itself, revert it in git first, then re-run the `helm` line above. The same values file feeds both.
+- Merging a PR that removes an `application.yaml` prunes that app's live resources. PR review is the gate.
+- The UI is <http://ops-vm-o11y-k3s-fra1-01:30080> over Tailscale. The `admin` password is in the `argocd-initial-admin-secret` Secret.
+
+## Verify
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd get applications
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get deploy grafana -o jsonpath='{.status.readyReplicas}{"\n"}'
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get secret vm-linode-sd -o jsonpath='{.metadata.name}{"\n"}'
+```
+
+Every Application reads `Synced` and `Healthy`, Grafana reports `1`, and the Secret is still there. Then the fleet count. The expected number comes from the inventory, not from discovery, so a half-working service discovery cannot pass its own check:
+
+```sh
+(cd ansible && ansible-inventory -i inventory/linode.yml --list | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["_meta"]["hostvars"]))')
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y exec statefulset/victoria-metrics-victoria-metrics-single-server -- \
+  wget -qO- 'http://127.0.0.1:8428/api/v1/query?query=count(up{job="node"}==1)'
+```
+
+The two numbers match. Step 5 below reads the same target list in more detail.
 
 ## Steps
 
-> **The playbooks are the mechanism. These steps are the explanation and the fallback.**
+> **The plays and Argo CD are the mechanism. These steps are the explanation and the fallback.**
 >
-> ```sh
-> ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml     -e variable_host=ops_o11y
-> ansible-playbook -i inventory/digitalocean.yml play-o11y--stack-0-deploy.yml -e variable_host=ops_o11y
-> ```
+> `play-k3s--single-node.yml` bootstraps the node and writes the kubeconfig, superseding
+> **step 1** and **step 6** — do not apply step 6's config block by hand, because the play
+> owns `/etc/rancher/k3s/config.yaml` and will revert it. Argo CD reconciles CoreDNS and
+> every release, superseding **steps 2, 4, 7** and **9**; a manual `helm upgrade` is
+> reverted by self-heal. Step 3 is the bootstrap Secret. VictoriaLogs ships by adding an
+> `application.yaml` for it, not by a flag.
 >
-> The first bootstraps the node and writes the kubeconfig, superseding **step 1** and
-> **step 6** — do not apply step 6's config block by hand, because
-> `play-k3s--single-node.yml` owns `/etc/rancher/k3s/config.yaml` and will revert it.
-> The second reconciles CoreDNS, the namespace, the service-discovery Secret and every
-> Helm release, superseding **steps 2, 3, 4, 7** and **9**. Add
-> `-e o11y_deploy_logs=true` for VictoriaLogs.
+> **Step 5 needs the fleet rollout.** Nothing has `node_exporter` until
+> `play-o11y--node-exporter-0-install.yml` has run on the fleet. Expect every fleet target
+> down before then.
 >
-> **Step 5 needs T38.** It verifies fleet targets are up, and nothing has `node_exporter`
-> until the rollout playbook has run. Expect 80 targets down before then.
->
-> Read the steps below to understand what the playbooks do, to verify afterwards, or to
-> recover by hand when a playbook cannot run.
+> Read the steps below to understand what the mechanism does, to verify afterwards, or to
+> recover by hand when it cannot run.
 
 ### 1. Kubeconfig
 
@@ -108,7 +172,7 @@ One `Ready` node. Record its `INTERNAL-IP` — step 6 needs to know whether it i
 
 ### 2. CoreDNS forwards ts.net
 
-Scrape targets are MagicDNS names, so the cluster resolver must forward `ts.net` to the Tailscale resolver. K3s imports this optional ConfigMap into its managed Corefile.
+Scrape targets are MagicDNS names, so the cluster resolver must forward `ts.net` to the Tailscale resolver. K3s imports this optional ConfigMap into its managed Corefile. The `cluster-dns` Application owns it; these lines are the hand fallback.
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/cluster/coredns/coredns-custom.yaml
@@ -139,7 +203,8 @@ Expect node_exporter's `# HELP` preamble. A hang or refusal means the tailnet AC
 All three releases share the `o11y` namespace.
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl create namespace o11y
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl create namespace o11y --dry-run=client -o yaml \
+  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
 ```
 
 The token never enters git and never reaches disk. Read it into the shell, hand it to `kubectl` through a file that holds the key name only, then drop both.
@@ -153,7 +218,8 @@ printf 'LINODE_API_TOKEN\n' > "$TOKEN_FILE"
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y create secret generic vm-linode-sd \
-  --from-env-file="$TOKEN_FILE"
+  --from-env-file="$TOKEN_FILE" --dry-run=client -o yaml \
+  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
 ```
 
 ```sh
@@ -162,7 +228,7 @@ rm -f "$TOKEN_FILE"; unset LINODE_API_TOKEN
 
 A line with no `=` makes `kubectl` take that key's value from the environment (`kubectl` `pkg/cmd/util/env_file.go`), so the temporary file contains a key name and nothing else.
 
-Do not copy `.secrets.env.sample` and fill it in. It is the tracked schema and stays empty; a filled copy inside the worktree is one `git add -A` away from a committed credential, and editor backups (`.secrets.env~`, `#.secrets.env#`) are exactly the names a narrow ignore pattern misses. There is deliberately no secure-erase step here: no file ever holds the value, and on an APFS or any copy-on-write filesystem an overwrite-in-place erase would not be a guarantee anyway. The only real erase is revoking the token at <https://cloud.linode.com/profile/tokens>.
+Never write the value to a file inside the worktree; `k3s/ops-o11y/.gitignore` catches the usual names, but a committed credential is one careless add away. There is deliberately no secure-erase step here: no file ever holds the value. The only real erase is revoking the token at <https://cloud.linode.com/profile/tokens>.
 
 The Secret key `LINODE_API_TOKEN` becomes the mounted filename. The scrape config reads `/etc/vm/secrets/LINODE_API_TOKEN`; renaming the key silently breaks service discovery.
 
@@ -175,6 +241,8 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y describe secret vm-lino
 Expect one entry, `LINODE_API_TOKEN`, with a byte count.
 
 ### 4. VictoriaMetrics
+
+The `victoria-metrics` Application owns this release; the line below is the hand fallback and self-heal reverts it.
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install victoria-metrics victoria-metrics-single \
@@ -291,6 +359,8 @@ Allocatable memory must sit exactly 1.5 GiB below Capacity. Nothing else is subt
 
 ### 7. Grafana
 
+The `grafana` Application owns this release; the line below is the hand fallback and self-heal reverts it.
+
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install grafana grafana \
   --repo https://grafana-community.github.io/helm-charts --version 13.1.0 \
@@ -347,7 +417,7 @@ The `available` column of `free -m` must read at least 1500. If it does not, thi
 
 VictoriaLogs has no pull mode. Every ingestion path is an agent on the source host pushing into this node, which re-creates exactly the topology rejected for metrics: 80 agents buffering to local disk against a dead endpoint. Shipping fleet logs is a separate operator decision about the accepted single point of failure, not a config change.
 
-Run it only after VictoriaMetrics has produced a real disk-growth curve, and only when the log source is decided.
+Run it only after VictoriaMetrics has produced a real disk-growth curve, and only when the log source is decided. Ship it by adding `k3s/ops-o11y/apps/victoria-logs/application.yaml` on the pattern of the other two; the line below is the hand fallback.
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install victoria-logs victoria-logs-single \
@@ -422,15 +492,14 @@ Take this branch only on evidence. It is strictly more moving parts.
 
 ## Teardown
 
-`helm uninstall` leaves StatefulSet PVCs behind by design. Deleting them destroys all history — that is why they are listed separately.
+Deleting the root Application cascades through its finalizer: every child Application and every resource they track goes with it. The VictoriaMetrics PVC comes from a StatefulSet template, so it survives; the Grafana PVC is a chart resource, so it is deleted with the app.
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm uninstall grafana -n o11y
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm uninstall victoria-logs -n o11y
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm uninstall victoria-metrics -n o11y
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd delete application root
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm uninstall argocd -n argocd
 ```
 
-Stop here for a redeploy that keeps history. Re-running steps 4, 7 and 9 reattaches the same volumes.
+Stop here for a redeploy that keeps metrics history. Re-running the GitOps section reattaches the same VictoriaMetrics volume.
 
 To destroy the data as well:
 
@@ -467,6 +536,7 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get ns o11y
 ## Known limits
 
 - **Not highly available.** One node, no replicas, no PodDisruptionBudgets. A node loss stops collection and the gap is permanent. Recorded operator decision.
+- **History lives on the root disk.** `local-path` volumes are directories on the node. A rebuild from code restores every definition and no data.
 - **The tailnet suffix is hard-coded** as `batfish-ray.ts.net` in the VictoriaMetrics values. A tailnet rename breaks all 80 targets at once.
 - **Linode label must equal the Tailscale hostname.** True for all 80 today. A rebuilt host that re-registers under a name collision becomes `<name>-1`, and its target then fails at DNS while its Linode label is unchanged. Worth a nightly drift check comparing Linode labels against tailnet peer names.
 - **A powered-off Linode stays a target** and reports `up=0`. That is the host-down signal. There is deliberately no `drop` rule on `__meta_linode_status`, because dropping would make a broken host vanish from the dashboard instead of alerting.
