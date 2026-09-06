@@ -18,24 +18,26 @@ brew install k6              # macOS
 
 ## Scenarios
 
-| File                     | Target                      | Profile                              | Purpose                                    |
-| ------------------------ | --------------------------- | ------------------------------------ | ------------------------------------------ |
-| `caddy-serve.js`         | `<site>.<root>`             | high-RPS GET, 5 min ramp + steady    | Caddy + R2 + CF cache behavior on hot path |
-| `caddy-serve-preview.js` | `<site>.preview.<root>`     | high-RPS GET, 5 min ramp + steady    | Preview alias hot path (no CF cache wins)  |
-| `artemis-whoami.js`      | `${ARTEMIS_URL}/api/whoami` | moderate-RPS, GH-bearer hot          | GitHub teams cache + auth middleware       |
-| `artemis-deploy.js`      | full deploy chain           | sustained init+upload+finalize burst | R2 PUT + JWT mint + alias write throughput |
+| File                     | Target                      | Profile                              | Purpose                                                                               |
+| ------------------------ | --------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
+| `caddy-serve.js`         | `<site>.<root>`             | high-RPS GET, 5 min ramp + steady    | Caddy + R2 + CF cache behavior on hot path                                            |
+| `caddy-serve-preview.js` | `<site>.preview.<root>`     | high-RPS GET, 5 min ramp + steady    | Preview alias hot path (no CF cache wins)                                             |
+| `artemis-whoami.js`      | `${ARTEMIS_URL}/api/whoami` | moderate-RPS, GH-bearer hot          | GitHub teams cache + auth middleware                                                  |
+| `artemis-deploy.js`      | full deploy chain           | sustained init+upload+finalize burst | R2 PUT + JWT mint + alias write throughput                                            |
+| `veritas-abuse.js`       | `${VERITAS_*_ORIGIN}` hosts | 20 rps discovery + five abuse probes | Rate limits: token, bootstrap, console, edge and SPA bursts; latency SLO on discovery |
 
 ## Common env
 
 All scenarios source `lib/config.js` which reads:
 
-| Variable       | Default                         | Purpose                           |
-| -------------- | ------------------------------- | --------------------------------- |
-| `ARTEMIS_URL`  | `https://uploads.freecode.camp` | Artemis base URL                  |
-| `SITE`         | `test`                          | Site key in `sites.yaml`          |
-| `ROOT_DOMAIN`  | `freecode.camp`                 | Public root domain                |
-| `GH_TOKEN`     | `gh auth token`                 | GH bearer for authenticated paths |
-| `LOAD_PROFILE` | `smoke`                         | `smoke` \| `baseline` \| `stress` |
+| Variable                                                                     | Default                         | Purpose                                                                                                         |
+| ---------------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `ARTEMIS_URL`                                                                | `https://uploads.freecode.camp` | Artemis base URL                                                                                                |
+| `SITE`                                                                       | `test`                          | Site key in `sites.yaml`                                                                                        |
+| `ROOT_DOMAIN`                                                                | `freecode.camp`                 | Public root domain                                                                                              |
+| `GH_TOKEN`                                                                   | `gh auth token`                 | GH bearer for authenticated paths                                                                               |
+| `LOAD_PROFILE`                                                               | `smoke`                         | `smoke` \| `baseline` \| `stress`                                                                               |
+| `VERITAS_LOGIN_ORIGIN` / `VERITAS_ACCOUNT_ORIGIN` / `VERITAS_CONSOLE_ORIGIN` | staging hosts                   | Veritas targets for `veritas-abuse.js` (401/403/429/503 are expected answers there; only 5xx count as failures) |
 
 `LOAD_PROFILE` selects the VU/duration ramp:
 
@@ -78,6 +80,11 @@ raw output.
   sweeps these eventually, but a long stress run will accumulate
   R2 storage. Cap with `LOAD_PROFILE=baseline` and trim runs by
   duration.
+- `veritas-abuse` posts to `/internal/bootstrap` without a token and
+  expects 401. Run it only after the target Veritas is bootstrapped;
+  the `veritas_bootstrap_201` threshold fails the run if a 201 appears.
+  It ignores `LOAD_PROFILE`: its rates are fixed at the Traefik
+  ratelimit values under test, and `--duration` must not be passed.
 
 ## Adding a scenario
 
