@@ -42,3 +42,459 @@ datasources:
         uid: victorialogs
         access: proxy
         url: http://victoria-logs-victoria-logs-single-server.o11y.svc:9428
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: default
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards/default
+dashboards:
+  default:
+    linode-right-sizing:
+      json: |-
+        {
+         "uid": "linode-right-sizing",
+         "title": "Linode right-sizing baseline",
+         "tags": [
+          "o11y",
+          "bare-metal"
+         ],
+         "timezone": "utc",
+         "schemaVersion": 39,
+         "version": 1,
+         "editable": true,
+         "refresh": "5m",
+         "time": {
+          "from": "now-7d",
+          "to": "now"
+         },
+         "templating": {
+          "list": [
+           {
+            "name": "env",
+            "type": "query",
+            "datasource": {
+             "type": "prometheus",
+             "uid": "victoriametrics"
+            },
+            "query": "label_values(up{job=\"node\"}, env)",
+            "includeAll": true,
+            "multi": true,
+            "current": {
+             "text": "All",
+             "value": "$__all"
+            },
+            "refresh": 2
+           },
+           {
+            "name": "role",
+            "type": "query",
+            "datasource": {
+             "type": "prometheus",
+             "uid": "victoriametrics"
+            },
+            "query": "label_values(up{job=\"node\",env=~\"$env\"}, role)",
+            "includeAll": true,
+            "multi": true,
+            "current": {
+             "text": "All",
+             "value": "$__all"
+            },
+            "refresh": 2
+           }
+          ]
+         },
+         "panels": [
+          {
+           "id": 1,
+           "type": "table",
+           "title": "Demand per role: allocated vs used (range p95 and peak)",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 9
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "bytes"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) (node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"})",
+             "legendFormat": "allocated",
+             "refId": "A",
+             "instant": true,
+             "format": "table"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) (quantile_over_time(0.95, (node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"} - node_memory_MemAvailable_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"})[$__range]))",
+             "legendFormat": "p95 used",
+             "refId": "B",
+             "instant": true,
+             "format": "table"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) (max_over_time((node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"} - node_memory_MemAvailable_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"})[$__range]))",
+             "legendFormat": "peak used",
+             "refId": "C",
+             "instant": true,
+             "format": "table"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "count by (role) (up{job=\"node\",env=~\"$env\",role=~\"$role\"})",
+             "legendFormat": "hosts",
+             "refId": "D",
+             "instant": true,
+             "format": "table"
+            }
+           ],
+           "transformations": [
+            {
+             "id": "merge",
+             "options": {}
+            },
+            {
+             "id": "organize",
+             "options": {
+              "excludeByName": {
+               "Time": true
+              },
+              "renameByName": {
+               "Value #A": "allocated",
+               "Value #B": "p95 used",
+               "Value #C": "peak used",
+               "Value #D": "hosts"
+              }
+             }
+            }
+           ]
+          },
+          {
+           "id": 2,
+           "type": "timeseries",
+           "title": "Memory used, sum per role",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 9,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "bytes"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) ((node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"} - node_memory_MemAvailable_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"}))",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 3,
+           "type": "timeseries",
+           "title": "Memory used, per host",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 12,
+            "y": 9,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "bytes"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "(node_memory_MemTotal_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"} - node_memory_MemAvailable_bytes{job=\"node\",env=~\"$env\",role=~\"$role\"})",
+             "legendFormat": "{{instance}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 4,
+           "type": "timeseries",
+           "title": "CPU busy, average per role",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 17,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "percentunit"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "1 - avg by (role) (rate(node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\",mode=\"idle\"}[5m]))",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 5,
+           "type": "timeseries",
+           "title": "CPU busy, per host",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 12,
+            "y": 17,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "percentunit"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\",mode=\"idle\"}[5m]))",
+             "legendFormat": "{{instance}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 6,
+           "type": "timeseries",
+           "title": "PSI: CPU waiting, per role",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 25,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "percentunit"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "avg by (role) (rate(node_pressure_cpu_waiting_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\"}[5m]))",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 7,
+           "type": "timeseries",
+           "title": "PSI: memory stalled, per role",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 12,
+            "y": 25,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "percentunit"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "avg by (role) (rate(node_pressure_memory_stalled_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\"}[5m]))",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 8,
+           "type": "timeseries",
+           "title": "Disk used, sum per role (root and data filesystems)",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 33,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "bytes"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) (node_filesystem_size_bytes{job=\"node\",env=~\"$env\",role=~\"$role\",fstype!~\"tmpfs|overlay|squashfs\"} - node_filesystem_avail_bytes{job=\"node\",env=~\"$env\",role=~\"$role\",fstype!~\"tmpfs|overlay|squashfs\"})",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            }
+           ]
+          },
+          {
+           "id": 9,
+           "type": "timeseries",
+           "title": "Network, receive and transmit per role",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 12,
+            "y": 33,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "Bps"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) (rate(node_network_receive_bytes_total{job=\"node\",env=~\"$env\",role=~\"$role\",device!~\"lo|veth.*|docker.*|br-.*|tailscale.*\"}[5m]))",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            },
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "sum by (role) (rate(node_network_transmit_bytes_total{job=\"node\",env=~\"$env\",role=~\"$role\",device!~\"lo|veth.*|docker.*|br-.*|tailscale.*\"}[5m]))",
+             "legendFormat": "{{role}}",
+             "refId": "B"
+            }
+           ]
+          },
+          {
+           "id": 10,
+           "type": "timeseries",
+           "title": "Load per vCPU, per role",
+           "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+           },
+           "gridPos": {
+            "x": 0,
+            "y": 41,
+            "w": 12,
+            "h": 8
+           },
+           "fieldConfig": {
+            "defaults": {
+             "unit": "short"
+            },
+            "overrides": []
+           },
+           "targets": [
+            {
+             "datasource": {
+              "type": "prometheus",
+              "uid": "victoriametrics"
+             },
+             "expr": "avg by (role) (node_load1{job=\"node\",env=~\"$env\",role=~\"$role\"} / count by (instance,role) (node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\",mode=\"idle\"}))",
+             "legendFormat": "{{role}}",
+             "refId": "A"
+            }
+           ]
+          }
+         ]
+        }
