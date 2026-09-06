@@ -3,7 +3,6 @@
 apps/*/secrets/.secrets.env*
 apps/*/secrets/#*#
 apps/*/secrets/.*.sw?
-!apps/*/secrets/.secrets.env.sample
 
 # Ad-hoc backups (local, not committed)
 .backups/
