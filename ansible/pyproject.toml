@@ -9,8 +9,11 @@ dependencies = [
   "boto3>=1.39.7",
   "botocore>=1.39.7",
   "docker>=7.1.0",
+  "jsonpatch>=1.33",
+  "kubernetes>=24.2.0",
   "linode-api4>=5.33.0",
   "polling>=0.3.2",
+  "requests-oauthlib>=2.0.0",
 ]
 
 [project.optional-dependencies]
