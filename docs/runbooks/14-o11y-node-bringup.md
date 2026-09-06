@@ -47,6 +47,8 @@ The node is code. OpenTofu creates the droplet, its tag-attached firewall and th
 cd terraform/ops-o11y && direnv exec . tofu init && direnv exec . tofu apply && cd ../..
 ```
 
+`node_count` in `terraform/ops-o11y/variables.tf` sets the node total (default 1); node `NN` is named `ops-vm-o11y-k3s-<region>-NN`, and every node shares the tag, the firewall and the project link. `play-k3s--single-node.yml` requires exactly one host in `ops_o11y`, so a count above 1 needs `play-k3s--cluster.yml` and is outside this runbook.
+
 State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
 
 The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/` with `INFRA_ADMIN=1` in the environment:

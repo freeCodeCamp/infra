@@ -1,7 +1,12 @@
 locals {
-  name    = "ops-vm-o11y-k3s-fra1-01"
+  prefix  = "ops-vm-o11y-k3s"
   tag     = "ops-o11y"
   project = "o11y"
+
+  nodes = {
+    for i in range(var.node_count) :
+    format("%02d", i + 1) => "${local.prefix}-${var.region}-${format("%02d", i + 1)}"
+  }
 }
 
 data "digitalocean_ssh_key" "ops_o11y" {
@@ -18,7 +23,9 @@ resource "digitalocean_tag" "ops_o11y" {
 }
 
 resource "digitalocean_droplet" "ops_o11y" {
-  name   = local.name
+  for_each = local.nodes
+
+  name   = each.value
   region = var.region
   size   = var.size
   image  = var.image
@@ -26,6 +33,11 @@ resource "digitalocean_droplet" "ops_o11y" {
 
   ssh_keys  = [for key in data.digitalocean_ssh_key.ops_o11y : key.id]
   user_data = file("${path.root}/../../cloud-init/basic.yml")
+}
+
+moved {
+  from = digitalocean_droplet.ops_o11y
+  to   = digitalocean_droplet.ops_o11y["01"]
 }
 
 resource "digitalocean_firewall" "ops_o11y" {
@@ -64,5 +76,5 @@ resource "digitalocean_firewall" "ops_o11y" {
 
 resource "digitalocean_project_resources" "ops_o11y" {
   project   = data.digitalocean_project.o11y.id
-  resources = [digitalocean_droplet.ops_o11y.urn]
+  resources = [for node in digitalocean_droplet.ops_o11y : node.urn]
 }

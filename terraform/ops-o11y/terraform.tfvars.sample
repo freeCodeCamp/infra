@@ -2,3 +2,4 @@ region        = "fra1"
 size          = "s-4vcpu-8gb-amd"
 image         = "ubuntu-24-04-x64"
 ssh_key_names = ["ssh-camperbot-ed25519", "ssh-raisedadead-ed25519"]
+node_count    = 1
