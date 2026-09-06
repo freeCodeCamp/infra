@@ -8,6 +8,21 @@ Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` an
 
 Four layers, one tool each: OpenTofu builds the machine, Ansible configures the node, one `helm` line installs Argo CD, and Argo CD installs everything else from `main`. Argo CD reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be pushed on the pinned branch before the GitOps section runs. Every Application pins `feat/bare-metal` today; flip the five `targetRevision` lines to `main` when the branch merges.
 
+## Quick path
+
+The whole bringup, in order, with the directory each line runs from. Everything below this block is the explanation and the fallback.
+
+| #   | From                                       | Command                                                                                                                  |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `terraform/ops-o11y/`                      | `direnv exec . tofu init && direnv exec . tofu apply`                                                                    |
+| 2   | anywhere                                   | wait for the node's first reboot: `ssh freecodecamp@<ipv4> cloud-init status --wait` until it prints `status: done`      |
+| 3   | `ansible/`                                 | the four `ansible-playbook` lines under Provision, each prefixed `INFRA_ADMIN=1 direnv exec . uv run`                     |
+| 4   | repo root                                  | `git push` the branch every Application pins                                                                             |
+| 5   | repo root                                  | the four lines under GitOps: `helm` bootstrap, namespace, Secret, root Application                                        |
+| 6   | repo root                                  | the CoreDNS restart and the `nslookup`, then the Verify section                                                           |
+
+The kubeconfig lands at `k3s/ops-o11y/.kubeconfig.yaml` during line 3. Lines 5 and 6 fail with "no such file" from any other directory.
+
 ## Topology, and why
 
 **Pull, not push.** `vmagent` is not deployed. VictoriaMetrics single-node scrapes the fleet directly through `-promscrape.config`, which the chart wires from `server.scrape.enabled`. The 80 production hosts run no agent that targets this node, so when this node dies the fleet does not notice. That is the accepted single point of failure, recorded deliberately: this node is not highly available.
@@ -25,22 +40,22 @@ Four layers, one tool each: OpenTofu builds the machine, Ansible configures the 
 | #   | Requirement                                                                                                                         | Check                                              |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | 1   | `tofu` 1.12.x on PATH; `infra-secrets/tfstate/.env.enc` carries `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_ENDPOINT_URL_S3` (the R2 endpoint names the account, so it is not tracked); `do-universe/.env.enc` decrypts; R2 bucket `infra-tfstate` exists | `cd terraform/ops-o11y && direnv exec . tofu init` (fails with `lookup s3.auto.amazonaws.com` when the endpoint is missing) |
-| 1b  | The token in `do-universe/.env.enc` belongs to the team that owns project `o11y`. A DigitalOcean token is scoped to one team, so the token alone decides where the droplet lands | `cd terraform/ops-o11y && direnv exec . sh -c 'DIGITALOCEAN_ACCESS_TOKEN=$DIGITALOCEAN_TOKEN doctl account get --format Team'` prints the intended team |
-| 1a  | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (auth keys live 1 to 90 days; minted 2026-09-06, rotate before 2026-12-05). Tags come from the play, not the key: `play-tailscale--1a-up.yml` passes `--advertise-tags` from `variable_tags`, default `tag:added-by-ops` | `test -n "$TAILSCALE_AUTH_KEY"` |
-| 2   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
-| 3   | `../tailscale-acls/policy.hujson` grants `tag:added-by-ops` → `tag:added-by-ops` on 9100 (branch `feat/o11y-scrape-grant`, applied on merge). The collector carries the same tag as the fleet | step 5 verification fails without it |
-| 4   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
-| 5   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
-| 6   | `helm` 3.14 or newer and `kubectl` on PATH                                                                                          | `helm version --short && kubectl version --client` |
-| 6a  | The files under `k3s/ops-o11y/apps/` and `k3s/ops-o11y/argocd/` are pushed on the branch every Application pins (`feat/bare-metal` today, `main` after the merge); Argo CD reads GitHub, never a checkout | `git ls-remote --heads origin feat/bare-metal` prints a commit |
-| 7   | Root shell on the node, by Tailscale SSH grant or key                                                                               | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
-| 8   | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                                                   | separate Ansible task; step 5 counts it            |
+| 2   | The token in `do-universe/.env.enc` belongs to the team that owns project `o11y`. A DigitalOcean token is scoped to one team, so the token alone decides where the droplet lands | `cd terraform/ops-o11y && direnv exec . sh -c 'DIGITALOCEAN_ACCESS_TOKEN=$DIGITALOCEAN_TOKEN doctl account get --format Team'` prints the intended team |
+| 3   | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (auth keys live 1 to 90 days; minted 2026-09-06, rotate before 2026-12-05). Tags come from the play, not the key: `play-tailscale--1a-up.yml` passes `--advertise-tags` from `variable_tags`, default `tag:added-by-ops` | `test -n "$TAILSCALE_AUTH_KEY"` |
+| 4   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
+| 5   | `../tailscale-acls/policy.hujson` grants `tag:added-by-ops` → `tag:added-by-ops` on 9100 (merged as f5b3e36 and applied). The collector carries the same tag as the fleet | step 5 verification fails without it |
+| 6   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
+| 7   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
+| 8   | `helm` 3.14 or newer and `kubectl` on PATH                                                                                          | `helm version --short && kubectl version --client` |
+| 9   | The files under `k3s/ops-o11y/apps/` and `k3s/ops-o11y/argocd/` are pushed on the branch every Application pins (`feat/bare-metal` today, `main` after the merge); Argo CD reads GitHub, never a checkout | `git ls-remote --heads origin feat/bare-metal` prints a commit |
+| 10  | Root shell on the node, by Tailscale SSH grant or key                                                                               | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
+| 11  | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                                                   | separate Ansible task; step 5 counts it            |
 
-Precondition 8 is easy to skip. This node is the one host whose disk and memory the whole design turns on, and without its own node_exporter it is the only machine in the estate that the monitoring cannot see.
+Precondition 11 is easy to skip. This node is the one host whose disk and memory the whole design turns on, and without its own node_exporter it is the only machine in the estate that the monitoring cannot see.
 
-Preconditions 2, 3, 4 and 8 are outside this repo. Confirm them before starting; each one fails late and looks like a different problem.
+Preconditions 4, 5, 6 and 11 are outside this repo. Confirm them before starting; each one fails late and looks like a different problem.
 
-Precondition 7 is easy to miss. Tailscale SSH refuses any identity the tailnet policy does not grant, and `/etc/rancher/k3s/k3s.yaml` is mode 0600 root-owned, so a non-root login needs `sudo cat` in step 1. Steps 1, 6, the disk-budget reading and teardown all need this shell.
+Precondition 10 is easy to miss. Tailscale SSH refuses any identity the tailnet policy does not grant, and `/etc/rancher/k3s/k3s.yaml` is mode 0600 root-owned, so a non-root login needs `sudo cat` in step 1. Steps 1, 6, the disk-budget reading and teardown all need this shell.
 
 ## Provision
 
@@ -54,20 +69,28 @@ cd terraform/ops-o11y && direnv exec . tofu init && direnv exec . tofu apply && 
 
 State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
 
-The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. Then, from `ansible/` with `INFRA_ADMIN=1` in the environment:
+The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. cloud-init upgrades the OS and reboots once; SSH refuses, opens, drops and opens again in the first three minutes. Wait for it before the first play:
 
 ```sh
-ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml        -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml            -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml            -e variable_host=ops_o11y
-ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
+ssh freecodecamp@"$(cd terraform/ops-o11y && direnv exec . tofu output -json ipv4_addresses | jq -r '.["01"]')" sudo cloud-init status --wait
 ```
 
-The advertised tags own the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving. The single-node play writes `k3s/ops-o11y/.kubeconfig.yaml`; the node_exporter play covers precondition 8.
+Then, from `ansible/`. `direnv exec .` loads the DigitalOcean token for the inventory, `INFRA_ADMIN=1` adds the tailnet auth key, and `uv run` picks the pinned Ansible:
+
+```sh
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml          -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml              -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml              -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
+```
+
+A second run of the single-node play must report `changed=0`; that is the idempotence proof, not more work.
+
+The advertised tags own the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving. The single-node play writes `k3s/ops-o11y/.kubeconfig.yaml`; the node_exporter play covers precondition 11.
 
 ## GitOps
 
-Argo CD runs on this node and owns every release from git. The bootstrap is one `helm` line, one Secret, and one `kubectl apply`. Run it from the repo root with `INFRA_ADMIN=1` in the environment.
+Argo CD runs on this node and owns every release from git. The bootstrap is one `helm` line, one Secret, and one `kubectl apply`. Run it from the repo root, not from `ansible/`, with `INFRA_ADMIN=1` in the environment, after the branch every Application pins is pushed.
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install argocd argo-cd \
@@ -319,7 +342,7 @@ kill "$PF_PID"
 | 80 `node` targets down, refused or timing out | Tailnet ACL blocks node → fleet tcp/9100, or node_exporter is not installed yet (precondition 3 or 4).                                                                  |
 | Fewer than 80 `node` targets, `dropped: 0`    | Real estate drift. That is the discovery working, not a fault.                                                                                                          |
 | Fewer than 80 `node` targets, `dropped` > 0   | The tailnet `keep` rule removed a target whose Linode label was empty, so `__address__` was never rewritten. Read `droppedTargets[].discoveredLabels` in the same JSON. |
-| `o11y-node` down, the 80 fleet targets up     | Precondition 8 — node_exporter is not on this node yet. Expected on a first run before the Ansible task has covered it.                                                 |
+| `o11y-node` down, the 80 fleet targets up     | Precondition 11 — node_exporter is not on this node yet. Expected on a first run before the Ansible task has covered it.                                                 |
 
 ### 6. Node config — NodePort binding and reserved memory
 
