@@ -43,6 +43,10 @@ k3s/<cluster>/<app>.secrets.env.enc         # dotenv → kustomize secretGenerat
 k3s/<cluster>/<app>-backup.secrets.env.enc  # backup-specific dotenv (suffix `-backup`)
 k3s/<cluster>/<app>.tls.{crt,key}.enc       # per-app TLS
 k3s/<cluster>/kubeconfig.yaml.enc           # encrypted kubeconfig
+# Helm-bundled exemplars (see §"Helm-bundled secrets" below):
+k3s/gxy-cassiopeia/veritas.values.yaml.enc          # tls + secretEnv + cnpgR2 in one envelope
+k3s/gxy-cassiopeia/veritas-staging.values.yaml.enc  # staging counterpart (no cnpgR2)
+k3s/gxy-management/valkey.values.yaml.enc           # secretEnv only (VALKEY_PASSWORD)
 scratchpad/                      # dev scratch
 ```
 
@@ -120,6 +124,21 @@ else:
 ```
 
 No change to per-app kustomization.yaml. Generated Secret name (`<app>-tls-cloudflare`) unchanged. Ephemeral decrypt path (`secrets/tls.{crt,key}`) unchanged.
+
+### Helm-bundled secrets
+
+Apps deployed via `just release <cluster> <app>` whose Helm chart renders Secrets directly from chart values (no kustomize hop) bundle all secret material — `secretEnv.*`, TLS cert+key, app-specific provider creds — inside a single `<app>.values.yaml.enc`. The separate `<app>.tls.{crt,key}.enc` + `<app>.secrets.env.enc` files (kustomize generator path) are NOT used for these apps.
+
+| Pattern             | Files                                                                                  | Used by                           |
+| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------- |
+| Kustomize-generated | `<app>.secrets.env.enc` + `<app>.tls.{crt,key}.enc` + `<app>.values.yaml.enc` (helm)   | argocd, windmill, zot, woodpecker |
+| Helm-bundled        | `<app>.values.yaml.enc` only (tls + secretEnv + provider creds inline under YAML keys) | veritas, veritas-staging, valkey  |
+
+Rationale: helm charts that author `kubernetes.io/tls` Secrets directly from `.Values.tls.{crt,key}` (or render any Secret directly from `.Values.secretEnv.*`) keep the entire encrypt/decrypt cycle inside the single values overlay; splitting tls out would require chart refactor + kustomize hop for zero security gain. Zone-fallback (D2) does NOT apply to helm-bundled apps — the chart's `required` helpers fail-fast if tls is missing from the envelope. Operator who needs zone wildcard for a helm-bundled app pastes the wildcard PEM into the bundled envelope rather than minting a per-app one.
+
+**Sample-twin discipline for helm-bundled apps:** the `<app>.values.yaml.sample` schema-twin lives in **`infra-secrets/k3s/<cluster>/`** alongside the `.enc` (per infra-secrets §"Sample-twin discipline"), NOT in `infra/k3s/<cluster>/apps/<app>/secrets/`. The schema is operator-facing reference, not chart wiring.
+
+Learner-auth provider creds (GitHub/Google/Apple `client_id`+`secret`) follow the helm-bundled pattern when consumed by Veritas: see [`Universe/decisions/010-secrets-management.md` §"Pre-existing learner-auth surface"](../../../Universe/decisions/010-secrets-management.md) for the canonical policy.
 
 ## Decision Index
 
