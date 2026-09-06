@@ -116,7 +116,7 @@
         release_namespace: "{{ item.namespace | default(o11y_namespace) }}"
         release_state: present
         values_files:
-          - "{{ cluster_dir }}/{{ item.values }}"
+          - "{{ cluster_dir }}/{{ item['values'] }}"
         kubeconfig: "{{ kubeconfig }}"
         wait: true
         wait_timeout: 5m
