@@ -42,6 +42,3 @@
     owner: root
     group: root
     mode: 0644
-
-- name: Write the listed upstream blocks
-  include_tasks: render-upstreams.yml

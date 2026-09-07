@@ -8,4 +8,37 @@
 
   tasks:
     - name: Configure Nginx instances
-      include_tasks: roles/nginx/tasks/config-nginx.yml
+      ansible.builtin.include_tasks: roles/nginx/tasks/config-nginx.yml
+
+- name: Wait for the operator to place the upstreams
+  hosts: '{{ variable_host | default("null") }}'
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Ask the operator for the upstreams file
+      ansible.builtin.pause:
+        prompt: >-
+          NGINX is configured but not started. Copy {{ nginx_upstreams_path }}
+          onto every host in this run ({{ ansible_play_hosts | join(', ') }}):
+          take it from a running proxy of the same tier, or from a copy you
+          edited. Press Enter when the files are in place
+
+    - name: Check the upstreams file is on the host
+      ansible.builtin.stat:
+        path: "{{ nginx_upstreams_path }}"
+      register: upstreams_placed
+
+    - name: Fail when the upstreams file is missing
+      ansible.builtin.assert:
+        that: upstreams_placed.stat.exists and upstreams_placed.stat.isreg
+        fail_msg: "{{ nginx_upstreams_path }} is not on {{ inventory_hostname }}; place it and run this play again"
+
+    - name: Write the listed upstream blocks
+      ansible.builtin.include_tasks: roles/nginx/tasks/render-upstreams.yml
+
+    - name: Check NGINX Config
+      ansible.builtin.command:
+        chdir: /etc/nginx
+        cmd: nginx -t
+      changed_when: false
