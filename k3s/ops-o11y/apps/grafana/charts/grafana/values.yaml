@@ -490,7 +490,7 @@ dashboards:
               "type": "prometheus",
               "uid": "victoriametrics"
              },
-             "expr": "avg by (role) (node_load1{job=\"node\",env=~\"$env\",role=~\"$role\"} / count by (instance,role) (node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\",mode=\"idle\"}))",
+             "expr": "avg by (role) (node_load1{job=\"node\",env=~\"$env\",role=~\"$role\"} / on(instance,role) count by (instance,role) (node_cpu_seconds_total{job=\"node\",env=~\"$env\",role=~\"$role\",mode=\"idle\"}))",
              "legendFormat": "{{role}}",
              "refId": "A"
             }
