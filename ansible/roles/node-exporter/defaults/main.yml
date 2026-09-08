@@ -1,0 +1,47 @@
+---
+node_exporter_version: "1.12.1"
+node_exporter_archive_checksum: "sha256:b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4e831d2c2222f084e63"
+node_exporter_archive_url:
+  "https://github.com/prometheus/node_exporter/releases/download/v{{
+  node_exporter_version }}/node_exporter-{{ node_exporter_version
+  }}.linux-amd64.tar.gz"
+
+node_exporter_port: 9100
+node_exporter_user: node_exporter
+node_exporter_group: node_exporter
+
+node_exporter_archive_path: "/usr/local/src/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+node_exporter_unpack_dir: "/usr/local/lib/node_exporter-{{ node_exporter_version }}"
+node_exporter_binary: /usr/local/bin/node_exporter
+node_exporter_launcher: /usr/local/bin/node-exporter-launch
+node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
+
+node_exporter_tailscale_binary: /usr/bin/tailscale
+node_exporter_tailscale_wait_timeout: 60s
+node_exporter_tailnet_cidr: "{{ tailnet_cidr | default('100.64.0.0/10') }}"
+
+node_exporter_enabled_collectors:
+  - processes
+  - systemd
+
+node_exporter_disabled_collectors:
+  - bcache
+  - bcachefs
+  - bonding
+  - btrfs
+  - fibrechannel
+  - hwmon
+  - infiniband
+  - ipvs
+  - mdadm
+  - nfs
+  - nfsd
+  - nvme
+  - powersupplyclass
+  - tapestats
+  - xfs
+  - zfs
+
+node_exporter_systemd_unit_include: "^(cron|node_exporter|ssh|tailscaled)[.]service"
+node_exporter_net_device_exclude: "^(veth.*|cali.*|[a-f0-9]{15})"
+node_exporter_extra_args: []

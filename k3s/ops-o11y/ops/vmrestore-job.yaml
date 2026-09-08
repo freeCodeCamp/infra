@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vmrestore
+  namespace: o11y
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: vmrestore
+          image: victoriametrics/vmrestore:v1.151.0
+          args:
+            - -storageDataPath=/storage
+            - -src=s3://$(R2_BUCKET)/ops-o11y/victoria-metrics
+            - -customS3Endpoint=$(AWS_ENDPOINT_URL_S3)
+          envFrom:
+            - secretRef:
+                name: vm-backup-r2
+          volumeMounts:
+            - name: storage
+              mountPath: /storage
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: server-volume-victoria-metrics-victoria-metrics-single-server-0

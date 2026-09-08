@@ -1,0 +1,37 @@
+---
+- name: Refuse any extra argument that could add a second listener
+  ansible.builtin.assert:
+    that:
+      - node_exporter_extra_args | select('search', 'web[.]listen-address') | list | length == 0
+      - node_exporter_extra_args | select('search', 'web[.]systemd-socket') | list | length == 0
+      - node_exporter_tailnet_cidr == '100.64.0.0/10'
+    fail_msg: >-
+      node_exporter_extra_args must not carry web.listen-address or
+      web.systemd-socket -- the flag is a repeatable accumulator and a second
+      value adds a listener. node_exporter_tailnet_cidr must stay
+      100.64.0.0/10 to match the launcher guard.
+
+- name: Install the node_exporter tailnet launcher
+  ansible.builtin.template:
+    src: node-exporter-launch.j2
+    dest: "{{ node_exporter_launcher }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart node_exporter
+
+- name: Install the node_exporter systemd unit
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart node_exporter
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: true

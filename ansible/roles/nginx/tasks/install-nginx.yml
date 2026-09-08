@@ -5,3 +5,8 @@
     state: present
   with_items:
     - nginx
+
+- name: Stop the stock NGINX until the config and the upstreams are in place
+  ansible.builtin.systemd:
+    name: nginx
+    state: stopped

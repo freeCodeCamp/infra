@@ -40,6 +40,13 @@
         cmd: nginx -s 'reload'
       when: nginx_config_check.rc == 0
 
+    - name: Check NGINX holds its listener
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 80
+        timeout: 30
+      when: nginx_config_check.rc == 0
+
     # Record it instead of failing here. Under this play's serial: 1 a hard
     # failure ends the whole play, so hosts behind the bad one would never be
     # enabled or started -- worse than the silent success this replaces.

@@ -1,0 +1,100 @@
+---
+# Bootstrap a single-node K3s server.
+#
+# Idempotent. Safe to re-run against a live node; k3s.orchestration.k3s_server
+# converges /etc/rancher/k3s/config.yaml from server_config_yaml and restarts
+# k3s only when the config or the unit changes. The role adds the tailnet SAN
+# from api_endpoint; this play adds the hostname SAN as a server flag. The
+# kubeconfig var keeps the role away from ~/.kube/config; the fetch task
+# below owns k3s/<galaxy>/.kubeconfig.yaml.
+#
+# Prerequisites:
+#   - Ubuntu host reachable by Ansible as the freecodecamp user
+#   - Tailscale installed and connected (play-tailscale--0-install.yml, then 1a-up)
+#   - variable_host is an inventory group that holds exactly one host
+#
+# Config lives in inventory/group_vars/<group>.yml, not here.
+#
+# Usage:
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml \
+#     -e variable_host=ops_o11y
+
+- name: K3s single node - Validate
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Validate group_vars
+      ansible.builtin.assert:
+        that:
+          - galaxy_name is defined and galaxy_name | length > 0
+          - k3s_version is defined and k3s_version | length > 0
+          - server_config_yaml is defined and server_config_yaml | length > 0
+        fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
+
+    - name: Validate a single target host
+      ansible.builtin.assert:
+        that: ansible_play_hosts | length == 1
+        fail_msg: >-
+          This playbook builds a single-node server. {{ ansible_play_hosts | length }}
+          hosts matched {{ variable_host }}. Use play-k3s--cluster.yml for HA.
+
+    - name: Validate Tailscale connected
+      ansible.builtin.include_tasks: tasks/assert-tailscale.yml
+
+    - name: Set network facts
+      ansible.builtin.set_fact:
+        tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
+
+- name: K3s single node - Deploy
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: true
+  become: true
+  vars:
+    api_endpoint: "{{ tailscale_ip }}"
+    extra_server_args: "--tls-san={{ inventory_hostname }}"
+    server_group: "{{ variable_host }}"
+    user_kubectl: false
+    kubeconfig: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+  roles:
+    - role: k3s.orchestration.prereq
+    - role: k3s.orchestration.k3s_server
+
+- name: K3s single node - Verify
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
+  become: true
+  vars:
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
+
+  tasks:
+    - name: Wait for the node to report Ready
+      ansible.builtin.command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      register: node_ready
+      retries: 3
+      delay: 20
+      until: node_ready.rc == 0
+      changed_when: false
+
+    - name: Fetch the kubeconfig
+      ansible.builtin.include_tasks: tasks/fetch-kubeconfig.yml
+      vars:
+        kubeconfig_dir: "{{ cluster_config_dir }}"
+        kubeconfig_server: "{{ inventory_hostname }}"
+        kubeconfig_context: "{{ galaxy_name }}"
+
+    - name: Verify kubectl reaches the cluster
+      ansible.builtin.command: kubectl get nodes -o wide
+      environment:
+        KUBECONFIG: "{{ cluster_config_dir }}/.kubeconfig.yaml"
+      register: kubectl_result
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Done
+      ansible.builtin.debug:
+        msg:
+          - "{{ galaxy_name }} ready — kubeconfig at k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+          - "{{ kubectl_result.stdout_lines }}"

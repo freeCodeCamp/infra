@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+# SECURITY INVARIANT: every fleet host has a public IPv4. Bind the CGNAT
+# tailnet address ({{ node_exporter_tailnet_cidr }}) or exit non-zero; the
+# exporter is never started without an explicit address.
+ip=$({{ node_exporter_tailscale_binary }} ip -4)
+
+case "$ip" in
+100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*) ;;
+*) exit 1 ;;
+esac
+
+case "$ip" in
+*[!0-9.]*) exit 1 ;;
+esac
+
+exec "$@" --web.listen-address="$ip:{{ node_exporter_port }}"

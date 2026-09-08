@@ -1,0 +1,8 @@
+# Never let a credential reach a committable path. Runbook 14 keeps the Linode
+# token in the environment, not in a file, but editors leave backups behind.
+apps/*/secrets/.secrets.env*
+apps/*/secrets/#*#
+apps/*/secrets/.*.sw?
+
+# Ad-hoc backups (local, not committed)
+.backups/

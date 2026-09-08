@@ -1,0 +1,89 @@
+---
+- name: Read the Tailscale address of this host
+  ansible.builtin.command: "{{ node_exporter_tailscale_binary }} ip -4"
+  register: verify_ne_tailscale
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Read the node_exporter unit state
+  ansible.builtin.systemd:
+    name: node_exporter
+  register: verify_ne_unit
+  changed_when: false
+  failed_when: false
+
+- name: Describe the unit and the address it must bind
+  ansible.builtin.set_fact:
+    verify_ne_address: "{{ (verify_ne_tailscale.stdout_lines | default([]) + ['']) | first }}"
+    verify_load: "{{ (verify_ne_unit.status | default({})).LoadState | default('unknown') }}"
+    verify_enabled: "{{ (verify_ne_unit.status | default({})).UnitFileState | default('unknown') }}"
+    verify_active: "{{ (verify_ne_unit.status | default({})).ActiveState | default('unknown') }}"
+
+- name: Wait for the exporter to answer on the Tailscale address
+  ansible.builtin.wait_for:
+    host: "{{ verify_ne_address }}"
+    port: "{{ node_exporter_port }}"
+    state: started
+    timeout: 90
+  register: verify_ne_listener
+  failed_when: false
+  check_mode: false
+  when: verify_ne_address | length > 0
+
+- name: Read every listener on the exporter port
+  ansible.builtin.command: ss -Hltn sport = :{{ node_exporter_port }}
+  register: verify_ne_listeners
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Read the metrics endpoint over the tailnet
+  ansible.builtin.uri:
+    url: "http://{{ verify_ne_address }}:{{ node_exporter_port }}/metrics"
+    status_code: 200
+  register: verify_ne_metrics
+  failed_when: false
+  check_mode: false
+  when: verify_ne_address | length > 0
+
+- name: Check that every non-tailnet address of this host refuses the exporter port
+  ansible.builtin.wait_for:
+    host: "{{ item }}"
+    port: "{{ node_exporter_port }}"
+    state: stopped
+    timeout: 10
+  register: verify_ne_refused
+  failed_when: false
+  check_mode: false
+  loop: >-
+    {{ ansible_all_ipv4_addresses | default([])
+       | difference([verify_ne_address]) | union(['127.0.0.1']) }}
+
+- name: Normalise the probe results
+  ansible.builtin.set_fact:
+    verify_ne_listener_ok: "{{ verify_ne_listener.state | default('') == 'started' }}"
+    verify_ne_listeners_seen: "{{ verify_ne_listeners.stdout_lines | default([]) }}"
+    verify_ne_bind_ok: >-
+      {%- set seen = verify_ne_listeners.stdout | default('') -%}
+      {{ verify_ne_address | length > 0
+         and verify_ne_listeners.stdout_lines | default([]) | length == 1
+         and (verify_ne_address ~ ':' ~ node_exporter_port) in seen
+         and ('0.0.0.0:' ~ node_exporter_port) not in seen
+         and ('*:' ~ node_exporter_port) not in seen
+         and ('[::]:' ~ node_exporter_port) not in seen }}
+    verify_ne_metrics_ok: "{{ verify_ne_metrics.status | default(0) | int == 200 }}"
+    verify_ne_refused_ok: >-
+      {{ verify_ne_refused.results | default([])
+         | rejectattr('state', 'defined') | list | length == 0 }}
+
+- name: Build this host's finding
+  ansible.builtin.include_tasks: verify-finding.yml
+
+- name: Report this host
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: {{ 'ANOMALY -- ' ~ (verify_finding.reasons | join('; '))
+         if verify_anomaly | bool
+         else 'node_exporter answers on ' ~ verify_ne_address ~ ':' ~ node_exporter_port
+              ~ ' and on no other address' }}

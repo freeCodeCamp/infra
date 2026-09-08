@@ -8,6 +8,11 @@
 #   ansible-playbook -i inventory/linode.yml play-any--verify-nginx.yml \
 #     -e variable_host=prd_oldeworld_pxy
 #
+# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
+# in the environment, and it selects hosts by name, not by group:
+#   ansible-playbook -i inventory/tailscale.yml play-any--verify-nginx.yml \
+#     -e variable_host='prd-vm-oldeworld-pxy-*'
+#
 # This play MUTATES: it restarts NGINX once on a host where it is down, then
 # rechecks. It reports the host as an anomaly either way, including when the
 # restart worked -- a night that healed itself is something you should see,

@@ -1,4 +1,12 @@
 ---
+# Usage:
+#   ansible-playbook -i inventory/linode.yml play-tailscale--1a-up.yml \
+#     -e variable_host=<group>
+#
+# The device is tagged at enrolment. Override the default tag list with
+#   -e variable_tags=tag:added-by-ops,tag:<extra>
+# Repeat the same -e variable_tags on every re-run of a host that carries more
+# than the default tag; tailscale up keeps no flags between runs.
 - name: Tailscale - Connect to Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
   become: true
@@ -17,6 +25,7 @@
           tailscale up \
           --authkey "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}" \
           --hostname {{ inventory_hostname }} \
+          --advertise-tags "{{ variable_tags | default('tag:added-by-ops') }}" \
           --force-reauth \
           --reset
         executable: /bin/bash

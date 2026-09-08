@@ -1,0 +1,9 @@
+---
+- name: Remove Grafana Alloy and its Grafana Cloud shipping
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: true
+  become: true
+  become_user: root
+  tasks:
+    - name: Remove Grafana Alloy where it is present
+      ansible.builtin.include_tasks: tasks/remove-grafana-alloy.yml

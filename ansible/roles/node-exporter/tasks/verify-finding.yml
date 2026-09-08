@@ -1,0 +1,38 @@
+---
+- name: Build this host's finding
+  ansible.builtin.set_fact:
+    verify_finding:
+      host: "{{ inventory_hostname }}"
+      address: "{{ verify_ne_address }}"
+      load: "{{ verify_load }}"
+      enabled: "{{ verify_enabled }}"
+      active: "{{ verify_active }}"
+      listener_ok: "{{ verify_ne_listener_ok | bool }}"
+      bind_ok: "{{ verify_ne_bind_ok | bool }}"
+      metrics_ok: "{{ verify_ne_metrics_ok | bool }}"
+      refused_ok: "{{ verify_ne_refused_ok | bool }}"
+      reasons: >-
+        {{
+          ([] if verify_load == 'loaded' else
+             ['systemd cannot load the unit (' ~ verify_load ~ ')'])
+          + ([] if verify_enabled in ['enabled', 'enabled-runtime', 'static'] else
+             ['not enabled at boot (' ~ verify_enabled ~ ') -- '
+              ~ 'it will NOT come back after a reboot'])
+          + ([] if verify_active in ['active', 'reloading'] else
+             ['not running (' ~ verify_active ~ ')'])
+          + ([] if verify_ne_address | length > 0 else
+             ['no Tailscale address -- tailscaled is down or not installed'])
+          + ([] if verify_ne_listener_ok | bool or verify_ne_address | length == 0 else
+             ['not answering on ' ~ verify_ne_address ~ ':' ~ node_exporter_port])
+          + ([] if verify_ne_bind_ok | bool or verify_ne_address | length == 0 else
+             ['not bound to the tailnet address alone (listeners: '
+              ~ (verify_ne_listeners_seen | default([]) | join(' | ')) ~ ')'])
+          + ([] if verify_ne_metrics_ok | bool or verify_ne_address | length == 0 else
+             ['/metrics did not answer 200 over the tailnet'])
+          + ([] if verify_ne_refused_ok | bool else
+             ['answers on a non-tailnet address -- the bind is not tailnet-only'])
+        }}
+
+- name: Flag whether this host is an anomaly
+  ansible.builtin.set_fact:
+    verify_anomaly: "{{ verify_finding.reasons | length > 0 }}"

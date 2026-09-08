@@ -69,6 +69,7 @@ just configure-kubeconfig gxy-launchbase
 direnv `.envrc` hierarchy still loads:
 
 - root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load ONLY with `INFRA_ADMIN=1` (shell export or untracked `.env`) — never auto-loaded (ADR-010, scoped 2026-07-17)
+- `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` **ungated**, so `ansible-playbook` against the DigitalOcean dynamic inventory needs no `INFRA_ADMIN` (added 2026-09-04)
 - `k3s/<galaxy>/.envrc` → sources root + adds galaxy-scoped tokens (e.g. `$SECRETS_DIR/do-universe/.env.enc`) + exports `KUBECONFIG`
 
 The galaxy-scoped `KUBECONFIG` export is now belt-and-suspenders — recipes that need it set it themselves. The galaxy-scoped DO tokens still matter for recipes that hit DO API directly (terraform `provision`, ansible `bootstrap` with DO dynamic inventory) — but those recipes either accept `cluster` as an arg (`provision`) or operate on ansible inventory unrelated to live cluster state (`bootstrap`).
@@ -86,6 +87,8 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 ## Operations
 
 `just` lists recipes. Run from repo root — recipes carry the galaxy as an arg and self-export `KUBECONFIG`. See Working-directory rule above.
+
+**New work adds no `just` recipes (operator 2026-09-03).** The recipes are brittle and abstract too much. Write standard-toolchain commands instead: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. The existing recipes and the docs that reference them stay as they are — they serve `gxy-*`, artemis and the legacy estate.
 
 ## Ansible
 

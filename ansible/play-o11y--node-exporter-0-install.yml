@@ -1,0 +1,47 @@
+---
+- name: Prove every target host answers before the fleet is touched
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Ping every target host
+      ansible.builtin.ping:
+
+- name: Install node_exporter on the tailnet address
+  hosts: "{{ variable_host | default('null') }}"
+  serial: "{{ variable_serial | default([1, 5, 10]) }}"
+  max_fail_percentage: 0
+  gather_facts: true
+  become: true
+  become_user: root
+  pre_tasks:
+    - name: Refuse a batch larger than this host allows
+      ansible.builtin.assert:
+        that:
+          - node_exporter_batch_max | default(0) | string is match('^[0-9]+$')
+          - >-
+            node_exporter_batch_max | default(0) | int == 0
+            or ansible_play_batch | length <= node_exporter_batch_max | int
+        fail_msg: >-
+          {{ inventory_hostname }} allows a batch of {{ node_exporter_batch_max | default(0) }};
+          run this group with -e variable_serial={{ node_exporter_batch_max | default(0) }}
+  tasks:
+    - name: Install and configure node_exporter
+      ansible.builtin.include_role:
+        name: node-exporter
+
+    - name: Apply pending restarts before the batch is graded
+      ansible.builtin.meta: flush_handlers
+
+    - name: Prove the tailnet-only bind on this host
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify
+
+    - name: Fail when this host is an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (verify_anomaly | bool)
+        fail_msg: >-
+          {{ inventory_hostname }}: {{ verify_finding.reasons | join('; ') }}
+        success_msg: "node_exporter is healthy on {{ inventory_hostname }}"

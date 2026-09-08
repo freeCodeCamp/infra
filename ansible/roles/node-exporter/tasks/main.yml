@@ -1,0 +1,6 @@
+---
+- name: Install node_exporter
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure node_exporter
+  ansible.builtin.import_tasks: configure.yml

@@ -1,0 +1,14 @@
+---
+- name: Wait for the rollout of {{ item }}
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ rollout_namespace }} rollout status {{ item }}
+      --timeout={{ rollout_timeout | default('300s') }}
+  environment:
+    KUBECONFIG: "{{ rollout_kubeconfig }}"
+  loop: "{{ rollout_targets }}"
+  register: rollout_status
+  retries: "{{ rollout_retries | default(3) }}"
+  delay: "{{ rollout_delay | default(15) }}"
+  until: rollout_status.rc == 0
+  changed_when: false

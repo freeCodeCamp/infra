@@ -4,12 +4,14 @@ collections:
     version: ">=10.0.0,<13.0.0"
   - name: community.docker
     version: ">=3.0.0,<5.0.0"
+  - name: community.sops
+    version: ">=2.0.0,<3.0.0"
   - name: community.digitalocean
     version: ">=1.27.0,<2.0.0"
   - name: ansible.posix
     version: ">=2.0.0,<3.0.0"
   - name: kubernetes.core
-    version: ">=5.0.0,<7.0.0"
+    version: ">=6.4.0,<7.0.0"
   - name: grafana.grafana
     version: ">=5.7.0,<6.0.0"
   - name: freeformz.ansible

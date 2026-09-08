@@ -1,0 +1,25 @@
+---
+# ops-o11y observability node configuration
+# Applied automatically when targeting the ops_o11y inventory group
+#
+# Three-server K3s on DO FRA1, s-4vcpu-16gb-amd, embedded etcd (T58).
+# API and NodePorts on the tailnet; etcd and flannel on the VPC (eth1).
+# play-k3s--servers.yml converts node 01 with --cluster-init, then joins 02 and 03.
+
+galaxy_name: ops-o11y
+k3s_init_host: ops-vm-o11y-k3s-fra1-01
+k3s_version: v1.36.4+k3s1
+
+node_exporter_systemd_unit_include: "^(cron|k3s|node_exporter|ssh|tailscaled)[.]service"
+
+server_config_yaml: |
+  write-kubeconfig-mode: "0600"
+  disable:
+    - servicelb
+  etcd-snapshot-schedule-cron: "0 */6 * * *"
+  etcd-snapshot-retention: 20
+  kubelet-arg:
+    - system-reserved=cpu=500m,memory=1536Mi
+    - eviction-hard=memory.available<500Mi,nodefs.available<10%
+  kube-proxy-arg:
+    - nodeport-addresses={{ tailnet_cidr }}

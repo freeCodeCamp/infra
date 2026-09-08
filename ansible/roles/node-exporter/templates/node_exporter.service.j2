@@ -1,0 +1,33 @@
+[Unit]
+Description=Prometheus node_exporter {{ node_exporter_version }}
+Documentation=https://github.com/prometheus/node_exporter
+After=tailscaled.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User={{ node_exporter_user }}
+Group={{ node_exporter_group }}
+ExecStartPre={{ node_exporter_tailscale_binary }} wait --timeout={{ node_exporter_tailscale_wait_timeout }}
+{% set collector_args = (node_exporter_disabled_collectors | map('regex_replace', '^', '--no-collector.') | list)
+   + (node_exporter_enabled_collectors | map('regex_replace', '^', '--collector.') | list)
+   + ['--collector.systemd.unit-include=' ~ node_exporter_systemd_unit_include,
+      '--collector.textfile.directory=' ~ node_exporter_textfile_dir,
+      '--collector.netclass.ignored-devices=' ~ node_exporter_net_device_exclude,
+      '--collector.netdev.device-exclude=' ~ node_exporter_net_device_exclude]
+   + node_exporter_extra_args -%}
+ExecStart={{ node_exporter_launcher }} {{ node_exporter_binary }} \
+    {{ collector_args | join(' \\\n    ') }}
+Restart=on-failure
+RestartSec=15s
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+# SECURITY INVARIANT: closes the weak-host path from the public interface to the tailnet socket.
+IPAddressDeny=any
+IPAddressAllow={{ node_exporter_tailnet_cidr }}
+
+[Install]
+WantedBy=multi-user.target

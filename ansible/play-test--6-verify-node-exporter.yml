@@ -1,0 +1,101 @@
+---
+- name: Test the node_exporter finding logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    verify_ne_address: 100.64.0.1
+    verify_ne_listeners_seen: ["LISTEN 0 4096 100.64.0.1:9100 0.0.0.0:*"]
+  tasks:
+    - name: Healthy host
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify-finding
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active: active
+        verify_ne_listener_ok: true
+        verify_ne_bind_ok: true
+        verify_ne_metrics_ok: true
+        verify_ne_refused_ok: true
+
+    - name: Assert a healthy host is not an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (verify_anomaly | bool)
+          - verify_finding.reasons == []
+        success_msg: "Healthy host reads clean"
+
+    - name: Dead after boot
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify-finding
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active: failed
+        verify_ne_listener_ok: false
+        verify_ne_bind_ok: false
+        verify_ne_metrics_ok: false
+        verify_ne_refused_ok: true
+        verify_ne_listeners_seen: []
+
+    - name: Assert a dead unit is an anomaly and says so plainly
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - "'not running (failed)' in verify_finding.reasons"
+          - "'not answering on 100.64.0.1:9100' in verify_finding.reasons"
+        success_msg: "A dead unit is reported"
+
+    - name: Bound to every address
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify-finding
+      vars:
+        verify_load: loaded
+        verify_enabled: enabled
+        verify_active: active
+        verify_ne_listener_ok: true
+        verify_ne_bind_ok: false
+        verify_ne_metrics_ok: true
+        verify_ne_refused_ok: false
+        verify_ne_listeners_seen: ["LISTEN 0 4096 *:9100 *:*"]
+
+    - name: Assert a wildcard bind is an anomaly even while metrics answer
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - >-
+            verify_finding.reasons
+            | select('search', 'not bound to the tailnet address alone') | list | length == 1
+          - >-
+            'answers on a non-tailnet address -- the bind is not tailnet-only'
+            in verify_finding.reasons
+        success_msg: "A wildcard bind is reported"
+
+    - name: No tailnet address
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify-finding
+      vars:
+        verify_ne_address: ""
+        verify_load: loaded
+        verify_enabled: disabled
+        verify_active: active
+        verify_ne_listener_ok: false
+        verify_ne_bind_ok: false
+        verify_ne_metrics_ok: false
+        verify_ne_refused_ok: true
+        verify_ne_listeners_seen: []
+
+    - name: Assert a host without a tailnet address is an anomaly and names the boot gap
+      ansible.builtin.assert:
+        that:
+          - verify_anomaly | bool
+          - verify_finding.reasons | select('search', 'no Tailscale address') | list | length == 1
+          - verify_finding.reasons | select('search', 'not enabled at boot') | list | length == 1
+          - verify_finding.reasons | length == 2
+        success_msg: "A missing tailnet address is reported once"

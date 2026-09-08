@@ -1,0 +1,57 @@
+---
+- name: Verify the node_exporter tailnet-only bind
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: true
+  become: true
+  become_user: root
+  vars:
+    verify_report_path: "{{ variable_report_path | default('') }}"
+  tasks:
+    - name: Check node_exporter
+      ansible.builtin.include_role:
+        name: node-exporter
+        tasks_from: verify
+
+    - name: Collect every host's finding, including hosts that dropped out
+      ansible.builtin.set_fact:
+        verify_all_findings: >-
+          {%- set out = [] -%}
+          {%- for host in ansible_play_hosts_all -%}
+            {%- set _ = out.append(
+                  hostvars[host].verify_finding
+                  | default({'host': host,
+                             'address': '',
+                             'load': 'unknown',
+                             'enabled': 'unknown',
+                             'active': 'unknown',
+                             'listener_ok': false,
+                             'bind_ok': false,
+                             'metrics_ok': false,
+                             'refused_ok': false,
+                             'reasons': ['host dropped out of the check -- unreachable, '
+                                         ~ 'or it failed before it could be graded']})) -%}
+          {%- endfor -%}
+          {{ out }}
+      run_once: true
+      delegate_to: localhost
+      become: false
+
+    - name: Write the findings file for the workflow
+      ansible.builtin.copy:
+        dest: "{{ verify_report_path }}"
+        mode: "0644"
+        content: >-
+          {{ {'group': variable_host | default('unknown'),
+              'findings': verify_all_findings} | to_nice_json }}
+      delegate_to: localhost
+      become: false
+      run_once: true
+      when: verify_report_path | length > 0
+
+    - name: Fail when any host is an anomaly
+      ansible.builtin.assert:
+        that:
+          - not (verify_anomaly | bool)
+        fail_msg: >-
+          {{ inventory_hostname }}: {{ verify_finding.reasons | join('; ') }}
+        success_msg: "node_exporter is healthy on {{ inventory_hostname }}"

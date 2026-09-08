@@ -50,11 +50,7 @@
         fail_msg: "VPC interface eth1 not found or IP not in 10.x.x.x range."
 
     - name: Validate Tailscale connected
-      assert:
-        that:
-          - ansible_tailscale0 is defined
-          - ansible_tailscale0.ipv4 is defined
-        fail_msg: "Tailscale not connected."
+      ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
     - name: Set network facts
       set_fact:
@@ -203,36 +199,12 @@
       debug:
         msg: "{{ cluster_status.stdout_lines }}"
 
-    - name: Read kubeconfig
-      slurp:
-        src: /etc/rancher/k3s/k3s.yaml
-      register: kubeconfig_raw
-      no_log: true
-
-    - name: Write kubeconfig locally
-      copy:
-        content: "{{ kubeconfig_raw.content | b64decode }}"
-        dest: "{{ cluster_config_dir }}/.kubeconfig.yaml"
-        mode: "0600"
-      delegate_to: localhost
-      become: false
-      no_log: true
-
-    - name: Fix kubeconfig server address (use Tailscale IP)
-      delegate_to: localhost
-      become: false
-      ansible.builtin.replace:
-        path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
-        regexp: 'https://127\.0\.0\.1:6443'
-        replace: "https://{{ hostvars[inventory_hostname]['tailscale_ip'] }}:6443"
-
-    - name: Fix kubeconfig context name
-      delegate_to: localhost
-      become: false
-      ansible.builtin.replace:
-        path: "{{ cluster_config_dir }}/.kubeconfig.yaml"
-        regexp: '(\s+)(name|cluster|user|current-context): default'
-        replace: '\1\2: {{ galaxy_name }}'
+    - name: Fetch the kubeconfig
+      ansible.builtin.include_tasks: tasks/fetch-kubeconfig.yml
+      vars:
+        kubeconfig_dir: "{{ cluster_config_dir }}"
+        kubeconfig_server: "{{ hostvars[inventory_hostname]['tailscale_ip'] }}"
+        kubeconfig_context: "{{ galaxy_name }}"
 
     - name: Verify kubectl connectivity
       command: kubectl get nodes

@@ -17,10 +17,12 @@
         accept_hostkey: true
       register: git_update
 
+    - name: Write the listed upstream blocks
+      include_tasks: roles/nginx/tasks/render-upstreams.yml
+
     - name: Check if Git Repository was Updated
       debug:
-        msg:
-          'Git Repository was updated, will run NGINX config check and reload.'
+        msg: "Git Repository was updated, will run NGINX config check and reload."
       when: git_update.changed
 
     - name: Check NGINX Config

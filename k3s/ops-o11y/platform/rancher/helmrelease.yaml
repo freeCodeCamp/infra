@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: rancher
+spec:
+  suspend: true
+  interval: 30m
+  timeout: 15m
+  dependsOn:
+    - name: cert-manager
+      namespace: cert-manager
+  chart:
+    spec:
+      chart: rancher
+      version: "2.15.1"
+      sourceRef:
+        kind: HelmRepository
+        name: rancher-stable
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    hostname: CHANGEME
+    replicas: 3
+    antiAffinity: required
+    networkExposure:
+      type: gateway
+    gateway:
+      gatewayClass:
+        name: traefik
+        tls:
+          source: rancher
+    tls: ingress
+    fleet: "false"
+    agentTLSMode: strict

@@ -1,0 +1,30 @@
+# VictoriaLogs single-node — ops-o11y.
+# Chart: victoria-logs-single 0.13.9 (https://victoriametrics.github.io/helm-charts).
+# Chart 0.13.9 ships appVersion v1.52.0, which is the resolved app version.
+# Deferred: VictoriaLogs has no pull mode, so fleet log shipping is a push
+# topology and needs a separate operator decision. See runbook 14 step 9.
+
+server:
+  retentionPeriod: 3
+
+  # The percent guard is chosen BECAUSE it measures the whole filesystem
+  # holding -storageDataPath: VictoriaMetrics shares the 160 GB root disk and
+  # stops ingesting at --storage.minFreeDiskSpaceBytes=20GB, so logs must yield
+  # first. Accepted trade: the cap is total filesystem usage, not this server's
+  # share, so if metrics alone pass 80% VictoriaLogs drops every partition and
+  # still does not clear it. Setting both disk keys makes the server refuse to
+  # start, so retentionDiskSpaceUsage stays unset.
+  retentionMaxDiskUsagePercent: 80
+
+  persistentVolume:
+    enabled: true
+    storageClassName: local-path
+    size: 32Gi
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 600Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
