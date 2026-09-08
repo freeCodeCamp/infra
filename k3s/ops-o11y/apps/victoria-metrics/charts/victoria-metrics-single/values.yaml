@@ -35,6 +35,7 @@ server:
     storage.minFreeDiskSpaceBytes: "20GB"
     storage.maxDailySeries: "500000"
     promscrape.config.strictParse: "true"
+    promscrape.configCheckInterval: "30s"
     search.maxConcurrentRequests: "2"
     search.maxMemoryPerQuery: "512MB"
     search.logQueryMemoryUsage: "256MB"
