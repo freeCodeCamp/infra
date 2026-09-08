@@ -23,7 +23,7 @@ spec:
     remediation:
       retries: 3
   values:
-    hostname: SET-AT-T58-STEP-8
+    hostname: CHANGEME
     replicas: 3
     antiAffinity: required
     networkExposure:

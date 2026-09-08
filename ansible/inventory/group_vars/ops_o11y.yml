@@ -7,6 +7,7 @@
 # play-k3s--servers.yml converts node 01 with --cluster-init, then joins 02 and 03.
 
 galaxy_name: ops-o11y
+k3s_init_host: ops-vm-o11y-k3s-fra1-01
 k3s_version: v1.36.4+k3s1
 
 node_exporter_systemd_unit_include: "^(cron|k3s|node_exporter|ssh|tailscaled)[.]service"

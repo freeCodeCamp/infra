@@ -79,13 +79,13 @@ From `ansible/`:
 ```sh
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml          -e variable_host=ops_o11y
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml              -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
 `play-k3s--servers.yml` reads the K3s version from the first host of the group when one runs, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). The first host gets `--cluster-init`; the others join it over the VPC. The play installs the Gateway API CRDs v1.4.0, writes the Traefik `HelmChartConfig`, saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
 
-`first_host` names the node that holds the datastore; the play asserts that it is the first host of the inventory group and inside `--limit`, and stops otherwise. Inventory order is the DigitalOcean plugin's, so the guard is what stops a second `--cluster-init` on the wrong node.
+`k3s_init_host` in `inventory/group_vars/ops_o11y.yml` names the node that holds the datastore. The play asserts that it is the first host of the inventory group and inside `--limit`, and stops otherwise. Inventory order is the DigitalOcean plugin's, so this guard is what stops a second `--cluster-init` on the wrong node.
 
 ### 3. Bootstrap secrets
 
@@ -120,6 +120,12 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux install --version=v2.9.5
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -k k3s/ops-o11y/flux-system
 ```
 
+On the growth path, suspend `apps` at once: the Argo CD workloads still run in `o11y`, and a Helm install over them fails on ownership. Step 7 resumes it.
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux suspend kustomization apps
+```
+
 Without the `flux` CLI, the first line is `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml`; the content is the same. `infra` is public, so the GitRepository carries no credential. This is the T62 decision: `flux install` plus committed sources, no `flux bootstrap`, pushes stay the operator's.
 
 Then watch the platform land in order: `platform-controllers` (External Secrets, Connect, cert-manager) → `platform-configs` (`ClusterSecretStore`, CSI with its token as an ExternalSecret) → `rancher`.
@@ -148,7 +154,7 @@ Then the Verify section.
 
 ### 6. Rancher
 
-Rancher is the last piece and is suspended in git until its hostname exists (precondition 12). Set `hostname` in `k3s/ops-o11y/platform/rancher/helmrelease.yaml`, remove `suspend: true`, commit, push, and reconcile:
+Rancher is the last piece and is suspended in git until its hostname exists (precondition 12). Replace `hostname: CHANGEME` in `k3s/ops-o11y/platform/rancher/helmrelease.yaml`, remove `suspend: true`, commit, push, and reconcile:
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux reconcile kustomization rancher --with-source
@@ -217,7 +223,7 @@ Exit check: `tailscale status | grep ops-vm-o11y` lists three devices; `KUBECONF
 The servers play with `--limit` on node 01 alone rewrites its unit with `--cluster-init` and restarts K3s, which converts the SQLite datastore in place (docs.k3s.io/datastore/ha-embedded, "Existing single-node clusters"). The same run moves `--node-ip` to the VPC address and enables Traefik.
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01 -l ops-vm-o11y-k3s-fra1-01
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01
 ```
 
 Exit check, in this order:
@@ -240,12 +246,12 @@ ssh root@ops-vm-o11y-k3s-fra1-01 'systemctl stop k3s && rm -rf /var/lib/rancher/
 One node per run, node 01 always in the limit. Each run saves a snapshot.
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01 -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
-Exit check: three `Ready` nodes at `v1.36.4+k3s1`; `k3s etcd-snapshot ls` on node 01 lists three `play-*` snapshots; `count(up{job="o11y-node"})` is 3 once the node_exporter play has run.
+Exit check: three `Ready` nodes at `v1.36.4+k3s1`; `k3s etcd-snapshot ls` on node 01 lists three `play-*` snapshots; `count(up{job="o11y-node"})` stays 1: the job is a static target list in the VictoriaMetrics values and names node 01 only. Extend it to the three nodes as a follow-up.
 
 ### Step 5 `[A]` — remove Argo CD
 
@@ -267,7 +273,7 @@ Exit check: `kubectl get ns argocd` reports not found; `kubectl -n o11y get stat
 
 ### Step 6 `[A]` for Flux, `[H]` for the secrets
 
-Fresh-bringup steps 3 and 4, in that order. Watch `platform-controllers` and `platform-configs` reach Ready; the `apps` Kustomization waits on it and does nothing yet.
+Fresh-bringup steps 3 and 4, in that order, with the `apps` suspend. Watch `platform-controllers` and `platform-configs` reach Ready.
 
 ### Step 7 `[A]` — move the apps to Flux and block storage
 
@@ -275,7 +281,7 @@ Argo CD wrote no Helm release Secrets, so Flux cannot adopt the running releases
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete namespace o11y
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux reconcile kustomization apps --with-source
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux resume kustomization apps
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get pvc
 ```
 
