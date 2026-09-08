@@ -77,6 +77,20 @@ server:
                 provider: digitalocean
                 region: fra1
                 role: o11y
+            - targets:
+                - ops-vm-o11y-k3s-fra1-02.batfish-ray.ts.net:9100
+              labels:
+                instance: ops-vm-o11y-k3s-fra1-02
+                provider: digitalocean
+                region: fra1
+                role: o11y
+            - targets:
+                - ops-vm-o11y-k3s-fra1-03.batfish-ray.ts.net:9100
+              labels:
+                instance: ops-vm-o11y-k3s-fra1-03
+                provider: digitalocean
+                region: fra1
+                role: o11y
 
         - job_name: node
           scheme: http
