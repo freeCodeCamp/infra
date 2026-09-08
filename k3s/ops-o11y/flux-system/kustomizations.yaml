@@ -1,17 +1,50 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: platform
+  name: platform-controllers
   namespace: flux-system
 spec:
   interval: 10m
   sourceRef:
     kind: GitRepository
     name: infra
-  path: ./k3s/ops-o11y/platform
+  path: ./k3s/ops-o11y/platform/controllers
   prune: true
   wait: true
   timeout: 10m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: platform-configs
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: platform-controllers
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: infra
+  path: ./k3s/ops-o11y/platform/configs
+  prune: true
+  wait: true
+  timeout: 10m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rancher
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: platform-configs
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: infra
+  path: ./k3s/ops-o11y/platform/rancher
+  prune: true
+  timeout: 15m
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -33,7 +66,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    - name: platform
+    - name: platform-configs
     - name: cluster-dns
   interval: 10m
   sourceRef:

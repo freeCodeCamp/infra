@@ -3,6 +3,8 @@
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
   become: true
+  vars:
+    first_host: "{{ groups[variable_host][0] }}"
 
   tasks:
     - name: Validate group_vars
@@ -12,11 +14,14 @@
           - server_config_yaml is defined and server_config_yaml | length > 0
         fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
-    - name: Validate the first host of the group is in the play
+    - name: Validate the first host of the group
       ansible.builtin.assert:
-        that: groups[variable_host][0] in ansible_play_hosts
+        that:
+          - groups[variable_host][0] == first_host
+          - first_host in ansible_play_hosts
         fail_msg: >-
-          {{ groups[variable_host][0] }} holds the datastore and must be in --limit.
+          first_host={{ first_host }} must be the first host of {{ variable_host }}
+          ({{ groups[variable_host][0] }}) and in --limit; it holds the datastore.
 
     - name: Validate Tailscale connected
       ansible.builtin.include_tasks: tasks/assert-tailscale.yml
@@ -56,7 +61,8 @@
   gather_facts: true
   become: true
   vars:
-    api_endpoint: "{{ hostvars[groups[variable_host][0]]['tailscale_ip'] }}"
+    first_host: "{{ groups[variable_host][0] }}"
+    api_endpoint: "{{ hostvars[first_host]['vpc_ip'] }}"
     extra_server_args: >-
       --node-ip={{ vpc_ip }}
       --advertise-address={{ vpc_ip }}

@@ -14,20 +14,20 @@ Four layers, one tool each: OpenTofu builds the droplets, Ansible builds the K3s
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Nodes         | 3 × `s-4vcpu-16gb-amd`, fra1, project `o11y`, tag `ops-o11y`; `ops-vm-o11y-k3s-fra1-01` … `-03`                                                         |
 | Datastore     | embedded etcd, every node a server; local snapshots every 6 h, 20 kept                                                                                  |
-| API           | tcp/6443 on the tailnet; SANs are the hostname and the tailnet address; the kubeconfig names node 01                                                    |
+| API           | tcp/6443 on the tailnet; SANs are the hostname and the tailnet address; the kubeconfig names node 01; joiners dial the first host on the VPC                                                    |
 | etcd, flannel | DigitalOcean VPC on `eth1` (`--node-ip`, `--advertise-address`, `--flannel-iface=eth1`); the firewall opens the four ports between tagged droplets only |
 | NodePorts     | tailnet only (`nodeport-addresses=100.64.0.0/10`); Grafana 30300, Traefik 30080/30443                                                                   |
 | Storage       | DigitalOcean block storage by CSI v4.18.0 (`do-block-storage`, default class); `local-path` stays for scratch only                                      |
 | Secrets       | External Secrets Operator 2.10.0 + 1Password Connect 2.4.1 (`ClusterSecretStore/onepassword`, vault `infra`)                                            |
-| GitOps        | Flux v2.9.5; `GitRepository/infra` → Kustomizations `platform`, `cluster-dns`, `apps`                                                                   |
+| GitOps        | Flux v2.9.5; `GitRepository/infra` → Kustomizations `platform-controllers` → `platform-configs` → `rancher`; `cluster-dns`; `apps`                                                                   |
 | Management    | Rancher 2.15.1, 3 replicas, Gateway API through the K3s Traefik, Rancher-issued CA, Fleet off                                                           |
 
 Git layout under `k3s/ops-o11y/`:
 
 | Path                                 | Owner                        | Content                                                                                                                                                               |
 | ------------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `flux-system/`                       | hand-applied once, then Flux | `GitRepository/infra`, the three Flux Kustomizations                                                                                                                  |
-| `platform/`                          | Kustomization `platform`     | External Secrets, 1Password Connect, DigitalOcean CSI (vendored v4.18.0), cert-manager, Rancher                                                                       |
+| `flux-system/`                       | hand-applied once, then Flux | `GitRepository/infra`, the five Flux Kustomizations                                                                                                                  |
+| `platform/`                          | Kustomizations `platform-controllers`, `platform-configs`, `rancher`   | `controllers/` (External Secrets, 1Password Connect, cert-manager), `configs/` (`ClusterSecretStore`, DigitalOcean CSI vendored v4.18.0), `rancher/`                                                                       |
 | `cluster/coredns/`                   | Kustomization `cluster-dns`  | `coredns-custom` ConfigMap (ts.net forward)                                                                                                                           |
 | `apps/`                              | Kustomization `apps`         | namespace `o11y`; per app a `HelmRepository`, a `HelmRelease`, an `ExternalSecret`, and a `configMapGenerator` over `charts/<chart>/values.yaml` + `values-mgmt.yaml` |
 | `ops/`                               | hand-applied on demand       | `vmbackup-job.yaml`, `vmrestore-job.yaml`                                                                                                                             |
@@ -79,26 +79,17 @@ From `ansible/`:
 ```sh
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml          -e variable_host=ops_o11y
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml              -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
-`play-k3s--servers.yml` reads the K3s version from the first host of the group when one runs, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). The first host gets `--cluster-init`; the others join it over the tailnet. The play installs the Gateway API CRDs v1.4.0, writes the Traefik `HelmChartConfig`, saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
+`play-k3s--servers.yml` reads the K3s version from the first host of the group when one runs, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). The first host gets `--cluster-init`; the others join it over the VPC. The play installs the Gateway API CRDs v1.4.0, writes the Traefik `HelmChartConfig`, saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
 
-`--limit` must always include the first host of the group; the play asserts it.
+`first_host` names the node that holds the datastore; the play asserts that it is the first host of the inventory group and inside `--limit`, and stops otherwise. Inventory order is the DigitalOcean plugin's, so the guard is what stops a second `--cluster-init` on the wrong node.
 
-### 3. Flux
+### 3. Bootstrap secrets
 
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux install --version=v2.9.5
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -k k3s/ops-o11y/flux-system
-```
-
-Without the `flux` CLI, the first line is `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml`; the content is the same. `infra` is public, so the GitRepository carries no credential. This is the T62 decision: `flux install` plus committed sources, no `flux bootstrap`, pushes stay the operator's.
-
-### 4. Bootstrap secrets
-
-Three Secrets are not in git and Flux never creates them. Create them before the `platform` Kustomization can become Ready. Values reach `kubectl` through the environment or a temporary file outside the worktree; no line prints a value.
+Three Secrets are not in git and Flux never creates them. Create the two Connect Secrets before Flux is installed; a HelmRelease that waits on a missing Secret times out and stops after three retries. Values reach `kubectl` through the environment or a temporary file outside the worktree; no line prints a value.
 
 1Password Connect credentials and token, in namespace `external-secrets`:
 
@@ -121,7 +112,17 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n external-secrets create secr
 unset OP_CONNECT_TOKEN
 ```
 
-Then watch the platform land in order: External Secrets → Connect → `ClusterSecretStore` → CSI (its token as an ExternalSecret) → cert-manager → Rancher.
+
+### 4. Flux
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux install --version=v2.9.5
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -k k3s/ops-o11y/flux-system
+```
+
+Without the `flux` CLI, the first line is `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml`; the content is the same. `infra` is public, so the GitRepository carries no credential. This is the T62 decision: `flux install` plus committed sources, no `flux bootstrap`, pushes stay the operator's.
+
+Then watch the platform land in order: `platform-controllers` (External Secrets, Connect, cert-manager) → `platform-configs` (`ClusterSecretStore`, CSI with its token as an ExternalSecret) → `rancher`.
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n flux-system get kustomizations,gitrepositories
@@ -135,7 +136,7 @@ Every Kustomization and HelmRelease reads `Ready=True`; the store and every Exte
 
 ### 5. Apps and CoreDNS
 
-The `apps` Kustomization waits on `platform` and `cluster-dns`, so nothing here needs a hand. Restart CoreDNS once after the ConfigMap lands and prove `ts.net` resolves from the pod network:
+The `apps` Kustomization waits on `platform-configs` and `cluster-dns`, so nothing here needs a hand. Restart CoreDNS once after the ConfigMap lands and prove `ts.net` resolves from the pod network:
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system rollout restart deployment coredns
@@ -150,7 +151,7 @@ Then the Verify section.
 Rancher is the last piece and is suspended in git until its hostname exists (precondition 12). Set `hostname` in `k3s/ops-o11y/platform/rancher/helmrelease.yaml`, remove `suspend: true`, commit, push, and reconcile:
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux reconcile kustomization platform --with-source
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux reconcile kustomization rancher --with-source
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n cattle-system rollout status deployment rancher --timeout=600s
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n cattle-system get gateway,httproute
 ```
@@ -216,7 +217,7 @@ Exit check: `tailscale status | grep ops-vm-o11y` lists three devices; `KUBECONF
 The servers play with `--limit` on node 01 alone rewrites its unit with `--cluster-init` and restarts K3s, which converts the SQLite datastore in place (docs.k3s.io/datastore/ha-embedded, "Existing single-node clusters"). The same run moves `--node-ip` to the VPC address and enables Traefik.
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01 -l ops-vm-o11y-k3s-fra1-01
 ```
 
 Exit check, in this order:
@@ -239,8 +240,8 @@ ssh root@ops-vm-o11y-k3s-fra1-01 'systemctl stop k3s && rm -rf /var/lib/rancher/
 One node per run, node 01 always in the limit. Each run saves a snapshot.
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01 -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -e first_host=ops-vm-o11y-k3s-fra1-01
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
@@ -266,11 +267,11 @@ Exit check: `kubectl get ns argocd` reports not found; `kubectl -n o11y get stat
 
 ### Step 6 `[A]` for Flux, `[H]` for the secrets
 
-Fresh-bringup steps 3 and 4. Watch `platform` reach Ready; the `apps` Kustomization waits on it and does nothing yet.
+Fresh-bringup steps 3 and 4, in that order. Watch `platform-controllers` and `platform-configs` reach Ready; the `apps` Kustomization waits on it and does nothing yet.
 
 ### Step 7 `[A]` — move the apps to Flux and block storage
 
-Argo CD wrote no Helm release Secrets, so Flux cannot adopt the running releases, and the StatefulSet's volume claim template cannot change class in place. Remove the old namespace with its `local-path` volumes, let Flux create the releases fresh on block storage, then restore.
+Argo CD wrote no Helm release Secrets, so Flux cannot adopt the running releases, and the StatefulSet's volume claim template cannot change class in place. Hours have passed since step 1, so back up again first (the step-1 Job lines; `vmbackup` uploads only what changed, and the `grafana.db` copy overwrites the old one). Then remove the old namespace with its `local-path` volumes, let Flux create the releases fresh on block storage, then restore.
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete namespace o11y
@@ -352,7 +353,7 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y exec statefulset/victor
 Suspend Flux, remove the releases, then the droplets. PVCs on block storage are deleted with the namespace; the R2 backup is the only copy after that.
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux suspend kustomization apps platform cluster-dns
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux suspend kustomization apps rancher platform-configs platform-controllers cluster-dns
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete -k k3s/ops-o11y/flux-system
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux uninstall
 cd terraform/ops-o11y && direnv exec . tofu destroy && cd ../..

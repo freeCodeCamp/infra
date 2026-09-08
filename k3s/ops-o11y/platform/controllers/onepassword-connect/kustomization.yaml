@@ -4,4 +4,3 @@ namespace: external-secrets
 resources:
   - helmrepository.yaml
   - helmrelease.yaml
-  - clustersecretstore.yaml
