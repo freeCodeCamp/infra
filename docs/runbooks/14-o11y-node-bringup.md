@@ -297,7 +297,7 @@ Re-create `vm-backup-r2` with the step-1 lines (the namespace was deleted), then
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/ops/vmrestore-job.yaml
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y wait --for=condition=complete job/vmrestore --timeout=30m
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y delete job vmrestore secret vm-backup-r2
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y delete job vmrestore secret vm-backup-r2   # the ExternalSecret re-creates vm-backup-r2
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y scale statefulset victoria-metrics-victoria-metrics-single-server --replicas=1
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux resume helmrelease victoria-metrics -n o11y
 ```
@@ -348,7 +348,7 @@ Grafana: <http://ops-vm-o11y-k3s-fra1-01:30300> over Tailscale, or any node's na
 
 Block storage volumes follow the pod to any node, which is what makes a node loss survivable. Retention is still the guard: `--retentionPeriod=12` and `--storage.minFreeDiskSpaceBytes=20GB` on a 50 Gi volume. Grow the claim in `values-mgmt.yaml` (`server.persistentVolume.size`); the CSI resizes the volume online.
 
-Backups are `vmbackup` to R2 by the Job in `ops/`, run by hand before every risky change; a schedule is a follow-up (VictoriaMetrics' scheduled `vmbackupmanager` is enterprise-only). The etcd snapshots are local to the nodes; `etcd-s3` to a bucket is a follow-up too. Read the disk after seven and thirty days:
+Backups are `vmbackup` to R2: the CronJob `vmbackup` in `apps/victoria-metrics/` runs daily at 03:17 UTC with the keys from the `vm-backup-r2` ExternalSecret (1Password item `mgmt-r2-backup`), and the Job in `ops/` is the hand-run copy before a risky change. Both write incrementally to the same prefix. The etcd snapshots are local to the nodes; `etcd-s3` to a bucket is a follow-up too. Read the disk after seven and thirty days:
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y exec statefulset/victoria-metrics-victoria-metrics-single-server -- df -h /storage

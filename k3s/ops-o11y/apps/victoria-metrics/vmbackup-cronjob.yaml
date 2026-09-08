@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vmbackup
+spec:
+  schedule: "17 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/instance: victoria-metrics
+                      app.kubernetes.io/component: server
+          containers:
+            - name: vmbackup
+              image: victoriametrics/vmbackup:v1.151.0
+              args:
+                - -storageDataPath=/storage
+                - -snapshot.createURL=http://victoria-metrics-victoria-metrics-single-server.o11y.svc:8428/snapshot/create
+                - -dst=s3://$(R2_BUCKET)/ops-o11y/victoria-metrics
+                - -customS3Endpoint=$(AWS_ENDPOINT_URL_S3)
+              envFrom:
+                - secretRef:
+                    name: vm-backup-r2
+              volumeMounts:
+                - name: storage
+                  mountPath: /storage
+          volumes:
+            - name: storage
+              persistentVolumeClaim:
+                claimName: server-volume-victoria-metrics-victoria-metrics-single-server-0
