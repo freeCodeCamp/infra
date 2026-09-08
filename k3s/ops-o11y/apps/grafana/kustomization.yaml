@@ -4,6 +4,7 @@ namespace: o11y
 resources:
   - helmrepository.yaml
   - externalsecret.yaml
+  - externalsecret-admin.yaml
   - helmrelease.yaml
 configMapGenerator:
   - name: grafana-values
