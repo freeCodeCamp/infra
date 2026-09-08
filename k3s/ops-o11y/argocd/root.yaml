@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/freeCodeCamp/infra.git
-    targetRevision: feat/bare-metal
+    targetRevision: main
     path: k3s/ops-o11y/apps
     directory:
       recurse: true

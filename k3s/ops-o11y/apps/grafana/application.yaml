@@ -16,7 +16,7 @@ spec:
         valueFiles:
           - $values/k3s/ops-o11y/apps/grafana/charts/grafana/values.yaml
     - repoURL: https://github.com/freeCodeCamp/infra.git
-      targetRevision: feat/bare-metal
+      targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
