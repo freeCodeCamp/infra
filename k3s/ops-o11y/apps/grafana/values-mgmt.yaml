@@ -41,3 +41,101 @@ alerting:
             object_matchers:
               - [severity, "=", page]
             continue: true
+  rules.yaml:
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: mgmt-capacity
+        folder: mgmt
+        interval: 1m
+        rules:
+          - uid: vm-storage-read-only
+            title: VictoriaMetrics storage is read-only
+            condition: C
+            for: 5m
+            noDataState: NoData
+            execErrState: Error
+            labels:
+              severity: page
+            annotations:
+              summary: Metrics ingestion has stopped; free disk under the 20 GB floor.
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: victoriametrics
+                model: { refId: A, instant: true, expr: 'max(vm_storage_is_read_only)' }
+              - refId: C
+                datasourceUid: __expr__
+                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+          - uid: vm-free-disk-low
+            title: VictoriaMetrics free disk near the read-only floor
+            condition: C
+            for: 15m
+            noDataState: NoData
+            execErrState: Error
+            labels:
+              severity: warn
+            annotations:
+              summary: Free disk is under 1.5 x the minFreeDiskSpaceBytes limit.
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: victoriametrics
+                model: { refId: A, instant: true, expr: 'min(vm_free_disk_space_bytes / vm_free_disk_space_limit_bytes)' }
+              - refId: C
+                datasourceUid: __expr__
+                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [1.5] } }] }
+          - uid: mgmt-root-fs-low
+            title: mgmt node root filesystem under 25 percent free
+            condition: C
+            for: 15m
+            noDataState: NoData
+            execErrState: Error
+            labels:
+              severity: warn
+            annotations:
+              summary: Root filesystem on {{ "{{" }} $labels.instance {{ "}}" }} is below 25 percent free.
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: victoriametrics
+                model: { refId: A, instant: true, expr: 'min by (instance) (node_filesystem_avail_bytes{job="o11y-node",mountpoint="/"} / node_filesystem_size_bytes{job="o11y-node",mountpoint="/"})' }
+              - refId: C
+                datasourceUid: __expr__
+                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [0.25] } }] }
+          - uid: linode-sd-failing
+            title: Linode service discovery is failing
+            condition: C
+            for: 10m
+            noDataState: OK
+            execErrState: Error
+            labels:
+              severity: warn
+            annotations:
+              summary: The fleet target list is going stale; check the Linode token and scopes.
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: victoriametrics
+                model: { refId: A, instant: true, expr: 'sum(increase(vm_promscrape_discovery_linode_failures_total[10m]))' }
+              - refId: C
+                datasourceUid: __expr__
+                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
+          - uid: fleet-degraded
+            title: Fewer than 75 fleet hosts are up
+            condition: C
+            for: 10m
+            noDataState: Alerting
+            execErrState: Error
+            labels:
+              severity: page
+            annotations:
+              summary: The Linode fleet, or the tailnet path to it, is degraded.
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: victoriametrics
+                model: { refId: A, instant: true, expr: 'count(up{job="node"} == 1)' }
+              - refId: C
+                datasourceUid: __expr__
+                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [75] } }] }
