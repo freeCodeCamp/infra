@@ -2,8 +2,9 @@
 # ops-o11y observability node configuration
 # Applied automatically when targeting the ops_o11y inventory group
 #
-# Single-node K3s on DO FRA1, s-4vcpu-8gb-amd. Not HA by decision — a dead
-# collector loses samples, not service. Reached over Tailscale only.
+# Three-server K3s on DO FRA1, s-4vcpu-16gb-amd, embedded etcd (T58).
+# API and NodePorts on the tailnet; etcd and flannel on the VPC (eth1).
+# play-k3s--servers.yml converts node 01 with --cluster-init, then joins 02 and 03.
 
 galaxy_name: ops-o11y
 k3s_version: v1.36.4+k3s1
@@ -13,8 +14,9 @@ node_exporter_systemd_unit_include: "^(cron|k3s|node_exporter|ssh|tailscaled)[.]
 server_config_yaml: |
   write-kubeconfig-mode: "0600"
   disable:
-    - traefik
     - servicelb
+  etcd-snapshot-schedule-cron: "0 */6 * * *"
+  etcd-snapshot-retention: 20
   kubelet-arg:
     - system-reserved=cpu=500m,memory=1536Mi
     - eviction-hard=memory.available<500Mi,nodefs.available<10%

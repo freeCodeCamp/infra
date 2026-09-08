@@ -1,0 +1,134 @@
+---
+- name: K3s servers - Validate
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Validate group_vars
+      ansible.builtin.assert:
+        that:
+          - galaxy_name is defined and galaxy_name | length > 0
+          - server_config_yaml is defined and server_config_yaml | length > 0
+        fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
+
+    - name: Validate the first host of the group is in the play
+      ansible.builtin.assert:
+        that: groups[variable_host][0] in ansible_play_hosts
+        fail_msg: >-
+          {{ groups[variable_host][0] }} holds the datastore and must be in --limit.
+
+    - name: Validate Tailscale connected
+      ansible.builtin.include_tasks: tasks/assert-tailscale.yml
+
+    - name: Validate the VPC interface
+      ansible.builtin.assert:
+        that:
+          - ansible_eth1 is defined
+          - ansible_eth1.ipv4.address | regex_search('^10\\.')
+        fail_msg: "eth1 carries no 10.x VPC address on {{ inventory_hostname }}."
+
+    - name: Set network facts
+      ansible.builtin.set_fact:
+        tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
+        vpc_ip: "{{ ansible_eth1.ipv4.address }}"
+
+    - name: Read the live K3s version from the first host
+      ansible.builtin.command: k3s --version
+      register: k3s_live_version
+      changed_when: false
+      failed_when: false
+      delegate_to: "{{ groups[variable_host][0] }}"
+      run_once: true
+
+    - name: Pin the play to the live version
+      ansible.builtin.set_fact:
+        k3s_version: "{{ k3s_live_version.stdout_lines[0] | regex_search('v[0-9.]+\\+k3s[0-9]+') }}"
+      when: k3s_live_version.rc == 0
+
+    - name: Validate a version is known
+      ansible.builtin.assert:
+        that: k3s_version is defined and k3s_version | length > 0
+        fail_msg: "No live K3s on {{ groups[variable_host][0] }} and no k3s_version in group_vars."
+
+- name: K3s servers - Deploy
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: true
+  become: true
+  vars:
+    api_endpoint: "{{ hostvars[groups[variable_host][0]]['tailscale_ip'] }}"
+    extra_server_args: >-
+      --node-ip={{ vpc_ip }}
+      --advertise-address={{ vpc_ip }}
+      --flannel-iface=eth1
+      --tls-san={{ inventory_hostname }}
+      --tls-san={{ tailscale_ip }}
+    server_group: "{{ variable_host }}"
+    user_kubectl: false
+    kubeconfig: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+  roles:
+    - role: k3s.orchestration.prereq
+    - role: k3s.orchestration.k3s_server
+
+- name: K3s servers - Verify
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
+  become: true
+  vars:
+    cluster_config_dir: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}"
+    first_host: "{{ groups[variable_host][0] }}"
+
+  tasks:
+    - name: Apply the Traefik HelmChartConfig
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: "0600"
+      when: inventory_hostname == first_host
+
+    - name: Install the Gateway API CRDs
+      ansible.builtin.command: >
+        k3s kubectl apply -f
+        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+      register: gateway_result
+      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
+      when: inventory_hostname == first_host
+
+    - name: Wait for every node to report Ready
+      ansible.builtin.command: k3s kubectl wait --for=condition=Ready nodes --all --timeout=300s
+      register: node_ready
+      retries: 3
+      delay: 20
+      until: node_ready.rc == 0
+      changed_when: false
+      when: inventory_hostname == first_host
+
+    - name: Save an etcd snapshot
+      ansible.builtin.command: k3s etcd-snapshot save --name "play-{{ ansible_play_hosts | length }}-servers"
+      changed_when: true
+      when: inventory_hostname == first_host
+
+    - name: Fetch the kubeconfig
+      ansible.builtin.include_tasks: tasks/fetch-kubeconfig.yml
+      vars:
+        kubeconfig_dir: "{{ cluster_config_dir }}"
+        kubeconfig_server: "{{ first_host }}"
+        kubeconfig_context: "{{ galaxy_name }}"
+      when: inventory_hostname == first_host
+
+    - name: Verify kubectl reaches the cluster
+      ansible.builtin.command: kubectl get nodes -o wide
+      environment:
+        KUBECONFIG: "{{ cluster_config_dir }}/.kubeconfig.yaml"
+      register: kubectl_result
+      changed_when: false
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Done
+      ansible.builtin.debug:
+        msg:
+          - "{{ galaxy_name }} at {{ k3s_version }} — kubeconfig at k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+          - "{{ kubectl_result.stdout_lines }}"
+      run_once: true

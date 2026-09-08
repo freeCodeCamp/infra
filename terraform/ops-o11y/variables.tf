@@ -5,7 +5,7 @@ variable "region" {
 
 variable "size" {
   type    = string
-  default = "s-4vcpu-8gb-amd"
+  default = "s-4vcpu-16gb-amd"
 }
 
 variable "image" {
@@ -20,7 +20,7 @@ variable "ssh_key_names" {
 
 variable "node_count" {
   type    = number
-  default = 1
+  default = 3
 
   validation {
     condition     = var.node_count >= 1 && floor(var.node_count) == var.node_count

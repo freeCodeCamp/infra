@@ -60,6 +60,20 @@ resource "digitalocean_firewall" "ops_o11y" {
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
 
+  dynamic "inbound_rule" {
+    for_each = {
+      "tcp/6443"      = { protocol = "tcp", port_range = "6443" }
+      "tcp/2379-2380" = { protocol = "tcp", port_range = "2379-2380" }
+      "tcp/10250"     = { protocol = "tcp", port_range = "10250" }
+      "udp/8472"      = { protocol = "udp", port_range = "8472" }
+    }
+    content {
+      protocol    = inbound_rule.value.protocol
+      port_range  = inbound_rule.value.port_range
+      source_tags = [digitalocean_tag.ops_o11y.id]
+    }
+  }
+
   outbound_rule {
     protocol              = "icmp"
     destination_addresses = ["0.0.0.0/0", "::/0"]

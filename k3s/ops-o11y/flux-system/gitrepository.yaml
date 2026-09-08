@@ -1,0 +1,13 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: infra
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: https://github.com/freeCodeCamp/infra.git
+  ref:
+    branch: feat/bare-metal
+  ignore: |
+    /*
+    !/k3s/ops-o11y/

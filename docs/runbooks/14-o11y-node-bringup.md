@@ -1,126 +1,141 @@
-# 14 — Observability node bringup (ops-o11y)
+# 14 — mgmt cluster bringup (ops-o11y)
 
-**Audience:** operator. **Trigger:** first bringup of `ops-vm-o11y-k3s-fra1-01`, or a rebuild of that node after a total loss.
+**Audience:** operator. **Trigger:** growth of the single `ops-vm-o11y-k3s-fra1-01` node into the three-server `mgmt` cluster (T58), a later rebuild of one node, or a rebuild of the whole cluster after a total loss.
 
-This node is freeCodeCamp's first infrastructure observability plane. It pulls node_exporter metrics from ~80 Linode VMs over Tailscale, keeps 12 months of history, and later scrapes the Hetzner bare-metal estate under the same `job="node"` so one dashboard spans the provider migration.
+The cluster is freeCodeCamp's management plane: Rancher, Flux, External Secrets, VictoriaMetrics and Grafana. It pulls node_exporter metrics from ~80 Linode VMs over Tailscale, keeps 12 months of history, and later scrapes the Hetzner estate under the same `job="node"`. The cluster name and every path stay `ops-o11y` until the rename is decided (RFC Q21).
 
-Every command below runs from the repo root. No `just`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files that load their envelopes, so the OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and the Ansible lines run from `ansible/` with `INFRA_ADMIN=1`, which loads `global/.env.enc` and with it the tailnet auth key and the Linode token. Each `kubectl` and `helm` line carries its own `KUBECONFIG=`.
+Every command runs from the repo root unless the line says otherwise. No `just`. Each `kubectl`, `helm` and `flux` line carries `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files, so OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and Ansible lines run from `ansible/` with `INFRA_ADMIN=1 direnv exec . uv run`.
 
-Four layers, one tool each: OpenTofu builds the machine, Ansible configures the node, one `helm` line installs Argo CD, and Argo CD installs everything else from `main`. Argo CD reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be pushed on the pinned branch before the GitOps section runs. Every Application pins `feat/bare-metal` today; flip the five `targetRevision` lines to `main` when the branch merges.
+Four layers, one tool each: OpenTofu builds the droplets, Ansible builds the K3s servers, `flux install` puts Flux on the cluster, and Flux installs everything else from git. Flux reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be pushed on the branch the GitRepository pins (`feat/bare-metal` today; flip `k3s/ops-o11y/flux-system/gitrepository.yaml` to `main` when the branch merges).
 
-## Quick path
+## Topology
 
-The whole bringup, in order, with the directory each line runs from. Everything below this block is the explanation and the fallback.
+| Item          | Value                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nodes         | 3 × `s-4vcpu-16gb-amd`, fra1, project `o11y`, tag `ops-o11y`; `ops-vm-o11y-k3s-fra1-01` … `-03`                                                         |
+| Datastore     | embedded etcd, every node a server; local snapshots every 6 h, 20 kept                                                                                  |
+| API           | tcp/6443 on the tailnet; SANs are the hostname and the tailnet address; the kubeconfig names node 01                                                    |
+| etcd, flannel | DigitalOcean VPC on `eth1` (`--node-ip`, `--advertise-address`, `--flannel-iface=eth1`); the firewall opens the four ports between tagged droplets only |
+| NodePorts     | tailnet only (`nodeport-addresses=100.64.0.0/10`); Grafana 30300, Traefik 30080/30443                                                                   |
+| Storage       | DigitalOcean block storage by CSI v4.18.0 (`do-block-storage`, default class); `local-path` stays for scratch only                                      |
+| Secrets       | External Secrets Operator 2.10.0 + 1Password Connect 2.4.1 (`ClusterSecretStore/onepassword`, vault `infra`)                                            |
+| GitOps        | Flux v2.9.5; `GitRepository/infra` → Kustomizations `platform`, `cluster-dns`, `apps`                                                                   |
+| Management    | Rancher 2.15.1, 3 replicas, Gateway API through the K3s Traefik, Rancher-issued CA, Fleet off                                                           |
 
-| #   | From                                       | Command                                                                                                                  |
-| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| 1   | `terraform/ops-o11y/`                      | `direnv exec . tofu init && direnv exec . tofu apply`                                                                    |
-| 2   | anywhere                                   | wait for the node's first reboot: `ssh freecodecamp@<ipv4> cloud-init status --wait` until it prints `status: done`      |
-| 3   | `ansible/`                                 | the four `ansible-playbook` lines under Provision, each prefixed `INFRA_ADMIN=1 direnv exec . uv run`                     |
-| 4   | repo root                                  | `git push` the branch every Application pins                                                                             |
-| 5   | repo root                                  | the four lines under GitOps: `helm` bootstrap, namespace, Secret, root Application                                        |
-| 6   | repo root                                  | the CoreDNS restart and the `nslookup`, then the Verify section                                                           |
+Git layout under `k3s/ops-o11y/`:
 
-The kubeconfig lands at `k3s/ops-o11y/.kubeconfig.yaml` during line 3. Lines 5 and 6 fail with "no such file" from any other directory.
+| Path                                 | Owner                        | Content                                                                                                                                                               |
+| ------------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flux-system/`                       | hand-applied once, then Flux | `GitRepository/infra`, the three Flux Kustomizations                                                                                                                  |
+| `platform/`                          | Kustomization `platform`     | External Secrets, 1Password Connect, DigitalOcean CSI (vendored v4.18.0), cert-manager, Rancher                                                                       |
+| `cluster/coredns/`                   | Kustomization `cluster-dns`  | `coredns-custom` ConfigMap (ts.net forward)                                                                                                                           |
+| `apps/`                              | Kustomization `apps`         | namespace `o11y`; per app a `HelmRepository`, a `HelmRelease`, an `ExternalSecret`, and a `configMapGenerator` over `charts/<chart>/values.yaml` + `values-mgmt.yaml` |
+| `ops/`                               | hand-applied on demand       | `vmbackup-job.yaml`, `vmrestore-job.yaml`                                                                                                                             |
+| `apps/*/application.yaml`, `argocd/` | Argo CD, until T58 step 5    | delete in the step-5 commit, never before                                                                                                                             |
 
-## Topology, and why
-
-**Pull, not push.** `vmagent` is not deployed. VictoriaMetrics single-node scrapes the fleet directly through `-promscrape.config`, which the chart wires from `server.scrape.enabled`. The 80 production hosts run no agent that targets this node, so when this node dies the fleet does not notice. That is the accepted single point of failure, recorded deliberately: this node is not highly available.
-
-**One process, not two.** A separate `vmagent` would add a Deployment, a ConfigMap, an HTTP hop and a `remoteWrite` disk buffer. That buffer only protects against a dead remote endpoint, which cannot happen when agent and storage share one node. The fleet is ~98k active series against a documented single-node envelope of 50M+.
-
-**Service discovery, not a static list.** `linode_sd_configs` enumerates the estate from the Linode API every minute. A static target list was rejected: the estate has already drifted once, with 8 live VMs absent from infrastructure-as-code.
-
-**Addresses are rewritten, and the rewrite is enforced.** Linode SD sets `__address__` to the public IPv4, falling back to the private IPv4 on Linode's shared regional network. node_exporter binds Tailscale-only, so a relabel rule rewrites `__address__` to `<linode-label>.batfish-ray.ts.net:9100`. The Linode label is the Tailscale hostname on all 80 hosts. That rewrite is a `replace` gated on a non-empty label, so on any non-match it is a silent no-op that would leave a Linode-routable address in place — a final `keep` rule on `__address__` therefore drops any target that did not land on the tailnet. It fails closed.
-
-**This node monitors itself.** Two static jobs, `vmsingle` and `o11y-node`, sit alongside the discovered `node` job. This is not a retreat from service discovery: SD still enumerates the whole fleet, and these two targets are the one machine SD cannot find, because it is a DigitalOcean droplet that `linode_sd_configs` will never return. Without them the single point of failure is the only host invisible to the monitoring it runs, and every capacity alert below has no series to fire on.
+`values-mgmt.yaml` overrides only what the three-node cluster changes: the storage class, and for Grafana the alerting contact points and SMTP. `charts/<chart>/values.yaml` stays the shared base.
 
 ## Preconditions
 
-| #   | Requirement                                                                                                                         | Check                                              |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | `tofu` 1.12.x on PATH; `infra-secrets/tfstate/.env.enc` carries `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_ENDPOINT_URL_S3` (the R2 endpoint names the account, so it is not tracked); `do-universe/.env.enc` decrypts; R2 bucket `infra-tfstate` exists | `cd terraform/ops-o11y && direnv exec . tofu init` (fails with `lookup s3.auto.amazonaws.com` when the endpoint is missing) |
-| 2   | The token in `do-universe/.env.enc` belongs to the team that owns project `o11y`. A DigitalOcean token is scoped to one team, so the token alone decides where the droplet lands | `cd terraform/ops-o11y && direnv exec . sh -c 'DIGITALOCEAN_ACCESS_TOKEN=$DIGITALOCEAN_TOKEN doctl account get --format Team'` prints the intended team |
-| 3   | The vault's `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (auth keys live 1 to 90 days; minted 2026-09-06, rotate before 2026-12-05). Tags come from the play, not the key: `play-tailscale--1a-up.yml` passes `--advertise-tags` from `variable_tags`, default `tag:added-by-ops` | `test -n "$TAILSCALE_AUTH_KEY"` |
-| 4   | Tailnet ACL permits operator → node on tcp/6443                                                                                     | step 1 below fails without it                      |
-| 5   | `../tailscale-acls/policy.hujson` grants `tag:added-by-ops` → `tag:added-by-ops` on 9100 (merged as f5b3e36 and applied). The collector carries the same tag as the fleet | step 5 verification fails without it |
-| 6   | node_exporter v1.12.1 on the fleet, bound to the Tailscale address, port 9100                                                       | separate Ansible task; not this runbook            |
-| 7   | Linode API token, scopes `linodes:read_only` and `ips:read_only`                                                                    | mint at <https://cloud.linode.com/profile/tokens>  |
-| 8   | `helm` 3.14 or newer and `kubectl` on PATH                                                                                          | `helm version --short && kubectl version --client` |
-| 9   | The files under `k3s/ops-o11y/apps/` and `k3s/ops-o11y/argocd/` are pushed on the branch every Application pins (`feat/bare-metal` today, `main` after the merge); Argo CD reads GitHub, never a checkout | `git ls-remote --heads origin feat/bare-metal` prints a commit |
-| 10  | Root shell on the node, by Tailscale SSH grant or key                                                                               | `ssh root@ops-vm-o11y-k3s-fra1-01 true`            |
-| 11  | node_exporter v1.12.1 on this node too, bound to its Tailscale address, port 9100                                                   | separate Ansible task; step 5 counts it            |
+| #   | Requirement                                                                                                                                                                                                                                                                                                                                           | Check                                                                                                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `tofu` 1.12.x on PATH; `infra-secrets/tfstate/.env.enc` carries `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`; `do-universe/.env.enc` decrypts; bucket `infra-tfstate` exists                                                                                                                                                   | `cd terraform/ops-o11y && direnv exec . tofu init`                                                                              |
+| 2   | The `do-universe` token owns project `o11y`                                                                                                                                                                                                                                                                                                           | `cd terraform/ops-o11y && direnv exec . sh -c 'DIGITALOCEAN_ACCESS_TOKEN=$DIGITALOCEAN_TOKEN doctl account get --format Team'`  |
+| 3   | `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (minted 2026-09-06, rotate before 2026-12-05)                                                                                                                                                                                                                                                    | `test -n "$TAILSCALE_AUTH_KEY"` under `INFRA_ADMIN=1`                                                                           |
+| 4   | Tailnet ACL permits operator → nodes on tcp/6443, and `tag:added-by-ops` → `tag:added-by-ops` on 9100                                                                                                                                                                                                                                                 | the servers play, then the target count, fail without it                                                                        |
+| 5   | node_exporter v1.12.1 on the fleet and on every mgmt node, bound to the tailnet address                                                                                                                                                                                                                                                               | `play-o11y--node-exporter-0-install.yml`                                                                                        |
+| 6   | `helm` 3.14+, `kubectl`, `flux` v2.9.5 on PATH (`brew install fluxcd/tap/flux`); `flux` is optional, every `flux` line has a `kubectl` twin below                                                                                                                                                                                                     | `flux version --client`                                                                                                         |
+| 7   | Root shell on each node by Tailscale SSH grant                                                                                                                                                                                                                                                                                                        | `ssh root@ops-vm-o11y-k3s-fra1-01 true`                                                                                         |
+| 8   | The branch the GitRepository pins is pushed                                                                                                                                                                                                                                                                                                           | `git ls-remote --heads origin feat/bare-metal`                                                                                  |
+| 9   | 1Password: a Connect server for vault `infra`, its `1password-credentials.json` and access token, stored as `../infra-secrets/onepassword/1password-credentials.json.enc` and `OP_CONNECT_TOKEN` in `../infra-secrets/onepassword/.env.enc`                                                                                                           | `sops -d --input-type dotenv --output-type dotenv ../infra-secrets/onepassword/.env.enc \| grep -c OP_CONNECT_TOKEN` prints `1` |
+| 10  | 1Password items in vault `infra`: `mgmt-do-csi-token` (field `token`, a DigitalOcean token with block-storage write scope), `mgmt-linode-sd-token` (field `token`, scopes `linodes:read_only`, `ips:read_only`), `mgmt-grafana-alerting` (fields `GOOGLE_CHAT_WEBHOOK_URL`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `ALERT_EMAIL_TO`) | the three ExternalSecrets read `SecretSynced` after the platform Kustomization is Ready                                         |
+| 11  | An R2 bucket for VictoriaMetrics backups, with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `R2_BUCKET` in `../infra-secrets/o11y-backup/.env.enc`                                                                                                                                                                            | step 1 of the growth path fails without it                                                                                      |
+| 12  | The Rancher hostname is decided and resolves on the tailnet to the three node addresses (three A records in a zone you own, or one MagicDNS name for a single node)                                                                                                                                                                                   | `dig +short <hostname>` prints `100.x` addresses                                                                                |
 
-Precondition 11 is easy to skip. This node is the one host whose disk and memory the whole design turns on, and without its own node_exporter it is the only machine in the estate that the monitoring cannot see.
+Preconditions 9–12 are new for the three-node cluster and are the operator's to create. Preconditions 9, 10 and 11 name proposed envelope paths and item names; if you choose other names, change `platform/onepassword-connect/clustersecretstore.yaml`, the three `externalsecret.yaml` files and the step-1 line to match.
 
-Preconditions 4, 5, 6 and 11 are outside this repo. Confirm them before starting; each one fails late and looks like a different problem.
+## Fresh bringup
 
-Precondition 10 is easy to miss. Tailscale SSH refuses any identity the tailnet policy does not grant, and `/etc/rancher/k3s/k3s.yaml` is mode 0600 root-owned, so a non-root login needs `sudo cat` in step 1. Steps 1, 6, the disk-budget reading and teardown all need this shell.
+Use this order for a cluster built from nothing. For the growth of the live single node, use **Growth path (T58)** below instead; it interleaves these same commands with the data moves.
 
-## Provision
-
-The node is code. OpenTofu creates the droplet, its tag-attached firewall and the project link; Ansible joins the tailnet and installs K3s. Every line runs from the repo root.
+### 1. Droplets
 
 ```sh
 cd terraform/ops-o11y && direnv exec . tofu init && direnv exec . tofu apply && cd ../..
 ```
 
-`node_count` in `terraform/ops-o11y/variables.tf` sets the node total (default 1); node `NN` is named `ops-vm-o11y-k3s-<region>-NN`, and every node shares the tag, the firewall and the project link. `play-k3s--single-node.yml` requires exactly one host in `ops_o11y`, so a count above 1 needs `play-k3s--cluster.yml` and is outside this runbook. The droplet ignores later changes to `image`, `ssh_keys` and `user_data`, because each one replaces the node and its disk; a bump reaches new nodes only. Rebuild a node on purpose with `direnv exec . tofu apply -replace='digitalocean_droplet.ops_o11y["01"]'`, after the device is removed from the tailnet. The public IPv4 is static for the life of the droplet and changes only on such a replacement; nothing here depends on it, the tailnet name is the address.
+`node_count` (default 3) and `size` (default `s-4vcpu-16gb-amd`) live in `terraform/ops-o11y/variables.tf`. Node `NN` is `ops-vm-o11y-k3s-fra1-NN`. Every node shares the tag, the firewall and the project link. The firewall opens tcp/22 and udp/41641 from anywhere, and tcp/6443, tcp/2379-2380, tcp/10250, udp/8472 from droplets that carry the tag. The droplet ignores later changes to `image`, `ssh_keys` and `user_data`. Rebuild one node with `direnv exec . tofu apply -replace='digitalocean_droplet.ops_o11y["02"]'` after you remove its device from the tailnet.
 
-State lives in R2 (`infra-tfstate`, key `ops-o11y/terraform.tfstate`) with S3-native locking. On the first `apply` after a hand-built node, the tag `ops-o11y` may already exist in the account; delete it first (`doctl compute tag delete ops-o11y`) or `tofu import digitalocean_tag.ops_o11y ops-o11y`. Delete the old firewall too — DigitalOcean permits two firewalls with one name, and both would apply.
-
-The firewall opens tcp/22 and udp/41641 at create, so Ansible reaches the node over its public IPv4 at once. cloud-init upgrades the OS and reboots once; SSH refuses, opens, drops and opens again in the first three minutes. Wait for it before the first play:
+Wait for cloud-init on every new node:
 
 ```sh
-ssh freecodecamp@"$(cd terraform/ops-o11y && direnv exec . tofu output -json ipv4_addresses | jq -r '.["01"]')" sudo cloud-init status --wait
+for ip in $(cd terraform/ops-o11y && direnv exec . tofu output -json ipv4_addresses | jq -r '.[]'); do ssh freecodecamp@"$ip" sudo cloud-init status --wait; done
 ```
 
-Then, from `ansible/`. `direnv exec .` loads the DigitalOcean token for the inventory, `INFRA_ADMIN=1` adds the tailnet auth key, and `uv run` picks the pinned Ansible:
+### 2. Tailnet and K3s
+
+From `ansible/`:
 
 ```sh
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml          -e variable_host=ops_o11y
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml              -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--single-node.yml              -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y
 INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
-A second run of the single-node play must report `changed=0`; that is the idempotence proof, not more work.
+`play-k3s--servers.yml` reads the K3s version from the first host of the group when one runs, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). The first host gets `--cluster-init`; the others join it over the tailnet. The play installs the Gateway API CRDs v1.4.0, writes the Traefik `HelmChartConfig`, saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
 
-The advertised tags own the device, so the node joins as `ops-vm-o11y-k3s-fra1-01` with no key expiry. If a device of that name is still in the tailnet, remove it in the admin console first, or the node joins as `-1` and the MagicDNS name in `values.yaml` stops resolving. The single-node play writes `k3s/ops-o11y/.kubeconfig.yaml`; the node_exporter play covers precondition 11.
+`--limit` must always include the first host of the group; the play asserts it.
 
-## GitOps
-
-Argo CD runs on this node and owns every release from git. The bootstrap is one `helm` line, one Secret, and one `kubectl apply`. Run it from the repo root, not from `ansible/`, with `INFRA_ADMIN=1` in the environment, after the branch every Application pins is pushed.
+### 3. Flux
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install argocd argo-cd \
-  --repo https://argoproj.github.io/argo-helm --version 10.8.1 \
-  -n argocd --create-namespace \
-  -f k3s/ops-o11y/apps/argocd/charts/argo-cd/values.yaml
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux install --version=v2.9.5
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -k k3s/ops-o11y/flux-system
 ```
 
+Without the `flux` CLI, the first line is `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml`; the content is the same. `infra` is public, so the GitRepository carries no credential. This is the T62 decision: `flux install` plus committed sources, no `flux bootstrap`, pushes stay the operator's.
+
+### 4. Bootstrap secrets
+
+Three Secrets are not in git and Flux never creates them. Create them before the `platform` Kustomization can become Ready. Values reach `kubectl` through the environment or a temporary file outside the worktree; no line prints a value.
+
+1Password Connect credentials and token, in namespace `external-secrets`:
+
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl create namespace o11y --dry-run=client -o yaml \
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl create namespace external-secrets --dry-run=client -o yaml \
   | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
-```
-
-The Linode token is the one input Argo CD does not own. `LINODE_API_TOKEN` is in the environment from `global/.env.enc`; the temporary file holds the key name only, so the value reaches neither argv nor disk (a line with no `=` makes `kubectl` read that key from the environment).
-
-```sh
-umask 077; TOKEN_FILE=$(mktemp); printf 'LINODE_API_TOKEN\n' > "$TOKEN_FILE"
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y create secret generic vm-linode-sd \
-  --from-env-file="$TOKEN_FILE" --dry-run=client -o yaml \
+umask 077; CRED=$(mktemp)
+sops -d --output-type json ../infra-secrets/onepassword/1password-credentials.json.enc > "$CRED"
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n external-secrets create secret generic op-credentials \
+  --from-file=1password-credentials.json="$CRED" --dry-run=client -o yaml \
   | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
-rm -f "$TOKEN_FILE"
+rm -f "$CRED"
 ```
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/argocd/root.yaml
+set -a; eval "$(sops -d --input-type dotenv --output-type dotenv ../infra-secrets/onepassword/.env.enc)"; set +a
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n external-secrets create secret generic op-connect-token \
+  --from-literal=token="$OP_CONNECT_TOKEN" --dry-run=client -o yaml \
+  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
+unset OP_CONNECT_TOKEN
 ```
 
-`root` is the app of apps: it syncs every `k3s/ops-o11y/apps/*/application.yaml`, and each of those pins one chart version and takes its values from this repo. Argo CD adopts the namespace, the `coredns-custom` ConfigMap and its own helm-installed resources on the first sync. The Secret is not in git, so Argo CD never tracks it and never prunes it.
+Then watch the platform land in order: External Secrets → Connect → `ClusterSecretStore` → CSI (its token as an ExternalSecret) → cert-manager → Rancher.
 
-Argo CD applies the CoreDNS ConfigMap but cannot restart CoreDNS. Once the `cluster-dns` app is Synced, restart it and prove `ts.net` resolves from the pod network:
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n flux-system get kustomizations,gitrepositories
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get helmreleases -A
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get clustersecretstore onepassword
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get externalsecrets -A
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get storageclass
+```
+
+Every Kustomization and HelmRelease reads `Ready=True`; the store and every ExternalSecret read `Ready`; `do-block-storage` is `(default)`. The `rancher` HelmRelease is suspended in git until step 6 and reads `Suspended`.
+
+### 5. Apps and CoreDNS
+
+The `apps` Kustomization waits on `platform` and `cluster-dns`, so nothing here needs a hand. Restart CoreDNS once after the ConfigMap lands and prove `ts.net` resolves from the pod network:
 
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system rollout restart deployment coredns
@@ -128,22 +143,189 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system run dnscheck --r
   --image=busybox:1.37 -- nslookup ops-vm-o11y-k3s-fra1-01.batfish-ray.ts.net
 ```
 
-Rules of the road:
+Then the Verify section.
 
-- A change to a release is a change to its `values.yaml` on `main`. A manual `helm upgrade` is reverted by self-heal on the next reconcile.
-- If a values change breaks Argo CD itself, revert it in git first, then re-run the `helm` line above. The same values file feeds both.
-- Merging a PR that removes an `application.yaml` prunes that app's live resources. PR review is the gate.
-- The UI is <http://ops-vm-o11y-k3s-fra1-01:30080> over Tailscale. The `admin` password is in the `argocd-initial-admin-secret` Secret.
+### 6. Rancher
+
+Rancher is the last piece and is suspended in git until its hostname exists (precondition 12). Set `hostname` in `k3s/ops-o11y/platform/rancher/helmrelease.yaml`, remove `suspend: true`, commit, push, and reconcile:
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux reconcile kustomization platform --with-source
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n cattle-system rollout status deployment rancher --timeout=600s
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n cattle-system get gateway,httproute
+```
+
+The UI is `https://<hostname>:30443` over Tailscale. Traefik terminates TLS with the certificate cert-manager issued from the Rancher-generated CA (`ingress.tls.source: rancher`), so the browser warns once; import the CA from the `tls-rancher` Secret in `cattle-system` into your trust store. At the first login the page asks for the server URL; enter `https://<hostname>:30443`. The bootstrap password:
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n cattle-system get secret bootstrap-secret -o go-template='{{ .data.bootstrapPassword | base64decode }}{{ "\n" }}'
+```
+
+Rancher runs three replicas with required anti-affinity, one per node, so one node off keeps the UI up.
+
+## Growth path (T58)
+
+The live single node runs SQLite K3s, Argo CD, and `local-path` volumes on its root disk. This path grows it in place. `[H]` marks a line only the operator runs (Terraform, node changes, secrets); `[A]` marks a line an agent may run against the cluster. Do the steps in order; each has an exit check.
+
+### Step 1 `[H]` — back the data up
+
+Argo CD must not see this change; the Job lives outside `apps/*/application.yaml`. Create the R2 credential Secret from the envelope (precondition 11), run the backup Job on the current volume, and copy the two files that no backup tool covers.
+
+```sh
+set -a; eval "$(sops -d --input-type dotenv --output-type dotenv ../infra-secrets/o11y-backup/.env.enc)"; set +a
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y create secret generic vm-backup-r2 \
+  --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  --from-literal=AWS_ENDPOINT_URL_S3="$AWS_ENDPOINT_URL_S3" --from-literal=R2_BUCKET="$R2_BUCKET" \
+  --dry-run=client -o yaml | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL_S3 R2_BUCKET
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/ops/vmbackup-job.yaml
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y wait --for=condition=complete job/vmbackup --timeout=30m
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y logs job/vmbackup | tail -3
+```
+
+`vmbackup` asks VictoriaMetrics for a snapshot over HTTP and uploads it, so the database keeps running. The Job mounts the same `local-path` claim, which pins it to node 01.
+
+```sh
+mkdir -p k3s/ops-o11y/.backups && umask 077
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y cp "$(KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get pod -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')":/var/lib/grafana/grafana.db k3s/ops-o11y/.backups/grafana.db
+ssh root@ops-vm-o11y-k3s-fra1-01 'systemctl stop k3s && cp /var/lib/rancher/k3s/server/db/state.db /root/state.db.pre-etcd && systemctl start k3s'
+scp root@ops-vm-o11y-k3s-fra1-01:/root/state.db.pre-etcd k3s/ops-o11y/.backups/state.db.pre-etcd
+```
+
+`k3s/ops-o11y/.backups/` is gitignored. The stop-copy-start takes about 20 s of API outage and gives a consistent SQLite file.
+
+Exit check: the Job is `Complete`, `.backups/` holds both files, and `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y delete job vmbackup` leaves the namespace as it was.
+
+### Step 2 `[H]` — resize and add droplets
+
+```sh
+cd terraform/ops-o11y && direnv exec . tofu plan && direnv exec . tofu apply && cd ../..
+```
+
+The plan shows node 01 resized to `s-4vcpu-16gb-amd` in place (a power-off and on), nodes 02 and 03 created, and four firewall rules added. Nothing is destroyed; stop if the plan says otherwise. Wait for cloud-init on 02 and 03 (fresh-bringup step 1), then join them to the tailnet:
+
+```sh
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
+```
+
+Exit check: `tailscale status | grep ops-vm-o11y` lists three devices; `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get nodes` still shows one `Ready` node with 16 GB (`kubectl describe node … | grep memory:`).
+
+### Step 3 `[H]` — convert node 01 to etcd
+
+The servers play with `--limit` on node 01 alone rewrites its unit with `--cluster-init` and restarts K3s, which converts the SQLite datastore in place (docs.k3s.io/datastore/ha-embedded, "Existing single-node clusters"). The same run moves `--node-ip` to the VPC address and enables Traefik.
+
+```sh
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01
+```
+
+Exit check, in this order:
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get nodes -o wide
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd get applications
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get pvc
+ssh root@ops-vm-o11y-k3s-fra1-01 'k3s etcd-snapshot ls'
+```
+
+One `Ready` node whose `INTERNAL-IP` is now `10.110.0.2`; five Applications `Synced`; two PVCs `Bound`; one snapshot `play-1-servers-…`. If the Applications or the PVCs are missing, roll back and stop:
+
+```sh
+ssh root@ops-vm-o11y-k3s-fra1-01 'systemctl stop k3s && rm -rf /var/lib/rancher/k3s/server/db/etcd && cp /root/state.db.pre-etcd /var/lib/rancher/k3s/server/db/state.db && sed -i "s/--cluster-init //" /etc/systemd/system/k3s.service && systemctl daemon-reload && systemctl start k3s'
+```
+
+### Step 4 `[H]` — join 02, then 03
+
+One node per run, node 01 always in the limit. Each run saves a snapshot.
+
+```sh
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
+INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
+```
+
+Exit check: three `Ready` nodes at `v1.36.4+k3s1`; `k3s etcd-snapshot ls` on node 01 lists three `play-*` snapshots; `count(up{job="o11y-node"})` is 3 once the node_exporter play has run.
+
+### Step 5 `[A]` — remove Argo CD
+
+Argo CD's Applications carry a resources finalizer: deleting an Application with the controller running deletes everything it tracks. Stop the controller first, then strip the finalizers, then delete. The workloads stay.
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
+for app in root argocd cluster-dns grafana victoria-metrics; do
+  KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd patch application "$app" --type json -p '[{"op":"remove","path":"/metadata/finalizers"}]'
+done
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd delete applications --all
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm uninstall argocd -n argocd
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete namespace argocd
+```
+
+Then the git side, as one commit made now and not before: delete `k3s/ops-o11y/apps/*/application.yaml`, `k3s/ops-o11y/apps/argocd/` and `k3s/ops-o11y/argocd/`. A push of that deletion while Argo CD still runs prunes the live workloads.
+
+Exit check: `kubectl get ns argocd` reports not found; `kubectl -n o11y get statefulset,deployment` still lists VictoriaMetrics and Grafana.
+
+### Step 6 `[A]` for Flux, `[H]` for the secrets
+
+Fresh-bringup steps 3 and 4. Watch `platform` reach Ready; the `apps` Kustomization waits on it and does nothing yet.
+
+### Step 7 `[A]` — move the apps to Flux and block storage
+
+Argo CD wrote no Helm release Secrets, so Flux cannot adopt the running releases, and the StatefulSet's volume claim template cannot change class in place. Remove the old namespace with its `local-path` volumes, let Flux create the releases fresh on block storage, then restore.
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete namespace o11y
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux reconcile kustomization apps --with-source
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get pvc
+```
+
+Both PVCs are `Bound` on `do-block-storage`. Now stop VictoriaMetrics, restore, start:
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux suspend helmrelease victoria-metrics -n o11y
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y scale statefulset victoria-metrics-victoria-metrics-single-server --replicas=0
+```
+
+Re-create `vm-backup-r2` with the step-1 lines (the namespace was deleted), then:
+
+```sh
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/ops/vmrestore-job.yaml
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y wait --for=condition=complete job/vmrestore --timeout=30m
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y delete job vmrestore secret vm-backup-r2
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y scale statefulset victoria-metrics-victoria-metrics-single-server --replicas=1
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux resume helmrelease victoria-metrics -n o11y
+```
+
+The `kubectl` twins of the `flux` lines are `kubectl -n o11y patch helmrelease victoria-metrics --type merge -p '{"spec":{"suspend":true}}'` and the same with `false`. Grafana: copy the database back and restart the pod.
+
+```sh
+GRAFANA_POD=$(KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get pod -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y cp k3s/ops-o11y/.backups/grafana.db "$GRAFANA_POD":/var/lib/grafana/grafana.db
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y rollout restart deployment grafana
+```
+
+Exit check: `count(up{job="node"})` reads the same value as before step 1 (80 at the time of writing), a query over the last 7 days returns history, and Grafana shows the same dashboards and admin login.
+
+### Step 8 `[H]` — Rancher and alerting
+
+Fresh-bringup step 6 for Rancher. Grafana alerting is already provisioned by `apps/grafana/values-mgmt.yaml` from the `grafana-alerting` ExternalSecret: contact points `ops-chat` (Google Chat) and `ops-email`, a default policy to chat, `severity=page` also to email. Send a test notification from **Alerting → Contact points** for both.
+
+Then the T58 verify list: Rancher UI up with one droplet powered off (`doctl compute droplet-action power-off <id>`, then on); every HelmRelease Ready; the fleet count unchanged; `k3s etcd-snapshot ls` shows three `play-*` snapshots.
+
+### Rename
+
+The name `ops-o11y` stays through T58. A rename to `mgmt` touches the droplet names, the tailnet devices, the DO tag and firewall, the inventory group, `k3s/ops-o11y/`, the Terraform state key and this runbook; do it as its own commit after Rancher has imported `prd` and `stg` (T12), when the name is worth its cost, or never.
 
 ## Verify
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd get applications
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get deploy grafana -o jsonpath='{.status.readyReplicas}{"\n"}'
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get secret vm-linode-sd -o jsonpath='{.metadata.name}{"\n"}'
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get nodes -o wide
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n flux-system get kustomizations
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get helmreleases -A
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get externalsecrets -A
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get pvc
 ```
 
-Every Application reads `Synced` and `Healthy`, Grafana reports `1`, and the Secret is still there. Then the fleet count. The expected number comes from the inventory, not from discovery, so a half-working service discovery cannot pass its own check:
+Three `Ready` nodes; every Kustomization and HelmRelease `Ready`; every ExternalSecret `SecretSynced`; PVCs on `do-block-storage`. Then the fleet count against the inventory:
 
 ```sh
 (cd ansible && ansible-inventory -i inventory/linode.yml --list | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["_meta"]["hostvars"]))')
@@ -151,430 +333,49 @@ KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y exec statefulset/victor
   wget -qO- 'http://127.0.0.1:8428/api/v1/query?query=count(up{job="node"}==1)'
 ```
 
-The two numbers match. Step 5 below reads the same target list in more detail.
+The two numbers match. The target-list detail, the label sanity check and the failure table from the single-node era are unchanged: port-forward 8428 and read `/api/v1/targets` (expect `node` 80, `o11y-node` 3, `vmsingle` 1, `dropped` 0, `off-tailnet` 0).
 
-## Steps
+Grafana: <http://ops-vm-o11y-k3s-fra1-01:30300> over Tailscale, or any node's name. The admin password is generated into the `grafana` Secret on first install and reused on every upgrade; the step-7 database copy carries the old password.
 
-> **The plays and Argo CD are the mechanism. These steps are the explanation and the fallback.**
->
-> `play-k3s--single-node.yml` bootstraps the node and writes the kubeconfig, superseding
-> **step 1** and **step 6** — do not apply step 6's config block by hand, because the play
-> owns `/etc/rancher/k3s/config.yaml` and will revert it. Argo CD reconciles CoreDNS and
-> every release, superseding **steps 2, 4, 7** and **9**; a manual `helm upgrade` is
-> reverted by self-heal. Step 3 is the bootstrap Secret. VictoriaLogs ships by adding an
-> `application.yaml` for it, not by a flag.
->
-> **Step 5 needs the fleet rollout.** Nothing has `node_exporter` until
-> `play-o11y--node-exporter-0-install.yml` has run on the fleet. Expect every fleet target
-> down before then.
->
-> Read the steps below to understand what the mechanism does, to verify afterwards, or to
-> recover by hand when it cannot run.
+## Storage and backups
 
-### 1. Kubeconfig
+Block storage volumes follow the pod to any node, which is what makes a node loss survivable. Retention is still the guard: `--retentionPeriod=12` and `--storage.minFreeDiskSpaceBytes=20GB` on a 50 Gi volume. Grow the claim in `values-mgmt.yaml` (`server.persistentVolume.size`); the CSI resizes the volume online.
 
-The kubeconfig is not in git and there is no sops envelope for this cluster. Pull it off the node and rewrite the server address to the tailnet IP.
+Backups are `vmbackup` to R2 by the Job in `ops/`, run by hand before every risky change; a schedule is a follow-up (VictoriaMetrics' scheduled `vmbackupmanager` is enterprise-only). The etcd snapshots are local to the nodes; `etcd-s3` to a bucket is a follow-up too. Read the disk after seven and thirty days:
 
 ```sh
-umask 077
-ssh root@ops-vm-o11y-k3s-fra1-01 cat /etc/rancher/k3s/k3s.yaml > k3s/ops-o11y/.kubeconfig.yaml
-NODE_IP=$(tailscale ip -4 ops-vm-o11y-k3s-fra1-01)
-sed -i '' "s|server: https://127.0.0.1:6443|server: https://${NODE_IP}:6443|" k3s/ops-o11y/.kubeconfig.yaml
-chmod 600 k3s/ops-o11y/.kubeconfig.yaml
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y exec statefulset/victoria-metrics-victoria-metrics-single-server -- df -h /storage
 ```
-
-On Linux drop the `''` after `sed -i`.
-
-Verify:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get nodes -o wide
-```
-
-One `Ready` node. Record its `INTERNAL-IP` — step 6 needs to know whether it is the tailnet address.
-
-### 2. CoreDNS forwards ts.net
-
-Scrape targets are MagicDNS names, so the cluster resolver must forward `ts.net` to the Tailscale resolver. K3s imports this optional ConfigMap into its managed Corefile. The `cluster-dns` Application owns it; these lines are the hand fallback.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f k3s/ops-o11y/cluster/coredns/coredns-custom.yaml
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system rollout restart deployment coredns
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system rollout status deployment coredns --timeout=120s
-```
-
-Prove resolution works from inside the pod network before deploying anything that depends on it:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system run dnscheck --rm -it --restart=Never \
-  --image=busybox:1.37 -- nslookup ops-vm-o11y-k3s-fra1-01.batfish-ray.ts.net
-```
-
-Expect a `100.x.y.z` answer. If it fails, see **Fallback: pod cannot reach the tailnet** below. Do not continue past this point on a failure — every target will be down.
-
-Now prove the whole scrape path in one shot, against any fleet host. This turns a precondition 3 or 4 failure into an error here rather than into "80 targets down" at step 5:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system run scrapecheck --rm -it --restart=Never \
-  --image=busybox:1.37 -- wget -qO- --timeout=5 http://prd-vm-oldeworld-clt-eng-0.batfish-ray.ts.net:9100/metrics
-```
-
-Expect node_exporter's `# HELP` preamble. A hang or refusal means the tailnet ACL does not permit node → fleet on tcp/9100, or node_exporter is not installed on that host yet.
-
-### 3. Namespace and the Linode token
-
-All three releases share the `o11y` namespace.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl create namespace o11y --dry-run=client -o yaml \
-  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
-```
-
-The token never enters git and never reaches disk. Read it into the shell, hand it to `kubectl` through a file that holds the key name only, then drop both.
-
-```sh
-umask 077
-read -rs LINODE_API_TOKEN && export LINODE_API_TOKEN
-TOKEN_FILE=$(mktemp)
-printf 'LINODE_API_TOKEN\n' > "$TOKEN_FILE"
-```
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y create secret generic vm-linode-sd \
-  --from-env-file="$TOKEN_FILE" --dry-run=client -o yaml \
-  | KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl apply -f -
-```
-
-```sh
-rm -f "$TOKEN_FILE"; unset LINODE_API_TOKEN
-```
-
-A line with no `=` makes `kubectl` take that key's value from the environment (`kubectl` `pkg/cmd/util/env_file.go`), so the temporary file contains a key name and nothing else.
-
-Never write the value to a file inside the worktree; `k3s/ops-o11y/.gitignore` catches the usual names, but a committed credential is one careless add away. There is deliberately no secure-erase step here: no file ever holds the value. The only real erase is revoking the token at <https://cloud.linode.com/profile/tokens>.
-
-The Secret key `LINODE_API_TOKEN` becomes the mounted filename. The scrape config reads `/etc/vm/secrets/LINODE_API_TOKEN`; renaming the key silently breaks service discovery.
-
-Confirm the key name without printing the value:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y describe secret vm-linode-sd
-```
-
-Expect one entry, `LINODE_API_TOKEN`, with a byte count.
-
-### 4. VictoriaMetrics
-
-The `victoria-metrics` Application owns this release; the line below is the hand fallback and self-heal reverts it.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install victoria-metrics victoria-metrics-single \
-  --repo https://victoriametrics.github.io/helm-charts --version 0.45.0 \
-  -n o11y \
-  -f k3s/ops-o11y/apps/victoria-metrics/charts/victoria-metrics-single/values.yaml
-```
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y rollout status statefulset victoria-metrics-victoria-metrics-single-server --timeout=300s
-```
-
-Chart 0.45.0 ships appVersion v1.150.0; `server.image.tag` pins the running binary to v1.151.0. `linode_sd_configs` needs v1.150.0 or newer, so there is no downgrade path below this chart generation.
-
-Confirm the tag and the retention flags:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get statefulset victoria-metrics-victoria-metrics-single-server \
-  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}{range .spec.template.spec.containers[0].args[*]}{@}{"\n"}{end}'
-```
-
-Expect `victoriametrics/victoria-metrics:v1.151.0`, `--retentionPeriod=12`, `--storage.minFreeDiskSpaceBytes=20GB`, `--storage.maxDailySeries=500000`, `--search.maxConcurrentRequests=2`, `--search.maxMemoryPerQuery=512MB`, `--search.logQueryMemoryUsage=256MB` and `--promscrape.config=/scrapeconfig/scrape.yml`.
-
-The query bounds are deliberate and they are visible to users. Two concurrent queries at 512 MB each caps the query term at ~1 GB inside a 3Gi limit that also holds ~1.8 GiB of cache. A wide dashboard that fires more than two panels at once queues (`-search.maxQueueDuration`, default 10s) and then returns 503. If that becomes routine, raise `search.maxConcurrentRequests` one step at a time and watch memory — do not remove the bound. `--storage.maxDailySeries=500000` drops new series beyond that count in a rolling 24 hours and logs each drop; it is a runaway guard against veth churn, not a tuning knob, and ~98.4k active series sits far below it.
-
-### 5. Verify the targets are up
-
-Service discovery is lazy about auth: a wrong token gives a running pod with zero targets and no crash. Count the targets explicitly, and prove every fleet target resolved onto the tailnet.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y port-forward svc/victoria-metrics-victoria-metrics-single-server 8428:8428 &
-PF_PID=$!
-sleep 3
-```
-
-```sh
-curl -s http://127.0.0.1:8428/api/v1/targets | python3 -c '
-import json,sys,collections
-d=json.load(sys.stdin)["data"]
-t=d["activeTargets"]
-print("by job:", dict(sorted(collections.Counter(x["labels"]["job"] for x in t).items())))
-print("health:", dict(collections.Counter(x["health"] for x in t)))
-print("dropped:", len(d["droppedTargets"]))
-for x in t:
-    if x["health"] != "up":
-        print("  DOWN", x["labels"].get("instance"), x.get("lastError","")[:120])
-bad=[x for x in t if x["labels"]["job"] == "node" and ".batfish-ray.ts.net:9100" not in x["scrapeUrl"]]
-print("off-tailnet:", len(bad), [x["scrapeUrl"] for x in bad][:5])
-'
-```
-
-Expect `by job: {'node': 80, 'o11y-node': 1, 'vmsingle': 1}`, `health: {'up': 82}`, `dropped: 0` and `off-tailnet: 0`.
-
-`off-tailnet` proves the invariant is armed rather than catching a leak: Linode SD hands out the public IPv4, a relabel rule rewrites it to the tailnet name, and a final `keep` rule drops any target that rewrite missed. A miss therefore shows up as a _missing_ target and a non-zero `dropped` count, never as a scrape over a Linode-routable path.
-
-Sanity-check the label set that the relabel rules produce:
-
-```sh
-curl -s 'http://127.0.0.1:8428/api/v1/query?query=count%20by%20(role)%20(up%7Bjob%3D%22node%22%7D)'
-```
-
-That is `count by (role) (up{job="node"})`. Expect `clt` 48, `api` 12, `nws` 7, `jms` 6, `pxy` 6, `backoffice` 1. The job filter keeps this node's own two targets out of the fleet counts. Then stop the forward:
-
-```sh
-kill "$PF_PID"
-```
-
-**Reading a failure:**
-
-| Symptom                                       | Cause                                                                                                                                                                   |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| no `node` targets                             | Token wrong, expired, or missing the `ips:read_only` scope. Query `vm_promscrape_discovery_linode_failures_total` — the `vmsingle` self-scrape job stores it.           |
-| 80 `node` targets, all down, `no such host`   | Step 2 did not take. Re-run the `nslookup` check.                                                                                                                       |
-| 80 `node` targets down, refused or timing out | Tailnet ACL blocks node → fleet tcp/9100, or node_exporter is not installed yet (precondition 3 or 4).                                                                  |
-| Fewer than 80 `node` targets, `dropped: 0`    | Real estate drift. That is the discovery working, not a fault.                                                                                                          |
-| Fewer than 80 `node` targets, `dropped` > 0   | The tailnet `keep` rule removed a target whose Linode label was empty, so `__address__` was never rewritten. Read `droppedTargets[].discoveredLabels` in the same JSON. |
-| `o11y-node` down, the 80 fleet targets up     | Precondition 11 — node_exporter is not on this node yet. Expected on a first run before the Ansible task has covered it.                                                 |
-
-### 6. Node config — NodePort binding and reserved memory
-
-Two node-level settings that no Helm value can carry: pin which node IPs a NodePort binds, and stop the scheduler treating k3s itself as free memory.
-
-Create or edit `/etc/rancher/k3s/config.yaml` on the node — the node was installed with CLI flags, so the file may not exist yet — and add both blocks:
-
-```yaml
-kube-proxy-arg:
-  - "nodeport-addresses=100.64.0.0/10"
-kubelet-arg:
-  - "system-reserved=cpu=500m,memory=1.5Gi"
-```
-
-```sh
-ssh root@ops-vm-o11y-k3s-fra1-01 systemctl restart k3s
-```
-
-Set `nodeport-addresses` even if the node's `INTERNAL-IP` is already the tailnet address. kube-proxy has no default for it; when unset, NodePort connections are accepted on every local IP in every proxy backend (kube-proxy 1.36, `cmd/kube-proxy/app/options.go`). Setting it is the only thing that restricts the binding. The DigitalOcean firewall (UDP 41641 only) is the outer control; this is defence in depth.
-
-`system-reserved` reserves capacity the scheduler may not hand to pods. k3s sets no reservation of its own, so without this the k3s server, containerd and the kubelet are invisible to scheduling on a node whose whole risk is that it is one node. This only shrinks allocatable — the default `enforceNodeAllocatable` is `pods` alone, so nothing puts the k3s process itself under a new cgroup limit.
-
-Verify both took. NodePort first — `ss -lntp` cannot answer this, because modern kube-proxy opens no listening socket for a NodePort. Read the proxy rules directly; this node's backend is whichever k3s v1.36.4 chose, so try both and expect the `100.64.0.0/10` destination match in one of them:
-
-```sh
-ssh root@ops-vm-o11y-k3s-fra1-01 'iptables-save -t nat | grep -A2 KUBE-NODEPORTS'
-ssh root@ops-vm-o11y-k3s-fra1-01 'nft list table ip kube-proxy | grep -i nodeport'
-```
-
-Then the reservation:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl describe node ops-vm-o11y-k3s-fra1-01 | grep -A8 -E '^(Capacity|Allocatable)'
-```
-
-Allocatable memory must sit exactly 1.5 GiB below Capacity. Nothing else is subtracted: k3s v1.36.4 sets `EvictionHard` to `imagefs.available: 5%` and `nodefs.available: 5%` only (`pkg/daemons/agent/agent.go`), and that map _replaces_ the kubelet default, so there is no `memory.available` threshold to reserve. Before this change the two figures are therefore identical — if they still are, the restart did not pick the file up.
-
-### 7. Grafana
-
-The `grafana` Application owns this release; the line below is the hand fallback and self-heal reverts it.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install grafana grafana \
-  --repo https://grafana-community.github.io/helm-charts --version 13.1.0 \
-  -n o11y \
-  -f k3s/ops-o11y/apps/grafana/charts/grafana/values.yaml
-```
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y rollout status deployment grafana --timeout=300s
-```
-
-`--repo` is mandatory. The `grafana` chart in `grafana/helm-charts` was deprecated at 10.5.15 and moved to `grafana-community`; a stale local `grafana` repo alias silently installs the old one.
-
-No admin password is set anywhere. The chart generates one into the `grafana` Secret on first install and reuses the existing value on every later upgrade, so the credential never enters git and never rotates underneath you. Read it once, store it in the team password manager, and do not delete that Secret — deleting it regenerates the password on the next upgrade.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y get secret grafana \
-  -o go-template='{{ index .data "admin-password" | base64decode }}'
-```
-
-### 8. Reach the UI
-
-<http://ops-vm-o11y-k3s-fra1-01:30300> — over Tailscale, plain HTTP inside the WireGuard tunnel. Log in as `admin` with the password from step 7.
-
-Both datasources are provisioned from values, so no clicking is needed:
-
-- **VictoriaMetrics** (default) — type `prometheus`, no plugin. VictoriaMetrics serves a Prometheus-compatible API. This trades MetricsQL-only syntax for zero plugin dependency.
-- **VictoriaLogs** — type `victoriametrics-logs-datasource`, plugin pinned at 0.31.0 and downloaded at pod start. It stays red until step 9 runs. That is expected.
-
-Confirm the metrics datasource is live: **Connections → Data sources → VictoriaMetrics → Save & test**. Then graph `count(up{job="node"})` and expect 80, and `count(up)` and expect 82 — the extra two are this node's own node_exporter and vmsingle itself.
-
-If Grafana crash-loops on start, the plugin download failed — the pod needs egress to `grafana.com`. Remove the `plugins` block and the VictoriaLogs datasource from values, redeploy, and restore both when step 9 runs.
-
-Now prove step 6 held, from the node itself. The first must fail and the second must succeed:
-
-```sh
-ssh root@ops-vm-o11y-k3s-fra1-01 'PUB=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address); TS=$(tailscale ip -4); \
-  curl -s -o /dev/null -w "public %{http_code}\n" --max-time 5 "http://$PUB:30300"; \
-  curl -s -o /dev/null -w "tailnet %{http_code}\n" --max-time 5 "http://$TS:30300"'
-```
-
-Expect the public probe to time out or refuse and the tailnet probe to return `302` or `200`. A `200` on the public address means the NodePort is answering on the public interface and the DigitalOcean firewall is the only thing between a Grafana admin login and the internet — go back to step 6.
-
-### 9. VictoriaLogs — deferred, optional
-
-**Do not run this on day one.** Check memory headroom before you do anything else here — this step adds a 1Gi limit on a node that already carries 3Gi for VictoriaMetrics and 512Mi for Grafana, against roughly 6.2 GiB allocatable after step 6's reservation:
-
-```sh
-ssh root@ops-vm-o11y-k3s-fra1-01 'free -m'
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl top node ops-vm-o11y-k3s-fra1-01
-```
-
-The `available` column of `free -m` must read at least 1500. If it does not, this step trades the metrics database for logs on a node with no replica — stop and reduce the VictoriaMetrics limit first, or do not run this step.
-
-VictoriaLogs has no pull mode. Every ingestion path is an agent on the source host pushing into this node, which re-creates exactly the topology rejected for metrics: 80 agents buffering to local disk against a dead endpoint. Shipping fleet logs is a separate operator decision about the accepted single point of failure, not a config change.
-
-Run it only after VictoriaMetrics has produced a real disk-growth curve, and only when the log source is decided. Ship it by adding `k3s/ops-o11y/apps/victoria-logs/application.yaml` on the pattern of the other two; the line below is the hand fallback.
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm upgrade --install victoria-logs victoria-logs-single \
-  --repo https://victoriametrics.github.io/helm-charts --version 0.13.9 \
-  -n o11y \
-  -f k3s/ops-o11y/apps/victoria-logs/charts/victoria-logs-single/values.yaml
-```
-
-The values set `retentionMaxDiskUsagePercent: 80` and deliberately leave `retentionDiskSpaceUsage` empty. The two are mutually exclusive — setting both makes VictoriaLogs refuse to start — and percent is chosen _because_ it measures the whole filesystem holding `-storageDataPath`. Both databases share the 160 GB root disk, and VictoriaMetrics stops accepting writes at `--storage.minFreeDiskSpaceBytes=20GB`. At 80% used VictoriaLogs begins dropping its oldest per-day partitions with ~32 GB still free, comfortably above that floor, so logs yield before metrics ingestion stops. A bytes-only cap would have given VictoriaLogs no awareness of the filesystem at all.
-
-Accept the trade knowingly: the percent cap counts _total_ filesystem usage, not VictoriaLogs' share. If VictoriaMetrics data and its index alone ever push the disk past 80%, VictoriaLogs deletes every partition it has and still does not clear the threshold. That is the intended priority — metrics outrank logs — but it should not be a surprise when it happens.
-
-## Disk budget
-
-The 160 GB root filesystem is shared by the OS, containerd and both databases. `local-path` ignores PVC capacity, so the PVC sizes below are the design expectation, not enforcement. The real guards are the retention flags, and one of the four rows is a reservation rather than a consumer.
-
-| Consumer / reservation             | Setting                                        | Budget  | Guard                                                                              |
-| ---------------------------------- | ---------------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
-| VictoriaMetrics                    | `retentionPeriod: 12`, PVC `50Gi`              | 53.7 GB | `--storage.minFreeDiskSpaceBytes=20GB` stops ingestion before full                 |
-| VictoriaLogs                       | `retentionMaxDiskUsagePercent: 80`, PVC `32Gi` | 34.4 GB | the percent flag, not the PVC — see below                                          |
-| Grafana                            | `persistence 2Gi`                              | 2.1 GB  | none needed                                                                        |
-| OS + containerd + k3s              | —                                              | ~20 GB  | —                                                                                  |
-| VictoriaMetrics free-space reserve | `--storage.minFreeDiskSpaceBytes=20GB`         | 20 GB   | space nothing may ever occupy; it must be in the sum, not only in the Guard column |
-
-That totals ~130.2 GB of 160 GB, leaving ~30 GB of real margin.
-
-The VictoriaLogs row is a budget, not a ceiling. The percent guard fires on total filesystem usage, so VictoriaLogs can legitimately grow past 32 GiB while the disk is quiet and will be forced back below it once metrics grow. Do not read `kubectl get pvc` as a capacity statement.
-
-~98,400 active series at a 60s interval is ~1,640 samples/s, ~142M samples/day. 12 months retention means up to 13 months on disk. At 0.75 B/sample that is ~42 GB of _samples_ — and zero bytes of inverted index. The index is the part nobody budgets: `-retentionTimezoneOffset` documents that indexdb rotation happens once per `-retentionPeriod`, so at 12 months the index rotates once a year and the previous generation is held alongside the current one. Every unique series minted in that window stays indexed for up to two years, and the Docker Swarm hosts mint series that never repeat — veth device names are per container instance, so each deploy adds ~35 series that never merge back.
-
-**Measure before extending, and measure the index separately.** Take a reading after seven days and again after thirty:
-
-```sh
-ssh root@ops-vm-o11y-k3s-fra1-01 'df -h /; du -sh /var/lib/rancher/k3s/storage/*; du -sh /var/lib/rancher/k3s/storage/*/data/indexdb'
-```
-
-Graph `vm_indexdb_items_added_size_bytes_total` alongside it — the `vmsingle` self-scrape job stores it.
-
-Extending `retentionPeriod` on existing data is safe and is the intended path once real numbers exist. Do not raise it speculatively, and note what the blocker actually is: not the sample term, which is arithmetic and already known, but index growth under veth churn. Thirty days of readings sample the first month of a 365-day monotonic index curve and cannot extrapolate to a 13-month figure. Only a full rotation cycle answers it. `--storage.maxDailySeries=500000` is the runaway guard in the meantime; it drops and logs excess new series rather than letting churn take the disk.
-
-### Disk full
-
-If the filesystem does fill, the node cannot recover on its own. This is worth stating plainly because the usual Kubernetes safety net does not apply here.
-
-The kubelet reclaims _node-level_ resources under disk pressure — it deletes unused images and evicts pods. PersistentVolume bytes under `/var/lib/rancher/k3s/storage/` are neither ephemeral storage nor reclaimable that way. k3s sets `nodefs.available: 5%` rather than the kubelet's own default, so the taint lands at ~8 GB free on this filesystem, and `EvictionMinimumReclaim` then asks for another 10% the kubelet cannot take from a PV. The node taints `DiskPressure:NoSchedule`, deletes images, evicts pods, and the pressure never clears, because evicting a database pod frees none of that database's bytes. That 5% is not a safety net on this node.
-
-Ordered by free space on the 160 GB filesystem, the guards fire like this: at 32 GB free VictoriaLogs drops its oldest partitions (80% used); at 20 GB free VictoriaMetrics goes read-only and metrics ingestion stops; at 8 GB free the kubelet declares DiskPressure and cannot fix it; at 0 the SQLite datastore behind k3s and containerd start taking ENOSPC. Only the first two are recoveries; the last two are damage.
-
-VictoriaMetrics clears its own read-only state only when free space rises, which means waiting for a monthly partition delete up to a month away, and only if it was the filler. The exits are manual: shell in and delete per-day partition directories under the storage path, or delete the PVC and lose the history. Catch it earlier with the capacity alerts under Known limits.
-
-## Fallback: pod cannot reach the tailnet
-
-If step 2's `nslookup` fails, CoreDNS cannot reach `100.100.100.100` from the pod network. Diagnose before changing the design:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system logs deployment/coredns --tail=50
-```
-
-```sh
-ssh root@ops-vm-o11y-k3s-fra1-01 'ip route get 100.100.100.100; tailscale status --peers=false'
-```
-
-If the node itself resolves and the pod does not, the gap is flannel masquerading pod traffic onto `tailscale0`. The escape hatch is to move the scrape into the host network namespace, which means swapping this design for a `vmagent` DaemonSet writing into VictoriaMetrics:
-
-- Deploy `victoria-metrics-agent` 0.46.0 with `mode: daemonSet`, `hostNetwork: true`, `dnsPolicy: ClusterFirstWithHostNet`, `image.tag: v1.151.0`, and this repo's `scrape_configs` moved under `config`. That chart mounts the scrape config at a different path: `/config/scrape/scrape.yml`.
-- `hostNetwork: true` renders **only** when `mode: daemonSet`. In `deployment` or `statefulSet` the chart drops it with no error and no warning.
-- Set `extraArgs.httpListenAddr: "127.0.0.1:8429"`. With `hostNetwork` the agent would otherwise bind 8429 on the public interface.
-- Turn off `server.scrape.enabled` in the VictoriaMetrics values and point the agent's `remoteWrite` at `http://victoria-metrics-victoria-metrics-single-server.o11y.svc:8428/api/v1/write`.
-- The `o11y-node` job moves across unchanged. The `vmsingle` job does not: `127.0.0.1:8428` is the vmsingle pod only from inside that pod, and under `hostNetwork` it resolves to the node. Re-target it at the vmsingle Service, or self-monitoring silently disappears along with every capacity alert below.
-
-Take this branch only on evidence. It is strictly more moving parts.
 
 ## Teardown
 
-Deleting the root Application cascades through its finalizer: every child Application and every resource they track goes with it. The VictoriaMetrics PVC comes from a StatefulSet template, so it survives; the Grafana PVC is a chart resource, so it is deleted with the app.
+Suspend Flux, remove the releases, then the droplets. PVCs on block storage are deleted with the namespace; the R2 backup is the only copy after that.
 
 ```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n argocd delete application root
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml helm uninstall argocd -n argocd
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux suspend kustomization apps platform cluster-dns
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete -k k3s/ops-o11y/flux-system
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml flux uninstall
+cd terraform/ops-o11y && direnv exec . tofu destroy && cd ../..
 ```
 
-Stop here for a redeploy that keeps metrics history. Re-running the GitOps section reattaches the same VictoriaMetrics volume.
-
-To destroy the data as well:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y delete pvc \
-  server-volume-victoria-metrics-victoria-metrics-single-server-0 \
-  server-volume-victoria-logs-victoria-logs-single-server-0 \
-  grafana --ignore-not-found
-```
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n o11y delete secret vm-linode-sd --ignore-not-found
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl delete namespace o11y
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system delete configmap coredns-custom --ignore-not-found
-```
-
-Then revert the node changes: remove both the `kube-proxy-arg` and the `kubelet-arg` blocks from `/etc/rancher/k3s/config.yaml`, restart k3s, and revoke the Linode API token at <https://cloud.linode.com/profile/tokens>. Revocation is the only real erase — deleting the Secret does not invalidate the credential.
-
-If the Hetzner estate has joined by then, its Robot credentials are a separate credential with a separate revocation path: retire them at <https://robot.hetzner.com> as well. They are higher value than a read-only Linode token.
-
-To remove the node itself, destroy it from the root that created it, then delete the device in the tailnet admin console:
-
-```sh
-cd terraform/ops-o11y && tofu destroy && cd ../..
-```
-
-Confirm nothing survives:
-
-```sh
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get pvc -A
-KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get ns o11y
-```
+Delete the three devices in the tailnet admin console, then revoke the tokens: the DigitalOcean CSI token and the Linode token in 1Password, and the R2 key. Revocation is the only real erase.
 
 ## Known limits
 
-- **Not highly available.** One node, no replicas, no PodDisruptionBudgets. A node loss stops collection and the gap is permanent. Recorded operator decision.
-- **History lives on the root disk.** `local-path` volumes are directories on the node. A rebuild from code restores every definition and no data.
+- **VictoriaMetrics and Grafana are one replica each.** A node loss reschedules them onto another node with the same volume; expect a gap of a few minutes, not a lost history. The fleet does not notice a dead collector, which is still the accepted trade.
+- **Rancher's hostname is a value in git.** It carries the port `30443`, because Traefik is a NodePort on the tailnet. Do not open 443 on the firewall to remove the port; the tailnet-only posture is the design.
 - **The tailnet suffix is hard-coded** as `batfish-ray.ts.net` in the VictoriaMetrics values. A tailnet rename breaks all 80 targets at once.
-- **Linode label must equal the Tailscale hostname.** True for all 80 today. A rebuilt host that re-registers under a name collision becomes `<name>-1`, and its target then fails at DNS while its Linode label is unchanged. Worth a nightly drift check comparing Linode labels against tailnet peer names.
-- **A powered-off Linode stays a target** and reports `up=0`. That is the host-down signal. There is deliberately no `drop` rule on `__meta_linode_status`, because dropping would make a broken host vanish from the dashboard instead of alerting.
-- **No alerting is deployed.** `vmalert` and a notifier are not part of this bringup. Capacity is the whole risk on a node with no replica, so write the capacity rules first. All five need the `vmsingle` and `o11y-node` self-scrape jobs, which is why they exist.
-  1. `vm_storage_is_read_only == 1` — metrics ingestion has already stopped. Page on this.
-  2. `vm_free_disk_space_bytes < 1.5 * vm_free_disk_space_limit_bytes` — the warning before that floor.
-  3. `node_filesystem_avail_bytes{instance="ops-vm-o11y-k3s-fra1-01",mountpoint="/"} / node_filesystem_size_bytes{instance="ops-vm-o11y-k3s-fra1-01",mountpoint="/"} < 0.25` — the whole filesystem, including anything that is not a database.
-  4. `vm_promscrape_discovery_linode_failures_total > 0` — service discovery is failing; the target list is going stale.
-  5. `count(up{job="node"}) < 75` — the fleet, or the tailnet path to it, is degraded.
-- **Only NodePort is pinned to the tailnet.** k3s binds the API server (tcp/6443) and the kubelet (tcp/10250) on `0.0.0.0` by default, and those are the highest-value ports on the node — step 1 copies a cluster-admin kubeconfig off 6443. The DigitalOcean firewall is their only control today. A host firewall permitting 6443 and 10250 from `100.64.0.0/10` only is the non-breaking way to add a second layer. Do not set `bind-address` in the k3s config instead: k3s writes `server: https://127.0.0.1:6443` into `/etc/rancher/k3s/k3s.yaml`, so rebinding away from `0.0.0.0` breaks `kubectl` on the node itself, which step 1 and the disk-budget readings depend on.
-- **No PSS labels on the `o11y` namespace.** Sibling clusters set `pod-security.kubernetes.io/enforce: restricted` from their own chart templates. These are upstream charts, so that convention does not carry. Compliance is untested — a follow-up, not part of this bringup.
-- **Docker Swarm hosts inflate series counts.** The 12 `api` and 6 `jms` hosts add one veth interface per container at ~35 series each. If such a host exceeds ~1,600 series, exclude `veth` from the netdev and netclass collectors on the node_exporter side.
+- **Linode label must equal the Tailscale hostname.** A rebuilt host that re-registers as `<name>-1` fails at DNS while its label is unchanged.
+- **A powered-off Linode stays a target** and reports `up=0`. That is the host-down signal.
+- **No alert rules yet.** Contact points and the policy exist; the capacity rules from the single-node era (`vm_storage_is_read_only`, free disk under `1.5 × vm_free_disk_space_limit_bytes`, root filesystem under 25 %, `vm_promscrape_discovery_linode_failures_total > 0`, `count(up{job="node"}) < 75`) are the first rules to write, as provisioned `rules.yaml` under `alerting`.
+- **6443 and 10250 bind `0.0.0.0`.** The DigitalOcean firewall is their only control from the internet; between droplets the four tagged rules are the control. A host firewall for `100.64.0.0/10` only is the non-breaking second layer.
+- **No PSS labels on the `o11y` namespace.** Upstream charts; compliance untested.
 
 ## Cross-doc references
 
 - [`00-index.md`](00-index.md) — runbook index
-- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — sops envelopes; this node loads `tfstate/` and `do-universe/` through `terraform/ops-o11y/.envrc`
-- <https://docs.victoriametrics.com/victoriametrics/sd_configs/> — `linode_sd_configs` and `hetzner_sd_configs` reference
+- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — sops envelopes
+- <https://docs.k3s.io/datastore/ha-embedded> — the in-place SQLite → etcd conversion
+- <https://fluxcd.io/flux/installation/> — `flux install`
+- <https://external-secrets.io/latest/provider/1password-automation/> — the Connect provider
+- <https://docs.victoriametrics.com/victoriametrics/vmbackup/> — `vmbackup` and `vmrestore`

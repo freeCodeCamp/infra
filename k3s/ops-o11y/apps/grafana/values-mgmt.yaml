@@ -1,0 +1,43 @@
+persistence:
+  storageClassName: do-block-storage
+
+envFromSecret: grafana-alerting
+
+grafana.ini:
+  smtp:
+    enabled: true
+    host: $__env{SMTP_HOST}
+    user: $__env{SMTP_USER}
+    password: $__env{SMTP_PASSWORD}
+    from_address: $__env{SMTP_FROM}
+    from_name: Grafana mgmt
+
+alerting:
+  contactpoints.yaml:
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: ops-chat
+        receivers:
+          - uid: ops-chat-googlechat
+            type: googlechat
+            settings:
+              url: $GOOGLE_CHAT_WEBHOOK_URL
+      - orgId: 1
+        name: ops-email
+        receivers:
+          - uid: ops-email
+            type: email
+            settings:
+              addresses: $ALERT_EMAIL_TO
+  policies.yaml:
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: ops-chat
+        group_by: [grafana_folder, alertname]
+        routes:
+          - receiver: ops-email
+            object_matchers:
+              - [severity, "=", page]
+            continue: true
