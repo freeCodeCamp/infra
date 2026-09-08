@@ -7,6 +7,9 @@ rbac:
 
 automountServiceAccountToken: false
 
+admin:
+  existingSecret: grafana-admin
+
 service:
   type: NodePort
   nodePort: 30300
@@ -47,14 +50,14 @@ dashboardProviders:
   dashboardproviders.yaml:
     apiVersion: 1
     providers:
-    - name: default
-      orgId: 1
-      folder: ''
-      type: file
-      disableDeletion: false
-      editable: true
-      options:
-        path: /var/lib/grafana/dashboards/default
+      - name: default
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
 dashboards:
   default:
     linode-right-sizing:
