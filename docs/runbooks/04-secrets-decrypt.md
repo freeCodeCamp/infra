@@ -42,9 +42,10 @@ just inspect-secret <name>
 
 ### 2. Helm value overlays (`*.values.yaml.enc`)
 
-YAML envelopes. Auto-detect works because sops reads `.yaml.enc`
-correctly, but explicit flags keep the recipe-side invocation
-uniform across types:
+YAML envelopes. Auto-detect does **not** work here: sops reads only the
+final `.enc` and applies the JSON parser, which fails with
+`Could not unmarshal input data: invalid character '#'`. Both flags are
+required, exactly as for a dotenv envelope:
 
 ```bash
 sops decrypt --input-type yaml --output-type yaml \

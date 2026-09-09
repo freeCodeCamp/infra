@@ -52,9 +52,32 @@ sops infra-secrets/management/artemis.env.enc
 
 Save + exit. Sops re-encrypts on close.
 
-### 3. Mirror dotenv → YAML overlay (helm input)
+### 3. Edit the YAML overlay directly (helm input)
 
-The chart consumes a YAML overlay; the dotenv is the SOT. Re-run the mirror block from [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) §5 to re-encrypt the YAML overlay.
+> **Do not run the mirror block. It destroys eight secrets.** The overlay
+> `k3s/gxy-management/artemis.values.yaml.enc` carries 14 secrets; eight exist
+> **only** there: `ARTEMIS_DB_PASSWORD`, `POSTGRES_PASSWORD`,
+> `HATCHET_DB_PASSWORD`, `VALKEY_PASSWORD`, `SENTRY_DSN`, `GH_APP_ID`,
+> `GH_APP_INSTALLATION_ID`, `GH_APP_PRIVATE_KEY`. A mirror from the dotenv
+> seals 5 keys and drops all eight — both tenant databases, Valkey, Sentry and
+> the whole GitHub App identity. That is a worse outage than the one you are
+> repairing. Observed 2026-09-08: `mirror-artemis-secrets.sh` refused with
+> `keys sealed: 5, REFUSING`, and its `case` list does not name the three
+> `GH_APP_*` keys, so it drops them even from a complete dotenv.
+
+**The overlay is the source of truth for secrets.** Edit it in place. Commit
+before editing — a committed envelope is the only reversible one.
+
+```bash
+EDITOR=vi VISUAL=vi SOPS_EDITOR=vi \
+  sops edit ../infra-secrets/k3s/gxy-management/artemis.values.yaml.enc
+```
+
+> **Pin a blocking editor on every `sops edit`.** With `VISUAL=code` the editor
+> returns at once, sops writes the empty buffer back, and the envelope is
+> truncated to 0 bytes. That happened to
+> `k3s/gxy-cassiopeia/caddy.values.yaml.enc` on 2026-09-08; recovery was
+> `git restore` from `d6d4f51`, possible only because the file was committed.
 
 ### 4. Commit + push infra-secrets
 

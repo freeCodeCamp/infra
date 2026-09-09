@@ -109,6 +109,10 @@ kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d hatchet -tAc
    GROUP BY 1, 2 ORDER BY 1"
 ```
 
+**Gate result, 2026-09-09: PASSED.** Seven consecutive nights, 2026-09-03 through 2026-09-09,
+returned 14 of 14 rows reading `1`. Two replicas are proven against the double-fire risk on live
+data, so the replica count needs no decision and no rollback.
+
 Every row must read `1`: one `tombstone-purge` in the 03:00 bucket and one `drift-detect` in the
 04:00 bucket per day. A `2` on either row means that cron double-fired: roll the engine back to one
 replica immediately (section E) and check the `tombstone-purge` audit rows in the `artemis` database
