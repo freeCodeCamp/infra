@@ -346,6 +346,30 @@ delete the throwaway slug and let the nightly sweep reclaim it, or leave it held
 
 **If step 3 still returns 200 after 20s**, the delete did not unpublish. Stop and check `SELECT slug, state, reserved_until FROM sites WHERE slug = '$SLUG';` before touching anything else — a deregistered-but-serving site is the exact defect this release exists to remove.
 
+### 6. Nightly cron gate (artemis 1.11.0+)
+
+Steps 1 to 8 above prove the request paths. The two nightly crons — `tombstone-purge` at 03:00 UTC
+and `drift-detect` at 04:00 UTC — are proved by three scripts in this repo.
+
+```sh
+# Before 03:00 UTC, snapshot what the purge should change:
+scripts/artemis-purge-gate.sh --capture       # writes $XDG_STATE_HOME/artemis/purge-gate-baseline.env
+
+# After 03:00 UTC, read the verdict. Exit 3 means the run has not reached a terminal
+# status yet, so re-run rather than treating it as a pass or a failure.
+scripts/artemis-purge-gate.sh
+
+# After 04:00 UTC, check both crons for the section C.6 double-fire condition:
+scripts/artemis-cron-gate.sh
+
+# Or wait for the fire and retry on exit 3 without sitting at the terminal:
+FIRE_AT=$(date -u -j -f '%Y-%m-%d %H:%M:%S' "$(date -u +%F) 03:00:00" +%s) \
+  scripts/artemis-gate-watch.sh scripts/artemis-purge-gate.sh
+```
+
+The purge is capped at `CLEANUP_BLAST_CAP` (default 10), so a leftover tombstone backlog is the
+design and not a failure. Read the `gc.tombstone-purge.capped` log line for the denominator.
+
 ## Failure paths
 
 | Symptom                                           | Diagnose                                                           | Mitigate                                                                                               |
