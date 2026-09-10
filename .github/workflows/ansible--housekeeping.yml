@@ -3,10 +3,9 @@ name: Ansible --02- Houskeeping
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 1 * * 3,6' # 01:30 UTC on Wednesdays and Saturdays [maintenance window: 12:00-06:00 UTC]
+    - cron: "30 1 * * 3,6" # 01:30 UTC on Wednesdays and Saturdays [maintenance window: 12:00-06:00 UTC]
 
 jobs:
-
   uptime:
     name: Uptime
     strategy:
@@ -32,11 +31,13 @@ jobs:
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
           - prd_oldeworld_clt_swa
+          - prd_oldeworld_clt_kor
+          - prd_oldeworld_clt_ara
 
     uses: ./.github/workflows/ansible--uptime.yml
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: '-v'
+      verbosity: "-v"
       serial: 3
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -79,11 +80,13 @@ jobs:
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
           - prd_oldeworld_clt_swa
+          - prd_oldeworld_clt_kor
+          - prd_oldeworld_clt_ara
 
     uses: ./.github/workflows/ansible--update.yml
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: '-v'
+      verbosity: "-v"
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -112,7 +115,7 @@ jobs:
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: '-v'
+      verbosity: "-v"
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -153,11 +156,13 @@ jobs:
           - prd_oldeworld_clt_por
           - prd_oldeworld_clt_ukr
           - prd_oldeworld_clt_swa
+          - prd_oldeworld_clt_kor
+          - prd_oldeworld_clt_ara
 
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: '-v'
+      verbosity: "-v"
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -194,7 +199,7 @@ jobs:
     uses: ./.github/workflows/ansible--verify-nginx.yml
     with:
       hosts: ${{ matrix.host_groups }}
-      verbosity: '-v'
+      verbosity: "-v"
       stage: Verify NGINX
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
