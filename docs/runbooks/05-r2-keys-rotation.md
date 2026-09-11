@@ -32,7 +32,15 @@ Use this on first artemis bring-up or on rotation. Steps 1–4 are ClickOps; ste
 1. Cloudflare Dashboard → R2 → **Manage R2 API Tokens** → **Create API Token**.
 1. Token name: `universe-static-apps-01-artemis-admin-<YYYYMMDD>` (date suffix lets two coexist during rotation).
 1. Permissions: **Object Read & Write**.
-1. Specify bucket: `universe-static-apps-01` **and** `management-cnpg-backups`. A single-bucket token breaks the nightly Postgres backup — both artemis CronJobs reuse these keys and write to the backup bucket (`backup.bucket`, `pgBackup.bucket`; ADR-019:86).
+1. Specify bucket: `universe-static-apps-01`. Keep it single-bucket — this token must never reach the backup bucket (ADR-016:23).
+
+**Mint a second, backup-only token in the same pass.** Since 2026-09-11 the backup CronJobs no longer share the serve token. Repeat steps 1 to 5 with:
+
+- Token name: `management-cnpg-backups-artemis-backup-<YYYYMMDD>`.
+- Permissions: **Object Read & Write**.
+- Specify bucket: `management-cnpg-backups` only.
+
+Seal its three values as `secretEnv.R2_BACKUP_ENDPOINT`, `secretEnv.R2_BACKUP_ACCESS_KEY_ID` and `secretEnv.R2_BACKUP_SECRET_ACCESS_KEY`. The chart renders them into `artemis-backup-secret` and refuses to render a backup CronJob without them.
 1. TTL: none (rotated every 90 days).
 1. **Create** → capture three values shown once:
    - Access Key ID

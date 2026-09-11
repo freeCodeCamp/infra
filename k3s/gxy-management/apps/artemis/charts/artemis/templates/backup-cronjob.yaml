@@ -99,17 +99,17 @@ spec:
                 - name: RCLONE_CONFIG_R2_ENDPOINT
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Release.Name }}-env-secret
+                      name: {{ .Release.Name }}-backup-secret
                       key: R2_ENDPOINT
                 - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Release.Name }}-env-secret
+                      name: {{ .Release.Name }}-backup-secret
                       key: R2_ACCESS_KEY_ID
                 - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Release.Name }}-env-secret
+                      name: {{ .Release.Name }}-backup-secret
                       key: R2_SECRET_ACCESS_KEY
               resources:
                 {{- toYaml .Values.backup.resources | nindent 16 }}

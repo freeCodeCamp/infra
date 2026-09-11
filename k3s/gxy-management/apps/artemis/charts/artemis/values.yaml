@@ -160,6 +160,10 @@ secretEnv:
   R2_ENDPOINT: null
   R2_ACCESS_KEY_ID: null
   R2_SECRET_ACCESS_KEY: null
+  # Backup-only R2 token, scoped to backup.bucket / pgBackup.bucket. ADR-016:23.
+  R2_BACKUP_ENDPOINT: null
+  R2_BACKUP_ACCESS_KEY_ID: null
+  R2_BACKUP_SECRET_ACCESS_KEY: null
   GH_CLIENT_ID: null
   JWT_SIGNING_KEY: null
   VALKEY_PASSWORD: null

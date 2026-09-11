@@ -31,7 +31,7 @@ It is a **drill**: sections A to F touch neither the live `artemis-postgresql` S
 
 The backup artefacts live under the R2 prefix `artemis/gxy-management/` in bucket **`management-cnpg-backups`**, named `artemis-<YYYYMMDD-HHMMSS>.sql.gz`. These literals come straight from the chart's `backup-cronjob.yaml` (`R2_PREFIX="artemis/${GALAXY}"`, `FILENAME="artemis-${TIMESTAMP}.sql.gz"`) and `backup.galaxy` / `backup.bucket` in the values files.
 
-> **Bucket split, 2026-09-11.** Both CronJobs wrote to `universe-static-apps-01`, the bucket artemis serves deploys from, which ADR-019:86 forbids — "never one shared bucket". `backup.bucket` and `pgBackup.bucket` now name `management-cnpg-backups` per ADR-019:173. Artefacts written before the split are still in the old bucket under the same prefixes. Read them from there until the migration lands. The R2 credentials are the same admin keys artemis uses — sealed in the YAML overlay under `secretEnv.R2_*` (NOT a separate backup envelope; the CronJob reuses `artemis-env-secret`).
+> **Bucket split, 2026-09-11.** Both CronJobs wrote to `universe-static-apps-01`, the bucket artemis serves deploys from, which ADR-019:86 forbids — "never one shared bucket". `backup.bucket` and `pgBackup.bucket` now name `management-cnpg-backups` per ADR-019:173. Artefacts written before the split are still in the old bucket under the same prefixes. Read them from there until the migration lands. The R2 credentials are a backup-only token, sealed in the YAML overlay under `secretEnv.R2_BACKUP_*` and rendered into `artemis-backup-secret`. It is scoped to the backup bucket alone; the serve token in `artemis-env-secret` cannot reach it (ADR-016:23).
 
 ## A — Confirm a backup exists and is current
 
