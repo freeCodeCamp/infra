@@ -107,8 +107,17 @@ The cost of losing k3s-3 is one node's blast radius, which is what the design ac
 
 - Valkey goes down. Deploys return `503 fence_unavailable`. Serving, authentication and the registry continue, per the Valkey entry above.
 - The `artemis-pg` standby goes down. The primary is on k3s-1 and keeps serving. The pair loses its replication protection until the node returns; the daily R2 dump remains the backup floor.
+- **The artemis pods on that node go down with it.** The Deployment's anti-affinity is `preferred`, not `required`, so the replicas are not guaranteed to spread. Measured after the 1.12.4 release on 2026-09-11: two of the three pods were on k3s-3, one on k3s-1, and **none on k3s-2**. Losing k3s-3 at that moment leaves one serving pod.
 
-Neither loss reaches the serve plane. The two faults do not compound: one pauses deploys, the other removes redundancy, and each is already the documented single-node case.
+Neither loss stops the serve plane. Sites are served by Caddy `r2_alias` on `gxy-cassiopeia`, which never calls artemis, and one artemis pod survives to serve the API. The three faults do not compound into an outage, but the API margin is one pod, not two.
+
+Read the real placement before any planned work on k3s-3:
+
+```sh
+kubectl -n artemis get pods -l app.kubernetes.io/component=deploy-proxy -o wide
+```
+
+A drain still completes. `pdb.minAvailable: 2` permits one eviction at a time, so two pods on one node are evicted in sequence, each waiting for its replacement to become Ready. That is slower than a spread placement, not a block.
 
 The move is also not durable. Both volumes are `local-path` with `WaitForFirstConsumer` and a `Delete` reclaim policy, so a volume cannot be detached and re-attached elsewhere — the move is a rebuild.
 
