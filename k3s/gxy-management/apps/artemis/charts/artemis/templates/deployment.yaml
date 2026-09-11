@@ -33,15 +33,16 @@ spec:
     spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                topologyKey: kubernetes.io/hostname
-                labelSelector:
-                  matchLabels:
-                    {{- include "artemis.selectorLabels" . | nindent 20 }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          matchLabelKeys:
+            - pod-template-hash
+          labelSelector:
+            matchLabels:
+              {{- include "artemis.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: deploy-proxy
       containers:
         - name: artemis
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

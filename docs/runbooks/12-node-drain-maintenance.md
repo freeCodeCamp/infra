@@ -107,7 +107,7 @@ The cost of losing k3s-3 is one node's blast radius, which is what the design ac
 
 - Valkey goes down. Deploys return `503 fence_unavailable`. Serving, authentication and the registry continue, per the Valkey entry above.
 - The `artemis-pg` standby goes down. The primary is on k3s-1 and keeps serving. The pair loses its replication protection until the node returns; the daily R2 dump remains the backup floor.
-- **The artemis pods on that node go down with it.** The Deployment's anti-affinity is `preferred`, not `required`, so the replicas are not guaranteed to spread. Measured after the 1.12.4 release on 2026-09-11: two of the three pods were on k3s-3, one on k3s-1, and **none on k3s-2**. Losing k3s-3 at that moment leaves one serving pod.
+- **The artemis pods on that node can go down with it.** Measured after the 1.12.4 release on 2026-09-11, under the old `preferred` pod anti-affinity: two of the three pods were on k3s-3, one on k3s-1, and **none on k3s-2**. Losing k3s-3 at that moment leaves one serving pod. The anti-affinity counted the old-revision pods during the rolling update, so every node scored the same and the new pods landed anywhere. The Deployment now uses a `topologySpreadConstraints` rule with `maxSkew: 1` on `kubernetes.io/hostname` and `matchLabelKeys: [pod-template-hash]`, which measures the spread inside the new revision only. It is `ScheduleAnyway`, so a cordoned node does not block the roll. Read the real placement below before you trust the spread.
 
 Neither loss stops the serve plane. Sites are served by Caddy `r2_alias` on `gxy-cassiopeia`, which never calls artemis, and one artemis pod survives to serve the API. The three faults do not compound into an outage, but the API margin is one pod, not two.
 
