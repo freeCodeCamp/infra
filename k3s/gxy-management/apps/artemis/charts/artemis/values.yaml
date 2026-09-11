@@ -249,6 +249,7 @@ hatchet:
 
 postgres:
   enabled: false
+  sslmode: disable
   image:
     repository: postgres
     tag: "16.14-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
@@ -284,6 +285,7 @@ postgres:
 
 postgresCluster:
   enabled: false
+  cutover: false
   operatorNamespace: cnpg-system
   instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:16.14-standard-bookworm@sha256:b459345655ea1a0438a219f599cbae509c3132dc8faad6d729d6957e70a618bb
