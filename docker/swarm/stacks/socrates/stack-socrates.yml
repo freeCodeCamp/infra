@@ -44,6 +44,7 @@ x-deploy-config: &deploy-config
     - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     - LOG_LEVEL=${LOG_LEVEL:-info}
     - DEBUG_SOCRATES=${DEBUG_SOCRATES:-false}
+    - SERVER_URL=${SERVER_URL:-}
     # Redis (local — each app connects to co-located Redis via host gateway)
     - REDIS_URL=redis://host.docker.internal:6379
     # Authentication
