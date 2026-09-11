@@ -121,6 +121,37 @@ Drain the standby's node first to see the clean path. Then drain the primary's n
 
 `local-path` pins each volume to one node by `nodeAffinity` and cannot expand it. An evicted instance therefore cannot start elsewhere on its old volume.
 
+### Measured 2026-09-11 — drain of `k3s-3`, which held the standby
+
+The standby evicted cleanly, as the table predicts. Two results were not predicted.
+
+**The drain still hung, on a workload in another namespace.** `valkey-0` is a single replica with a PodDisruptionBudget of `minAvailable: 1`, so `disruptionsAllowed` is `0` and `kubectl drain` retried the eviction every 5 seconds without end. Read the PodDisruptionBudgets across all namespaces before a drain, not only `artemis`:
+
+```sh
+kubectl get pdb -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ALLOWED:.status.disruptionsAllowed
+```
+
+Three reported `0`: `artemis-pg-primary`, `artemis-postgresql` and `valkey`. See [12-node-drain-maintenance.md](12-node-drain-maintenance.md).
+
+**The `local-path` pin is now proven.** `artemis-pg-1` went `Pending` with this scheduler event:
+
+```
+0/3 nodes are available: 1 node(s) were unschedulable,
+2 node(s) didn't match PersistentVolume's node affinity.
+```
+
+| mark                         | value  |
+| ---------------------------- | ------ |
+| cluster state while drained  | `1/2`, phase `Waiting for the instances to become active` |
+| primary                      | `artemis-pg-2`, unmoved, 0 restarts |
+| edge `/healthz`              | `200` throughout |
+| `uncordon` to pod `Running`  | 5s     |
+| `uncordon` to `2/2` healthy  | **17s** |
+
+The instance re-attached the same volume. There was no re-clone and no restart, and replication returned to `streaming` at `lag_bytes=0`.
+
+This 17s is the baseline case, where `nodeMaintenanceWindow.inProgress` is `false` and `reusePVC` is therefore inert. It is not the section D measurement.
+
 ## D — The `reusePVC` measurement
 
 `nodeMaintenanceWindow` applies only while `inProgress` is `true`. Both keys are chart values:
