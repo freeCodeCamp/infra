@@ -1,15 +1,16 @@
 # R2 keys — provision + rotation
 
-**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Bucket:** `universe-static-apps-01` (single, prefix-scoped per D8). **Spec:** ADR-016 §R2 layout; secret-envelope layout per `docs/architecture/rfc-secrets-layout.md`.
+**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Buckets:** `universe-static-apps-01` (serve, prefix-scoped per D8) and `management-cnpg-backups` (Postgres backups, ADR-019:86). **Spec:** ADR-016 §R2 layout; secret-envelope layout per `docs/architecture/rfc-secrets-layout.md`.
 
-Two role-keys exist on the bucket. They live in different sops envelopes because the consumers run in different galaxies and different blast-radius domains.
+Three role-keys exist across the two buckets. They live in different sops envelopes because the consumers run in different galaxies and different blast-radius domains.
 
 | Role          | Permission        | Consumer                    | Sops envelope                                                   |
 | ------------- | ----------------- | --------------------------- | --------------------------------------------------------------- |
 | artemis-admin | Object Read+Write | `artemis` (gxy-management)  | `infra-secrets/management/artemis.env.enc` (dotenv SOT)         |
 | caddy-ro      | Object Read       | `caddy-s3` (gxy-cassiopeia) | `infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc` (yaml) |
+| artemis-backup | Object Read+Write | `artemis-backup` + `artemis-pg-backup` CronJobs (gxy-management), scoped to `management-cnpg-backups` | `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` (yaml, `secretEnv.R2_BACKUP_*`) |
 
-Caddy is read-only by design: a compromised caddy pod cannot promote, rollback, or write artifacts. Artemis holds the only rw key and gates every write behind GitHub team membership (see [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) and ADR-016).
+Caddy is read-only by design: a compromised caddy pod cannot promote, rollback, or write artifacts. Artemis holds the only rw key on the serve bucket and gates every write behind GitHub team membership (see [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) and ADR-016).
 
 > **Superseded path.** A third role-key — Woodpecker per-site rw bootstrap — was specced under T11 / D40. ADR-016 (deploy-proxy plane) supersedes that flow: Woodpecker no longer holds R2 credentials; artemis brokers every write.
 
@@ -33,19 +34,21 @@ Use this on first artemis bring-up or on rotation. Steps 1–4 are ClickOps; ste
 1. Token name: `universe-static-apps-01-artemis-admin-<YYYYMMDD>` (date suffix lets two coexist during rotation).
 1. Permissions: **Object Read & Write**.
 1. Specify bucket: `universe-static-apps-01`. Keep it single-bucket — this token must never reach the backup bucket (ADR-016:23).
-
-**Mint a second, backup-only token in the same pass.** Since 2026-09-11 the backup CronJobs no longer share the serve token. Repeat steps 1 to 5 with:
-
-- Token name: `management-cnpg-backups-artemis-backup-<YYYYMMDD>`.
-- Permissions: **Object Read & Write**.
-- Specify bucket: `management-cnpg-backups` only.
-
-Seal its three values as `secretEnv.R2_BACKUP_ENDPOINT`, `secretEnv.R2_BACKUP_ACCESS_KEY_ID` and `secretEnv.R2_BACKUP_SECRET_ACCESS_KEY`. The chart renders them into `artemis-backup-secret` and refuses to render a backup CronJob without them.
 1. TTL: none (rotated every 90 days).
 1. **Create** → capture three values shown once:
    - Access Key ID
    - Secret Access Key
    - Jurisdictional endpoint (`https://<account-id>.r2.cloudflarestorage.com`)
+
+### 1b. CF dashboard → mint the backup-only token
+
+Since 2026-09-11 the backup CronJobs do not share the serve token. Mint this one in the same pass, with the same six items above and these three values changed:
+
+1. Token name: `management-cnpg-backups-artemis-backup-<YYYYMMDD>`.
+1. Permissions: **Object Read & Write**.
+1. Specify bucket: `management-cnpg-backups` only.
+
+Store the three captured values under their own names — `R2_BACKUP_ENDPOINT`, `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY` — in the dotenv SOT at step 2, then in the YAML overlay at step 3. **Never write them over `R2_ENDPOINT`, `R2_ACCESS_KEY_ID` or `R2_SECRET_ACCESS_KEY`**; those three are the serve token and overwriting them breaks the deploy path. The chart renders the `R2_BACKUP_*` set into `artemis-backup-secret` and refuses to render a backup CronJob without it.
 
 ### 2. Edit the artemis dotenv envelope
 
@@ -56,6 +59,10 @@ sops infra-secrets/management/artemis.env.enc
 #   R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 #   R2_ACCESS_KEY_ID=<new key id>
 #   R2_SECRET_ACCESS_KEY=<new secret>
+# And, for the backup-only token from step 1b, three separate keys:
+#   R2_BACKUP_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+#   R2_BACKUP_ACCESS_KEY_ID=<new backup key id>
+#   R2_BACKUP_SECRET_ACCESS_KEY=<new backup secret>
 ```
 
 Save + exit. Sops re-encrypts on close.
@@ -63,7 +70,7 @@ Save + exit. Sops re-encrypts on close.
 ### 3. Edit the YAML overlay directly (helm input)
 
 > **Do not run the mirror block. It destroys eight secrets.** The overlay
-> `k3s/gxy-management/artemis.values.yaml.enc` carries 14 secrets; eight exist
+> `k3s/gxy-management/artemis.values.yaml.enc` carries 17 secrets; eight exist
 > **only** there: `ARTEMIS_DB_PASSWORD`, `POSTGRES_PASSWORD`,
 > `HATCHET_DB_PASSWORD`, `VALKEY_PASSWORD`, `SENTRY_DSN`, `GH_APP_ID`,
 > `GH_APP_INSTALLATION_ID`, `GH_APP_PRIVATE_KEY`. A mirror from the dotenv

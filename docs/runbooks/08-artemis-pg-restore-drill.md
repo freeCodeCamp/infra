@@ -54,7 +54,7 @@ kubectl -n artemis create job --from=cronjob/artemis-backup \
 
 ## B — Pull + integrity-check the newest artefact
 
-Decrypt the R2 admin keys from the YAML overlay (the overlay is YAML, not dotenv — see `04-secrets-decrypt.md` §2) and wire them into rclone's `RCLONE_CONFIG_R2_*` env pattern (no on-disk `rclone.conf`; `RCLONE_CONFIG=/dev/null`):
+Decrypt the R2 keys from the YAML overlay (the overlay is YAML, not dotenv — see `04-secrets-decrypt.md` §2) and wire them into rclone's `RCLONE_CONFIG_R2_*` env pattern (no on-disk `rclone.conf`; `RCLONE_CONFIG=/dev/null`):
 
 ```sh
 cd $HOME/DEV/fCC/infra
@@ -64,18 +64,26 @@ eval "$(sops decrypt --input-type yaml --output-type yaml \
   | yq -r '.secretEnv |
     "export R2_ENDPOINT=\(.R2_ENDPOINT)
      export R2_ACCESS_KEY_ID=\(.R2_ACCESS_KEY_ID)
-     export R2_SECRET_ACCESS_KEY=\(.R2_SECRET_ACCESS_KEY)"')"
+     export R2_SECRET_ACCESS_KEY=\(.R2_SECRET_ACCESS_KEY)
+     export R2_BACKUP_ENDPOINT=\(.R2_BACKUP_ENDPOINT)
+     export R2_BACKUP_ACCESS_KEY_ID=\(.R2_BACKUP_ACCESS_KEY_ID)
+     export R2_BACKUP_SECRET_ACCESS_KEY=\(.R2_BACKUP_SECRET_ACCESS_KEY)"')"
 
 export RCLONE_CONFIG=/dev/null
 export RCLONE_CONFIG_R2_TYPE=s3
 export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
 export RCLONE_CONFIG_R2_ACL=private
-export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
-export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
-export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+# The backup token reads the backup bucket. The serve token reads the old one.
+export RCLONE_CONFIG_R2_ENDPOINT="$R2_BACKUP_ENDPOINT"
+export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_BACKUP_ACCESS_KEY_ID"
+export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_BACKUP_SECRET_ACCESS_KEY"
 
 # Until the T17 migration lands, the surviving artefacts are still in the old
-# bucket. A `no .sql.gz` failure here means you need the line below instead.
+# bucket. An AccessDenied or a `no .sql.gz` failure here means you need the
+# serve token and the old bucket instead:
+#   export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
+#   export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+#   export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
 #   BUCKET=universe-static-apps-01
 BUCKET=management-cnpg-backups
 PREFIX=artemis/gxy-management
@@ -299,9 +307,7 @@ Reference, read from `artemis-pg-2` on 2026-09-11 12:26 UTC: `deploys=327`, `sit
 Run §B's rclone block unchanged for the credentials and the `RCLONE_CONFIG_R2_*` exports, then substitute the prefix and pull both files:
 
 ```sh
-# Until the T17 migration lands, the surviving artefacts are still in the old
-# bucket. A `no .sql.gz` failure here means you need the line below instead.
-#   BUCKET=universe-static-apps-01
+# Same token and old-bucket fallback as §B.
 BUCKET=management-cnpg-backups
 PREFIX=artemis/gxy-management/pg
 
