@@ -89,6 +89,28 @@ Placement is not pinned. Re-check before every drain.
 
 **Node holding one `hatchet-engine` replica** — no special handling since 2026-08-31; `minAvailable: 1` at two replicas permits the eviction and the drain completes. Do NOT scale to zero: that step belonged to the single-replica posture and now causes an outage the PDB was about to prevent. Two cautions remain. Required anti-affinity means the evicted pod cannot reschedule until a node with no engine pod is free, so it stays `Pending` while the drained node is cordoned — expected, not a fault. And prefer a window outside 03:00–04:30 UTC so the nightly check-ins are not recorded as missed. Confirm the workers re-attach afterwards: the engine log reports `listing actions for workers` with a non-zero count.
 
+### Full order for a node carrying more than one blocker
+
+Placement is not pinned, so a node can hold the `artemis-pg` primary, `valkey-0`, `artemis-postgresql-0` and an artemis replica at once. Survey first, then run the steps that apply, in this order.
+
+```sh
+export KUBECONFIG=~/DEV/fCC/infra/k3s/gxy-management/.kubeconfig.yaml
+kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name
+kubectl get pdb -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ALLOWED:.status.disruptionsAllowed
+```
+
+1. **Announce the window.** Deploys stop for its whole length if the node holds `valkey-0`.
+2. **Set the CloudNativePG maintenance window** if the node holds an `artemis-pg` instance. Set `postgresCluster.nodeMaintenanceWindow.inProgress: true` and release. `reusePVC` is `true`, so the operator waits for the node and re-attaches the same volume.
+3. **Move the `artemis-pg` primary off the node** if it is there. See [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §B. The `-primary` PDB sits at `disruptionsAllowed: 0` and blocks until the primary is elsewhere.
+4. **Scale `artemis-postgresql` to zero** if the node holds it. Its PDB is `minAvailable: 1` on one replica and blocks otherwise.
+5. **Do nothing for `valkey-0`.** `maxUnavailable: 1` permits the eviction. Do not scale it to zero.
+6. **Do nothing for `hatchet-engine` or the artemis replicas.** Both roll.
+7. **Drain**, do the maintenance, **uncordon**.
+8. **Restore, in reverse:** scale `artemis-postgresql` back to 1, clear `inProgress`, and confirm `valkey-0` re-attached its volume.
+9. **Verify** per the section below, and run one real deploy.
+
+Do not use `--force` or `--disable-eviction` at any step. Both bypass a PDB rather than satisfying it.
+
 ## Verify after any drain
 
 ```sh
