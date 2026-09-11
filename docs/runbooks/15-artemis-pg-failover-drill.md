@@ -98,7 +98,15 @@ kubectl -n artemis logs -f "$PRIMARY" -c postgres > /tmp/old-primary.log &
 kubectl -n cnpg-system logs -f -l app.kubernetes.io/name=cloudnative-pg > /tmp/operator.log &
 ```
 
-The application is unavailable for the whole window. The outbox relay logged `failed to connect ... (artemis-pg-rw): dial error ... operation not permitted` until the promotion. Treat 183s as the deploy-and-GC outage, not as a serving outage.
+**The 183s is handover latency, not downtime.** The old primary kept serving through `artemis-pg-rw` for nearly all of it. Three facts fix this:
+
+- The `/readyz` probe runs every 10s on 3 pods, so about 55 probes fell inside the window. Exactly **one** logged `readyz.postgres.degraded`, at 08:22:40.
+- The outbox relay logged exactly **one** `relay.run` connect failure, at 08:22:39.
+- `artemis-pg-2` reports `pg_postmaster_start_time()` of 06:06:08, unbroken across the drill. The standby was promoted in place. Only the old primary restarted, at 08:22:43.
+
+Real write unavailability was therefore about **3 seconds**, at the end of the window. Nothing was lost: zero rows were written between 08:19:38Z and 08:22:42Z, the last write before the drill was at 07:24:33Z, and the outbox holds 0 unpublished rows.
+
+The cost of the 183s is a delayed handover, not an outage. It matters for a planned `kubectl delete pod`, which is what a chart change or a drain performs. It should not apply to an unplanned instance loss, where there is no old primary to wait for and `failoverDelay` is 0 — section C measures that case and has not been run.
 
 ## C — Node loss
 
@@ -192,7 +200,7 @@ CloudNativePG then rebuilds the claim and the Job together. Do not delete the PV
 Stamp each rehearsal here.
 
 - **Last rehearsed:** 2026-09-11, section B only.
-- **Promotion RTO:** 182.9s to `currentPrimary`, 193.9s to `readyInstances: 2`. Cause of the 183s not established.
+- **Promotion RTO:** 182.9s to `currentPrimary`, 193.9s to `readyInstances: 2`, of which about 3s was write unavailability. Cause of the 183s handover not established.
 - **Node-loss outcome:** _(pending — sections C and D not run)_
 
 ## Cross-refs
