@@ -182,6 +182,16 @@ kubectl -n artemis exec statefulset/artemis-postgresql -- \
 
 Expect both `artemis` and `hatchet` databases owned by their like-named roles.
 
+**After the cutover this instance is no longer the `artemis` database.** On gxy-management, `postgresCluster.cutover` is `true` since 2026-09-11, so `DATABASE_URL` points at the `artemis-pg-rw` service of the CloudNativePG pair. The `artemis` database still present on the StatefulSet is a frozen copy, and it answers every query without an error. The StatefulSet keeps the `hatchet` database until the ADR-023 re-platform. Resolve the live instance rather than naming a pod:
+
+```bash
+kubectl -n artemis get pod -l cnpg.io/cluster=artemis-pg,cnpg.io/instanceRole=primary -o name
+```
+
+The block above stays correct for a fresh galaxy bootstrap, where the pair does not exist yet.
+
+**`postgres.enabled` stays `true` until the ADR-023 re-platform.** The cutover moved the `artemis` database only. Setting the flag `false` deletes the instance that still holds the `hatchet` database, and it also drops the hatchet gRPC egress rule, because `networkpolicy.yaml` keeps that rule inside the same conditional.
+
 Confirm migrations applied and the worker stayed dormant via the artemis pod logs:
 
 ```bash
@@ -393,9 +403,12 @@ Expected: `boot.starting version=X.Y.Z commit=<full-sha>` one line per replica.
 **Check this first, from artemis 1.10.0 onward:**
 
 ```bash
-kubectl -n artemis exec artemis-postgresql-0 -- \
+PRIMARY=$(kubectl -n artemis get pod -l cnpg.io/cluster=artemis-pg,cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl -n artemis exec "$PRIMARY" -c postgres -- \
   psql -U postgres -d artemis -tAc "SELECT slug, reserved_until FROM sites WHERE state = 'reserved';"
 ```
+
+Do not read this from `artemis-postgresql-0`. That instance holds a frozen `artemis` database since the cutover and answers with stale rows and no error. Where `postgresCluster.cutover` is `false`, use `artemis-postgresql-0` instead.
 
 On a schema older than `0010_site_reservations.sql` this answers
 `ERROR: column "reserved_until" does not exist`. That error *is* the safe answer — the column does
@@ -434,7 +447,7 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 | 502 / "no available server" via CF                                                       | CF zone SSL = Strict + origin no cert          | flip CF zone SSL to Flexible (zone-wide; matches cassiopeia caddy)                                         |
 | ERR_SSL_PROTOCOL_ERROR in browser                                                        | CF zone SSL = Off                              | set CF zone SSL to Flexible                                                                                |
 | 429 on bulk upload                                                                       | rate-limit middleware tripped                  | tune `rateLimit.average` / `.burst` in `values.production.yaml`                                            |
-| A site delete answers 204 but the name is registerable again, or a deleted site keeps serving | lifecycle call issued during the mixed-version rollout window | §6 gate — wait for one distinct image digest across all pods before any delete, register or undelete. Check `SELECT slug, state FROM sites WHERE slug = '<slug>';` and re-issue the delete against the settled fleet |
+| A site delete answers 204 but the name is registerable again, or a deleted site keeps serving | lifecycle call issued during the mixed-version rollout window | §6 gate — wait for one distinct image digest across all pods before any delete, register or undelete. Check `SELECT slug, state FROM sites WHERE slug = '<slug>';` on the instance `postgresCluster.cutover` names, and re-issue the delete against the settled fleet |
 
 ## Cross-references
 

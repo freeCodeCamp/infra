@@ -89,6 +89,12 @@ networkPolicy:
 # out of deploy-only; worker + relay boot because env.HATCHET_ADDR is set
 # (stage-2 flip 2026-06-06). The image.tag above must be an artemis build
 # that contains the durable-exec code.
+#
+# KEEP THIS true. The instance still holds the hatchet database. Setting it
+# false deletes that instance and drops the hatchet gRPC egress rule in
+# networkpolicy.yaml, which sits inside the same conditional. The artemis
+# database moved to the artemis-pg pair at the 2026-09-11 cutover; the
+# hatchet database moves at the ADR-023 re-platform and not before.
 postgres:
   enabled: true
 
