@@ -80,7 +80,7 @@ spec:
                       name: {{ .Release.Name }}-env-secret
                       key: POSTGRES_PASSWORD
                 - name: R2_BUCKET
-                  value: {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
+                  value: {{ required ".Values.backup.bucket is required" .Values.backup.bucket | quote }}
                 # rclone reads remote `r2` from RCLONE_CONFIG_R2_* env vars;
                 # RCLONE_CONFIG=/dev/null refuses any on-disk rclone.conf
                 # so the readOnlyRootFilesystem securityContext holds.

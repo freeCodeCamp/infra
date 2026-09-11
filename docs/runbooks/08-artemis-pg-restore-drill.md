@@ -29,7 +29,9 @@ It is a **drill**: sections A to F touch neither the live `artemis-postgresql` S
 | Durable-exec profile live                     | `kubectl -n artemis get sts artemis-postgresql` returns the StatefulSet |
 | Nightly backup CronJob present                | `kubectl -n artemis get cronjob artemis-backup`                         |
 
-The backup artefacts live under the R2 prefix `artemis/gxy-management/` in bucket `universe-static-apps-01`, named `artemis-<YYYYMMDD-HHMMSS>.sql.gz`. These literals come straight from the chart's `backup-cronjob.yaml` (`R2_PREFIX="artemis/${GALAXY}"`, `FILENAME="artemis-${TIMESTAMP}.sql.gz"`) and `backup.galaxy: gxy-management` / `env.R2_BUCKET` in the values files. The R2 credentials are the same admin keys artemis uses — sealed in the YAML overlay under `secretEnv.R2_*` (NOT a separate backup envelope; the CronJob reuses `artemis-env-secret`).
+The backup artefacts live under the R2 prefix `artemis/gxy-management/` in bucket **`management-cnpg-backups`**, named `artemis-<YYYYMMDD-HHMMSS>.sql.gz`. These literals come straight from the chart's `backup-cronjob.yaml` (`R2_PREFIX="artemis/${GALAXY}"`, `FILENAME="artemis-${TIMESTAMP}.sql.gz"`) and `backup.galaxy` / `backup.bucket` in the values files.
+
+> **Bucket split, 2026-09-11.** Both CronJobs wrote to `universe-static-apps-01`, the bucket artemis serves deploys from, which ADR-019:86 forbids — "never one shared bucket". `backup.bucket` and `pgBackup.bucket` now name `management-cnpg-backups` per ADR-019:173. Artefacts written before the split are still in the old bucket under the same prefixes. Read them from there until the migration lands. The R2 credentials are the same admin keys artemis uses — sealed in the YAML overlay under `secretEnv.R2_*` (NOT a separate backup envelope; the CronJob reuses `artemis-env-secret`).
 
 ## A — Confirm a backup exists and is current
 
@@ -72,7 +74,7 @@ export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
 export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
 export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
 
-BUCKET=universe-static-apps-01
+BUCKET=management-cnpg-backups
 PREFIX=artemis/gxy-management
 
 # Timestamp prefix in the filename means tail = newest.
@@ -294,7 +296,7 @@ Reference, read from `artemis-pg-2` on 2026-09-11 12:26 UTC: `deploys=327`, `sit
 Run §B's rclone block unchanged for the credentials and the `RCLONE_CONFIG_R2_*` exports, then substitute the prefix and pull both files:
 
 ```sh
-BUCKET=universe-static-apps-01
+BUCKET=management-cnpg-backups
 PREFIX=artemis/gxy-management/pg
 
 DUMP=$(rclone lsf "r2:${BUCKET}/${PREFIX}/" --include 'artemis-*.sql.gz' | sort | tail -1)

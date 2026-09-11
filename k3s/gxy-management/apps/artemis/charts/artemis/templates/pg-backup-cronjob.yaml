@@ -85,7 +85,7 @@ spec:
                       name: {{ .Release.Name }}-pg-app
                       key: password
                 - name: R2_BUCKET
-                  value: {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
+                  value: {{ required ".Values.pgBackup.bucket is required" .Values.pgBackup.bucket | quote }}
                 - name: RCLONE_CONFIG
                   value: /dev/null
                 - name: RCLONE_CONFIG_R2_TYPE
