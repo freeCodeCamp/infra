@@ -32,6 +32,7 @@ spec:
       dataChecksums: true
 
   enableSuperuserAccess: false
+  enablePDB: true
 
   managed:
     roles:
