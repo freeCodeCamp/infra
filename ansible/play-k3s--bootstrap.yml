@@ -8,7 +8,9 @@
 #
 # Prerequisites:
 #   - VMs provisioned with VPC (eth1) and Tailscale connected
-#   - DO cloud firewall allows: 2379-2380, 4240, 5001, 6443, 8472, 10250 between VPC nodes
+#   - DO cloud firewall allows: 2379-2380, 4240, 4244, 5001, 6443, 8472, 10250, 4443 between VPC nodes
+#     4443 is required by the metrics-server hostNetwork patch below. Without it
+#     `kubectl top nodes` works only through the apiserver on the pod's own node.
 #   - Env vars loaded via direnv (cd into cluster dir first)
 #   - Group vars populated for the target inventory group
 #
