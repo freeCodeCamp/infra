@@ -105,7 +105,7 @@ Inventory groups (matches `ansible/inventory/group_vars/`):
 | Galaxy           | Inventory Group      | Role                                                                 |
 | ---------------- | -------------------- | -------------------------------------------------------------------- |
 | `gxy-management` | `gxy_management_k3s` | Control plane — artemis + Hatchet + Valkey (`uploads.freecode.camp`) |
-| `gxy-launchbase` | `gxy_launchbase_k3s` | Standby (CNPG operator running) — woodpecker retired 2026-05-03      |
+| `gxy-launchbase` | `gxy_launchbase_k3s` | **NOT LIVE — never probe it** (operator, 2026-09-11). Standby; woodpecker retired 2026-05-03 |
 | `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2     |
 
 Retired:
@@ -113,6 +113,8 @@ Retired:
 - `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). Historical journal: `~/DEV/fCC-U/Architecture/.archive/gxy-static/2026-04-27-teardown.md`.
 
 Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
+
+**`gxy-launchbase` is not live. Never run a command against it** — no `kubectl`, no `just`, no kubeconfig read, not even in a cluster-wide sweep. Operator instruction, 2026-09-11. A sweep over `k3s/*/` must skip it by name.
 
 ## Non-obvious conventions
 
