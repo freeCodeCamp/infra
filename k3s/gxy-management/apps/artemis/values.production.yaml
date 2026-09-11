@@ -100,7 +100,7 @@ backup:
 
 postgresCluster:
   enabled: true
-  cutover: false
+  cutover: true
 
 pgBackup:
   enabled: true
