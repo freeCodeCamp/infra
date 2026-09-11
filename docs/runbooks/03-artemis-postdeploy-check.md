@@ -208,6 +208,19 @@ kubectl -n artemis get cm artemis-oom-watch-state -o jsonpath='{.data.state\.jso
 
 The watcher exists because a cgroup OOM kill of a PostgreSQL *backend* leaves the postmaster alive, so `restartCount` never moves and Kubernetes emits no event. It posts a Sentry check-in on slug `artemis-oom-watch` every run. The first check-in of each run carries `monitor_config`, so Sentry creates the monitor object itself. Alert routing is still a console step. Confirm the monitor exists after the first run; without it a dead watcher is as silent as the fault it watches. Design: [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
 
+### 4b. Backup monitors are registered
+
+Both backup CronJobs post Sentry cron check-ins. Confirm the monitors exist in Sentry org `freecodecamp`, project `artemis`:
+
+| CronJob | monitor slug |
+| --- | --- |
+| `artemis-backup` | `artemis-backup` |
+| `artemis-pg-backup` | `artemis-pg-backup` |
+
+The first check-in of each run carries `monitor_config`, so Sentry creates the monitor object itself. A missed or `error` check-in is the only page a failed backup Job emits.
+
+The check-in is best-effort: `sentry_checkin()` returns 0 when `SENTRY_DSN` is empty or `curl` is absent, so telemetry never fails a backup. `curl` is absent from any `postgres-rclone` image built before 2026-09-11. A backup CronJob that runs green with no Sentry monitor means the image digest in `values.production.yaml` is still the old build.
+
 ### 5. Site lifecycle — delete, hold, undelete, release (artemis 1.10.0+)
 
 Nothing in `just verify-artemis` exercises this, and it is the release's headline behaviour change. Run it by hand once per release, on a throwaway slug.

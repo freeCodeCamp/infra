@@ -37,9 +37,20 @@ spec:
               # in-cluster service idiom.
               - matchName: "artemis-postgresql.artemis.svc.cluster.local"
               - matchPattern: "*.*.svc.cluster.local"
+{{- range .Values.backup.sentryFqdnPatterns }}
+              - matchPattern: {{ . | quote }}
+{{- end }}
     # R2 -- admin S3 endpoint (account-scoped subdomain).
     - toFQDNs:
         - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toFQDNs:
+{{- range .Values.backup.sentryFqdnPatterns }}
+        - matchPattern: {{ . | quote }}
+{{- end }}
       toPorts:
         - ports:
             - port: "443"
@@ -84,8 +95,19 @@ spec:
               - matchPattern: "*.r2.cloudflarestorage.com"
               - matchName: "{{ .Release.Name }}-pg-rw.{{ .Values.namespace }}.svc.cluster.local"
               - matchPattern: "*.*.svc.cluster.local"
+{{- range .Values.pgBackup.sentryFqdnPatterns }}
+              - matchPattern: {{ . | quote }}
+{{- end }}
     - toFQDNs:
         - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toFQDNs:
+{{- range .Values.pgBackup.sentryFqdnPatterns }}
+        - matchPattern: {{ . | quote }}
+{{- end }}
       toPorts:
         - ports:
             - port: "443"

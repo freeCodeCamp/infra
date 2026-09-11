@@ -42,8 +42,10 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # PGDG apt repo: bookworm stock apt tops out at PG 15; the artemis
 # server is PG 16 so we need PGDG to pick up postgresql-client-16.
 # apt-key(8) is deprecated — use /etc/apt/keyrings + signed-by per
-# Debian wiki. curl + gnupg are build-only and purged at end of
-# the RUN. ca-certificates stays — rclone TLS handshake needs it.
+# Debian wiki. gnupg is build-only and purged at end of the RUN.
+# curl STAYS: the backup CronJob posts Sentry cron check-ins with it
+# (chart templates/_helpers.tpl `artemis.sentryCheckin`).
+# ca-certificates stays — rclone TLS handshake needs it.
 # hadolint ignore=DL3008
 RUN set -eux \
  && apt-get update \
@@ -57,7 +59,8 @@ RUN set -eux \
  && apt-get update \
  && apt-get install -y --no-install-recommends postgresql-client-16 \
  && pg_dumpall --version \
- && apt-get purge -y --auto-remove curl gnupg \
+ && apt-get purge -y --auto-remove gnupg \
+ && curl --version \
  && rm -rf /var/lib/apt/lists/*
 
 # rclone binary copied verbatim from upstream image. Smoke-check

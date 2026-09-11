@@ -341,6 +341,14 @@ pgBackup:
   galaxy: gxy-management
   activeDeadlineSeconds: 1800
   tmpSizeLimit: 512Mi
+  monitorSlug: artemis-pg-backup
+  monitorCheckinMargin: 10
+  monitorMaxRuntime: 25
+  monitorFailureThreshold: 1
+  monitorTimezone: UTC
+  sentryFqdnPatterns:
+    - "*.ingest.sentry.io"
+    - "*.ingest.*.sentry.io"
   resources:
     requests:
       cpu: 100m
@@ -425,6 +433,14 @@ backup:
   # emptyDir tmpfs sizeLimit for the /tmp dump scratch. Raise if the
   # gzipped logical dump approaches this ceiling.
   tmpSizeLimit: 512Mi
+  monitorSlug: artemis-backup
+  monitorCheckinMargin: 10
+  monitorMaxRuntime: 25
+  monitorFailureThreshold: 1
+  monitorTimezone: UTC
+  sentryFqdnPatterns:
+    - "*.ingest.sentry.io"
+    - "*.ingest.*.sentry.io"
   resources:
     requests:
       cpu: 100m

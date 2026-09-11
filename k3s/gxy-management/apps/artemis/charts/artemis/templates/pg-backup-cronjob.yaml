@@ -43,6 +43,9 @@ spec:
                 - -c
                 - |
                   set -euo pipefail
+{{- include "artemis.sentryCheckin" . | nindent 18 }}
+                  trap 'sentry_checkin error' ERR
+                  sentry_checkin in_progress
                   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
                   DUMP="artemis-${TIMESTAMP}.sql.gz"
                   ROLES="artemis-roles-${TIMESTAMP}.sql"
@@ -70,6 +73,7 @@ spec:
                   rclone delete --min-age {{ .Values.pgBackup.retention }} "r2:${R2_BUCKET}/${R2_PREFIX}/"
 
                   echo "Backup complete: ${R2_PREFIX}/${DUMP}"
+                  sentry_checkin ok
               env:
                 - name: GALAXY
                   value: {{ .Values.pgBackup.galaxy | quote }}
@@ -111,6 +115,26 @@ spec:
                     secretKeyRef:
                       name: {{ .Release.Name }}-backup-secret
                       key: R2_SECRET_ACCESS_KEY
+                - name: MONITOR_SLUG
+                  value: {{ .Values.pgBackup.monitorSlug | quote }}
+                - name: MONITOR_SCHEDULE
+                  value: {{ .Values.pgBackup.schedule | quote }}
+                - name: MONITOR_CHECKIN_MARGIN
+                  value: {{ .Values.pgBackup.monitorCheckinMargin | quote }}
+                - name: MONITOR_MAX_RUNTIME
+                  value: {{ .Values.pgBackup.monitorMaxRuntime | quote }}
+                - name: MONITOR_FAILURE_THRESHOLD
+                  value: {{ .Values.pgBackup.monitorFailureThreshold | quote }}
+                - name: MONITOR_TIMEZONE
+                  value: {{ .Values.pgBackup.monitorTimezone | quote }}
+                - name: ENVIRONMENT
+                  value: {{ .Values.env.ENVIRONMENT | default "production" | quote }}
+                - name: SENTRY_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: SENTRY_DSN
+                      optional: true
               resources:
                 {{- toYaml .Values.pgBackup.resources | nindent 16 }}
               volumeMounts:
