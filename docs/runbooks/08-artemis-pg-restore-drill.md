@@ -4,6 +4,8 @@
 
 **Last rehearsed:** 2026-08-25 — PASSED. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
 
+**The pair is not rehearsed.** Both runs below drilled the `artemis-postgresql` StatefulSet. `postgresCluster.cutover` is `true` since 2026-09-11, so the live `artemis` database is on the CloudNativePG pair and no drill has read its artefact. §H is the procedure. Until §H records a date, the pair has a backup that nobody has restored.
+
 Prior: 2026-06-05 — R8 drill PASSED (dossier `2026-06-02-artemis-durable-exec-cutover` §S 2026-06-05 11:25; both tenants restored, 6/6 artemis tables present, `sites` count matched the live registry, §F RPO/RTO floor demonstrated).
 
 > The 2026-06-05 rehearsal predated the Windmill retirement (2026-07-07), at which point the artemis backup CronJob inherited an image built for a PG 18 server. The skew went undetected for seven weeks because §C ran `ON_ERROR_STOP=0` and the only gate was §D's row counts — which pass regardless, since the data still lands. The §C error gate exists because of that gap.
@@ -12,7 +14,9 @@ The artemis durable-exec substrate is a single-node bundled Postgres StatefulSet
 
 It is a **drill**: sections A to F touch neither the live `artemis-postgresql` StatefulSet nor the live databases. The scratch pod is a standalone `postgres:16-alpine` with no tenant labels, so neither the live PG nor the postgres NetworkPolicy is involved. A destructive production restore is section **G**, and it is the reason this drill exists.
 
-`08.A` confirms a backup exists; `08.B` pulls + integrity-checks the artefact; `08.C` restores into a scratch PG; `08.D` is the row-count sanity gate; `08.E` tears the scratch pod down; `08.F` is the RPO/RTO statement; `08.G` is the destructive production restore.
+`08.A` confirms a backup exists; `08.B` pulls + integrity-checks the artefact; `08.C` restores into a scratch PG; `08.D` is the row-count sanity gate; `08.E` tears the scratch pod down; `08.F` is the RPO/RTO statement; `08.G` is the destructive production restore; `08.H` drills the CloudNativePG pair.
+
+**Sections A to F drill the `artemis-postgresql` StatefulSet only.** They read the `pg_dumpall` artefact under `artemis/gxy-management/`, which holds the `hatchet` database and, before the cutover, the `artemis` database. `postgresCluster.cutover` is `true` since 2026-09-11, so the live `artemis` database is on the CloudNativePG pair and its artefact is a different file in a different prefix. Drill the pair with `08.H`. ADR-019:177 records that R8 has not passed against the pair.
 
 ## Prerequisites
 
@@ -232,6 +236,148 @@ The pair keeps `enableSuperuserAccess: false`, so the `postgres` role has a NULL
 1. Verify with §D's row counts against the `artemis` database, then confirm `/healthz` and a live deploy.
 
 A restore into a rebuilt pair is a different case again: let `bootstrap.initdb` create the database and the owner from `artemis-pg-app`, then replay the dump. Do not hand-create the owner role.
+
+## H — Drill the pair (`artemis-pg`)
+
+**Status: not yet run. Run on: —**
+
+This is the R8 rehearsal for the CloudNativePG pair. ADR-019:177 records that R8 has passed only against the legacy StatefulSet dump. The 2026-06-05 and 2026-08-25 runs both drilled `artemis-gxy-management`, not the pair.
+
+`postgresCluster.cutover` is `true`, so the live `artemis` database — registry, deploys, outbox, audit log, tombstones — is on the pair. The StatefulSet artefact no longer carries it.
+
+### What is different from A to F
+
+| | StatefulSet artefact | pair artefact |
+| --- | --- | --- |
+| R2 prefix | `artemis/gxy-management/` | `artemis/gxy-management/pg/` |
+| producer | `artemis-backup` CronJob | `artemis-pg-backup` CronJob |
+| files | `artemis-<ts>.sql.gz` | `artemis-<ts>.sql.gz` **and** `artemis-roles-<ts>.sql` |
+| command | `pg_dumpall --clean --if-exists` | `pg_dump --clean --if-exists -d artemis` |
+| databases | `artemis` + `hatchet` | `artemis` only |
+| completion sentinel | `PostgreSQL database cluster dump complete` | `PostgreSQL database dump complete` |
+| roles | inside the dump, with passwords | a separate file, **without** passwords |
+
+Use the §B sentinel from the right row. The pair's dump is `pg_dump`, not `pg_dumpall`, so the word `cluster` is absent and the §B check fails on a good artefact.
+
+### H1 — Confirm the pair's backup is current
+
+```sh
+cd $HOME/DEV/fCC/infra/k3s/gxy-management
+export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
+
+kubectl -n artemis get cronjob artemis-pg-backup \
+  -o jsonpath='schedule={.spec.schedule}{"\n"}lastSuccessful={.status.lastSuccessfulTime}{"\n"}'
+```
+
+Expect `schedule=0 2 * * *` and `lastSuccessful` within the past ~26 hours. Force a run the same way §A does, with `--from=cronjob/artemis-pg-backup`.
+
+### H2 — Record the live counts first
+
+The gate compares the restored counts against the live pair. Read the live numbers **before** the restore, from the primary.
+
+```sh
+PRIMARY=$(kubectl -n artemis get pod \
+  -l cnpg.io/cluster=artemis-pg,cnpg.io/instanceRole=primary \
+  -o jsonpath='{.items[0].metadata.name}')
+
+kubectl -n artemis exec "$PRIMARY" -- psql -U postgres -d artemis -tAc "
+SELECT 'deploys', count(*) FROM deploys
+UNION ALL SELECT 'sites', count(*) FROM sites;"
+```
+
+Write both numbers down. The drill is a comparison, and a count read after the restore proves nothing.
+
+Reference, read from `artemis-pg-2` on 2026-09-11 12:26 UTC: `deploys=327`, `sites=73`, `aliases=123`, `outbox=305`, `tombstones=29`, `repo_requests=23`. All six tables are populated, so a zero in any of them is a finding, not an empty-cluster case.
+
+### H3 — Pull the two artefacts
+
+Run §B's rclone block unchanged for the credentials and the `RCLONE_CONFIG_R2_*` exports, then substitute the prefix and pull both files:
+
+```sh
+BUCKET=universe-static-apps-01
+PREFIX=artemis/gxy-management/pg
+
+DUMP=$(rclone lsf "r2:${BUCKET}/${PREFIX}/" --include 'artemis-*.sql.gz' | sort | tail -1)
+[ -n "$DUMP" ] || { echo "FAIL: no dump under r2:${BUCKET}/${PREFIX}/"; exit 1; }
+STAMP=${DUMP#artemis-}; STAMP=${STAMP%.sql.gz}
+ROLES="artemis-roles-${STAMP}.sql"
+echo "Target: $DUMP + $ROLES"
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+rclone copyto "r2:${BUCKET}/${PREFIX}/${DUMP}"  "${TMP}/${DUMP}"
+rclone copyto "r2:${BUCKET}/${PREFIX}/${ROLES}" "${TMP}/${ROLES}"
+
+gunzip -t "${TMP}/${DUMP}" || { echo "FAIL: gunzip integrity"; exit 1; }
+gunzip -c "${TMP}/${DUMP}" | tail -10 \
+  | grep -q 'PostgreSQL database dump complete' \
+  || { echo "FAIL: completion sentinel missing"; exit 1; }
+[ -s "${TMP}/${ROLES}" ] || { echo "FAIL: roles file empty"; exit 1; }
+echo "OK: ${DUMP} + ${ROLES}"
+```
+
+The two files share one timestamp because the CronJob writes them in one run. A dump with no matching roles file means the run failed between the two uploads — take the previous pair.
+
+### H4 — Restore into a scratch Postgres
+
+Bring the scratch pod up exactly as §C does. Then replay the roles file first, create the database, and replay the dump as its owner.
+
+```sh
+SCRATCH=artemis-restore-drill
+# ... §C's `kubectl run` block, unchanged ...
+
+kubectl -n artemis cp "${TMP}/${ROLES}" "${SCRATCH}:/tmp/${ROLES}"
+kubectl -n artemis cp "${TMP}/${DUMP}"  "${SCRATCH}:/tmp/${DUMP}"
+
+kubectl -n artemis exec "$SCRATCH" -- bash -c "
+  set -e
+  psql -U postgres -v ON_ERROR_STOP=1 -f /tmp/${ROLES}
+  psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE artemis OWNER artemis'
+  gunzip -c /tmp/${DUMP} | psql -U postgres -d artemis -v ON_ERROR_STOP=0 \
+    >/tmp/restore.log 2>&1
+  tail -5 /tmp/restore.log
+"
+
+kubectl -n artemis exec "$SCRATCH" -- bash -c \
+  'grep -c "^ERROR:" /tmp/restore.log; grep "^ERROR:" /tmp/restore.log | sort -u'
+```
+
+The roles file replays under `ON_ERROR_STOP=1`. Every statement is a `DO` block guarded by `IF NOT EXISTS`, so a correct file raises nothing and any error is a finding.
+
+The dump replays under `ON_ERROR_STOP=0` for the same reason §C does: `--clean` drops objects that a fresh database does not have. Expect only `ERROR: ... does not exist, skipping` forms from the `DROP` preamble. **Any error outside that form fails the drill.** A `does not exist` on a `CREATE` or a `COPY` is not part of the preamble and is a finding.
+
+The roles carry no password, so the restored `artemis` role cannot log in. That is correct for a drill and is the defect a production restore must repair — see §G.
+
+### H5 — Compare against the live counts
+
+```sh
+kubectl -n artemis exec "$SCRATCH" -- psql -U postgres -d artemis -tAc "
+SELECT 'deploys', count(*) FROM deploys
+UNION ALL SELECT 'aliases', count(*) FROM aliases
+UNION ALL SELECT 'tombstones', count(*) FROM tombstones
+UNION ALL SELECT 'outbox', count(*) FROM outbox
+UNION ALL SELECT 'sites', count(*) FROM sites
+UNION ALL SELECT 'repo_requests', count(*) FROM repo_requests;"
+```
+
+Pass criteria:
+
+- All six tables resolve. A missing table means a partial dump.
+- `sites` equals the H2 number, or is lower by the sites registered since the dump ran. A higher count is impossible and is a finding.
+- `deploys` is at or below the H2 number, for the same reason.
+- The restore log holds no error outside the `DROP ... does not exist, skipping` form.
+
+Tear the scratch pod down with §E.
+
+### H6 — Record the result
+
+Replace the status line at the top of this section:
+
+```
+**Status: PASSED. Run on: <YYYY-MM-DD>.** Artefact `artemis-<ts>.sql.gz`. sites=<n> against live <n>. deploys=<n> against live <n>. Errors outside the DROP preamble: 0.
+```
+
+A drill with no recorded date has not been run. Do not write the line before the run.
 
 ## Related
 
