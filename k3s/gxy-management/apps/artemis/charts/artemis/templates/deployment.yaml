@@ -85,10 +85,12 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
-            # /readyz pings Valkey + HEADs R2; pods are removed from the
-            # Service endpoints when either upstream is unreachable.
-            # Sequential probe budget = 2 × 3s; failureThreshold gives
-            # ~30s grace before the pod is taken out of rotation.
+            # /readyz pings Valkey, HEADs R2 and pings Postgres. Ruling
+            # 2026-09-11: no upstream failure returns 503. Each one sets
+            # degraded: true in a 200 and Sentry pages, because all
+            # replicas share each upstream and a 503 would empty the
+            # Service on one correlated fault. Only a pod that cannot
+            # answer the probe at all leaves the endpoints.
             httpGet:
               path: /readyz
               port: http
