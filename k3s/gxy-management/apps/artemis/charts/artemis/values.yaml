@@ -305,7 +305,7 @@ postgresCluster:
       memory: 1Gi
     limits:
       cpu: "1"
-      memory: 4Gi
+      memory: 1536Mi
 
 pgBackup:
   enabled: false

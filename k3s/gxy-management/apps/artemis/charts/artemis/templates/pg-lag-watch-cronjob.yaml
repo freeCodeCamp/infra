@@ -82,19 +82,19 @@ spec:
                 - /scripts/report.py
               env:
                 - name: MIN_STANDBYS
-                  value: {{ .Values.pgLagWatch.minStandbys | quote }}
+                  value: {{ .Values.pgLagWatch.minStandbys | int64 | quote }}
                 - name: MAX_LAG_BYTES
-                  value: {{ .Values.pgLagWatch.maxLagBytes | quote }}
+                  value: {{ .Values.pgLagWatch.maxLagBytes | int64 | quote }}
                 - name: MONITOR_SLUG
                   value: {{ .Values.pgLagWatch.monitorSlug | quote }}
                 - name: MONITOR_SCHEDULE
                   value: {{ .Values.pgLagWatch.schedule | quote }}
                 - name: MONITOR_CHECKIN_MARGIN
-                  value: {{ .Values.pgLagWatch.monitorCheckinMargin | quote }}
+                  value: {{ .Values.pgLagWatch.monitorCheckinMargin | int64 | quote }}
                 - name: MONITOR_MAX_RUNTIME
-                  value: {{ .Values.pgLagWatch.monitorMaxRuntime | quote }}
+                  value: {{ .Values.pgLagWatch.monitorMaxRuntime | int64 | quote }}
                 - name: MONITOR_FAILURE_THRESHOLD
-                  value: {{ .Values.pgLagWatch.monitorFailureThreshold | quote }}
+                  value: {{ .Values.pgLagWatch.monitorFailureThreshold | int64 | quote }}
                 - name: MONITOR_TIMEZONE
                   value: {{ .Values.pgLagWatch.monitorTimezone | quote }}
                 - name: ENVIRONMENT
