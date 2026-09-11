@@ -142,6 +142,45 @@ The backup job exports role definitions as idempotent `DO` blocks with no passwo
 
 The primary moves after a failover. Reach it through the `artemis-pg-rw` service or the label `cnpg.io/instanceRole=primary`. Never name a pod ordinal.
 
+### WAL archiving — ruling 2026-09-11
+
+**The nightly dump is the floor. There is no WAL archive and none is planned for this store.**
+`spec.backup` on the `artemis-pg` Cluster is null, so no `barmanObjectStore` and no
+`archive_command`. Streaming replication to the standby is not WAL archiving: it protects against
+instance loss, not against a logical fault that both instances replay.
+
+RPO is therefore up to 24 hours, bounded by the `artemis-pg-backup` CronJob. RTO for instance loss
+is the standby promotion time; RTO for data loss is a restore from the dump.
+
+Four measurements support the ruling.
+
+| measurement | value on 2026-09-11 |
+| --- | --- |
+| `artemis` database size | 12 MB |
+| `pg_wal` on the primary | 561 MB |
+| filesystem the PVC sits on | 309 G total, 275 G free |
+| `spec.backup` | null |
+
+- **The data does not justify it.** A 12 MB database restores from a dump in seconds. WAL-continuous
+  buys an RPO of 5 minutes instead of 24 hours on the registry, the deploy index, the outbox and the
+  audit log.
+- **Most of a lost day is recoverable elsewhere.** Deploy bytes live in R2, and the nightly
+  `drift-detect` sweep re-indexes what the index lost. The registry rows are the part that is not
+  recoverable, and they change on the order of once a week.
+- **It would add a failure mode this wave exists to remove.** With a `barmanObjectStore`, a failing
+  `archive_command` holds WAL segments on the data volume until the archive drains. `local-path` is
+  hostPath-backed with no quota — `df` inside the pod reports the node's 309 G filesystem, not the
+  declared `10Gi` — so an R2 outage would fill the **node** disk and take down every pod on that
+  node, not only Postgres. `max_slot_wal_keep_size: 2GB` bounds what a replication slot retains. It
+  does not bound an archive backlog.
+- **The ADR already says so.** ADR-019's 2026-09-11 amendment records that the GA floor for this
+  store is no longer `RPO <= 5 min`; the operator ruling in ADR-023 §Database sets a daily RPO and
+  an RTO equal to the standby promotion time.
+
+Revisit when one of these changes: the database outgrows a dump-and-restore window, a storage class
+with an enforced quota and volume expansion replaces `local-path`, or a `walStorage` volume with its
+own bounded retention is added.
+
 ### Release order
 
 Release `cnpg-system` first. The artemis chart declares a `Cluster`, and the CRD does not exist until the operator is installed.
