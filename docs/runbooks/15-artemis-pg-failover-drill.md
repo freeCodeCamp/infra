@@ -108,6 +108,35 @@ Real write unavailability was therefore about **3 seconds**, at the end of the w
 
 The cost of the 183s is a delayed handover, not an outage. It matters for a planned `kubectl delete pod`, which is what a chart change or a drain performs. It should not apply to an unplanned instance loss, where there is no old primary to wait for and `failoverDelay` is 0 — section C measures that case and has not been run.
 
+### Re-run after the `smartShutdownTimeout: 15` release
+
+Run this once the artemis chart release lands. `helm template` renders `smartShutdownTimeout: 15`; the live `spec` reads 180 until then. Read the live value first:
+
+```sh
+kubectl -n artemis get cluster artemis-pg -o jsonpath='{.spec.smartShutdownTimeout}{"\n"}'
+```
+
+Two readings disagree and this run decides between them:
+
+- **The field bounds the 183s.** 183 is a near-exact match for the 180s default, so the smart phase ran its full length and a held `pgx` connection kept it there. This run then measures about 18s.
+- **The field does not apply.** CloudNativePG runs `TryShuttingDownFastImmediate` on a deleted primary, bounded by `switchoverDelay` (3600s). This run then measures 183s again and the cause is still open.
+
+Start both log captures BEFORE the delete. The old pod's logs die with the pod, which is why the first run explained nothing:
+
+```sh
+kubectl -n artemis logs -f "$PRIMARY" -c postgres > /tmp/old-primary.log &
+kubectl -n cnpg-system logs -f -l app.kubernetes.io/name=cloudnative-pg > /tmp/operator.log &
+```
+
+Then run section B above and fill this table:
+
+| mark                       | time | delta from delete |
+| -------------------------- | ---- | ----------------- |
+| `currentPrimary` changes   | —    | —                 |
+| `readyInstances` back to 2 | —    | —                 |
+
+Write the result into §G and name which of the two readings held.
+
 ## C — Node loss
 
 A node carrying an instance goes away. Two cases behave differently, and the difference is the `artemis-pg-primary` PodDisruptionBudget.
