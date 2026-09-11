@@ -104,6 +104,8 @@ service:
 # ---------------------------------------------------------------------
 env:
   R2_BUCKET: "universe-static-apps-01"
+  # Cloudflare zone id; empty keeps the post-deploy edge purge OFF.
+  CF_ZONE_ID: ""
   GH_ORG: "freeCodeCamp-Universe"
   GH_API_BASE: "https://api.github.com"
   # Valkey registry — required by artemis since the `sites_yaml` backend
@@ -185,6 +187,9 @@ secretEnv:
   GH_APP_INSTALLATION_ID: null
   GH_APP_PRIVATE_KEY: null
   SENTRY_DSN: null
+  # Cloudflare API token, Zone.Cache Purge on the zone in env.CF_ZONE_ID.
+  # Leave null to keep the post-deploy edge purge OFF.
+  CF_PURGE_API_TOKEN: null
 
 # ---------------------------------------------------------------------
 # Gateway / HTTPRoute (Traefik gatewayClassName) — public surface

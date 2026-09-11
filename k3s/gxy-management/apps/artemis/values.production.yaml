@@ -43,6 +43,8 @@ env:
   REGISTRY_AUTHZ_TEAM: "staff"
   REPO_APPROVE_AUTHZ_TEAM: "gh-artemis-approvers"
   JWT_TTL_SECONDS: "900"
+  # freecode.camp zone. The purge token rides in via secretEnv (sops overlay).
+  CF_ZONE_ID: "bd950c5102bec0c41541b6a355969c24"
   GH_MEMBERSHIP_CACHE_TTL: "300"
   # Site key in R2 = `<site>.freecode.camp` (full FQDN). Matches the
   # cassiopeia caddy r2_alias module's parseSiteAndAlias which returns

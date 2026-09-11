@@ -51,6 +51,7 @@ spec:
               - matchPattern: "ghcr.io"
               - matchPattern: "*.ingest.sentry.io"
               - matchPattern: "*.ingest.*.sentry.io"
+              - matchName: "api.cloudflare.com"
               # In-cluster service DNS — required for the Valkey
               # registry resolution (`valkey.valkey.svc.cluster.local`).
               # Cilium DNS `matchPattern` wildcards do NOT cross dots
@@ -81,6 +82,13 @@ spec:
     - toFQDNs:
         - matchPattern: "*.ingest.sentry.io"
         - matchPattern: "*.ingest.*.sentry.io"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    # Cloudflare API — edge cache purge after an alias write.
+    - toFQDNs:
+        - matchName: "api.cloudflare.com"
       toPorts:
         - ports:
             - port: "443"

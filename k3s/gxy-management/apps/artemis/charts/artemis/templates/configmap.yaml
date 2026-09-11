@@ -26,6 +26,11 @@ data:
   REPO_APPROVE_AUTHZ_TEAM:      {{ default "gh-artemis-approvers" .Values.env.REPO_APPROVE_AUTHZ_TEAM | quote }}
   ENVIRONMENT:                  {{ default "development" .Values.env.ENVIRONMENT | quote }}
   SENTRY_TRACES_SAMPLE_RATE:    {{ default "0.2" .Values.env.SENTRY_TRACES_SAMPLE_RATE | quote }}
+  {{- if .Values.env.CF_ZONE_ID }}
+  # Edge purge after every alias write. Pairs with secretEnv.CF_PURGE_API_TOKEN;
+  # artemis refuses to boot with only one of the two set.
+  CF_ZONE_ID:                   {{ .Values.env.CF_ZONE_ID | quote }}
+  {{- end }}
   {{- if .Values.postgres.enabled }}
   CLEANUP_BLAST_CAP:            {{ default "0" .Values.env.CLEANUP_BLAST_CAP | quote }}
   CLEANUP_DRY_RUN:              {{ default "false" .Values.env.CLEANUP_DRY_RUN | quote }}
