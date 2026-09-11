@@ -220,6 +220,25 @@ kubectl -n artemis exec "$PRIMARY" -c postgres -- psql -U postgres -d artemis -t
 
 On 2026-09-11 those read 248 and 324. The gap is what a rollback discards.
 
+### Hatchet during the cutover window
+
+The cutover release restarts the three artemis pods, and each pod runs one Hatchet worker. The window does not read as an incident. Measured on the engine pod that survived the cutover, `hatchet-engine-74f79677d7-5kjj8`, over 06:00Z to 08:00Z on 2026-09-11:
+
+| signal                            | result                                       |
+| --------------------------------- | -------------------------------------------- |
+| engine `ERR` and `FTL` lines      | 0                                            |
+| sampled worker-count lines        | 36, every one reporting `for 3 workers`      |
+| `outbox` rows unpublished         | 0 of 299                                     |
+
+The engine samples the worker count only when the listing is slow, so those 36 lines do not exclude a dip shorter than the gap between them. They do show the fleet back at 3 on both sides of the window, and the empty outbox shows nothing was dropped.
+
+Expect this noise and do not treat it as a fault:
+
+- `WRN replenishing slots took longer than 100ms`, `WRN concurrency strategy N took longer than 100ms`, and `WRN long lock .../scheduler.go:1162`. These run continuously, not only at a cutover.
+- One `Readiness probe failed: HTTP probe failed with statuscode: 503` per engine pod restart.
+
+`site.lifecycle` runs are durable. A run in flight when a worker goes away is re-claimed after the 5-minute claim expiry, and the relay retries an unpublished `outbox` row after 60 seconds. Neither needs an operator. The one real signal is a **missed** Sentry cron check-in, which happens only if the window spans 03:00Z or 04:00Z. A *red* check-in is different: that means the job ran and failed.
+
 ### The soak, and dropping the frozen copy
 
 Keep the frozen `artemis` database on the StatefulSet for a **14-day soak** from the cutover date. It is the rollback target, and it costs 12 MB.
