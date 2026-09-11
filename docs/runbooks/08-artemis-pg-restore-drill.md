@@ -10,9 +10,9 @@ Prior: 2026-06-05 — R8 drill PASSED (dossier `2026-06-02-artemis-durable-exec-
 
 The artemis durable-exec substrate is a single-node bundled Postgres StatefulSet (`artemis-postgresql`) shared by two tenants — the `artemis` database (deploy/GC bookkeeping) and the `hatchet` database (engine state). Its availability floor is **not replication** — it is the nightly logical backup to R2 plus this rehearsed restore (chart `values.yaml` `postgres:` block; ADR-020 §3). This runbook restores the newest R2 dump into a throwaway scratch Postgres, sanity-checks row counts, and records the RPO/RTO the artefact actually delivers.
 
-It is a **drill**: nothing here touches the live `artemis-postgresql` StatefulSet or the live databases. The scratch pod is a standalone `postgres:16-alpine` with no tenant labels, so neither the live PG nor the postgres NetworkPolicy is involved. A real production restore (overwrite the live instance) is a separate, destructive procedure — out of scope here; this drill is the confidence check that such a restore would succeed.
+It is a **drill**: sections A to F touch neither the live `artemis-postgresql` StatefulSet nor the live databases. The scratch pod is a standalone `postgres:16-alpine` with no tenant labels, so neither the live PG nor the postgres NetworkPolicy is involved. A destructive production restore is section **G**, and it is the reason this drill exists.
 
-`08.A` confirms a backup exists; `08.B` pulls + integrity-checks the artefact; `08.C` restores into a scratch PG; `08.D` is the row-count sanity gate; `08.E` tears the scratch pod down; `08.F` is the RPO/RTO statement.
+`08.A` confirms a backup exists; `08.B` pulls + integrity-checks the artefact; `08.C` restores into a scratch PG; `08.D` is the row-count sanity gate; `08.E` tears the scratch pod down; `08.F` is the RPO/RTO statement; `08.G` is the destructive production restore.
 
 ## Prerequisites
 
@@ -183,6 +183,45 @@ The drill validates the **M1 stateful floor** for artemis-PG, not the GA (CNPG-s
 The serve plane (Caddy + R2) is unaffected by a PG outage — only new deploys + retention GC pause (ADR-016 consequence; ADR-020 §3 "HA scope = artemis only"). The ADR-019 GA target of RPO \<= 5 min (WAL-continuous) and RTO \<= 30-60 min lands at the platform CNPG sweep, which folds artemis-PG into the operator-managed T1+T2 ladder — that is OUT OF SCOPE for the M1 bundled profile this drill covers (ADR-020 §3 D1; chart `values.yaml` `postgres:` PG-HA posture note).
 
 Rehearse this drill before declaring artemis-PG GA, and after any change to the backup CronJob, the `postgres-rclone` image, or the bundled PG version.
+
+## G — Production restore (destructive)
+
+Run this only after a real data loss, and only with an announced window. Sections A to F are the rehearsal; this is the act.
+
+### Decide which instance
+
+Two Postgres instances now run in namespace `artemis`. Answer this first, because the artefact and the procedure differ.
+
+| target | holds | artefact | restore path |
+| --- | --- | --- | --- |
+| `artemis-postgresql` StatefulSet | the `hatchet` database, and the `artemis` database until cutover | `artemis-<ts>.sql.gz`, a `pg_dumpall` of both tenants | scale to zero, replay as superuser, scale back |
+| `artemis-pg` CloudNativePG pair | the `artemis` database after cutover | `artemis-<ts>.sql.gz` plus `artemis-roles-<ts>.sql` under `artemis/<galaxy>/pg/` | replay into the primary as the `artemis` owner |
+
+Read `postgresCluster.cutover` in `k3s/gxy-management/apps/artemis/values.production.yaml` to learn which instance artemis is using right now. `false` means the StatefulSet. Restoring the wrong instance loses the window and changes nothing.
+
+### Into the StatefulSet
+
+1. Announce. Deploys and GC stop. Serving continues from R2.
+1. `kubectl -n artemis scale statefulset artemis-postgresql --replicas=0`, then back to 1 once the volume is clear. See [12-node-drain-maintenance.md](12-node-drain-maintenance.md) for the disruption posture.
+1. Replay the `pg_dumpall` artefact as the superuser, exactly as §C does against the scratch pod.
+1. Verify with §D, then confirm recovery per [11-artemis-pg-outage-drill.md](11-artemis-pg-outage-drill.md).
+
+### Into the CloudNativePG pair
+
+The pair keeps `enableSuperuserAccess: false`, so the `postgres` role has a NULL password and no client can authenticate as it. The backup job therefore runs as the `artemis` owner and writes two files, not one.
+
+1. Resolve the primary by label. Never name a pod ordinal — the primary moves after a failover.
+
+   ```sh
+   kubectl -n artemis get pod -l cnpg.io/cluster=artemis-pg,cnpg.io/instanceRole=primary -o name
+   ```
+
+1. Replay `artemis-roles-<ts>.sql` first. Each statement is a `DO` block guarded by `IF NOT EXISTS`, so a replay into a cluster that already has `artemis` or `streaming_replica` is safe.
+1. **The exported roles carry no password.** The job cannot read `rolpassword` without superuser. Set each password again from the sops overlay after the replay, or the owner cannot log in.
+1. Replay `artemis-<ts>.sql.gz`. It is `pg_dump --clean --if-exists` of the `artemis` database alone. It does not carry `hatchet`.
+1. Verify with §D's row counts against the `artemis` database, then confirm `/healthz` and a live deploy.
+
+A restore into a rebuilt pair is a different case again: let `bootstrap.initdb` create the database and the owner from `artemis-pg-app`, then replay the dump. Do not hand-create the owner role.
 
 ## Related
 
