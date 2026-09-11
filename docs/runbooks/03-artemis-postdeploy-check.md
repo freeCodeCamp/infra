@@ -190,11 +190,12 @@ Expect two chart-managed CronJobs:
 | Name                | Schedule       | Gate                  |
 | ------------------- | -------------- | --------------------- |
 | `artemis-backup`    | `0 2 * * *`    | `backup.enabled`      |
+| `artemis-pg-backup` | `0 2 * * *`    | `pgBackup.enabled`    |
 | `artemis-oom-watch` | `*/15 * * * *` | `oomWatch.enabled`    |
 
 Full backup verify + restore drill is runbook 08; this check only confirms the chart rendered them. A missing CronJob on a `backup.enabled` deployment means the overlay did not flip `backup.enabled: true`.
 
-Any third CronJob in this namespace is drift. The hand-applied `pool-baseline` sampler was retired on 2026-08-24; see [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
+Any fourth CronJob in this namespace is drift. The hand-applied `pool-baseline` sampler was retired on 2026-08-24; see [`../architecture/rfc-pg-oom-alerting.md`](../architecture/rfc-pg-oom-alerting.md).
 
 ### 4a. OOM watcher is alive
 

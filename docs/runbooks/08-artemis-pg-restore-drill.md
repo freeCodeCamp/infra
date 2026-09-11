@@ -2,7 +2,7 @@
 
 **Type:** Operator. Disaster-recovery rehearsal (read-mostly; writes only to a throwaway scratch pod). **Cluster:** `gxy-management`. Namespace: `artemis`. **Spec:** chart at `k3s/gxy-management/apps/artemis/`. Stateful floor: ADR-019 §Stateful-pillar backup pattern + ADR-020 (durable-execution model).
 
-**Last rehearsed:** 2026-08-25 — PASSED. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
+**Last rehearsed:** 2026-08-25 — PASSED, and now **stale**: the backup CronJob changed bucket on 2026-09-11 (`94b7b97a`), which this section's own rule below requires a re-rehearsal for. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
 
 **The pair is not rehearsed.** Both runs below drilled the `artemis-postgresql` StatefulSet. `postgresCluster.cutover` is `true` since 2026-09-11, so the live `artemis` database is on the CloudNativePG pair and no drill has read its artefact. §H is the procedure. Until §H records a date, the pair has a backup that nobody has restored.
 
@@ -74,6 +74,9 @@ export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
 export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
 export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
 
+# Until the T17 migration lands, the surviving artefacts are still in the old
+# bucket. A `no .sql.gz` failure here means you need the line below instead.
+#   BUCKET=universe-static-apps-01
 BUCKET=management-cnpg-backups
 PREFIX=artemis/gxy-management
 
@@ -296,6 +299,9 @@ Reference, read from `artemis-pg-2` on 2026-09-11 12:26 UTC: `deploys=327`, `sit
 Run §B's rclone block unchanged for the credentials and the `RCLONE_CONFIG_R2_*` exports, then substitute the prefix and pull both files:
 
 ```sh
+# Until the T17 migration lands, the surviving artefacts are still in the old
+# bucket. A `no .sql.gz` failure here means you need the line below instead.
+#   BUCKET=universe-static-apps-01
 BUCKET=management-cnpg-backups
 PREFIX=artemis/gxy-management/pg
 

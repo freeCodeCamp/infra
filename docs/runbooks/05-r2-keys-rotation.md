@@ -32,7 +32,7 @@ Use this on first artemis bring-up or on rotation. Steps 1–4 are ClickOps; ste
 1. Cloudflare Dashboard → R2 → **Manage R2 API Tokens** → **Create API Token**.
 1. Token name: `universe-static-apps-01-artemis-admin-<YYYYMMDD>` (date suffix lets two coexist during rotation).
 1. Permissions: **Object Read & Write**.
-1. Specify bucket: `universe-static-apps-01`.
+1. Specify bucket: `universe-static-apps-01` **and** `management-cnpg-backups`. A single-bucket token breaks the nightly Postgres backup — both artemis CronJobs reuse these keys and write to the backup bucket (`backup.bucket`, `pgBackup.bucket`; ADR-019:86).
 1. TTL: none (rotated every 90 days).
 1. **Create** → capture three values shown once:
    - Access Key ID

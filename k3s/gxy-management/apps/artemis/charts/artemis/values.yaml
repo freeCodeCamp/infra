@@ -330,7 +330,7 @@ postgresCluster:
 pgBackup:
   enabled: false
   # ADR-019 §Stateful-pillar: per-galaxy backup bucket, never the serve bucket.
-  bucket: "management-cnpg-backups"
+  bucket: ""
   image: ghcr.io/freecodecamp/postgres-rclone@sha256:fbedc38a76b25ab22cf2acb986a7538cf46b6bf3d62b30d00b50f94dd7b0335e
   schedule: "0 2 * * *"
   retention: 7d
@@ -403,7 +403,7 @@ oomWatch:
 backup:
   enabled: false
   # ADR-019 §Stateful-pillar: per-galaxy backup bucket, never the serve bucket.
-  bucket: "management-cnpg-backups"
+  bucket: ""
   # postgres-rclone image -- pg_dumpall + rclone in one run-once-and-die
   # rootfs. Digest-pinned; build is workflow_dispatch-only
   # (.github/workflows/docker--postgres-rclone.yml). Its pg client MUST
