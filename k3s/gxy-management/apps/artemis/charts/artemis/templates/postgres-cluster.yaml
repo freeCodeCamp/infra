@@ -61,7 +61,7 @@ spec:
     podAntiAffinityType: required
 
   nodeMaintenanceWindow:
-    inProgress: false
+    inProgress: {{ .Values.postgresCluster.maintenanceInProgress }}
     reusePVC: {{ .Values.postgresCluster.reusePVC }}
 
   resources:
