@@ -28,7 +28,7 @@ spec:
               {{- range .Values.oomWatch.sentryFqdnPatterns }}
               - matchPattern: {{ . | quote }}
               {{- end }}
-              - matchName: "{{ .Release.Name }}-rw.{{ .Values.namespace }}.svc.cluster.local"
+              - matchName: "{{ .Release.Name }}-pg-rw.{{ .Values.namespace }}.svc.cluster.local"
               - matchPattern: "*.*.svc.cluster.local"
     - toFQDNs:
         {{- range .Values.oomWatch.sentryFqdnPatterns }}
@@ -41,7 +41,7 @@ spec:
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
-            "k8s:cnpg.io/cluster": {{ .Release.Name }}
+            "k8s:cnpg.io/cluster": {{ .Release.Name }}-pg
       toPorts:
         - ports:
             - port: "5432"

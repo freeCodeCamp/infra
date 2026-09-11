@@ -46,7 +46,7 @@ spec:
   description: "artemis CloudNativePG instances: operator status on 8000, SQL and streaming replication on 5432"
   endpointSelector:
     matchLabels:
-      "cnpg.io/cluster": {{ .Release.Name }}
+      "cnpg.io/cluster": {{ .Release.Name }}-pg
   ingress:
     - fromEndpoints:
         - matchLabels:
@@ -79,7 +79,7 @@ spec:
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
-            "k8s:cnpg.io/cluster": {{ .Release.Name }}
+            "k8s:cnpg.io/cluster": {{ .Release.Name }}-pg
       toPorts:
         - ports:
             - port: "5432"

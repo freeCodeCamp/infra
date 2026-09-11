@@ -101,7 +101,7 @@ spec:
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
-            "k8s:cnpg.io/cluster": {{ .Release.Name }}
+            "k8s:cnpg.io/cluster": {{ .Release.Name }}-pg
       toPorts:
         - ports:
             - port: "5432"

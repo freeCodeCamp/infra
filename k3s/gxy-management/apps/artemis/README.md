@@ -113,7 +113,9 @@ E2E smoke: `just verify-artemis`.
 
 ## Postgres: the replicated pair
 
-`postgresCluster` declares a CloudNativePG `Cluster` named `artemis`. It is disabled by default. The operator comes from `apps/cnpg-system`.
+`postgresCluster` declares a CloudNativePG `Cluster` named `artemis-pg`. It is disabled by default. The operator comes from `apps/cnpg-system`.
+
+The name must not be `artemis`. CloudNativePG creates a PodDisruptionBudget with the same name as the `Cluster`, and the chart already owns a PodDisruptionBudget named `artemis` for the deploy-proxy Deployment (`templates/pdb.yaml`). Two owners of one object is a release failure.
 
 It runs beside the legacy `postgres` StatefulSet, not in place of it. The StatefulSet keeps the `hatchet` database until ADR-023 moves it. Do not set `postgres.enabled: false` — that deletes the instance Hatchet still uses.
 
@@ -125,10 +127,11 @@ Four settings carry a ruling of 2026-09-11 and must not change without a new one
 | `nodeMaintenanceWindow.reusePVC` | `true`     | `local-path` pins a volume to one node and cannot expand it. A drain must rebuild elsewhere, never wait.  |
 | `enableSuperuserAccess`          | `false`    | The `postgres` role keeps a NULL password. The backup job runs as the owner and exports roles separately. |
 | `max_slot_wal_keep_size`         | `2GB`      | An orphaned replication slot would otherwise fill a 10Gi volume that cannot be expanded.                  |
+| `managed.roles` `pg_read_all_stats` | granted to `artemis` | `pg_stat_replication` returns NULL in every LSN column to a non-superuser without it. The lag watch would then read `lag_bytes=0` forever and never alert. |
 
 The `artemis-pg-app` secret is `kubernetes.io/basic-auth` and carries the encrypted `ARTEMIS_DB_PASSWORD` from the overlay. CloudNativePG would otherwise generate its own password and `DATABASE_URL` would have two owners. The secret username must equal the `initdb` owner.
 
-The primary moves after a failover. Reach it through the `artemis-rw` service or the label `cnpg.io/instanceRole=primary`. Never name a pod ordinal.
+The primary moves after a failover. Reach it through the `artemis-pg-rw` service or the label `cnpg.io/instanceRole=primary`. Never name a pod ordinal.
 
 ### Release order
 
@@ -152,4 +155,4 @@ While `cutover` is `false` the pair runs empty and artemis keeps talking to the 
 
 Setting `postgres.enabled: false` deletes the instance Hatchet uses, and also drops the hatchet gRPC egress rule in `networkpolicy.yaml` — the rule sits inside that same conditional. The hatchet move is the ADR-023 successor wave.
 
-The cutover flips `cutover` to `true` and points `DATABASE_URL` at `artemis-rw` with `sslmode=require`. `verify-full` needs the CloudNativePG CA mounted into the Deployment and is a separate change.
+The cutover flips `cutover` to `true` and points `DATABASE_URL` at `artemis-pg-rw` with `sslmode=require`. `verify-full` needs the CloudNativePG CA mounted into the Deployment and is a separate change.

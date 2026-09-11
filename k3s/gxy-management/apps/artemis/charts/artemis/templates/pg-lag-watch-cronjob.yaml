@@ -44,13 +44,16 @@ spec:
                 - -c
                 - |
                   set -euo pipefail
-                  read -r STANDBYS LAG <<<"$(psql -d artemis -tAF' ' -c \
-                    "SELECT count(*), coalesce(max(pg_wal_lsn_diff(sent_lsn, replay_lsn)), 0)::bigint FROM pg_stat_replication")"
+                  psql -d artemis -tAF' ' -c \
+                    "SELECT count(*), coalesce(max(pg_wal_lsn_diff(sent_lsn, replay_lsn)), 0)::bigint FROM pg_stat_replication" \
+                    > /work/probe.out
+                  read -r STANDBYS LAG < /work/probe.out
+                  [ -n "${STANDBYS:-}" ] && [ -n "${LAG:-}" ] || exit 1
                   printf 'standbys=%s lag_bytes=%s\n' "${STANDBYS}" "${LAG}" > /work/lag.txt
                   cat /work/lag.txt
               env:
                 - name: PGHOST
-                  value: {{ .Release.Name }}-rw
+                  value: {{ .Release.Name }}-pg-rw
                 - name: PGUSER
                   value: artemis
                 - name: PGSSLMODE

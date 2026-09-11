@@ -14,7 +14,7 @@ stringData:
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ .Release.Name }}-pg
   labels:
     {{- include "artemis.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres-cluster
@@ -32,6 +32,17 @@ spec:
       dataChecksums: true
 
   enableSuperuserAccess: false
+
+  managed:
+    roles:
+      - name: artemis
+        ensure: present
+        login: true
+        superuser: false
+        inRoles:
+          - pg_read_all_stats
+        passwordSecret:
+          name: {{ .Release.Name }}-pg-app
 
   storage:
     storageClass: {{ .Values.postgresCluster.storageClassName }}

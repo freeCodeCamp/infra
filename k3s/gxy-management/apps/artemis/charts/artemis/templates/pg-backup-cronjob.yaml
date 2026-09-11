@@ -74,7 +74,7 @@ spec:
                 - name: GALAXY
                   value: {{ .Values.pgBackup.galaxy | quote }}
                 - name: PGHOST
-                  value: {{ .Release.Name }}-rw
+                  value: {{ .Release.Name }}-pg-rw
                 - name: PGUSER
                   value: artemis
                 - name: PGSSLMODE
