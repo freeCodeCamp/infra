@@ -20,11 +20,11 @@ type: application
 # Chart version — bump on every rollout, chart-shape change or not, so that
 # `helm list` and `helm history` name each deploy on their own without a
 # reader having to correlate the APP VERSION column.
-version: 0.9.4
+version: 0.9.5
 # appVersion tracks the artemis service tag in GHCR — bump alongside
 # image tag rolls in values.production.yaml so `helm list` reflects
 # what is actually running.
-appVersion: "1.11.0"
+appVersion: "1.12.4"
 home: https://github.com/freeCodeCamp/artemis
 sources:
   - https://github.com/freeCodeCamp/artemis
