@@ -129,3 +129,27 @@ Four settings carry a ruling of 2026-09-11 and must not change without a new one
 The `artemis-pg-app` secret is `kubernetes.io/basic-auth` and carries the encrypted `ARTEMIS_DB_PASSWORD` from the overlay. CloudNativePG would otherwise generate its own password and `DATABASE_URL` would have two owners. The secret username must equal the `initdb` owner.
 
 The primary moves after a failover. Reach it through the `artemis-rw` service or the label `cnpg.io/instanceRole=primary`. Never name a pod ordinal.
+
+### Release order
+
+Release `cnpg-system` first. The artemis chart declares a `Cluster`, and the CRD does not exist until the operator is installed.
+
+```sh
+just release gxy-management cnpg-system
+just release gxy-management artemis
+```
+
+### The four production flags
+
+| flag                      | value   | meaning                                                                            |
+| ------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `postgres.enabled`        | `true`  | The legacy StatefulSet. It still holds the `hatchet` database. Never set it false. |
+| `postgresCluster.enabled` | `true`  | The pair runs.                                                                     |
+| `postgresCluster.cutover` | `false` | `DATABASE_URL` still points at the StatefulSet.                                    |
+| `pgBackup.enabled`        | `true`  | `pg_dump` of `artemis` to `artemis/<galaxy>/pg/` in R2.                            |
+
+While `cutover` is `false` the pair runs empty and artemis keeps talking to the StatefulSet. Bringing the pair up is reversible by deleting the `Cluster`.
+
+Setting `postgres.enabled: false` deletes the instance Hatchet uses, and also drops the hatchet gRPC egress rule in `networkpolicy.yaml` — the rule sits inside that same conditional. The hatchet move is the ADR-023 successor wave.
+
+The cutover flips `cutover` to `true` and points `DATABASE_URL` at `artemis-rw` with `sslmode=require`. `verify-full` needs the CloudNativePG CA mounted into the Deployment and is a separate change.

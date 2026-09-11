@@ -97,3 +97,13 @@ postgres:
 # superuser password + R2 creds. See chart values.yaml `backup:` block.
 backup:
   enabled: true
+
+postgresCluster:
+  enabled: true
+  cutover: false
+
+pgBackup:
+  enabled: true
+
+pgLagWatch:
+  enabled: true
