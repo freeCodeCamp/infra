@@ -1,1 +1,17 @@
-{}
+# Production overlay for the remote cloudnative-pg chart on gxy-management.
+# The chart version is pinned in charts/cloudnative-pg/version, not here.
+# Anything in this file is git-tracked and may be inspected publicly.
+
+# Digest pin. The chart exposes no separate digest key, so the tag carries
+# both parts. It renders into the operator container and into
+# OPERATOR_IMAGE_NAME, which is the image CloudNativePG injects as the
+# instance manager in every Cluster pod.
+#
+# The digest must match the appVersion in README.md. Resolve a new one with:
+#   TOK=$(curl -s "https://ghcr.io/token?scope=repository:cloudnative-pg/cloudnative-pg:pull&service=ghcr.io" | jq -r .token)
+#   curl -sI -H "Authorization: Bearer $TOK" \
+#     -H "Accept: application/vnd.oci.image.index.v1+json" \
+#     https://ghcr.io/v2/cloudnative-pg/cloudnative-pg/manifests/<version> \
+#     | grep -i docker-content-digest
+image:
+  tag: "1.30.0@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb"
