@@ -52,9 +52,9 @@ Its volume is `local-path`, so the evicted pod cannot start on another node and 
 - **Authentication continues.** A team-cache read error falls through to the GitHub API.
 - **Deploys fail closed.** The upload and finalize handlers return `503 fence_unavailable` because the deploy fence read fails. This is correct: without the fence an in-flight permit can overwrite a finished deploy.
 - **Registry changes propagate slowly.** The `registry.changed` channel is gone, so a change reaches the read-side pods on the 60 s TTL refresh from Postgres instead of at once.
-- **A restarting artemis pod crashloops.** artemis boot still hard-fails on Valkey (`openRegistry` uses `valkey.NewWithRetry`). Do not drain a node that holds both `valkey-0` and an artemis replica without checking placement first, and do not restart artemis during the window.
+- **A restarting artemis pod boots degraded.** artemis commit `9898b91` makes boot fall back to a Valkey client built without dialing when the registry source of truth is Postgres, so a rescheduled pod starts and serves. Before that release it crashlooped.
 
-**This section describes the state after the artemis release that carries artemis commit `50df4ba`.** Until that image is live, a Valkey eviction still returns `503` from `/readyz` and ejects every artemis pod from the Service. Check the running version first: `curl -sSI https://uploads.freecode.camp/healthz | grep x-artemis-version`.
+**This section describes the state after the artemis release that carries artemis commits `50df4ba` and `9898b91`.** Until that image is live, a Valkey eviction still returns `503` from `/readyz` and ejects every artemis pod from the Service, and a rescheduled artemis pod crashloops at boot. Check the running version first: `curl -sSI https://uploads.freecode.camp/healthz | grep x-artemis-version`.
 
 ## History — two blocking workloads remain
 
@@ -84,7 +84,7 @@ Placement is not pinned. Re-check before every drain.
 **Node holding `valkey`** — the drain proceeds. Do not scale the statefulset to zero; that step belonged to the `minAvailable: 1` posture and now causes the outage the drain would have survived.
 
 1. Announce the window. Deploys return `503 fence_unavailable` for its whole length.
-2. Confirm the node does not also hold an artemis replica. If it does, the rescheduled artemis pod crashloops while Valkey is `Pending`. Drain a different node first, or accept 2 of 3 artemis replicas for the window.
+2. Confirm the artemis release carries `50df4ba` and `9898b91`. Without them a node that also holds an artemis replica loses that replica for the window: the rescheduled pod crashloops while Valkey is `Pending`. Drain a different node first, or accept 2 of 3 replicas.
 3. Drain, do the maintenance, uncordon.
 4. `valkey-0` re-attaches the same `local-path` volume when the node returns.
 5. Confirm `curl -sS https://uploads.freecode.camp/readyz` returns `{"ready":true}` with no `degraded`, and run one real deploy.
