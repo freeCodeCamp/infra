@@ -1,0 +1,168 @@
+{{- if and .Values.postgresCluster.enabled .Values.pgLagWatch.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-pg-lag-watch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pg-lag-watch
+data:
+  report.py: |
+    import json
+    import os
+    import sys
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    from datetime import datetime, timezone
+
+    PROBE = "/work/lag.txt"
+    MIN_STANDBYS = int(os.environ["MIN_STANDBYS"])
+    MAX_LAG_BYTES = int(os.environ["MAX_LAG_BYTES"])
+    MONITOR_SLUG = os.environ["MONITOR_SLUG"]
+    MONITOR_SCHEDULE = os.environ["MONITOR_SCHEDULE"]
+    MONITOR_CHECKIN_MARGIN = int(os.environ["MONITOR_CHECKIN_MARGIN"])
+    MONITOR_MAX_RUNTIME = int(os.environ["MONITOR_MAX_RUNTIME"])
+    MONITOR_FAILURE_THRESHOLD = int(os.environ["MONITOR_FAILURE_THRESHOLD"])
+    MONITOR_TIMEZONE = os.environ["MONITOR_TIMEZONE"]
+    ENVIRONMENT = os.environ.get("ENVIRONMENT", "production")
+    DSN = os.environ.get("SENTRY_DSN", "").strip()
+    CHECK_IN_ID = os.urandom(16).hex()
+    STARTED = datetime.now(timezone.utc)
+
+
+    def dsn_parts():
+        parts = urllib.parse.urlsplit(DSN)
+        project = parts.path.rstrip("/").rsplit("/", 1)[-1]
+        if not parts.username or not parts.hostname or not project:
+            raise ValueError("SENTRY_DSN is not a usable DSN")
+        return parts.username, parts.hostname, project
+
+
+    def post_envelope(items):
+        key, host, project = dsn_parts()
+        body = "\n".join(items).encode()
+        req = urllib.request.Request(
+            "https://{}/api/{}/envelope/".format(host, project), data=body, method="POST"
+        )
+        req.add_header("Content-Type", "application/x-sentry-envelope")
+        req.add_header(
+            "X-Sentry-Auth",
+            "Sentry sentry_version=7, sentry_client=pg-lag-watch/1.0, sentry_key=" + key,
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status
+
+
+    def send(title, fingerprint, extra):
+        event_id = os.urandom(16).hex()
+        now = STARTED.isoformat()
+        event = {
+            "event_id": event_id,
+            "timestamp": now,
+            "platform": "other",
+            "level": "error",
+            "logger": "pg-lag-watch",
+            "environment": ENVIRONMENT,
+            "message": {"formatted": title},
+            "fingerprint": fingerprint,
+            "tags": {"component": "platform-db"},
+            "extra": extra,
+        }
+        return post_envelope(
+            [
+                json.dumps({"event_id": event_id, "sent_at": now, "dsn": DSN}),
+                json.dumps({"type": "event"}),
+                json.dumps(event),
+            ]
+        )
+
+
+    def check_in(status, upsert=False):
+        payload = {
+            "check_in_id": CHECK_IN_ID,
+            "monitor_slug": MONITOR_SLUG,
+            "status": status,
+            "environment": ENVIRONMENT,
+        }
+        if upsert:
+            payload["monitor_config"] = {
+                "schedule": {"type": "crontab", "value": MONITOR_SCHEDULE},
+                "checkin_margin": MONITOR_CHECKIN_MARGIN,
+                "max_runtime": MONITOR_MAX_RUNTIME,
+                "failure_issue_threshold": MONITOR_FAILURE_THRESHOLD,
+                "timezone": MONITOR_TIMEZONE,
+            }
+        return post_envelope(
+            [
+                json.dumps({"sent_at": STARTED.isoformat(), "dsn": DSN}),
+                json.dumps({"type": "check_in"}),
+                json.dumps(payload),
+            ]
+        )
+
+
+    def read_probe():
+        with open(PROBE) as handle:
+            fields = dict(pair.split("=", 1) for pair in handle.read().split())
+        return int(fields["standbys"]), int(fields["lag_bytes"])
+
+
+    def main():
+        if not DSN:
+            print("SENTRY_DSN is empty; refusing to run blind", file=sys.stderr)
+            return 1
+        dsn_parts()
+        failures = 0
+        try:
+            check_in("in_progress", upsert=True)
+        except (urllib.error.URLError, OSError) as exc:
+            print("upsert check-in failed: {}".format(exc), file=sys.stderr)
+            failures += 1
+
+        standbys, lag_bytes = read_probe()
+        print("standbys={} lag_bytes={}".format(standbys, lag_bytes))
+        breaches = []
+        if standbys < MIN_STANDBYS:
+            breaches.append(
+                (
+                    "artemis Postgres has {} streaming standbys, want {}".format(
+                        standbys, MIN_STANDBYS
+                    ),
+                    ["artemis-pg", "standby_missing"],
+                )
+            )
+        if lag_bytes > MAX_LAG_BYTES:
+            breaches.append(
+                (
+                    "artemis Postgres replay lag is {} bytes, over the {} byte bound".format(
+                        lag_bytes, MAX_LAG_BYTES
+                    ),
+                    ["artemis-pg", "replay_lag"],
+                )
+            )
+        extra = {
+            "standbys": standbys,
+            "lag_bytes": lag_bytes,
+            "min_standbys": MIN_STANDBYS,
+            "max_lag_bytes": MAX_LAG_BYTES,
+        }
+        for title, fingerprint in breaches:
+            try:
+                send(title, fingerprint, extra)
+                print("sent: " + title)
+            except (urllib.error.URLError, OSError) as exc:
+                failures += 1
+                print("send failed ({}): {}".format(exc, title), file=sys.stderr)
+
+        try:
+            check_in("error" if (failures or breaches) else "ok")
+        except (urllib.error.URLError, OSError) as exc:
+            print("check-in failed: {}".format(exc), file=sys.stderr)
+            failures += 1
+        return 1 if (failures or breaches) else 0
+
+
+    sys.exit(main())
+{{- end }}

@@ -321,6 +321,25 @@ pgBackup:
       cpu: 500m
       memory: 512Mi
 
+pgLagWatch:
+  enabled: false
+  schedule: "*/15 * * * *"
+  activeDeadlineSeconds: 300
+  minStandbys: 1
+  maxLagBytes: 33554432
+  monitorSlug: artemis-pg-lag
+  monitorCheckinMargin: 10
+  monitorMaxRuntime: 10
+  monitorFailureThreshold: 2
+  monitorTimezone: UTC
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
 oomWatch:
   enabled: true
   schedule: "*/15 * * * *"

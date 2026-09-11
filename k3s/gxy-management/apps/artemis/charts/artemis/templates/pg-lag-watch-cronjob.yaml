@@ -1,0 +1,120 @@
+{{- if and .Values.postgresCluster.enabled .Values.pgLagWatch.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-pg-lag-watch
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pg-lag-watch
+spec:
+  schedule: {{ .Values.pgLagWatch.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: {{ .Values.pgLagWatch.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "artemis.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: pg-lag-watch
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: probe
+              image: {{ .Values.pgBackup.image }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  read -r STANDBYS LAG <<<"$(psql -d artemis -tAF' ' -c \
+                    "SELECT count(*), coalesce(max(pg_wal_lsn_diff(sent_lsn, replay_lsn)), 0)::bigint FROM pg_stat_replication")"
+                  printf 'standbys=%s lag_bytes=%s\n' "${STANDBYS}" "${LAG}" > /work/lag.txt
+                  cat /work/lag.txt
+              env:
+                - name: PGHOST
+                  value: {{ .Release.Name }}-rw
+                - name: PGUSER
+                  value: artemis
+                - name: PGSSLMODE
+                  value: require
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-pg-app
+                      key: password
+              resources:
+                {{- toYaml .Values.pgLagWatch.resources | nindent 16 }}
+              volumeMounts:
+                - name: work
+                  mountPath: /work
+          containers:
+            - name: report
+              image: {{ .Values.oomWatch.image }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - python3
+                - /scripts/report.py
+              env:
+                - name: MIN_STANDBYS
+                  value: {{ .Values.pgLagWatch.minStandbys | quote }}
+                - name: MAX_LAG_BYTES
+                  value: {{ .Values.pgLagWatch.maxLagBytes | quote }}
+                - name: MONITOR_SLUG
+                  value: {{ .Values.pgLagWatch.monitorSlug | quote }}
+                - name: MONITOR_SCHEDULE
+                  value: {{ .Values.pgLagWatch.schedule | quote }}
+                - name: MONITOR_CHECKIN_MARGIN
+                  value: {{ .Values.pgLagWatch.monitorCheckinMargin | quote }}
+                - name: MONITOR_MAX_RUNTIME
+                  value: {{ .Values.pgLagWatch.monitorMaxRuntime | quote }}
+                - name: MONITOR_FAILURE_THRESHOLD
+                  value: {{ .Values.pgLagWatch.monitorFailureThreshold | quote }}
+                - name: MONITOR_TIMEZONE
+                  value: {{ .Values.pgLagWatch.monitorTimezone | quote }}
+                - name: ENVIRONMENT
+                  value: {{ .Values.env.ENVIRONMENT | default "production" | quote }}
+                - name: SENTRY_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: SENTRY_DSN
+                      optional: true
+              resources:
+                {{- toYaml .Values.pgLagWatch.resources | nindent 16 }}
+              volumeMounts:
+                - name: work
+                  mountPath: /work
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: work
+              emptyDir:
+                medium: Memory
+                sizeLimit: 1Mi
+            - name: scripts
+              configMap:
+                name: {{ .Release.Name }}-pg-lag-watch
+{{- end }}
