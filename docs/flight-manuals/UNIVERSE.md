@@ -169,6 +169,7 @@ VPC-only (source `10.110.0.0/20`):
 | 2379-2380 | TCP      | etcd peer + client (HA)  | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
 | 4240      | TCP      | Cilium health checks     | [Cilium system requirements](https://docs.cilium.io/en/stable/operations/system_requirements/) |
 | 4244      | TCP      | Hubble relay peer        | [Cilium #14402](https://github.com/cilium/cilium/issues/14402)                                 |
+| 4443      | TCP      | metrics-server (hostNetwork patch) | [metrics-server README](https://github.com/kubernetes-sigs/metrics-server#requirements)         |
 | 5001      | TCP      | Spegel embedded registry | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
 | 6443      | TCP      | k3s API server           | [k3s docs](https://docs.k3s.io/installation/requirements)                                      |
 | 8472      | UDP      | Cilium VXLAN overlay     | [Cilium system requirements](https://docs.cilium.io/en/stable/operations/system_requirements/) |
@@ -181,6 +182,17 @@ Public (source `0.0.0.0/0`):
 | 22   | TCP      | SSH (Tailscale handles auth) |
 | 80   | TCP      | HTTP (Traefik ingress)       |
 | 443  | TCP      | HTTPS (Traefik ingress)      |
+
+`gxy-fw-fra1` is codified in `terraform/do-universe-galaxies/`. The resource was created by hand, so the state is empty until the operator imports it once:
+
+```sh
+cd terraform/do-universe-galaxies
+direnv exec . tofu init
+direnv exec . tofu import digitalocean_firewall.gxy_fra1 ebd1c524-ef60-4c03-90ba-b3ec913699d8
+direnv exec . tofu plan   # must report: No changes.
+```
+
+`tofu import` writes the remote state in bucket `infra-tfstate` under key `do-universe-galaxies/terraform.tfstate`. Run `plan` before any `apply`; a non-empty plan means the module drifted from the live rules, and the live rules win until you reconcile the module.
 
 **Trap:** the DO cloud firewall is separate from host UFW. The k3s-ansible prereq role opens UFW; it does NOT touch the cloud firewall. Both layers must be configured. Verify attachment after provisioning — `droplet_ids` / `tags` empty on the firewall means the firewall exists in name only.
 
