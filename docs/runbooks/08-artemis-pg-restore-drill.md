@@ -320,7 +320,13 @@ The two files share one timestamp because the CronJob writes them in one run. A 
 
 ### H4 — Restore into a scratch Postgres
 
-Bring the scratch pod up exactly as §C does. Then replay the roles file first, create the database, and replay the dump as its owner.
+Bring the scratch pod up exactly as §C does. The image is `postgres:16-alpine` and it is correct for the pair: the live `Cluster` runs `ghcr.io/cloudnative-pg/postgresql:16.14-standard-bookworm` and reports `PostgreSQL 16.14`, measured on 2026-09-11. Re-read the live `imageName` before the drill and match the major version:
+
+```sh
+kubectl -n artemis get cluster artemis-pg -o jsonpath='{.spec.imageName}{"\n"}'
+```
+
+Then replay the roles file first, create the database, and replay the dump as its owner.
 
 ```sh
 SCRATCH=artemis-restore-drill
@@ -344,7 +350,9 @@ kubectl -n artemis exec "$SCRATCH" -- bash -c \
 
 The roles file replays under `ON_ERROR_STOP=1`. Every statement is a `DO` block guarded by `IF NOT EXISTS`, so a correct file raises nothing and any error is a finding.
 
-The dump replays under `ON_ERROR_STOP=0` for the same reason §C does: `--clean` drops objects that a fresh database does not have. Expect only `ERROR: ... does not exist, skipping` forms from the `DROP` preamble. **Any error outside that form fails the drill.** A `does not exist` on a `CREATE` or a `COPY` is not part of the preamble and is a finding.
+The dump replays under `ON_ERROR_STOP=0` so the replay finishes and the log, not the exit code, is the evidence. **Expect zero `^ERROR:` lines.** This is a stricter gate than §C's, and the reason is the dump command: `pg_dump --clean --if-exists` writes `DROP ... IF EXISTS`, which raises `NOTICE: ... does not exist, skipping` on a fresh database, not `ERROR:`. The two tolerated errors in §C come from the `pg_dumpall` role section, which the pair's dump does not carry. **Any `ERROR:` line fails this drill.**
+
+One error has a known meaning. `ERROR: unrecognized configuration parameter "<name>"` on a `SET` is client/server version skew: the `pg_dump` in `pgBackup.image` is newer than the scratch server. Check `postgresql-client-*` in `docker/images/postgres-rclone/Dockerfile` against the scratch image tag. The two are inside PostgreSQL 16 today — the backup client is 16.15, the pair is 16.14 — so no unknown GUC is expected.
 
 The roles carry no password, so the restored `artemis` role cannot log in. That is correct for a drill and is the defect a production restore must repair — see §G.
 
@@ -365,7 +373,7 @@ Pass criteria:
 - All six tables resolve. A missing table means a partial dump.
 - `sites` equals the H2 number, or is lower by the sites registered since the dump ran. A higher count is impossible and is a finding.
 - `deploys` is at or below the H2 number, for the same reason.
-- The restore log holds no error outside the `DROP ... does not exist, skipping` form.
+- The restore log holds zero `^ERROR:` lines.
 
 Tear the scratch pod down with §E.
 
@@ -374,7 +382,7 @@ Tear the scratch pod down with §E.
 Replace the status line at the top of this section:
 
 ```
-**Status: PASSED. Run on: <YYYY-MM-DD>.** Artefact `artemis-<ts>.sql.gz`. sites=<n> against live <n>. deploys=<n> against live <n>. Errors outside the DROP preamble: 0.
+**Status: PASSED. Run on: <YYYY-MM-DD>.** Artefact `artemis-<ts>.sql.gz`. sites=<n> against live <n>. deploys=<n> against live <n>. ERROR lines: 0.
 ```
 
 A drill with no recorded date has not been run. Do not write the line before the run.
