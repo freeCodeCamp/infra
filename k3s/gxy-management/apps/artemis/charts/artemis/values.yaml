@@ -282,6 +282,28 @@ postgres:
     enabled: true
     minAvailable: 1
 
+postgresCluster:
+  enabled: false
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.14-standard-bookworm@sha256:b459345655ea1a0438a219f599cbae509c3132dc8faad6d729d6957e70a618bb
+  storage: 10Gi
+  storageClassName: "local-path"
+  reusePVC: true
+  parameters:
+    max_connections: "200"
+    shared_buffers: 256MB
+    effective_cache_size: 3GB
+    work_mem: 4MB
+    log_temp_files: "0"
+    max_slot_wal_keep_size: 2GB
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 4Gi
+
 oomWatch:
   enabled: true
   schedule: "*/15 * * * *"

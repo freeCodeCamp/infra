@@ -1,0 +1,57 @@
+{{- if .Values.postgresCluster.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-pg-app
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-cluster
+type: kubernetes.io/basic-auth
+stringData:
+  username: artemis
+  password: {{ required ".Values.secretEnv.ARTEMIS_DB_PASSWORD is required when postgresCluster.enabled" .Values.secretEnv.ARTEMIS_DB_PASSWORD | quote }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres-cluster
+spec:
+  instances: {{ .Values.postgresCluster.instances }}
+  imageName: {{ .Values.postgresCluster.imageName }}
+  primaryUpdateStrategy: unsupervised
+
+  bootstrap:
+    initdb:
+      database: artemis
+      owner: artemis
+      secret:
+        name: {{ .Release.Name }}-pg-app
+      dataChecksums: true
+
+  enableSuperuserAccess: false
+
+  storage:
+    storageClass: {{ .Values.postgresCluster.storageClassName }}
+    size: {{ .Values.postgresCluster.storage }}
+
+  postgresql:
+    parameters:
+      {{- range $k, $v := .Values.postgresCluster.parameters }}
+      {{ $k }}: {{ $v | quote }}
+      {{- end }}
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: {{ .Values.postgresCluster.reusePVC }}
+
+  resources:
+    {{- toYaml .Values.postgresCluster.resources | nindent 4 }}
+{{- end }}

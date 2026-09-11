@@ -110,3 +110,22 @@ curl -fsS https://uploads.freecode.camp/healthz   # → 200 "ok"
 ```
 
 E2E smoke: `just verify-artemis`.
+
+## Postgres: the replicated pair
+
+`postgresCluster` declares a CloudNativePG `Cluster` named `artemis`. It is disabled by default. The operator comes from `apps/cnpg-system`.
+
+It runs beside the legacy `postgres` StatefulSet, not in place of it. The StatefulSet keeps the `hatchet` database until ADR-023 moves it. Do not set `postgres.enabled: false` — that deletes the instance Hatchet still uses.
+
+Four settings carry a ruling of 2026-09-11 and must not change without a new one.
+
+| setting                          | value      | why                                                                                                       |
+| -------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
+| `podAntiAffinityType`            | `required` | A soft rule is dropped under exactly the scheduling pressure the pair exists to survive.                  |
+| `nodeMaintenanceWindow.reusePVC` | `true`     | `local-path` pins a volume to one node and cannot expand it. A drain must rebuild elsewhere, never wait.  |
+| `enableSuperuserAccess`          | `false`    | The `postgres` role keeps a NULL password. The backup job runs as the owner and exports roles separately. |
+| `max_slot_wal_keep_size`         | `2GB`      | An orphaned replication slot would otherwise fill a 10Gi volume that cannot be expanded.                  |
+
+The `artemis-pg-app` secret is `kubernetes.io/basic-auth` and carries the encrypted `ARTEMIS_DB_PASSWORD` from the overlay. CloudNativePG would otherwise generate its own password and `DATABASE_URL` would have two owners. The secret username must equal the `initdb` owner.
+
+The primary moves after a failover. Reach it through the `artemis-rw` service or the label `cnpg.io/instanceRole=primary`. Never name a pod ordinal.
