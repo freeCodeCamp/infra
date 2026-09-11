@@ -73,6 +73,8 @@ Direct connections from pods to node VPC IPs (`10.110.0.x:<port>`) return instan
 
 **Workaround (in code).** Run affected workloads with `hostNetwork: true`. The bootstrap play patches `metrics-server` to hostNetwork with `--secure-port=4443` (avoids the kubelet `:10250` collision).
 
+**Firewall dependency (2026-09-11).** The hostNetwork workaround moves the endpoint to a node VPC IP, so the DigitalOcean firewall `gxy-fw-fra1` now applies to it. That firewall permits tcp `2379`, `2380`, `4240`, `4244`, `5001`, `6443`, `10250` and udp `8472` from `10.110.0.0/20`, and it does not permit `4443`. A cross-node dial to `10.110.0.19:4443` therefore hangs while `10250`, `6443` and `2379` open. The aggregated metrics API works only through the apiserver on the same node as the pod, because `pkg/daemons/control/tunnel.go:239` dials directly when the destination node is local. Add inbound tcp `4443` from `10.110.0.0/20` to `gxy-fw-fra1`. `terraform/do-universe-galaxies/` is empty, so this firewall is unmanaged.
+
 **Status.** PARKED. Activation trigger: Cilium 1.20+ release with confirmed fix OR cluster-affecting reproduction. See `flight-manuals/gxy-management.md` Open Decisions table.
 
 ## Decision rubric
@@ -106,7 +108,7 @@ Pods cannot reach node VPC IPs but service IPs work?
 | `gxy-launchbase` | `k3s/gxy-launchbase/cluster/cilium/values.yaml` | `[eth0, eth1]` | 1500 | tunnel      |
 | `gxy-cassiopeia` | `k3s/gxy-cassiopeia/cluster/cilium/values.yaml` | `[eth0, eth1]` | 1500 | tunnel      |
 
-`metrics-server` hostNetwork patch is applied by `ansible/play-k3s--bootstrap.yml` Play 5 across all galaxies — Failure 8b workaround stays uniform.
+`metrics-server` hostNetwork patch is applied by `ansible/play-k3s--bootstrap.yml` Play 5 across all galaxies — Failure 8b workaround stays uniform, and so does the missing tcp/4443 firewall rule above — `kubectl top nodes` fails on every galaxy except through the co-located apiserver.
 
 ## Cross-refs
 
