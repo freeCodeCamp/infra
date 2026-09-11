@@ -1,0 +1,27 @@
+# CloudNativePG operator. Chart 0.29.0 ships app 1.30.0.
+#
+# The floor is 1.29.1: CVE-2026-44477 (CVSS 9.4) in the metrics exporter
+# was fixed there. 1.28 is end-of-life.
+#
+# The chart is remote, so `charts/cloudnative-pg/repo` names the
+# repository and `charts/cloudnative-pg/version` pins the chart. The
+# release recipe refuses a remote chart with no version file.
+
+replicaCount: 1
+
+config:
+  data:
+    INHERITED_ANNOTATIONS: "kubectl.kubernetes.io/*"
+
+monitoring:
+  podMonitorEnabled: false
+  grafanaDashboard:
+    create: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

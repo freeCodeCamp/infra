@@ -106,9 +106,16 @@ release cluster app:
       REPO_FILE="$CHART_DIR/repo"
       if [ -f "$REPO_FILE" ]; then
         REPO_URL=$(cat "$REPO_FILE")
-        echo "Helm: install {{ app }} (chart: $CHART_NAME) from $REPO_URL"
+        VERSION_FILE="$CHART_DIR/version"
+        # A remote chart with no --version takes whatever is current on
+        # the day it runs, so two releases of the same commit can install
+        # different charts. Refuse rather than resolve.
+        [ -f "$VERSION_FILE" ] || { echo "Error: $VERSION_FILE not found — a remote chart must be pinned"; exit 1; }
+        CHART_VERSION=$(cat "$VERSION_FILE")
+        echo "Helm: install {{ app }} (chart: $CHART_NAME $CHART_VERSION) from $REPO_URL"
         helm upgrade --install {{ app }} "$CHART_NAME" \
           --repo "$REPO_URL" \
+          --version "$CHART_VERSION" \
           -n {{ app }} --create-namespace \
           $HELM_ARGS $EXTRA_HELM_ARGS
       else
