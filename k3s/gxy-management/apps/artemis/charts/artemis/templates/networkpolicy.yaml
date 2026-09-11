@@ -97,6 +97,16 @@ spec:
         - ports:
             - port: "6379"
               protocol: TCP
+    {{- if .Values.postgresCluster.enabled }}
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:cnpg.io/cluster": {{ .Release.Name }}
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    {{- end }}
     {{- if .Values.postgres.enabled }}
     # Bundled Postgres (intra-namespace, shared instance).
     - toEndpoints:

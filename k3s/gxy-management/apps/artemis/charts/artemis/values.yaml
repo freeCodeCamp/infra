@@ -284,6 +284,7 @@ postgres:
 
 postgresCluster:
   enabled: false
+  operatorNamespace: cnpg-system
   instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:16.14-standard-bookworm@sha256:b459345655ea1a0438a219f599cbae509c3132dc8faad6d729d6957e70a618bb
   storage: 10Gi
