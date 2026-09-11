@@ -102,9 +102,11 @@ kubectl -n artemis create job --from=cronjob/artemis-pg-backup pg-backup-manual-
 
 Then confirm the two Sentry cron monitors exist per [03](03-artemis-postdeploy-check.md) §4b. A green Job with no monitor means the image digest from step 4 did not reach the cluster.
 
-## 8. Run the drill
+## 8. Re-run the drill
 
-Run [08](08-artemis-pg-restore-drill.md) §H against the pair and write the date into the §H status line. Runbook 08:201 requires a re-rehearsal after any backup CronJob change, and this migration changed the bucket, the token and the image in one release.
+Run [08](08-artemis-pg-restore-drill.md) §H again and write the new date into the §H status line. Runbook 08 requires a re-rehearsal after any backup CronJob change, and this migration changed the bucket, the token and the image in one release.
+
+§H does not wait for this migration. Run it first against the live `universe-static-apps-01` artefacts with the serve token — that is what §B and §H3 default to — and run it a second time here.
 
 ## Rollback
 

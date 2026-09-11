@@ -2,7 +2,7 @@
 
 **Type:** Operator. Disaster-recovery rehearsal (read-mostly; writes only to a throwaway scratch pod). **Cluster:** `gxy-management`. Namespace: `artemis`. **Spec:** chart at `k3s/gxy-management/apps/artemis/`. Stateful floor: ADR-019 §Stateful-pillar backup pattern + ADR-020 (durable-execution model).
 
-**Last rehearsed:** 2026-08-25 — PASSED, and now **stale**: the backup CronJob changed bucket on 2026-09-11 (`94b7b97a`), which this section's own rule below requires a re-rehearsal for. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
+**Last rehearsed:** 2026-08-25 — PASSED. It goes **stale when the bucket split is released**, not before: `94b7b97a` only commits the change, and the rule below requires a re-rehearsal once it reaches the cluster. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
 
 **The pair is not rehearsed.** Both runs below drilled the `artemis-postgresql` StatefulSet. `postgresCluster.cutover` is `true` since 2026-09-11, so the live `artemis` database is on the CloudNativePG pair and no drill has read its artefact. §H is the procedure. Until §H records a date, the pair has a backup that nobody has restored.
 
@@ -29,9 +29,11 @@ It is a **drill**: sections A to F touch neither the live `artemis-postgresql` S
 | Durable-exec profile live                     | `kubectl -n artemis get sts artemis-postgresql` returns the StatefulSet |
 | Nightly backup CronJob present                | `kubectl -n artemis get cronjob artemis-backup`                         |
 
-The backup artefacts live under the R2 prefix `artemis/gxy-management/` in bucket **`management-cnpg-backups`**, named `artemis-<YYYYMMDD-HHMMSS>.sql.gz`. These literals come straight from the chart's `backup-cronjob.yaml` (`R2_PREFIX="artemis/${GALAXY}"`, `FILENAME="artemis-${TIMESTAMP}.sql.gz"`) and `backup.galaxy` / `backup.bucket` in the values files.
+The backup artefacts live under the R2 prefix `artemis/gxy-management/`, named `artemis-<YYYYMMDD-HHMMSS>.sql.gz`. These literals come straight from the chart's `backup-cronjob.yaml` (`R2_PREFIX="artemis/${GALAXY}"`, `FILENAME="artemis-${TIMESTAMP}.sql.gz"`) and `backup.galaxy` / `backup.bucket` in the values files.
 
-> **Bucket split, 2026-09-11.** Both CronJobs wrote to `universe-static-apps-01`, the bucket artemis serves deploys from, which ADR-019:86 forbids — "never one shared bucket". `backup.bucket` and `pgBackup.bucket` now name `management-cnpg-backups` per ADR-019:173. Artefacts written before the split are still in the old bucket under the same prefixes. Read them from there until the migration lands. The R2 credentials are a backup-only token, sealed in the YAML overlay under `secretEnv.R2_BACKUP_*` and rendered into `artemis-backup-secret`. It is scoped to the backup bucket alone; the serve token in `artemis-env-secret` cannot reach it (ADR-016:23).
+> **Which bucket, right now.** The live CronJobs still write to **`universe-static-apps-01`** with the serve token. Every block below uses that. This drill needs nothing else and runs today.
+>
+> **After the migration only.** The chart is committed to write to `management-cnpg-backups` with a backup-only token, because `universe-static-apps-01` is the bucket artemis serves deploys from and ADR-019:86 forbids one shared bucket — "never one shared bucket". That change is unreleased. [16-artemis-backup-bucket-split.md](16-artemis-backup-bucket-split.md) creates the bucket, mints the token and moves the artefacts. Once it has run, swap two things in the §B block: decrypt `R2_BACKUP_ENDPOINT`, `R2_BACKUP_ACCESS_KEY_ID` and `R2_BACKUP_SECRET_ACCESS_KEY` instead of the three serve keys, and set `BUCKET=management-cnpg-backups`. The backup token reaches only the new bucket and the serve token only the old one, so a half-swap fails with `AccessDenied` (ADR-016:23).
 
 ## A — Confirm a backup exists and is current
 
@@ -64,28 +66,17 @@ eval "$(sops decrypt --input-type yaml --output-type yaml \
   | yq -r '.secretEnv |
     "export R2_ENDPOINT=\(.R2_ENDPOINT)
      export R2_ACCESS_KEY_ID=\(.R2_ACCESS_KEY_ID)
-     export R2_SECRET_ACCESS_KEY=\(.R2_SECRET_ACCESS_KEY)
-     export R2_BACKUP_ENDPOINT=\(.R2_BACKUP_ENDPOINT)
-     export R2_BACKUP_ACCESS_KEY_ID=\(.R2_BACKUP_ACCESS_KEY_ID)
-     export R2_BACKUP_SECRET_ACCESS_KEY=\(.R2_BACKUP_SECRET_ACCESS_KEY)"')"
+     export R2_SECRET_ACCESS_KEY=\(.R2_SECRET_ACCESS_KEY)"')"
 
 export RCLONE_CONFIG=/dev/null
 export RCLONE_CONFIG_R2_TYPE=s3
 export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
 export RCLONE_CONFIG_R2_ACL=private
-# The backup token reads the backup bucket. The serve token reads the old one.
-export RCLONE_CONFIG_R2_ENDPOINT="$R2_BACKUP_ENDPOINT"
-export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_BACKUP_ACCESS_KEY_ID"
-export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_BACKUP_SECRET_ACCESS_KEY"
+export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
+export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
 
-# Until the T17 migration lands, the surviving artefacts are still in the old
-# bucket. An AccessDenied or a `no .sql.gz` failure here means you need the
-# serve token and the old bucket instead:
-#   export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
-#   export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
-#   export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
-#   BUCKET=universe-static-apps-01
-BUCKET=management-cnpg-backups
+BUCKET=universe-static-apps-01
 PREFIX=artemis/gxy-management
 
 # Timestamp prefix in the filename means tail = newest.
@@ -201,11 +192,11 @@ The serve plane (Caddy + R2) is unaffected by a PG outage — only new deploys +
 
 **Superseded for the `artemis` database on 2026-09-11.** The CloudNativePG pair is live, so the M1 row above describes the StatefulSet only. Ruling R2 of the `artemis-pg-pair` wave sets the pair's floor and supersedes ADR-019 §85 and ADR-023 §51.
 
-| Metric | `artemis-pg` value | Basis |
-| --- | --- | --- |
-| **RPO** | daily | The `artemis-pg-backup` CronJob at 02:00 UTC. There is still no WAL-continuous archive. Replication protects against instance loss, not against a bad write. |
-| **RTO** | the standby promotion time | Measure it in [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §B and record the number there. |
-| **Retention ceiling** | 7 days | `pgBackup.retention: 7d`. An artefact older than that is deleted from R2 and cannot be restored. |
+| Metric                | `artemis-pg` value         | Basis                                                                                                                                                        |
+| --------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **RPO**               | daily                      | The `artemis-pg-backup` CronJob at 02:00 UTC. There is still no WAL-continuous archive. Replication protects against instance loss, not against a bad write. |
+| **RTO**               | the standby promotion time | Measure it in [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §B and record the number there.                                             |
+| **Retention ceiling** | 7 days                     | `pgBackup.retention: 7d`. An artefact older than that is deleted from R2 and cannot be restored.                                                             |
 
 A daily RPO means a logical restore still loses up to a day. The pair removes the single-node failure mode; it does not remove the backup window.
 
@@ -219,10 +210,10 @@ Run this only after a real data loss, and only with an announced window. Section
 
 Two Postgres instances now run in namespace `artemis`. Answer this first, because the artefact and the procedure differ.
 
-| target | holds | artefact | restore path |
-| --- | --- | --- | --- |
-| `artemis-postgresql` StatefulSet | the `hatchet` database, and the `artemis` database until cutover | `artemis-<ts>.sql.gz`, a `pg_dumpall` of both tenants | scale to zero, replay as superuser, scale back |
-| `artemis-pg` CloudNativePG pair | the `artemis` database after cutover | `artemis-<ts>.sql.gz` plus `artemis-roles-<ts>.sql` under `artemis/<galaxy>/pg/` | replay into the primary as the `artemis` owner |
+| target                           | holds                                                            | artefact                                                                         | restore path                                   |
+| -------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `artemis-postgresql` StatefulSet | the `hatchet` database, and the `artemis` database until cutover | `artemis-<ts>.sql.gz`, a `pg_dumpall` of both tenants                            | scale to zero, replay as superuser, scale back |
+| `artemis-pg` CloudNativePG pair  | the `artemis` database after cutover                             | `artemis-<ts>.sql.gz` plus `artemis-roles-<ts>.sql` under `artemis/<galaxy>/pg/` | replay into the primary as the `artemis` owner |
 
 Read `postgresCluster.cutover` in `k3s/gxy-management/apps/artemis/values.production.yaml` to learn which instance artemis is using right now. `false` means the StatefulSet. Restoring the wrong instance loses the window and changes nothing.
 
@@ -244,8 +235,11 @@ The pair keeps `enableSuperuserAccess: false`, so the `postgres` role has a NULL
    ```
 
 1. Replay `artemis-roles-<ts>.sql` first. Each statement is a `DO` block guarded by `IF NOT EXISTS`, so a replay into a cluster that already has `artemis` or `streaming_replica` is safe.
+
 1. **The exported roles carry no password.** The job cannot read `rolpassword` without superuser. Set each password again from the sops overlay after the replay, or the owner cannot log in.
+
 1. Replay `artemis-<ts>.sql.gz`. It is `pg_dump --clean --if-exists` of the `artemis` database alone. It does not carry `hatchet`.
+
 1. Verify with §D's row counts against the `artemis` database, then confirm `/healthz` and a live deploy.
 
 A restore into a rebuilt pair is a different case again: let `bootstrap.initdb` create the database and the owner from `artemis-pg-app`, then replay the dump. Do not hand-create the owner role.
@@ -260,15 +254,15 @@ This is the R8 rehearsal for the CloudNativePG pair. ADR-019:177 records that R8
 
 ### What is different from A to F
 
-| | StatefulSet artefact | pair artefact |
-| --- | --- | --- |
-| R2 prefix | `artemis/gxy-management/` | `artemis/gxy-management/pg/` |
-| producer | `artemis-backup` CronJob | `artemis-pg-backup` CronJob |
-| files | `artemis-<ts>.sql.gz` | `artemis-<ts>.sql.gz` **and** `artemis-roles-<ts>.sql` |
-| command | `pg_dumpall --clean --if-exists` | `pg_dump --clean --if-exists -d artemis` |
-| databases | `artemis` + `hatchet` | `artemis` only |
-| completion sentinel | `PostgreSQL database cluster dump complete` | `PostgreSQL database dump complete` |
-| roles | inside the dump, with passwords | a separate file, **without** passwords |
+|                     | StatefulSet artefact                        | pair artefact                                          |
+| ------------------- | ------------------------------------------- | ------------------------------------------------------ |
+| R2 prefix           | `artemis/gxy-management/`                   | `artemis/gxy-management/pg/`                           |
+| producer            | `artemis-backup` CronJob                    | `artemis-pg-backup` CronJob                            |
+| files               | `artemis-<ts>.sql.gz`                       | `artemis-<ts>.sql.gz` **and** `artemis-roles-<ts>.sql` |
+| command             | `pg_dumpall --clean --if-exists`            | `pg_dump --clean --if-exists -d artemis`               |
+| databases           | `artemis` + `hatchet`                       | `artemis` only                                         |
+| completion sentinel | `PostgreSQL database cluster dump complete` | `PostgreSQL database dump complete`                    |
+| roles               | inside the dump, with passwords             | a separate file, **without** passwords                 |
 
 Use the §B sentinel from the right row. The pair's dump is `pg_dump`, not `pg_dumpall`, so the word `cluster` is absent and the §B check fails on a good artefact.
 
@@ -307,8 +301,8 @@ Reference, read from `artemis-pg-2` on 2026-09-11 12:26 UTC: `deploys=327`, `sit
 Run §B's rclone block unchanged for the credentials and the `RCLONE_CONFIG_R2_*` exports, then substitute the prefix and pull both files:
 
 ```sh
-# Same token and old-bucket fallback as §B.
-BUCKET=management-cnpg-backups
+# Same credentials block as §B.
+BUCKET=universe-static-apps-01
 PREFIX=artemis/gxy-management/pg
 
 DUMP=$(rclone lsf "r2:${BUCKET}/${PREFIX}/" --include 'artemis-*.sql.gz' | sort | tail -1)
