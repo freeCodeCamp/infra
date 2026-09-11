@@ -131,6 +131,8 @@ Four settings carry a ruling of 2026-09-11 and must not change without a new one
 
 The `artemis-pg-app` secret is `kubernetes.io/basic-auth` and carries the encrypted `ARTEMIS_DB_PASSWORD` from the overlay. CloudNativePG would otherwise generate its own password and `DATABASE_URL` would have two owners. The secret username must equal the `initdb` owner.
 
+Ingress on 5432 to the pair is allowed from four sources only: peer instances, the deploy-proxy pods, the `pg-backup` job and the `pg-lag-watch` job. The legacy StatefulSet is not one of them. Move the data at cutover with two `kubectl exec` hops through the API server, not with a direct `psql` from `artemis-postgresql-0`.
+
 The `nodeMaintenanceWindow` block applies only while `inProgress` is `true`. Set `inProgress` before a node drain and clear it after.
 
 The backup job exports role definitions as idempotent `DO` blocks with no password. A restore must set each password again from the sops overlay. `enableSuperuserAccess: false` means the job cannot read `rolpassword`.

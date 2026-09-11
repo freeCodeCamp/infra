@@ -60,6 +60,22 @@ spec:
     - fromEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:cnpg.io/cluster": {{ .Release.Name }}-pg
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/name": {{ .Chart.Name }}
+            "k8s:app.kubernetes.io/instance": {{ .Release.Name }}
+            "k8s:app.kubernetes.io/component": deploy-proxy
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/name": {{ .Chart.Name }}
+            "k8s:app.kubernetes.io/instance": {{ .Release.Name }}
+            "k8s:app.kubernetes.io/component": pg-backup
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:app.kubernetes.io/name": {{ .Chart.Name }}
+            "k8s:app.kubernetes.io/instance": {{ .Release.Name }}
+            "k8s:app.kubernetes.io/component": pg-lag-watch
       toPorts:
         - ports:
             - port: "5432"
