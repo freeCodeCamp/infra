@@ -23,9 +23,20 @@ image:
   tag: "8.1.7-alpine"
   pullPolicy: IfNotPresent
 
-# StatefulSet replicas. v0.1 ships 1 — single-AZ k3s; the registry
-# fits in <1MB so HA gain is marginal. Multi-replica + Sentinel is
-# post-GA scope.
+# StatefulSet replicas. Ruling 2026-09-11: stays 1.
+#
+# Do not raise this to 2. The chart has no replication wiring, and the
+# `valkey` ClusterIP Service selects every pod by label, so two
+# replicas are two independent servers behind one round-robin Service.
+# The artemis deploy fence would split: MarkDeployFinalized writes to
+# one pod and IsDeployFinalized reads the other and misses. That is a
+# correctness regression, not HA.
+#
+# Real HA needs Sentinel plus a failover-aware client in artemis.
+# Postgres is the registry source of truth after the 2026-09-11
+# cutover, so Valkey now holds only the deploy fence, the GitHub team
+# cache and the registry.changed channel. Sentinel is the wrong size
+# for that. Revisit when one of those three becomes a source of truth.
 replicaCount: 1
 
 # ---------------------------------------------------------------------
@@ -61,8 +72,9 @@ service:
 
 # ---------------------------------------------------------------------
 # Pod & container security context (PSS restricted-compliant; the
-# valkey namespace runs PSS restricted — Valkey holds the registry
-# source-of-truth and merits the strictest pod security profile).
+# valkey namespace runs PSS restricted — Valkey holds the artemis
+# deploy fence and the GitHub team cache, so it merits the strictest
+# pod security profile).
 # ---------------------------------------------------------------------
 podSecurityContext:
   runAsNonRoot: true
@@ -83,9 +95,11 @@ containerSecurityContext:
 # Valkey config (rendered into a ConfigMap, mounted at
 # /etc/valkey/valkey.conf, passed via --config to valkey-server).
 #
-# AOF on (`appendonly yes`): registry source-of-truth — RDB-only would
-# lose up-to-60s of writes on crash. fsync everysec is the standard
-# durability/perf balance.
+# AOF on (`appendonly yes`): RDB-only would lose up-to-60s of writes
+# on crash. The registry rebuilds from Postgres, but the deploy fence
+# does not, and a lost fence lets an in-flight permit overwrite a
+# finished deploy. fsync everysec is the standard durability/perf
+# balance.
 #
 # `protected-mode no` is safe here because:
 #   1. NetworkPolicy locks ingress to the artemis pod label.
@@ -117,14 +131,21 @@ secretEnv:
   VALKEY_PASSWORD: null
 
 # ---------------------------------------------------------------------
-# PodDisruptionBudget — minAvailable 1. With replicaCount 1 this
-# blocks voluntary disruptions during node drains; eviction must
-# wait for operator hand-roll. Acceptable for v0.1; revisit when
-# multi-replica.
+# PodDisruptionBudget. Set minAvailable OR maxUnavailable, never both.
+#
+# Ruling 2026-09-11: single-replica Valkey uses `maxUnavailable: 1`,
+# which reports disruptionsAllowed 1 and lets a node drain proceed.
+# `minAvailable: 1` on one replica reports 0 and blocks every drain
+# of the pinned node for good. After the artemis readyz ruling
+# (artemis docs/design/0007-readyz-degradation.md) a Valkey outage no
+# longer removes artemis from the load balancer, so the eviction is
+# survivable and the permanent drain block is the larger harm.
+# Switch back to minAvailable when real replication lands.
 # ---------------------------------------------------------------------
 pdb:
   enabled: true
-  minAvailable: 1
+  minAvailable: null
+  maxUnavailable: 1
 
 # ---------------------------------------------------------------------
 # NetworkPolicy

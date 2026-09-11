@@ -59,7 +59,8 @@ valkeyConfig: |
 
 pdb:
   enabled: true
-  minAvailable: 1
+  minAvailable: null
+  maxUnavailable: 1
 
 networkPolicy:
   enabled: true

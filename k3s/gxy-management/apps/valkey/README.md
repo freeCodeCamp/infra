@@ -1,6 +1,8 @@
-# Valkey — registry KV substrate
+# Valkey — registry cache front
 
-In-cluster Valkey backing the static-apps registry consumed by artemis (`/api/site/register`, `/api/sites`, `/api/site/{slug}` PATCH/DELETE).
+In-cluster Valkey serving the static-apps registry consumed by artemis (`/api/site/register`, `/api/sites`, `/api/site/{slug}` PATCH/DELETE).
+
+**Valkey is not the source of truth.** After the artemis Postgres cutover of 2026-09-11, `pg.RegistryStore` is the registry Writer and the Reader source; Valkey is the cache front and the `registry.changed` transport (artemis `cmd/artemis/main.go`, `openRegistry`). A Valkey outage loses no registry data. It costs the artemis deploy fence, the GitHub team cache and the change channel.
 
 Selected over CF KV / R2 JSON / Postgres / etcd / Redis in `docs/architecture/rfc-gxy-cassiopeia-ga.md` §3 KV substrate matrix. Vendor-neutral, in-cluster, decouples the registry from the operator-on-PR loop that previously gated `artemis/config/sites.yaml`.
 
@@ -21,7 +23,7 @@ apps/valkey/
 │       ├── service.yaml         # ClusterIP + headless companion
 │       ├── configmap.yaml       # valkey.conf
 │       ├── secret-env.yaml      # VALKEY_PASSWORD from sops overlay
-│       ├── pdb.yaml             # minAvailable 1
+│       ├── pdb.yaml             # maxUnavailable 1 (ruling 2026-09-11)
 │       └── networkpolicy.yaml   # ingress from artemis pods only
 ├── secrets/
 │   └── valkey.values.yaml.enc.template  # sops envelope schema
@@ -48,3 +50,15 @@ just release gxy-management valkey
 ```
 
 End-to-end recipe (mint envelope, deploy, verify, import seed data): `docs/flight-manuals/gxy-management.md §C-valkey`.
+
+## One replica, and why
+
+Ruling 2026-09-11. `replicaCount` stays 1 and the PodDisruptionBudget uses `maxUnavailable: 1`.
+
+Do not raise `replicaCount` to 2. The chart has no replication wiring and the `valkey` ClusterIP Service selects every pod by label, so two replicas are two independent servers behind one round-robin Service. The artemis deploy fence would split: `MarkDeployFinalized` writes to one pod and `IsDeployFinalized` reads the other and misses. That is a correctness regression, not high availability.
+
+Real high availability needs Sentinel plus a failover-aware client in artemis. Valkey now holds only the deploy fence, the team cache and the change channel, so Sentinel is the wrong size for it. Revisit when one of those three becomes a source of truth.
+
+`minAvailable: 1` on one replica reports `disruptionsAllowed: 0` and blocks every drain of the node that `local-path` pinned the PVC to. `maxUnavailable: 1` reports 1 and lets the drain proceed. After the artemis readyz ruling (artemis `docs/design/0007-readyz-degradation.md`) a Valkey outage no longer removes artemis from the load balancer, so the eviction is survivable and the permanent drain block is the larger harm.
+
+**A drain still needs care.** The PVC is `local-path` and pinned by node affinity, so an evicted `valkey-0` stays `Pending` until the node returns. Valkey is down for the whole drain, not for a moment. artemis boot also still hard-fails on Valkey, so any artemis pod that restarts during that window crashloops. Follow the drain procedure in `docs/runbooks/12-node-drain-maintenance.md`.

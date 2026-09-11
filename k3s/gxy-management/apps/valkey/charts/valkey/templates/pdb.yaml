@@ -7,7 +7,14 @@ metadata:
   labels:
     {{- include "valkey.labels" . | nindent 4 }}
 spec:
+  {{- if and .Values.pdb.minAvailable .Values.pdb.maxUnavailable }}
+  {{- fail "valkey pdb: set minAvailable OR maxUnavailable, never both" }}
+  {{- end }}
+  {{- if .Values.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  {{- else }}
   minAvailable: {{ .Values.pdb.minAvailable }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "valkey.selectorLabels" . | nindent 6 }}
