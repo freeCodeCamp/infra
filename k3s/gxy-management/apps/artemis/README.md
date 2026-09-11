@@ -124,12 +124,16 @@ Four settings carry a ruling of 2026-09-11 and must not change without a new one
 | setting                          | value      | why                                                                                                       |
 | -------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
 | `podAntiAffinityType`            | `required` | A soft rule is dropped under exactly the scheduling pressure the pair exists to survive.                  |
-| `nodeMaintenanceWindow.reusePVC` | `true`     | `local-path` pins a volume to one node and cannot expand it. A drain must rebuild elsewhere, never wait.  |
+| `nodeMaintenanceWindow.reusePVC` | `true`     | The operator waits for the drained node to return and re-attaches the same `local-path` volume. It drops its own PodDisruptionBudget while it waits, so the drain completes. `false` instead rebuilds the instance on another node with a new volume. |
 | `enableSuperuserAccess`          | `false`    | The `postgres` role keeps a NULL password. The backup job runs as the owner and exports roles separately. |
 | `max_slot_wal_keep_size`         | `2GB`      | An orphaned replication slot would otherwise fill a 10Gi volume that cannot be expanded.                  |
 | `managed.roles` `pg_read_all_stats` | granted to `artemis` | `pg_stat_replication` returns NULL in every LSN column to a non-superuser without it. The lag watch would then read `lag_bytes=0` forever and never alert. |
 
 The `artemis-pg-app` secret is `kubernetes.io/basic-auth` and carries the encrypted `ARTEMIS_DB_PASSWORD` from the overlay. CloudNativePG would otherwise generate its own password and `DATABASE_URL` would have two owners. The secret username must equal the `initdb` owner.
+
+The `nodeMaintenanceWindow` block applies only while `inProgress` is `true`. Set `inProgress` before a node drain and clear it after.
+
+The backup job exports role definitions as idempotent `DO` blocks with no password. A restore must set each password again from the sops overlay. `enableSuperuserAccess: false` means the job cannot read `rolpassword`.
 
 The primary moves after a failover. Reach it through the `artemis-pg-rw` service or the label `cnpg.io/instanceRole=primary`. Never name a pod ordinal.
 

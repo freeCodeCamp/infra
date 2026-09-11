@@ -53,7 +53,7 @@ spec:
 
                   echo "Exporting role definitions"
                   psql -d artemis -tAc \
-                    "SELECT 'CREATE ROLE '||quote_ident(rolname)||' LOGIN;' FROM pg_roles WHERE rolcanlogin AND rolname NOT LIKE 'pg=_%' ESCAPE '=' AND rolname <> 'postgres'" \
+                    'SELECT format($f$DO $r$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = %L) THEN CREATE ROLE %I LOGIN; END IF; END $r$;$f$, rolname, rolname) FROM pg_roles WHERE rolcanlogin AND rolname NOT LIKE $p$pg=_%$p$ ESCAPE $p$=$p$ AND rolname <> $p$postgres$p$' \
                     > "/tmp/${ROLES}"
 
                   for F in "${DUMP}" "${ROLES}"; do

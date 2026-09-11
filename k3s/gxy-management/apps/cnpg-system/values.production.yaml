@@ -1,5 +1,1 @@
-# gxy-management overlay for the CloudNativePG operator.
-#
-# Three nodes, all control-plane+etcd, no taints. The operator is a
-# single stateless replica; a node loss reschedules it and the managed
-# clusters keep running while it is absent.
+{}

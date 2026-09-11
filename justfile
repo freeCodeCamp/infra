@@ -110,7 +110,12 @@ release cluster app:
         # A remote chart with no --version takes whatever is current on
         # the day it runs, so two releases of the same commit can install
         # different charts. Refuse rather than resolve.
-        [ -f "$VERSION_FILE" ] || { echo "Error: $VERSION_FILE not found — a remote chart must be pinned"; exit 1; }
+        if [ ! -f "$VERSION_FILE" ]; then
+          echo "Error: $VERSION_FILE not found — a remote chart must be pinned."
+          echo "  Read the live pin:  helm list -n {{ app }} -o json | jq -r '.[0].chart'"
+          echo "  Then write it:      echo <version> > $VERSION_FILE"
+          exit 1
+        fi
         CHART_VERSION=$(cat "$VERSION_FILE")
         echo "Helm: install {{ app }} (chart: $CHART_NAME $CHART_VERSION) from $REPO_URL"
         helm upgrade --install {{ app }} "$CHART_NAME" \
