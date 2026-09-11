@@ -172,19 +172,18 @@ Set them in `values.production.yaml` and release from `~/DEV/fCC/infra` on `main
 
 Upstream calls `false` unsuitable **unless the database is small enough for fast re-cloning**. The `artemis` database measured 11877399 bytes on 2026-09-11. Upstream also keeps `nodeMaintenanceWindow` for backward compatibility only, and recommends direct control of the PodDisruptionBudget instead.
 
-Ruling R6 chose `true`. It was made on a description that had the two values the wrong way round. Measure before you re-rule:
+### Ruling 2026-09-11 — keep `true`, do not measure
 
-1. Set `maintenanceInProgress: true` and `reusePVC: true`. Release. Drain the standby's node. Time the return to `readyInstances: 2` after you uncordon.
-1. Run `kubectl -n artemis describe resourcequota baseline`. The re-clone needs the drained instance's memory to be free first. A blocked join Job is section F, not a CloudNativePG fault.
-1. Set `reusePVC: false`. Release. Drain again. Time the re-clone.
-1. Clear `maintenanceInProgress`. Release.
+Ruling R6 chose `true` on a description that had the two values the wrong way round. The correct description does not change the value. Keep `true`. The measurement is cancelled. Three facts decide it.
 
-Step 3 moves the standby to whichever node is free. That changes the blast radius recorded in [12-node-drain-maintenance.md](12-node-drain-maintenance.md). Update that table if the standby does not return to its old node.
+1. `reusePVC` is inert in production. `maintenanceInProgress` is `false` and no change plans to set it.
+1. The planned-drain path that would activate it is blocked before CloudNativePG sees it. `valkey/valkey` holds `disruptionsAllowed: 0` on a single replica, so `kubectl drain` of `k3s-3` loops on `valkey-0`. See [12-node-drain-maintenance.md](12-node-drain-maintenance.md).
+1. Upstream keeps `nodeMaintenanceWindow` for backward compatibility only and recommends direct PodDisruptionBudget control instead.
 
-Record both numbers here. The ruling follows the measurement.
+A measurement of an inert setting on an unreachable path costs four releases and proves nothing. Re-open this only after the Valkey single-replica blocker is fixed, and only if a planned drain is then required.
 
-- **`reusePVC: true` recovery:** _(pending)_
-- **`reusePVC: false` recovery:** _(pending)_
+- **`reusePVC: true` recovery:** not measured — setting inert, drain path blocked
+- **`reusePVC: false` recovery:** not measured — same
 
 ## E — Rollback
 
