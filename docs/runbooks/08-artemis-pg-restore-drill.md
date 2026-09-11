@@ -180,7 +180,17 @@ The drill validates the **M1 stateful floor** for artemis-PG, not the GA (CNPG-s
 | **RPO** | \<= 24 hours                           | Nightly logical dump at 02:00 (`backup.schedule: 0 2 * * *`). Worst case loses up to a day of deploy/GC bookkeeping written since the last successful dump. This is the bundled single-node profile — there is NO WAL-continuous archive at M1.                      |
 | **RTO** | \<= 60 minutes                         | Galaxy rebuild + restore of the newest R2 dump into a fresh `artemis-postgresql` StatefulSet, per ADR-019 §Stateful-pillar backup pattern. The drill above (steps B-D) is the rehearsal of the restore leg; the StatefulSet re-provision is the remaining wall-time. |
 
-The serve plane (Caddy + R2) is unaffected by a PG outage — only new deploys + retention GC pause (ADR-016 consequence; ADR-020 §3 "HA scope = artemis only"). The ADR-019 GA target of RPO \<= 5 min (WAL-continuous) and RTO \<= 30-60 min lands at the platform CNPG sweep, which folds artemis-PG into the operator-managed T1+T2 ladder — that is OUT OF SCOPE for the M1 bundled profile this drill covers (ADR-020 §3 D1; chart `values.yaml` `postgres:` PG-HA posture note).
+The serve plane (Caddy + R2) is unaffected by a PG outage — only new deploys + retention GC pause (ADR-016 consequence; ADR-020 §3 "HA scope = artemis only").
+
+**Superseded for the `artemis` database on 2026-09-11.** The CloudNativePG pair is live, so the M1 row above describes the StatefulSet only. Ruling R2 of the `artemis-pg-pair` wave sets the pair's floor and supersedes ADR-019 §85 and ADR-023 §51.
+
+| Metric | `artemis-pg` value | Basis |
+| --- | --- | --- |
+| **RPO** | daily | The `artemis-pg-backup` CronJob at 02:00 UTC. There is still no WAL-continuous archive. Replication protects against instance loss, not against a bad write. |
+| **RTO** | the standby promotion time | Measure it in [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §B and record the number there. |
+| **Retention ceiling** | 7 days | `pgBackup.retention: 7d`. An artefact older than that is deleted from R2 and cannot be restored. |
+
+A daily RPO means a logical restore still loses up to a day. The pair removes the single-node failure mode; it does not remove the backup window.
 
 Rehearse this drill before declaring artemis-PG GA, and after any change to the backup CronJob, the `postgres-rclone` image, or the bundled PG version.
 
