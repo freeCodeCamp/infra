@@ -82,6 +82,24 @@ kubectl -n artemis get cluster artemis-pg -w
 
 Record the seconds from delete to `readyInstances: 2`. That number is the RTO for a promotion, and ruling R2 defines RTO as the standby promotion time.
 
+**Measured 2026-09-11**, primary `artemis-pg-1` on k3s-3, deleted at 08:19:38Z:
+
+| mark                        | time      | delta from delete |
+| --------------------------- | --------- | ----------------- |
+| `currentPrimary` changes    | 08:22:42Z | **182.9s**        |
+| `readyInstances` back to 2  | 08:22:53Z | 193.9s            |
+
+`/healthz` answered 200 on all 226 polls. Both instances stayed on their original nodes with 0 restarts, replication returned to `streaming` at lag 0, the `pg_read_all_stats` grant survived, and `deploys` held at 321 rows.
+
+**183s is the number to improve, and the cause is not yet established.** The obvious suspect is wrong: `smartShutdownTimeout` (180s, and a near-exact match) does not apply here, because CloudNativePG runs `TryShuttingDownFastImmediate` on a deleted primary, bounded by `switchoverDelay` (3600s), not a smart shutdown. The old pod's logs are destroyed with the pod, and the operator logged nothing between 08:19:38Z and 08:22:52Z. Capture both before the next run:
+
+```sh
+kubectl -n artemis logs -f "$PRIMARY" -c postgres > /tmp/old-primary.log &
+kubectl -n cnpg-system logs -f -l app.kubernetes.io/name=cloudnative-pg > /tmp/operator.log &
+```
+
+The application is unavailable for the whole window. The outbox relay logged `failed to connect ... (artemis-pg-rw): dial error ... operation not permitted` until the promotion. Treat 183s as the deploy-and-GC outage, not as a serving outage.
+
 ## C — Node loss
 
 A node carrying an instance goes away. Two cases behave differently, and the difference is the `artemis-pg-primary` PodDisruptionBudget.
@@ -173,9 +191,9 @@ CloudNativePG then rebuilds the claim and the Job together. Do not delete the PV
 
 Stamp each rehearsal here.
 
-- **Last rehearsed:** _(pending)_
-- **Promotion RTO:** _(pending)_
-- **Node-loss outcome:** _(pending)_
+- **Last rehearsed:** 2026-09-11, section B only.
+- **Promotion RTO:** 182.9s to `currentPrimary`, 193.9s to `readyInstances: 2`. Cause of the 183s not established.
+- **Node-loss outcome:** _(pending — sections C and D not run)_
 
 ## Cross-refs
 
