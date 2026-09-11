@@ -19,6 +19,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 12  | [12-node-drain-maintenance.md](12-node-drain-maintenance.md)               | Operator  | Drain a k3s node — PDB posture differs per node     |
 | 13  | [13-purge-orphaned-sites.md](13-purge-orphaned-sites.md)                   | Operator  | Take down a deregistered site that still serves    |
 | 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)                         | Operator  | Bring up / grow the ops-o11y mgmt cluster (T58)     |
+| 15  | [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md)         | Operator  | Rehearse failover of the artemis-pg CNPG pair      |
 
 ## Reading order by scenario
 
@@ -55,6 +56,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 10    | 10    | CF origin-cert rotation; foundation-adjacent to 04/05 |
 | 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08       |
 | 14    | 14    | ops-o11y mgmt cluster bringup + T58 growth; standalone |
+| 15    | 15    | Artemis PG failover drill; DR-adjacent to 08 and 11    |
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 

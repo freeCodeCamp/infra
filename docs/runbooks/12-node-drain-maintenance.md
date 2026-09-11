@@ -13,6 +13,7 @@ The `artemis` namespace holds three workloads with three different disruption po
 | `artemis` (deploy proxy) | 3 | all three | `minAvailable: 2` | 1 | Drains cleanly, one node at a time |
 | `artemis-postgresql` | 1 | k3s-2 | `minAvailable: 1` | **0** | **Blocks indefinitely** |
 | `hatchet-engine` | 2 | two of three | `minAvailable: 1` | 1 | Drains cleanly, one node at a time (since 2026-08-31) |
+| `artemis-pg` (CloudNativePG pair) | 2 | two of three | `artemis-pg-primary` | **0** | The standby's node drains cleanly. The primary's node **blocks**. |
 
 Confirm the live numbers before trusting the table:
 
@@ -43,7 +44,9 @@ The engine keeps no local state; its run history lives in the `hatchet` database
 
 **2026-08-23.** `just release gxy-management hatchet` took the release to revision 2 and applied `hatchet-engine` at `minAvailable: 1`. **`just release gxy-management artemis` does not release the hatchet chart** — the two charts are separate releases in one namespace. That is why the template sat unapplied from 2026-06-06. At one replica that PDB blocked a drain, which was the intended trade at the time: an outage the operator times beats one the scheduler picks.
 
-**2026-08-31.** The engine went to two replicas with required anti-affinity, per ADR-022 §Prerequisite. That reverses the trade rather than refining it: the engine no longer blocks a drain and no longer needs the manual scale-to-zero step, because one replica always survives. `artemis-postgresql` is now the ONLY workload in this namespace that blocks a drain.
+**2026-08-31.** The engine went to two replicas with required anti-affinity, per ADR-022 §Prerequisite. That reverses the trade rather than refining it: the engine no longer blocks a drain and no longer needs the manual scale-to-zero step, because one replica always survives.
+
+**2026-09-11.** The `artemis-pg` CloudNativePG pair went live. Two workloads now block a drain, not one. CloudNativePG builds a `-primary` PodDisruptionBudget at `disruptionsAllowed: 0` for every cluster, so the node holding the primary blocks. It builds a replicas PodDisruptionBudget only at three or more instances, so at two instances the standby's node drains cleanly. Move the primary first — see [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §B — then drain. Do not scale the `Cluster` to zero; that is not the CloudNativePG path.
 
 Placement is not pinned. Re-check before every drain.
 
