@@ -124,7 +124,7 @@ Four settings carry a ruling of 2026-09-11 and must not change without a new one
 | setting                          | value      | why                                                                                                       |
 | -------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
 | `podAntiAffinityType`            | `required` | A soft rule is dropped under exactly the scheduling pressure the pair exists to survive.                  |
-| `nodeMaintenanceWindow.reusePVC` | `true`     | The operator waits for the drained node to return and re-attaches the same `local-path` volume. It drops its own PodDisruptionBudget while it waits, so the drain completes. `false` instead rebuilds the instance on another node with a new volume. |
+| `nodeMaintenanceWindow.reusePVC` | `true`     | The operator waits for the drained node to return and re-attaches the same `local-path` volume. It drops its own PodDisruptionBudget while it waits, so the drain completes. `false` instead rebuilds the instance on another node with a new volume. The setting is inert unless `maintenanceInProgress` is `true`, so it governs planned drains only. |
 | `enableSuperuserAccess`          | `false`    | The `postgres` role keeps a NULL password. The backup job runs as the owner and exports roles separately. |
 | `max_slot_wal_keep_size`         | `2GB`      | An orphaned replication slot would otherwise fill a 10Gi volume that cannot be expanded.                  |
 

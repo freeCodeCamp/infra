@@ -97,20 +97,32 @@ Drain the standby's node first to see the clean path. Then drain the primary's n
 
 ## D — The `reusePVC` measurement
 
-`nodeMaintenanceWindow` applies only while `inProgress` is `true`. Set it by hand before a drain and clear it after.
+`nodeMaintenanceWindow` applies only while `inProgress` is `true`. Both keys are chart values:
 
-| value   | behaviour                                                                                                                             | cost                                            |
+| key                                     | default |
+| --------------------------------------- | ------- |
+| `postgresCluster.maintenanceInProgress` | `false` |
+| `postgresCluster.reusePVC`              | `true`  |
+
+Set them in `values.production.yaml` and release from `~/DEV/fCC/infra` on `main`. Do not release from a stale worktree.
+
+**`reusePVC` is inert while `inProgress` is `false`.** The operator evaluates `IsNodeMaintenanceWindowInProgress() && IsReusePVCEnabled()`, so a `false` `inProgress` short-circuits the pair. On an unplanned node failure the operator waits for the original node and its pinned PVC to return, whatever `reusePVC` says. This setting therefore governs **planned drains only**, where the node comes back by definition.
+
+| value   | behaviour during a drain                                                                                                              | cost                                            |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | `true`  | The operator waits for the drained node to return and re-attaches the same volume. It removes the PodDisruptionBudget while it waits. | The instance stays down until the node returns. |
 | `false` | The operator discards the pinned volume and rebuilds the instance on a free node, re-cloning from the primary.                        | One re-clone.                                   |
 
-Upstream calls `false` unsuitable **unless the database is small enough for fast re-cloning**. The `artemis` database measured 12811287 bytes on 2026-09-11.
+Upstream calls `false` unsuitable **unless the database is small enough for fast re-cloning**. The `artemis` database measured 11877399 bytes on 2026-09-11. Upstream also keeps `nodeMaintenanceWindow` for backward compatibility only, and recommends direct control of the PodDisruptionBudget instead.
 
 Ruling R6 chose `true`. It was made on a description that had the two values the wrong way round. Measure before you re-rule:
 
-1. Set `inProgress: true` and `reusePVC: true` in `values.production.yaml`. Release. Drain the standby's node. Time the return to `readyInstances: 2` after you uncordon.
+1. Set `maintenanceInProgress: true` and `reusePVC: true`. Release. Drain the standby's node. Time the return to `readyInstances: 2` after you uncordon.
+1. Run `kubectl -n artemis describe resourcequota baseline`. The re-clone needs the drained instance's memory to be free first. A blocked join Job is section F, not a CloudNativePG fault.
 1. Set `reusePVC: false`. Release. Drain again. Time the re-clone.
-1. Clear `inProgress`. Release.
+1. Clear `maintenanceInProgress`. Release.
+
+Step 3 moves the standby to whichever node is free. That changes the blast radius recorded in [12-node-drain-maintenance.md](12-node-drain-maintenance.md). Update that table if the standby does not return to its old node.
 
 Record both numbers here. The ruling follows the measurement.
 
