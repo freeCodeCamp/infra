@@ -26,7 +26,7 @@ kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.
 
 Read the first command across all namespaces. Every PodDisruptionBudget at `disruptionsAllowed: 0` blocks the node that holds its pod. The second command names what the target node carries.
 
-Pod placement is not pinned, so re-check which node holds Postgres, the engine and Valkey rather than assuming k3s-2 and k3s-3.
+Pod placement is not declared in any chart, so re-check which node holds Postgres, the engine and Valkey rather than assuming k3s-2 and k3s-3. A pod that already holds a `local-path` volume is a different case: its PersistentVolume carries a node affinity and the pod cannot start anywhere else. `valkey-0`, `artemis-pg-1` and `artemis-pg-2` are in that case.
 
 ## Blast radius, per workload
 
@@ -68,7 +68,7 @@ Its volume is `local-path`, so the evicted pod cannot start on another node and 
 
 **2026-09-11, second entry.** A §C drill drain of `k3s-3` hung on `valkey-0` and retried every 5 seconds until the operator stopped it. This runbook had surveyed the `artemis` namespace only, so the third blocker was never recorded. `artemis-pg-1` evicted cleanly in the same drain and went `Pending` with `2 node(s) didn't match PersistentVolume's node affinity` — the `local-path` pin, measured rather than assumed. After `uncordon` the instance re-attached the same volume and the cluster returned to `2/2` in 17 seconds, with no re-clone and no restart.
 
-Placement is not pinned. Re-check before every drain.
+Which node holds what is not declared anywhere. Re-check before every drain.
 
 ## Procedure
 
@@ -91,9 +91,40 @@ Placement is not pinned. Re-check before every drain.
 
 **Node holding one `hatchet-engine` replica** — no special handling since 2026-08-31; `minAvailable: 1` at two replicas permits the eviction and the drain completes. Do NOT scale to zero: that step belonged to the single-replica posture and now causes an outage the PDB was about to prevent. Two cautions remain. Required anti-affinity means the evicted pod cannot reschedule until a node with no engine pod is free, so it stays `Pending` while the drained node is cordoned — expected, not a fault. And prefer a window outside 03:00–04:30 UTC so the nightly check-ins are not recorded as missed. Confirm the workers re-attach afterwards: the engine log reports `listing actions for workers` with a non-zero count.
 
+### `valkey-0` and `artemis-pg-1` share k3s-3 — ruling 2026-09-11
+
+**Do not move either one.** The co-location is accepted.
+
+Measured on 2026-09-11:
+
+```
+data-valkey-0   local-path   [gxy-vm-management-k3s-3]
+artemis-pg-1    local-path   [gxy-vm-management-k3s-3]   replica
+artemis-pg-2    local-path   [gxy-vm-management-k3s-1]   primary
+```
+
+The cost of losing k3s-3 is one node's blast radius, which is what the design accepts:
+
+- Valkey goes down. Deploys return `503 fence_unavailable`. Serving, authentication and the registry continue, per the Valkey entry above.
+- The `artemis-pg` standby goes down. The primary is on k3s-1 and keeps serving. The pair loses its replication protection until the node returns; the daily R2 dump remains the backup floor.
+
+Neither loss reaches the serve plane. The two faults do not compound: one pauses deploys, the other removes redundancy, and each is already the documented single-node case.
+
+The move is also not durable. Both volumes are `local-path` with `WaitForFirstConsumer` and a `Delete` reclaim policy, so a volume cannot be detached and re-attached elsewhere — the move is a rebuild.
+
+- Rebuilding `artemis-pg-1` is cheap. Delete the instance's PVC and pod and CloudNativePG re-clones the standby from the primary. **The new PVC binds wherever the scheduler puts the new pod.** `podAntiAffinityType: required` keeps it off k3s-1 and leaves k3s-2 and k3s-3, so the rebuild can land back on k3s-3. Holding it off k3s-3 needs an explicit `nodeSelector` or node affinity on the `Cluster`, which pins the pair to named nodes and removes the scheduling freedom the anti-affinity rule exists to use.
+- Rebuilding `valkey-0` loses the append-only file. After the 2026-09-11 cutover that file holds the deploy fence and the GitHub team cache, not the registry. Both rebuild on demand, but any in-flight deploy permit is lost.
+
+Re-open this ruling when a switchover puts the `artemis-pg` primary on k3s-3. The primary and Valkey on one node is a different case: that node's loss pauses deploys *and* forces a promotion, and the two recoveries compete for the same window. Check the current role before any planned maintenance:
+
+```sh
+kubectl -n artemis get pod -l cnpg.io/cluster=artemis-pg \
+  -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName,ROLE:.metadata.labels.cnpg\.io/instanceRole
+```
+
 ### Full order for a node carrying more than one blocker
 
-Placement is not pinned, so a node can hold the `artemis-pg` primary, `valkey-0`, `artemis-postgresql-0` and an artemis replica at once. Survey first, then run the steps that apply, in this order.
+A node can hold the `artemis-pg` primary, `valkey-0`, `artemis-postgresql-0` and an artemis replica at once. Survey first, then run the steps that apply, in this order.
 
 ```sh
 export KUBECONFIG=~/DEV/fCC/infra/k3s/gxy-management/.kubeconfig.yaml
