@@ -54,3 +54,48 @@ spec:
             - port: "5432"
               protocol: TCP
 {{- end }}
+{{- if and .Values.networkPolicy.enabled .Values.postgresCluster.enabled .Values.pgBackup.enabled }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-pg-backup
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pg-backup
+spec:
+  description: "artemis pg-backup CronJob: R2 upload and SQL to the CloudNativePG primary"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: pg-backup
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.r2.cloudflarestorage.com"
+              - matchName: "{{ .Release.Name }}-rw.{{ .Values.namespace }}.svc.cluster.local"
+              - matchPattern: "*.*.svc.cluster.local"
+    - toFQDNs:
+        - matchPattern: "*.r2.cloudflarestorage.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}
+            "k8s:cnpg.io/cluster": {{ .Release.Name }}
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+{{- end }}

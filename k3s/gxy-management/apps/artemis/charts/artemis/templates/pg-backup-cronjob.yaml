@@ -1,0 +1,124 @@
+{{- if and .Values.postgresCluster.enabled .Values.pgBackup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-pg-backup
+  labels:
+    {{- include "artemis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pg-backup
+spec:
+  schedule: {{ .Values.pgBackup.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.pgBackup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "artemis.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: pg-backup
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: pg-backup
+              image: {{ .Values.pgBackup.image }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  DUMP="artemis-${TIMESTAMP}.sql.gz"
+                  ROLES="artemis-roles-${TIMESTAMP}.sql"
+                  R2_PREFIX="artemis/${GALAXY}/pg"
+
+                  echo "Dumping database artemis from ${PGHOST}"
+                  pg_dump --clean --if-exists -d artemis | gzip > "/tmp/${DUMP}"
+
+                  echo "Exporting role definitions"
+                  psql -d artemis -tAc \
+                    "SELECT 'CREATE ROLE '||quote_ident(rolname)||' LOGIN;' FROM pg_roles WHERE rolcanlogin AND rolname NOT LIKE 'pg=_%' ESCAPE '=' AND rolname <> 'postgres'" \
+                    > "/tmp/${ROLES}"
+
+                  for F in "${DUMP}" "${ROLES}"; do
+                    SIZE=$(stat -c%s "/tmp/${F}" 2>/dev/null || stat -f%z "/tmp/${F}")
+                    if [ "${SIZE}" -eq 0 ]; then
+                      echo "Refusing to upload an empty ${F}" >&2
+                      exit 1
+                    fi
+                    echo "Uploading ${F} (${SIZE} bytes) to r2:${R2_BUCKET}/${R2_PREFIX}/${F}"
+                    rclone copyto "/tmp/${F}" "r2:${R2_BUCKET}/${R2_PREFIX}/${F}"
+                  done
+
+                  echo "Pruning older than {{ .Values.pgBackup.retention }} under r2:${R2_BUCKET}/${R2_PREFIX}/"
+                  rclone delete --min-age {{ .Values.pgBackup.retention }} "r2:${R2_BUCKET}/${R2_PREFIX}/"
+
+                  echo "Backup complete: ${R2_PREFIX}/${DUMP}"
+              env:
+                - name: GALAXY
+                  value: {{ .Values.pgBackup.galaxy | quote }}
+                - name: PGHOST
+                  value: {{ .Release.Name }}-rw
+                - name: PGUSER
+                  value: artemis
+                - name: PGSSLMODE
+                  value: require
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-pg-app
+                      key: password
+                - name: R2_BUCKET
+                  value: {{ required ".Values.env.R2_BUCKET is required" .Values.env.R2_BUCKET | quote }}
+                - name: RCLONE_CONFIG
+                  value: /dev/null
+                - name: RCLONE_CONFIG_R2_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_R2_PROVIDER
+                  value: Cloudflare
+                - name: RCLONE_CONFIG_R2_ACL
+                  value: private
+                - name: RCLONE_CONFIG_R2_NO_CHECK_BUCKET
+                  value: "true"
+                - name: RCLONE_CONFIG_R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: R2_ENDPOINT
+                - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: R2_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-env-secret
+                      key: R2_SECRET_ACCESS_KEY
+              resources:
+                {{- toYaml .Values.pgBackup.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: {{ .Values.pgBackup.tmpSizeLimit }}
+{{- end }}
