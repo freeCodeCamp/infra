@@ -20,6 +20,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 13  | [13-purge-orphaned-sites.md](13-purge-orphaned-sites.md)                   | Operator  | Take down a deregistered site that still serves    |
 | 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)                         | Operator  | Bring up / grow the ops-o11y mgmt cluster (T58)     |
 | 15  | [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md)         | Operator  | Rehearse failover of the artemis-pg CNPG pair      |
+| 16  | [16-artemis-backup-bucket-split.md](16-artemis-backup-bucket-split.md)     | Operator  | One-off: move PG backups off the serve bucket      |
 
 ## Reading order by scenario
 
@@ -36,6 +37,8 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 **Stand up / rebuild the Hatchet engine (durable-exec stage 2):** 09 (wires into 02 §Staged durable-exec bootstrap; operator-only).
 
 **Rotate the CF origin cert:** 10 (links to 04 internally; consolidated single-copy wildcard per `docs/architecture/rfc-secrets-layout.md` D1).
+
+**Split the backup bucket (one-off, 2026-09):** 16 (create the bucket, mint the backup-only token, rebuild the image, move the artefacts, release, drill; links to 05 + 02 + 03 + 08 internally).
 
 **Drain a node for maintenance:** 12 (per-node PDB posture, the blocked-drain procedure for Postgres, and the undeployed hatchet PDB; links to 11 internally).
 
@@ -57,6 +60,7 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08       |
 | 14    | 14    | ops-o11y mgmt cluster bringup + T58 growth; standalone |
 | 15    | 15    | Artemis PG failover drill; DR-adjacent to 08 and 11    |
+| 16    | 16    | One-off backup bucket split; calls 05, 02, 03, 08      |
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
