@@ -33,7 +33,9 @@ const (
 )
 
 const (
-	documentCacheControl  = "public, max-age=0, must-revalidate"
+	documentCacheControl  = "public, max-age=0, s-maxage=60, must-revalidate"
+	hashedCacheControl    = "public, max-age=31536000, immutable"
+	hashedAssetPattern    = `^/(assets|_astro|_next/static|static/(js|css|media))/.*[.-][A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|avif|ico|map|wasm)$`
 	errorCacheControl     = "no-store"
 	chartMaxFileSize      = "33554432"
 	chartMetricsPort      = "9180"
@@ -101,7 +103,10 @@ func startCaddyWithMaxFileSize(t *testing.T, s3Endpoint string, maxFileSize int6
 
 :%d {
 	handle {
-		header Cache-Control "%s"
+		@hashed path_regexp %s
+		@unhashed not path_regexp %s
+		header @hashed   Cache-Control "%s"
+		header @unhashed Cache-Control "%s"
 
 		r2_alias {
 			bucket %s
@@ -141,7 +146,8 @@ func startCaddyWithMaxFileSize(t *testing.T, s3Endpoint string, maxFileSize int6
 		caddyAdminPort, caddyHTTPPort, caddyHTTPSPort,
 		testBucket, s3Endpoint, sizeDirective,
 		caddyHTTPPort,
-		documentCacheControl,
+		hashedAssetPattern, hashedAssetPattern,
+		hashedCacheControl, documentCacheControl,
 		testBucket, s3Endpoint,
 		cacheTTL, rootDomain,
 		errorCacheControl,
@@ -331,6 +337,44 @@ func TestIntegration_ServedObjectTellsTheBrowserToRevalidate(t *testing.T) {
 	}
 	if got := resp.Header.Get("Cache-Control"); got != documentCacheControl {
 		t.Fatalf("Cache-Control: want %q, got %q", documentCacheControl, got)
+	}
+}
+
+func TestIntegration_HashedAssetIsImmutable(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	resp, _ := doGetResponse(t, tester, site, "/assets/app-Bx7Qk2mZ.js")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != hashedCacheControl {
+		t.Fatalf("Cache-Control: want %q, got %q", hashedCacheControl, got)
+	}
+}
+
+func TestIntegration_UnhashedScriptTellsTheBrowserToRevalidate(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+
+	for _, path := range []string{"/src/app.js", "/assets/logo.svg"} {
+		resp, _ := doGetResponse(t, tester, site, path)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s status: want 200, got %d", path, resp.StatusCode)
+		}
+		if got := resp.Header.Get("Cache-Control"); got != documentCacheControl {
+			t.Fatalf("%s Cache-Control: want %q, got %q", path, documentCacheControl, got)
+		}
 	}
 }
 

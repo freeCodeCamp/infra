@@ -199,8 +199,20 @@ func TestChartCaddyfileCarriesTheTestedCachePolicy(t *testing.T) {
 	body := chartCaddyfile(t)
 
 	serving := blockAfter(t, body, "handle {")
-	if !strings.Contains(serving, `header Cache-Control "`+documentCacheControl+`"`) {
-		t.Errorf("the serving block must send %q, the policy the integration tests prove", documentCacheControl)
+	if !strings.Contains(serving, "@hashed path_regexp "+hashedAssetPattern+"\n") {
+		t.Errorf("the serving block must match hashed assets with the pattern the integration tests prove: %s", hashedAssetPattern)
+	}
+	if !strings.Contains(serving, "@unhashed not path_regexp "+hashedAssetPattern+"\n") {
+		t.Errorf("the serving block must match everything else with the negation of the same pattern")
+	}
+	if !strings.Contains(serving, `header @hashed   Cache-Control "`+hashedCacheControl+`"`) {
+		t.Errorf("the serving block must send %q for hashed assets, the policy the integration tests prove", hashedCacheControl)
+	}
+	if !strings.Contains(serving, `header @unhashed Cache-Control "`+documentCacheControl+`"`) {
+		t.Errorf("the serving block must send %q for everything else, the policy the integration tests prove", documentCacheControl)
+	}
+	if strings.Contains(serving, "header Cache-Control ") {
+		t.Errorf("the serving block must not send an unmatched Cache-Control; it would shadow the per-path policy")
 	}
 	if strings.Contains(serving, errorCacheControl) {
 		t.Errorf("the serving block must not send %q", errorCacheControl)
