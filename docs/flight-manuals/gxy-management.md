@@ -489,6 +489,59 @@ Acceptance gates (this chapter contributes G5/G6/G9/G10/G11 from RFC §E):
 - **G10** Registry survives `kubectl delete pod -l app=valkey` — PVC reattach + AOF replay; sites enum unchanged.
 - **G11** Nightly RDB lands in R2 (§C.4 manual trigger validates).
 
+## §K — metrics-server
+
+`kubectl top nodes` and `kubectl top pods` answer `Metrics API not available`.
+
+### K.1 Diagnosis of 2026-09-11
+
+The `metrics-server` Deployment is a k3s bundled addon. k3s reconciles it from
+`/var/lib/rancher/k3s/server/manifests/metrics-server/`. Do not edit the Deployment in place; k3s
+reverts it.
+
+Measured state on 2026-09-11:
+
+- Pod `metrics-server-84f58d4648-l9mtl`, started `2026-04-22T13:23:16Z`, **0 restarts**, `1/1 Ready`.
+- **Last log line `2026-08-04 09:19:36Z.**` Nothing for 38 days. A running scraper logs on every
+  failure at `--metric-resolution=15s`, so silence means it stopped scraping, not that it succeeded.
+- `APIService v1beta1.metrics.k8s.io` reports `Available=True`, "all checks passed".
+- `kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes` answers
+  `Error from server (Timeout): the server was unable to return a response in the time allotted`.
+- The kubelet is fine. `kubectl get --raw /api/v1/nodes/<node>/proxy/metrics/resource` returns real
+  counters.
+- The configuration is correct. `--kubelet-preferred-address-types=InternalIP` plus
+  `--kubelet-use-node-status-port`, and the three node `InternalIP` values are `10.110.0.17`,
+  `10.110.0.19` and `10.110.0.18`, each with `kubeletEndpoint.Port: 10250`. The August scrape errors
+  named exactly those addresses.
+
+The process is wedged: Ready to the probe, answering nothing to the API. The `/readyz` probe passes
+while the store serves no data, so neither the liveness nor the readiness probe restarts it.
+
+### K.2 Repair
+
+```sh
+export KUBECONFIG=~/DEV/fCC/infra/k3s/gxy-management/.kubeconfig.yaml
+kubectl -n kube-system delete pod -l k8s-app=metrics-server
+kubectl -n kube-system rollout status deploy/metrics-server --timeout=120s
+sleep 30   # the store needs one --metric-resolution cycle plus margin
+kubectl top nodes
+```
+
+Delete the pod rather than `rollout restart`. `rollout restart` writes a pod-template annotation
+that k3s strips on its next reconcile, which rolls the Deployment a second time.
+
+### K.3 Two defects to raise if it wedges again
+
+- **No probe catches this state.** `/readyz` answered 200 for 38 days while the metrics API timed
+  out. A probe on `/metrics` scrape freshness, or an alert on the `metrics.k8s.io` API latency,
+  would have caught it the same day.
+- **`hostNetwork: true` with `dnsPolicy: ClusterFirst`.** Kubernetes silently downgrades that pair
+  to the host's `/etc/resolv.conf`; the pod events carry
+  `DNSConfigForming ... Nameserver limits were exceeded`. metrics-server does not need cluster DNS —
+  it dials nodes by IP and the apiserver by `KUBERNETES_SERVICE_HOST` — so this did not cause the
+  outage. `dnsPolicy: ClusterFirstWithHostNet` is the correct value and the change belongs upstream
+  in k3s, not in a local edit that the reconciler reverts.
+
 ## §J — Teardown
 
 Destructive. Run a Valkey ad-hoc RDB capture (§C.5, `just backup-valkey`) before teardown.
