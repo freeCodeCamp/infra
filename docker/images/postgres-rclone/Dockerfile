@@ -5,7 +5,8 @@
 #
 # Why this shape:
 #  - Image is run-once-and-die inside a CronJob — never interactive.
-#    We need pg_dumpall + rclone + bash. Nothing else.
+#    We need pg_dumpall + rclone + bash, and curl for the Sentry
+#    cron check-in the backup script posts. Nothing else.
 #  - postgres-client-16 matches the live artemis-postgresql server
 #    (postgres:16.14-alpine, chart values.yaml `postgres.image.tag`).
 #    Dump-then-restore round-trip is the actual DR contract; client
@@ -15,9 +16,8 @@
 #    throws 7 errors psql 16 cannot honour. Re-pin this line whenever
 #    `postgres.image.tag` moves.
 #  - rclone binary comes from `rclone/rclone:1.74.1` via COPY so we
-#    inherit upstream's release engineering (signed builds, no `curl
-#    + unzip` in our final image, no apt cache layer for build-only
-#    tools).
+#    inherit upstream's release engineering (signed builds, no unzip
+#    in our final image, no apt cache layer for build-only tools).
 #  - debian:bookworm-slim base is ~30 MB; final image ~150-200 MB
 #    vs ~500 MB for the prior postgres:18-bookworm monolith we
 #    abandoned.

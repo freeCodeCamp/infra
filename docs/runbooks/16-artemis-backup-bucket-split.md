@@ -46,7 +46,7 @@ The backup script posts a Sentry cron check-in with `curl`. Every image built be
 
 1. Run the `workflow_dispatch` build of `.github/workflows/docker--postgres-rclone.yml`.
 1. Read the new digest from the registry, not from the build log.
-1. Repin it at `k3s/gxy-management/apps/artemis/charts/artemis/values.yaml:338` (`pgBackup.image`) and `:424` (`backup.image`). Both lines carry the same digest.
+1. Repin `pgBackup.image` and `backup.image` in `k3s/gxy-management/apps/artemis/charts/artemis/values.yaml`. Both lines carry the same digest.
 1. Commit the repin.
 
 ## 5. Move the artefacts

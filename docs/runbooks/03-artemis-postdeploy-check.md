@@ -219,7 +219,7 @@ Both backup CronJobs post Sentry cron check-ins. Confirm the monitors exist in S
 
 The first check-in of each run carries `monitor_config`, so Sentry creates the monitor object itself. A missed or `error` check-in is the only page a failed backup Job emits.
 
-The check-in is best-effort: `sentry_checkin()` returns 0 when `SENTRY_DSN` is empty or `curl` is absent, so telemetry never fails a backup. `curl` is absent from any `postgres-rclone` image built before 2026-09-11. A backup CronJob that runs green with no Sentry monitor means the image digest in `values.production.yaml` is still the old build.
+The check-in is best-effort: `sentry_checkin()` returns 0 when `SENTRY_DSN` is empty or `curl` is absent, so telemetry never fails a backup. `curl` is absent from any `postgres-rclone` image built before 2026-09-11. A backup CronJob that runs green with no Sentry monitor means the `postgres-rclone` digest in the chart's `values.yaml` (`pgBackup.image` and `backup.image`) is still the old build. Rebuild and repin per [16](16-artemis-backup-bucket-split.md) §4. A rejected check-in looks different: the pod logs `sentry check-in <status> failed` on stderr.
 
 ### 5. Site lifecycle — delete, hold, undelete, release (artemis 1.10.0+)
 

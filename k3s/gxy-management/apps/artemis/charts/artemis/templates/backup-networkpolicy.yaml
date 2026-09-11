@@ -37,7 +37,7 @@ spec:
               # in-cluster service idiom.
               - matchName: "artemis-postgresql.artemis.svc.cluster.local"
               - matchPattern: "*.*.svc.cluster.local"
-{{- range .Values.backup.sentryFqdnPatterns }}
+{{- range .Values.oomWatch.sentryFqdnPatterns }}
               - matchPattern: {{ . | quote }}
 {{- end }}
     # R2 -- admin S3 endpoint (account-scoped subdomain).
@@ -47,14 +47,16 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+{{- if .Values.oomWatch.sentryFqdnPatterns }}
     - toFQDNs:
-{{- range .Values.backup.sentryFqdnPatterns }}
+{{- range .Values.oomWatch.sentryFqdnPatterns }}
         - matchPattern: {{ . | quote }}
 {{- end }}
       toPorts:
         - ports:
             - port: "443"
               protocol: TCP
+{{- end }}
     # Bundled Postgres (intra-namespace, shared instance).
     - toEndpoints:
         - matchLabels:
@@ -95,7 +97,7 @@ spec:
               - matchPattern: "*.r2.cloudflarestorage.com"
               - matchName: "{{ .Release.Name }}-pg-rw.{{ .Values.namespace }}.svc.cluster.local"
               - matchPattern: "*.*.svc.cluster.local"
-{{- range .Values.pgBackup.sentryFqdnPatterns }}
+{{- range .Values.oomWatch.sentryFqdnPatterns }}
               - matchPattern: {{ . | quote }}
 {{- end }}
     - toFQDNs:
@@ -104,14 +106,16 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+{{- if .Values.oomWatch.sentryFqdnPatterns }}
     - toFQDNs:
-{{- range .Values.pgBackup.sentryFqdnPatterns }}
+{{- range .Values.oomWatch.sentryFqdnPatterns }}
         - matchPattern: {{ . | quote }}
 {{- end }}
       toPorts:
         - ports:
             - port: "443"
               protocol: TCP
+{{- end }}
     - toEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": {{ .Values.namespace }}

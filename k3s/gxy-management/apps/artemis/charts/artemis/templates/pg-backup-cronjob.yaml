@@ -44,7 +44,7 @@ spec:
                 - |
                   set -euo pipefail
 {{- include "artemis.sentryCheckin" . | nindent 18 }}
-                  trap 'sentry_checkin error' ERR
+                  trap 'rc=$?; [ $rc -eq 0 ] || sentry_checkin error' EXIT
                   sentry_checkin in_progress
                   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
                   DUMP="artemis-${TIMESTAMP}.sql.gz"

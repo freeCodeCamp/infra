@@ -335,6 +335,8 @@ pgBackup:
   enabled: false
   # ADR-019 §Stateful-pillar: per-galaxy backup bucket, never the serve bucket.
   bucket: ""
+  # STALE for paging: this build purged curl, so the Sentry check-in is a
+  # no-op. Rebuild and repin per docs/runbooks/16-artemis-backup-bucket-split.md step 4.
   image: ghcr.io/freecodecamp/postgres-rclone@sha256:fbedc38a76b25ab22cf2acb986a7538cf46b6bf3d62b30d00b50f94dd7b0335e
   schedule: "0 2 * * *"
   retention: 7d
@@ -344,11 +346,8 @@ pgBackup:
   monitorSlug: artemis-pg-backup
   monitorCheckinMargin: 10
   monitorMaxRuntime: 25
-  monitorFailureThreshold: 1
+  monitorFailureThreshold: 2
   monitorTimezone: UTC
-  sentryFqdnPatterns:
-    - "*.ingest.sentry.io"
-    - "*.ingest.*.sentry.io"
   resources:
     requests:
       cpu: 100m
@@ -421,6 +420,8 @@ backup:
   # (.github/workflows/docker--postgres-rclone.yml). Its pg client MUST
   # match postgres.image.tag above -- see docs/runbooks/08-artemis-pg-
   # restore-drill.md and the Dockerfile header.
+  # STALE for paging: this build purged curl, so the Sentry check-in is a
+  # no-op. Rebuild and repin per docs/runbooks/16-artemis-backup-bucket-split.md step 4.
   image: ghcr.io/freecodecamp/postgres-rclone@sha256:fbedc38a76b25ab22cf2acb986a7538cf46b6bf3d62b30d00b50f94dd7b0335e
   schedule: "0 2 * * *"
   # rclone --min-age threshold for the prune step (objects older than
@@ -436,11 +437,8 @@ backup:
   monitorSlug: artemis-backup
   monitorCheckinMargin: 10
   monitorMaxRuntime: 25
-  monitorFailureThreshold: 1
+  monitorFailureThreshold: 2
   monitorTimezone: UTC
-  sentryFqdnPatterns:
-    - "*.ingest.sentry.io"
-    - "*.ingest.*.sentry.io"
   resources:
     requests:
       cpu: 100m

@@ -33,19 +33,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "artemis.sentryCheckin" -}}
 # docs.sentry.io/product/crons/getting-started/http/
 sentry_checkin() {
-  local status="$1" key host proj url
-  [ -n "${SENTRY_DSN:-}" ] || return 0
+  local status="$1" dsn key host proj url
+  dsn="${SENTRY_DSN:-}"; dsn="${dsn//[[:space:]]/}"
+  [ -n "${dsn}" ] || return 0
   command -v curl >/dev/null 2>&1 || return 0
-  key="${SENTRY_DSN#*//}"; key="${key%%@*}"
-  host="${SENTRY_DSN#*@}"; host="${host%%/*}"
-  proj="${SENTRY_DSN##*/}"
-  url="https://${host}/api/${proj}/cron/${MONITOR_SLUG}/${key}/?environment=${ENVIRONMENT}"
+  key="${dsn#*//}"; key="${key%%@*}"
+  host="${dsn#*@}"; host="${host%%/*}"
+  proj="${dsn##*/}"
+  url="https://${host}/api/${proj}/cron/${MONITOR_SLUG:-unknown}/${key}/?environment=${ENVIRONMENT:-production}"
   if [ "${status}" = "in_progress" ]; then
-    curl -sS -m 10 -o /dev/null -X POST "${url}" \
+    curl -fsS -m 10 -o /dev/null -X POST "${url}" \
       -H 'Content-Type: application/json' \
-      --data-raw "{\"status\":\"in_progress\",\"monitor_config\":{\"schedule\":{\"type\":\"crontab\",\"value\":\"${MONITOR_SCHEDULE}\"},\"checkin_margin\":${MONITOR_CHECKIN_MARGIN},\"max_runtime\":${MONITOR_MAX_RUNTIME},\"failure_issue_threshold\":${MONITOR_FAILURE_THRESHOLD},\"timezone\":\"${MONITOR_TIMEZONE}\"}}" || true
+      --data-raw "{\"status\":\"in_progress\",\"monitor_config\":{\"schedule\":{\"type\":\"crontab\",\"value\":\"${MONITOR_SCHEDULE:-}\"},\"checkin_margin\":${MONITOR_CHECKIN_MARGIN:-10},\"max_runtime\":${MONITOR_MAX_RUNTIME:-25},\"failure_issue_threshold\":${MONITOR_FAILURE_THRESHOLD:-2},\"timezone\":\"${MONITOR_TIMEZONE:-UTC}\"}}" \
+      || echo "sentry check-in ${status} failed" >&2
   else
-    curl -sS -m 10 -o /dev/null "${url}&status=${status}" || true
+    curl -fsS -m 10 -o /dev/null "${url}&status=${status}" \
+      || echo "sentry check-in ${status} failed" >&2
   fi
+  return 0
 }
 {{- end -}}
