@@ -194,10 +194,55 @@ Every step in this runbook is reversible.
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Promotion went to the wrong instance | Repeat section B. The pair has no preferred primary.                                                                                                           |
 | A drill left `inProgress: true`      | Set it back to `false` and release. It is inert either way until a drain.                                                                                      |
-| The pair misbehaves before cutover   | `postgresCluster.cutover` is `false`, so artemis still uses the StatefulSet. Set `postgresCluster.enabled: false` and release to remove the `Cluster`.         |
-| The pair misbehaves after cutover    | Set `postgresCluster.cutover: false` and release. `DATABASE_URL` returns to `artemis-postgresql:5432`. Data written to the pair since cutover does not follow. |
+| The pair misbehaves before cutover   | Where `postgresCluster.cutover` is `false`, artemis still uses the StatefulSet. Set `postgresCluster.enabled: false` and release to remove the `Cluster`.      |
+| The pair misbehaves after cutover    | Set `postgresCluster.cutover: false` and release. See the section below.                                                                                       |
 
 Never set `postgres.enabled: false`. That deletes the instance holding the `hatchet` database, and it also drops the hatchet gRPC egress rule, which sits inside the same conditional.
+
+### The cutover rollback
+
+`postgresCluster.cutover` on gxy-management is `true` since 2026-09-11. `secret-env.yaml` builds `DATABASE_URL` from the flag, so the rollback is the flag and a release, not a hand-edited secret.
+
+| `cutover` | `DATABASE_URL` the chart builds                                                          |
+| --------- | ---------------------------------------------------------------------------------------- |
+| `true`    | `postgres://artemis:$ARTEMIS_DB_PASSWORD@artemis-pg-rw:5432/artemis?sslmode=require`      |
+| `false`   | `postgres://artemis:$ARTEMIS_DB_PASSWORD@artemis-postgresql:5432/artemis?sslmode=disable` |
+
+`sslmode` comes from `postgres.sslmode`, which is `disable` in the chart defaults. A `secretEnv.DATABASE_URL` in the sops overlay wins over both rows; confirm the overlay sets none before you trust the table.
+
+**Rows written to the pair since the cutover do not follow the rollback.** The StatefulSet copy is frozen at the import. Read both counts before you decide:
+
+```bash
+kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -d artemis -tAc "select count(*) from deploys;"
+PRIMARY=$(kubectl -n artemis get pod -l cnpg.io/cluster=artemis-pg,cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl -n artemis exec "$PRIMARY" -c postgres -- psql -U postgres -d artemis -tAc "select count(*) from deploys;"
+```
+
+On 2026-09-11 those read 248 and 324. The gap is what a rollback discards.
+
+### The soak, and dropping the frozen copy
+
+Keep the frozen `artemis` database on the StatefulSet for a **14-day soak** from the cutover date. It is the rollback target, and it costs 12 MB.
+
+While it exists, a mistaken `DATABASE_URL` serves a frozen registry and raises no error. That is the reason to drop it rather than keep it forever.
+
+Drop it on or after **2026-09-25**, and only when all three hold:
+
+1. `postgresCluster.cutover` has stayed `true` for the whole soak.
+2. `pgBackup` has written a dump of the pair's `artemis` database for each of the last 7 days.
+3. Section B has been rehearsed against the pair at least once since the cutover.
+
+```bash
+kubectl -n artemis exec artemis-postgresql-0 -- \
+  psql -U postgres -tAc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'artemis';"
+kubectl -n artemis exec artemis-postgresql-0 -- psql -U postgres -c 'DROP DATABASE artemis;'
+```
+
+Do not drop the `artemis` **role**. The nightly `backup` job for the StatefulSet exports roles, and the `hatchet` database is unaffected by either command.
+
+- **Cutover date:** 2026-09-11
+- **Earliest drop date:** 2026-09-25
+- **Dropped on:** _(pending)_
 
 ## F — Recovery from a stuck bring-up
 
