@@ -121,7 +121,7 @@ The name must not be `artemis`. CloudNativePG creates a PodDisruptionBudget with
 
 It runs beside the legacy `postgres` StatefulSet, not in place of it. The StatefulSet keeps the `hatchet` database until ADR-023 moves it. Do not set `postgres.enabled: false` — that deletes the instance Hatchet still uses.
 
-Four settings carry a ruling of 2026-09-11 and must not change without a new one.
+Five settings carry a ruling of 2026-09-11 and must not change without a new one.
 
 | setting                          | value      | why                                                                                                       |
 | -------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
@@ -129,6 +129,7 @@ Four settings carry a ruling of 2026-09-11 and must not change without a new one
 | `nodeMaintenanceWindow.reusePVC` | `true`     | The operator waits for the drained node to return and re-attaches the same `local-path` volume. It drops its own PodDisruptionBudget while it waits, so the drain completes. `false` instead rebuilds the instance on another node with a new volume. The setting is inert unless `maintenanceInProgress` is `true`, so it governs planned drains only. |
 | `enableSuperuserAccess`          | `false`    | The `postgres` role keeps a NULL password. The backup job runs as the owner and exports roles separately. |
 | `max_slot_wal_keep_size`         | `2GB`      | An orphaned replication slot would otherwise fill a 10Gi volume that cannot be expanded.                  |
+| `smartShutdownTimeout`           | `15`       | The planned failover of 2026-09-11 took 183 seconds against the default of 180, so the smart phase ran its full length. A held pgx connection keeps it open, not slow work. Every artemis write is one short statement. The field does not roll the instances. |
 
 `managed.roles` grants `pg_read_all_stats` to `artemis`. This is an engineering fix, not a ruling. Without it `pg_stat_replication` returns NULL in every LSN column to a non-superuser, and the lag watch reads `lag_bytes=0` forever and never alerts.
 

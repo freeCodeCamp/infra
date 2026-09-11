@@ -22,6 +22,8 @@ spec:
   instances: {{ .Values.postgresCluster.instances }}
   imageName: {{ .Values.postgresCluster.imageName }}
   primaryUpdateStrategy: unsupervised
+  smartShutdownTimeout: {{ .Values.postgresCluster.smartShutdownTimeout }}
+  stopDelay: {{ .Values.postgresCluster.stopDelay }}
 
   bootstrap:
     initdb:

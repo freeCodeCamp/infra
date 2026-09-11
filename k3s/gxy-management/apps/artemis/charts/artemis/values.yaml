@@ -293,6 +293,25 @@ postgresCluster:
   storageClassName: "local-path"
   maintenanceInProgress: false
   reusePVC: true
+  # Ruling 2026-09-11. A planned failover on 2026-09-11 measured 183
+  # seconds against the CloudNativePG default smartShutdownTimeout of
+  # 180, so the smart phase ran its full length and then fell through
+  # to fast. A held connection, not slow work, kept it open: the
+  # artemis pgx pools keep idle connections and a smart shutdown waits
+  # for every client to disconnect.
+  #
+  # 15 seconds is ample for artemis. Every write is one short
+  # statement — a registry upsert, a deploy index row, an outbox
+  # insert — and the pgx pool retries a terminated one.
+  #
+  # The field does not roll the instances. CloudNativePG rolls on
+  # imageName, postgresql.extensions, a restart-requiring parameter,
+  # resources, schedulerName and topologySpreadConstraints; shutdown
+  # timing is read by the instance manager at SIGTERM.
+  smartShutdownTimeout: 15
+  # Total shutdown budget. The fast phase gets what the smart phase
+  # leaves. Unchanged from the CloudNativePG default.
+  stopDelay: 1800
   parameters:
     max_connections: "200"
     shared_buffers: 256MB
