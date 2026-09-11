@@ -1,6 +1,6 @@
 # artemis — Universe deploy proxy (gxy-management)
 
-Authenticates GitHub OAuth device-flow tokens, validates per-site team membership against the Valkey-backed sites registry, mints HS256 deploy-session JWTs, and forwards authorized PUTs to Cloudflare R2 with admin S3 keys held cluster-side. Public surface: `https://uploads.freecode.camp`.
+Authenticates GitHub OAuth device-flow tokens, validates per-site team membership against the sites registry, mints HS256 deploy-session JWTs, and forwards authorized PUTs to Cloudflare R2 with admin S3 keys held cluster-side. Public surface: `https://uploads.freecode.camp`.
 
 Spec: ADR-016 (Universe deploy proxy).
 
@@ -63,7 +63,7 @@ Generic `release` recipe smart-dispatches: `apps/artemis/charts/<chart>/` presen
 1. `apps/artemis/values.production.yaml` — production overlay
 1. `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` — sops-sealed (6 required + 3 optional secret env keys; optional triple gates the repo-creation feature)
 
-No `.deploy-flags.sh` hook for artemis post-cutover — the chart no longer mounts a sites ConfigMap. The Valkey registry is the authoritative store; `universe sites <subcommand>` is the operator surface (see `docs/runbooks/01-deploy-new-constellation-site.md`).
+No `.deploy-flags.sh` hook for artemis post-cutover — the chart no longer mounts a sites ConfigMap. Postgres is the authoritative store since the 2026-09-11 cutover; `universe sites <subcommand>` is the operator surface (see `docs/runbooks/01-deploy-new-constellation-site.md`).
 
 The sops sealed overlay is operator-owned. Mint via the paste-once shell block in `docs/runbooks/02-deploy-artemis-service.md` §5. Re-run on env-var rotation. See runbook for end-to-end operator flow.
 
@@ -71,7 +71,9 @@ No TLS material in the overlay — CF Flexible SSL on `freecode.camp` zone (CF t
 
 ## Sites registry
 
-Source of truth: Valkey (`valkey.valkey.svc.cluster.local:6379`, namespace `valkey`). The registry API contract — endpoints (`POST`/`PATCH`/`DELETE /api/site*`, `GET /api/sites`), `REGISTRY_AUTHZ_TEAM` authz (default `staff`; reads open to any GitHub bearer), slug rules, and `registry.changed` pub-sub propagation (≤60 s TTL fallback; no pod restart or Helm upgrade) — is canonical in **ADR-016 §Authn-authz**.
+Source of truth: the `sites` table in Postgres, since the 2026-09-11 cutover. `cmd/artemis/main.go:426-438` makes `pg.RegistryStore` the Writer and the Reader source when `DATABASE_URL` is set, and leaves Valkey (`valkey.valkey.svc.cluster.local:6379`, namespace `valkey`) as the change transport and the cache front. `internal/registry/valkey/reader.go` holds an in-memory snapshot and refreshes it from Postgres on a `registry.changed` event or on the TTL, so a Valkey outage does not lose registry data.
+
+Valkey is still a hard dependency of readiness. `internal/handler/readyz.go:56-61` returns 503 when the Valkey ping fails, before the degraded branch that R2 and Postgres use, so a Valkey outage removes every pod from the load balancer. Valkey also holds the deploy fence (`internal/registry/valkey/finalized.go`) and the team cache. The registry API contract — endpoints (`POST`/`PATCH`/`DELETE /api/site*`, `GET /api/sites`), `REGISTRY_AUTHZ_TEAM` authz (default `staff`; reads open to any GitHub bearer), slug rules, and `registry.changed` pub-sub propagation (≤60 s TTL fallback; no pod restart or Helm upgrade) — is canonical in **ADR-016 §Authn-authz**.
 
 `freeCodeCamp/artemis` `config/sites.yaml` is a **dormant cold-start seed** — checked in for cold-recovery reference, not consumed at runtime.
 
