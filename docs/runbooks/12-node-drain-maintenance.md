@@ -54,6 +54,8 @@ Its volume is `local-path`, so the evicted pod cannot start on another node and 
 - **Registry changes propagate slowly.** The `registry.changed` channel is gone, so a change reaches the read-side pods on the 60 s TTL refresh from Postgres instead of at once.
 - **A restarting artemis pod crashloops.** artemis boot still hard-fails on Valkey (`openRegistry` uses `valkey.NewWithRetry`). Do not drain a node that holds both `valkey-0` and an artemis replica without checking placement first, and do not restart artemis during the window.
 
+**This section describes the state after the artemis release that carries artemis commit `50df4ba`.** Until that image is live, a Valkey eviction still returns `503` from `/readyz` and ejects every artemis pod from the Service. Check the running version first: `curl -sSI https://uploads.freecode.camp/healthz | grep x-artemis-version`.
+
 ## History — two blocking workloads remain
 
 **2026-08-23.** `just release gxy-management hatchet` took the release to revision 2 and applied `hatchet-engine` at `minAvailable: 1`. **`just release gxy-management artemis` does not release the hatchet chart** — the two charts are separate releases in one namespace. That is why the template sat unapplied from 2026-06-06. At one replica that PDB blocked a drain, which was the intended trade at the time: an outage the operator times beats one the scheduler picks.

@@ -61,4 +61,6 @@ Real high availability needs Sentinel plus a failover-aware client in artemis. V
 
 `minAvailable: 1` on one replica reports `disruptionsAllowed: 0` and blocks every drain of the node that `local-path` pinned the PVC to. `maxUnavailable: 1` reports 1 and lets the drain proceed. After the artemis readyz ruling (artemis `docs/design/0007-readyz-degradation.md`) a Valkey outage no longer removes artemis from the load balancer, so the eviction is survivable and the permanent drain block is the larger harm.
 
+**Order matters.** The PodDisruptionBudget change is safe only after the artemis release that carries artemis commit `50df4ba`. Until that image is live a Valkey eviction still returns `503` from `/readyz` and ejects every artemis pod. Release artemis first, then valkey.
+
 **A drain still needs care.** The PVC is `local-path` and pinned by node affinity, so an evicted `valkey-0` stays `Pending` until the node returns. Valkey is down for the whole drain, not for a moment. artemis boot also still hard-fails on Valkey, so any artemis pod that restarts during that window crashloops. Follow the drain procedure in `docs/runbooks/12-node-drain-maintenance.md`.
