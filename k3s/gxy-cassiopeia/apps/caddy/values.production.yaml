@@ -15,7 +15,7 @@ image:
   # platform pillars build outside Universe). Local fallback: `just
   # caddy-s3-build` produces `dev-<sha>` for ad-hoc testing. Bump via PR
   # with `just caddy-s3-verify` + cluster smoke-test re-run.
-  tag: "sha-ef71932d19dae9309a05ef2c63f82d91ecf714fe@sha256:4aaf7a3865611ccaabe8986f678a075c82f0291adfe75946036fe6e664a61b31"
+  tag: "sha-5c8daf9d049f352b30e961bb621cb997cf8a9944@sha256:9501221230d55df7787c58fe9722b48a99749febfe1d822c9a2f27fdf790e894"
   pullPolicy: IfNotPresent
 
 resources:
