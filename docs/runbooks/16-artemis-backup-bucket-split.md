@@ -23,14 +23,14 @@ Related: [05](05-r2-keys-rotation.md) mints the tokens. [02](02-deploy-artemis-s
 
 The location hint is permanent. Cloudflare: "Location Hints are only honored the first time a bucket with a given name is created. If you delete and recreate a bucket with the same name, the original bucket's location will be used." — https://developers.cloudflare.com/r2/reference/data-location/
 
-The nodes run in DigitalOcean `fra1`, so the hint is `weur`. `universe-static-apps-01` and `cassiopeia-cnpg-backups` both predate that rule and sit in APAC.
+The nodes run in DigitalOcean `fra1`, so the hint is `weur`. `universe-static-apps-01` and `cassiopeia-cnpg-backups` both predate that rule and sit in APAC. `universe-static-apps-01` is superseded by `universe-static-apps-weur` (2026-09-12). `cassiopeia-cnpg-backups` was empty and was deleted (2026-09-12); its successor `backups-gxy-cassiopeia-cnpg` is created when the first cassiopeia CNPG cluster lands.
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=ad45585c4383c97ec7023d61b8aef8c8
 wrangler r2 bucket info backups-gxy-management-cnpg
 ```
 
-**The name diverges from ADR-019 and from its sibling.** ADR-019 names `management-cnpg-backups` at `:173`, `:174`, `:175` and `:179`, and the live sibling is `cassiopeia-cnpg-backups`. The operator chose `backups-gxy-management-cnpg` on 2026-09-12 and this repo follows the live bucket. **ADR-019 needs amending in the `fCC-U/Architecture` repo**; until it is, that ADR names a bucket that does not exist.
+**The name diverged from ADR-019 and from its sibling until 2026-09-12; the ADRs and the sibling now follow `backups-<galaxy>-cnpg`.** ADR-019 names `management-cnpg-backups` at `:173`, `:174`, `:175` and `:179`, and the live sibling is `cassiopeia-cnpg-backups`. The operator chose `backups-gxy-management-cnpg` on 2026-09-12 and this repo follows the live bucket. **ADR-019 needs amending in the `fCC-U/Architecture` repo**; until it is, that ADR names a bucket that does not exist.
 
 ## 2. Mint the backup-only token
 
