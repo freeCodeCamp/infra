@@ -95,18 +95,22 @@ Which node holds what is not declared anywhere. Re-check before every drain.
 
 **Do not move either one.** The co-location is accepted.
 
-Measured on 2026-09-11:
+> **Re-opened 2026-09-12. The primary is now on k3s-3.** The failover drill of that day promoted `artemis-pg-1`, so k3s-3 holds the `artemis-pg` **primary**, `valkey-0` and one artemis pod. The ruling below was written for the standby case. Read §The primary and Valkey on one node before any planned work on k3s-3.
+
+Measured on 2026-09-12, after the failover drill:
 
 ```
 data-valkey-0   local-path   [gxy-vm-management-k3s-3]
-artemis-pg-1    local-path   [gxy-vm-management-k3s-3]   replica
-artemis-pg-2    local-path   [gxy-vm-management-k3s-1]   primary
+artemis-pg-1    local-path   [gxy-vm-management-k3s-3]   primary
+artemis-pg-2    local-path   [gxy-vm-management-k3s-1]   replica
 ```
+
+Prior state, 2026-09-11: the roles were the other way round.
 
 The cost of losing k3s-3 is one node's blast radius, which is what the design accepts:
 
 - Valkey goes down. Deploys return `503 fence_unavailable`. Serving, authentication and the registry continue, per the Valkey entry above.
-- The `artemis-pg` standby goes down. The primary is on k3s-1 and keeps serving. The pair loses its replication protection until the node returns; the daily R2 dump remains the backup floor.
+- **The `artemis-pg` primary goes down** (since 2026-09-12; it was the standby before). The standby on k3s-1 is promoted, measured at 18 seconds to `currentPrimary` and 29 seconds to `readyInstances: 2` — see [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §B. Writes are unavailable for about 3 seconds at the end of that window; the outbox relay logs one transient connect failure and retries. The pair loses its replication protection until the node returns; the daily R2 dump remains the backup floor.
 - **The artemis pods on that node can go down with it.** Measured after the 1.12.4 release on 2026-09-11, under the old `preferred` pod anti-affinity: two of the three pods were on k3s-3, one on k3s-1, and **none on k3s-2**. Losing k3s-3 at that moment leaves one serving pod. The anti-affinity counted the old-revision pods during the rolling update, so every node scored the same and the new pods landed anywhere. The Deployment now uses a `topologySpreadConstraints` rule with `maxSkew: 1` on `kubernetes.io/hostname` and `matchLabelKeys: [pod-template-hash]`, which measures the spread inside the new revision only. It is `ScheduleAnyway`, so a cordoned node does not block the roll. Read the real placement below before you trust the spread.
 
 Neither loss stops the serve plane. Sites are served by Caddy `r2_alias` on `gxy-cassiopeia`, which never calls artemis, and one artemis pod survives to serve the API. The three faults do not compound into an outage, but the API margin is one pod, not two.
@@ -124,7 +128,18 @@ The move is also not durable. Both volumes are `local-path` with `WaitForFirstCo
 - Rebuilding `artemis-pg-1` is cheap. Delete the instance's PVC and pod — `kubectl cnpg destroy` is the supported form — and the `ClusterReconciler` creates a new instance with a new PVC and clones it from the primary with `pg_basebackup`. CloudNativePG manages Pods and PersistentVolumeClaims directly rather than through a StatefulSet, so **the new PVC binds wherever the scheduler puts the new pod.** `reusePVC` changes this only inside a `nodeMaintenanceWindow`. `podAntiAffinityType: required` keeps it off k3s-1 and leaves k3s-2 and k3s-3, so the rebuild can land back on k3s-3. Holding it off k3s-3 needs an explicit `nodeSelector` or node affinity on the `Cluster`, which pins the pair to named nodes and removes the scheduling freedom the anti-affinity rule exists to use.
 - Rebuilding `valkey-0` loses the append-only file. After the 2026-09-11 cutover that file holds the deploy fence and the GitHub team cache, not the registry. Both rebuild on demand, but any in-flight deploy permit is lost.
 
-Re-open this ruling when a switchover puts the `artemis-pg` primary on k3s-3. The primary and Valkey on one node is a different case: that node's loss pauses deploys *and* forces a promotion, and the two recoveries compete for the same window. Check the current role before any planned maintenance:
+### The primary and Valkey on one node
+
+This case is live since 2026-09-12. Losing k3s-3 now pauses deploys **and** forces a promotion, and the two recoveries compete for the same window.
+
+The promotion is no longer the slow part. It measured 18s on 2026-09-12 with `smartShutdownTimeout: 15`, against 183s before the field was set. Valkey's rebuild is the longer of the two, and deploys stay fenced for its whole length.
+
+Two ways out, and the cheap one first:
+
+1. **Fail back.** Delete the primary pod again; the standby on k3s-1 is promoted and k3s-3 returns to holding the standby. One command, about 30 seconds, and it restores the posture this ruling was written for.
+2. **Pin the pair** with a `nodeSelector` or node affinity on the `Cluster`. This holds the primary off k3s-3 for good and removes the scheduling freedom `podAntiAffinityType: required` exists to use. Only worth it if the roles keep landing badly.
+
+Doing nothing is also defensible — no single fault here reaches the serve plane — but decide deliberately rather than by drift. Check the current role before any planned maintenance:
 
 ```sh
 kubectl -n artemis get pod -l cnpg.io/cluster=artemis-pg \
