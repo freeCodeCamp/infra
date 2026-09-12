@@ -55,7 +55,7 @@ data:
         @hashed path_regexp ^/(assets|_astro|_next/static|static/(js|css|media))/.*[.-][A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|avif|ico|map|wasm)$
         @unhashed not path_regexp ^/(assets|_astro|_next/static|static/(js|css|media))/.*[.-][A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|avif|ico|map|wasm)$
         header @hashed   Cache-Control "public, max-age=31536000, immutable"
-        header @unhashed Cache-Control "public, max-age=0, s-maxage=60, must-revalidate"
+        header @unhashed Cache-Control "public, max-age=0, s-maxage=86400, must-revalidate"
 
         r2_alias {
           bucket            {env.R2_BUCKET}

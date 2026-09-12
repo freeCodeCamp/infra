@@ -33,7 +33,7 @@ const (
 )
 
 const (
-	documentCacheControl  = "public, max-age=0, s-maxage=60, must-revalidate"
+	documentCacheControl  = "public, max-age=0, s-maxage=86400, must-revalidate"
 	hashedCacheControl    = "public, max-age=31536000, immutable"
 	hashedAssetPattern    = `^/(assets|_astro|_next/static|static/(js|css|media))/.*[.-][A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|avif|ico|map|wasm)$`
 	errorCacheControl     = "no-store"
