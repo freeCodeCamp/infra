@@ -294,7 +294,7 @@ UNION ALL SELECT 'sites', count(*) FROM sites;"
 
 Write both numbers down. The drill is a comparison, and a count read after the restore proves nothing.
 
-Reference, read from `artemis-pg-2` on 2026-09-11 12:26 UTC: `deploys=327`, `sites=73`, `aliases=123`, `outbox=305`, `tombstones=29`, `repo_requests=23`. All six tables are populated, so a zero in any of them is a finding, not an empty-cluster case.
+Reference, read from the primary `artemis-pg-2` on 2026-09-12 07:36 UTC: `deploys=331`, `sites=73`, `aliases=123`, `outbox=314`, `tombstones=32`, `repo_requests=23`. All six tables are populated, so a zero in any of them is a finding, not an empty-cluster case. Prior read 2026-09-11 12:26 UTC: `deploys=327`, `outbox=305`, `tombstones=29`, the other three unchanged.
 
 ### H3 — Pull the two artefacts
 
@@ -328,7 +328,7 @@ The two files share one timestamp because the CronJob writes them in one run. A 
 
 ### H4 — Restore into a scratch Postgres
 
-Bring the scratch pod up exactly as §C does. The image is `postgres:16-alpine` and it is correct for the pair: the live `Cluster` runs `ghcr.io/cloudnative-pg/postgresql:16.14-standard-bookworm` and reports `PostgreSQL 16.14`, measured on 2026-09-11. Re-read the live `imageName` before the drill and match the major version:
+Bring the scratch pod up exactly as §C does. The image is `postgres:16-alpine` and it is correct for the pair: the live `Cluster` runs `ghcr.io/cloudnative-pg/postgresql:16.14-standard-bookworm` and `SHOW server_version` reports `16.14 (Debian 16.14-1.pgdg12+1)`, re-measured 2026-09-12. Re-read the live `imageName` before the drill and match the major version:
 
 ```sh
 kubectl -n artemis get cluster artemis-pg -o jsonpath='{.spec.imageName}{"\n"}'
