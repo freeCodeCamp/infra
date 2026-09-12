@@ -17,8 +17,8 @@ pdb:
 
 image:
   repository: ghcr.io/freecodecamp/artemis
-  # release: 1.12.4
-  tag: "1.12.4@sha256:838d5bc24d59f79c06dd7ca1671f5f3b03c122a794810775dbf02098fc438c6f"
+  # release: 1.13.0
+  tag: "1.13.0@sha256:395e3da3f7b88f75fa01e2a6ed0bcc10530ec793d38ef9058dcc99a5c42a5757"
   pullPolicy: IfNotPresent
 
 resources:
