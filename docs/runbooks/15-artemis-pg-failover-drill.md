@@ -128,14 +128,29 @@ kubectl -n artemis logs -f "$PRIMARY" -c postgres > /tmp/old-primary.log &
 kubectl -n cnpg-system logs -f -l app.kubernetes.io/name=cloudnative-pg > /tmp/operator.log &
 ```
 
-Then run section B above and fill this table:
+**Measured 2026-09-12**, primary `artemis-pg-2` on k3s-1, deleted at 12:06:12Z. Live `smartShutdownTimeout` was 15.
 
-| mark                       | time | delta from delete |
-| -------------------------- | ---- | ----------------- |
-| `currentPrimary` changes   | —    | —                 |
-| `readyInstances` back to 2 | —    | —                 |
+| mark                       | time      | delta from delete | previous run |
+| -------------------------- | --------- | ----------------- | ------------ |
+| `currentPrimary` changes   | 12:06:30Z | **18s**           | 182.9s       |
+| `readyInstances` back to 2 | 12:06:41Z | 29s               | 193.9s       |
 
-Write the result into §G and name which of the two readings held.
+`/healthz` answered 200 across the window. The standby was promoted in place on k3s-3; the old primary rebuilt as a standby on k3s-1 with 0 restarts.
+
+**The first reading held: `smartShutdownTimeout` does bound the delay.** The old primary's log — captured this time, and destroyed with the pod last time — gives the chain:
+
+```
+12:06:12       SIGTERM, "Stopping container postgres"
+12:06:27.180   FATAL 57P01 terminating connection due to administrator command
+               (idle `artemis` session from 10.1.2.93, open since 11:56:01)
+12:06:27.326   checkpoint starting: shutdown immediate
+12:06:27.694   instance-manager shutdown
+12:06:30       currentPrimary = artemis-pg-1
+```
+
+The smart phase runs its **full configured length** — 15s here, 180s before — because a held idle client connection never closes on its own. Only when the timeout expires does PostgreSQL terminate it and escalate to `shutdown immediate`. Promotion then takes about 3 seconds. Lowering the field lowers the handover one-for-one; it does not make the shutdown itself faster.
+
+The `TryShuttingDownFastImmediate` / `switchoverDelay` reading recorded above is **wrong** for a deleted primary and is kept only to show what was ruled out.
 
 ## C — Node loss
 
@@ -322,8 +337,10 @@ CloudNativePG then rebuilds the claim and the Job together. Do not delete the PV
 
 Stamp each rehearsal here.
 
-- **Last rehearsed:** 2026-09-11, section B only.
-- **Promotion RTO:** 182.9s to `currentPrimary`, 193.9s to `readyInstances: 2`, of which about 3s was write unavailability. Cause of the 183s handover not established.
+- **Last rehearsed:** 2026-09-12, section B only.
+- **Promotion RTO:** **18s** to `currentPrimary`, 29s to `readyInstances: 2`, with `smartShutdownTimeout: 15` live. Prior run 2026-09-11 measured 182.9s / 193.9s against the 180s default.
+- **Cause established 2026-09-12.** The smart-shutdown phase always runs its full configured length, because an idle client connection is only terminated when the timeout expires. `smartShutdownTimeout` therefore sets the handover latency directly.
+- **Primary now sits on k3s-3**, the node that also holds `valkey-0`. T4 accepted that co-location and asked for it to be re-opened whenever a switchover puts the primary there. This drill did.
 - **Node-loss outcome:** _(pending — sections C and D not run)_
 
 ## Cross-refs
