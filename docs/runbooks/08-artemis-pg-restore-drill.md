@@ -2,7 +2,7 @@
 
 **Type:** Operator. Disaster-recovery rehearsal (read-mostly; writes only to a throwaway scratch pod). **Cluster:** `gxy-management`. Namespace: `artemis`. **Spec:** chart at `k3s/gxy-management/apps/artemis/`. Stateful floor: ADR-019 §Stateful-pillar backup pattern + ADR-020 (durable-execution model).
 
-**Last rehearsed:** 2026-08-25 — PASSED. It goes **stale when the bucket split is released**, not before: `94b7b97a` only commits the change, and the rule below requires a re-rehearsal once it reaches the cluster. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
+**Last rehearsed:** 2026-08-25 — PASSED, and now **stale**. The bucket split released on 2026-09-12 and changed the bucket, the token and the `postgres-rclone` image in one go; the rule below requires a re-rehearsal for any one of those. Sections A to F have not run against `backups-gxy-management-cnpg`. Triggered by the `postgres-rclone` client-version fix (Helm rev 62, image `@sha256:fbedc38a…`, `pg_dumpall 16.15` matching the live `postgres:16.14-alpine`). Drilled artefact `artemis-20260825-134826.sql.gz`, written by the fixed image. §C `ERRORCOUNT=2` — the two expected `--clean` superuser errors, zero `transaction_timeout`. §D both tenants restored, 6/6 artemis tables, `sites=69` matching the live registry exactly.
 
 **The pair is not rehearsed.** Both runs below drilled the `artemis-postgresql` StatefulSet. `postgresCluster.cutover` is `true` since 2026-09-11, so the live `artemis` database is on the CloudNativePG pair and no drill has read its artefact. §H is the procedure. Until §H records a date, the pair has a backup that nobody has restored.
 
@@ -31,9 +31,9 @@ It is a **drill**: sections A to F touch neither the live `artemis-postgresql` S
 
 The backup artefacts live under the R2 prefix `artemis/gxy-management/`, named `artemis-<YYYYMMDD-HHMMSS>.sql.gz`. These literals come straight from the chart's `backup-cronjob.yaml` (`R2_PREFIX="artemis/${GALAXY}"`, `FILENAME="artemis-${TIMESTAMP}.sql.gz"`) and `backup.galaxy` / `backup.bucket` in the values files.
 
-> **Which bucket, right now.** The live CronJobs still write to **`universe-static-apps-01`** with the serve token. Every block below uses that. This drill needs nothing else and runs today.
+> **Which bucket.** Both CronJobs write to **`backups-gxy-management-cnpg`** (WEUR) with a backup-only token, since the split released on 2026-09-12. The blocks below use that. The serve bucket `universe-static-apps-01` no longer holds any artemis backup; ADR-019:86 forbids one shared bucket — "never one shared bucket". Migration record: [16-artemis-backup-bucket-split.md](16-artemis-backup-bucket-split.md).
 >
-> **After the migration only.** The chart is committed to write to `backups-gxy-management-cnpg` with a backup-only token, because `universe-static-apps-01` is the bucket artemis serves deploys from and ADR-019:86 forbids one shared bucket — "never one shared bucket". That change is unreleased. [16-artemis-backup-bucket-split.md](16-artemis-backup-bucket-split.md) creates the bucket, mints the token and moves the artefacts. Once it has run, swap two things in the §B block: decrypt `R2_BACKUP_ENDPOINT`, `R2_BACKUP_ACCESS_KEY_ID` and `R2_BACKUP_SECRET_ACCESS_KEY` instead of the three serve keys, and set `BUCKET=backups-gxy-management-cnpg`. The backup token reaches only the new bucket and the serve token only the old one, so a half-swap fails with `AccessDenied` (ADR-016:23).
+> **The two tokens do not overlap.** The backup token reaches only `backups-gxy-management-cnpg` and the serve token only `universe-static-apps-01`, so decrypting one set and naming the other bucket fails with `AccessDenied` (ADR-016:23). Artefacts written before 2026-09-12 were moved, not copied, so there is nothing to read from the old bucket.
 
 ## A — Confirm a backup exists and is current
 
@@ -64,19 +64,19 @@ cd $HOME/DEV/fCC/infra
 eval "$(sops decrypt --input-type yaml --output-type yaml \
   ../infra-secrets/k3s/gxy-management/artemis.values.yaml.enc \
   | yq -r '.secretEnv |
-    "export R2_ENDPOINT=\(.R2_ENDPOINT)
-     export R2_ACCESS_KEY_ID=\(.R2_ACCESS_KEY_ID)
-     export R2_SECRET_ACCESS_KEY=\(.R2_SECRET_ACCESS_KEY)"')"
+    "export R2_BACKUP_ENDPOINT=\(.R2_BACKUP_ENDPOINT)
+     export R2_BACKUP_ACCESS_KEY_ID=\(.R2_BACKUP_ACCESS_KEY_ID)
+     export R2_BACKUP_SECRET_ACCESS_KEY=\(.R2_BACKUP_SECRET_ACCESS_KEY)"')"
 
 export RCLONE_CONFIG=/dev/null
 export RCLONE_CONFIG_R2_TYPE=s3
 export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
 export RCLONE_CONFIG_R2_ACL=private
-export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
-export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
-export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+export RCLONE_CONFIG_R2_ENDPOINT="$R2_BACKUP_ENDPOINT"
+export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_BACKUP_ACCESS_KEY_ID"
+export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_BACKUP_SECRET_ACCESS_KEY"
 
-BUCKET=universe-static-apps-01
+BUCKET=backups-gxy-management-cnpg
 PREFIX=artemis/gxy-management
 
 # Timestamp prefix in the filename means tail = newest.
@@ -246,7 +246,7 @@ A restore into a rebuilt pair is a different case again: let `bootstrap.initdb` 
 
 ## H — Drill the pair (`artemis-pg`)
 
-**Status: PASSED. Run on: 2026-09-12.** Artefact `artemis-20260912-020001.sql.gz` + `artemis-roles-20260912-020001.sql`, pulled from `universe-static-apps-01`. Restore `ERROR` lines: **0**. `sites=73` against live 73, `aliases=123` against 123, `repo_requests=23` against 23. Three tables differed and each reconciles to a deletion between the 02:00 dump and the 07:36 live read: `deploys=333` against live 331 and `tombstones=30` against 32 are the same two rows — `20260908-193643-0000000` and `20260908-195955-t31prob`, both `test.freecode.camp`, garbage-collected at 03:00:01 and 03:00:03 UTC, present in the dump and absent live; `outbox=315` against 314 is row `467`, a `site.changed` published 2026-08-12 and pruned by retention.
+**Status: PASSED. Run on: 2026-09-12.** Re-run pending — this run read `universe-static-apps-01` with the serve token, hours before the bucket split released the same day. The artefact, the token and the image have all changed since. Artefact `artemis-20260912-020001.sql.gz` + `artemis-roles-20260912-020001.sql`, pulled from `universe-static-apps-01`. Restore `ERROR` lines: **0**. `sites=73` against live 73, `aliases=123` against 123, `repo_requests=23` against 23. Three tables differed and each reconciles to a deletion between the 02:00 dump and the 07:36 live read: `deploys=333` against live 331 and `tombstones=30` against 32 are the same two rows — `20260908-193643-0000000` and `20260908-195955-t31prob`, both `test.freecode.camp`, garbage-collected at 03:00:01 and 03:00:03 UTC, present in the dump and absent live; `outbox=315` against 314 is row `467`, a `site.changed` published 2026-08-12 and pruned by retention.
 
 This is the R8 rehearsal for the CloudNativePG pair. ADR-019:177 records that R8 has passed only against the legacy StatefulSet dump. The 2026-06-05 and 2026-08-25 runs both drilled `artemis-gxy-management`, not the pair.
 
@@ -302,7 +302,7 @@ Run §B's rclone block unchanged for the credentials and the `RCLONE_CONFIG_R2_*
 
 ```sh
 # Same credentials block as §B.
-BUCKET=universe-static-apps-01
+BUCKET=backups-gxy-management-cnpg
 PREFIX=artemis/gxy-management/pg
 
 DUMP=$(rclone lsf "r2:${BUCKET}/${PREFIX}/" --include 'artemis-*.sql.gz' | sort | tail -1)
