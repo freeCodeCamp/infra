@@ -246,7 +246,7 @@ A restore into a rebuilt pair is a different case again: let `bootstrap.initdb` 
 
 ## H — Drill the pair (`artemis-pg`)
 
-**Status: not yet run. Run on: —**
+**Status: PASSED. Run on: 2026-09-12.** Artefact `artemis-20260912-020001.sql.gz` + `artemis-roles-20260912-020001.sql`, pulled from `universe-static-apps-01`. Restore `ERROR` lines: **0**. `sites=73` against live 73, `aliases=123` against 123, `repo_requests=23` against 23. Three tables differed and each reconciles to a deletion between the 02:00 dump and the 07:36 live read: `deploys=333` against live 331 and `tombstones=30` against 32 are the same two rows — `20260908-193643-0000000` and `20260908-195955-t31prob`, both `test.freecode.camp`, garbage-collected at 03:00:01 and 03:00:03 UTC, present in the dump and absent live; `outbox=315` against 314 is row `467`, a `site.changed` published 2026-08-12 and pruned by retention.
 
 This is the R8 rehearsal for the CloudNativePG pair. ADR-019:177 records that R8 has passed only against the legacy StatefulSet dump. The 2026-06-05 and 2026-08-25 runs both drilled `artemis-gxy-management`, not the pair.
 
@@ -379,9 +379,17 @@ UNION ALL SELECT 'repo_requests', count(*) FROM repo_requests;"
 Pass criteria:
 
 - All six tables resolve. A missing table means a partial dump.
-- `sites` equals the H2 number, or is lower by the sites registered since the dump ran. A higher count is impossible and is a finding.
-- `deploys` is at or below the H2 number, for the same reason.
 - The restore log holds zero `^ERROR:` lines.
+- Every count difference reconciles to a row written or deleted between the dump timestamp and the H2 read.
+
+**A restored count above the live count is normal, not a finding.** The dump is older than the H2 read, and `deploys` and `outbox` rows are deletable, so the live number can be the smaller one. The 2026-09-12 run restored `deploys=333` against a live 331 because GC trashed two deploys an hour after the dump. Reconcile rather than compare:
+
+```sh
+kubectl -n artemis exec artemis-pg-2 -c postgres -- psql -U postgres -d artemis -tAc \
+  "SELECT site, id, trashed_at FROM tombstones WHERE trashed_at >= '<dump-timestamp>' ORDER BY trashed_at;"
+```
+
+Each row here explains one `deploys` row that the dump holds and the live pair does not, and it must also account for the `tombstones` difference in the opposite direction. Confirm the ids both ways — present in the scratch pod, absent live. An unexplained difference is the finding.
 
 Tear the scratch pod down with §E.
 
