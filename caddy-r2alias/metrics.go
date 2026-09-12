@@ -32,6 +32,7 @@ var moduleMetrics = struct {
 	once       sync.Once
 	operations *prometheus.CounterVec
 	lookups    *prometheus.CounterVec
+	heads      *prometheus.CounterVec
 	inFlight   prometheus.Gauge
 }{}
 
@@ -51,6 +52,13 @@ func initMetrics(registry *prometheus.Registry) error {
 			Help:      "Alias resolutions by cache outcome.",
 		}, []string{"result"})
 
+		moduleMetrics.heads = prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: metricNamespace,
+			Subsystem: metricSubsystem,
+			Name:      "head_lookups_total",
+			Help:      "HeadObject resolutions by cache outcome.",
+		}, []string{"result"})
+
 		moduleMetrics.inFlight = prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: metricNamespace,
 			Subsystem: metricSubsystem,
@@ -63,7 +71,7 @@ func initMetrics(registry *prometheus.Registry) error {
 		return nil
 	}
 	for _, c := range []prometheus.Collector{
-		moduleMetrics.operations, moduleMetrics.lookups, moduleMetrics.inFlight,
+		moduleMetrics.operations, moduleMetrics.lookups, moduleMetrics.heads, moduleMetrics.inFlight,
 	} {
 		if err := registry.Register(c); err != nil {
 			var already prometheus.AlreadyRegisteredError
@@ -87,6 +95,13 @@ func recordLookup(result string) {
 		return
 	}
 	moduleMetrics.lookups.WithLabelValues(result).Inc()
+}
+
+func recordHeadLookup(result string) {
+	if moduleMetrics.heads == nil {
+		return
+	}
+	moduleMetrics.heads.WithLabelValues(result).Inc()
 }
 
 func addBufferedBytes(delta float64) {

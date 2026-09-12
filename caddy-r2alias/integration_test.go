@@ -322,6 +322,54 @@ func TestIntegration_ServesIndexWithOneBodyFetch(t *testing.T) {
 	}
 }
 
+func TestIntegration_SecondRootRequestCostsOneObjectFetch(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+	if status, _ := doGet(t, tester, site, "/"); status != http.StatusOK {
+		t.Fatalf("first status: want 200, got %d", status)
+	}
+
+	before := len(stub.allOps())
+	status, body := doGet(t, tester, site, "/")
+	if status != http.StatusOK {
+		t.Fatalf("second status: want 200, got %d (body=%q)", status, body)
+	}
+	ops := stub.allOps()[before:]
+	want := []string{http.MethodGet + " " + site + "/deploys/v1/index.html"}
+	if len(ops) != 1 || ops[0] != want[0] {
+		t.Fatalf("second GET / must cost one body fetch and nothing else: want %v, got %v", want, ops)
+	}
+}
+
+func TestIntegration_FirstRootRequestHeadsEachKeyOnce(t *testing.T) {
+	stub := startS3Stub(t)
+	site := "site-a." + rootDomain
+
+	uploadDeployFixtures(t, stub, site, "v1")
+	stub.putAlias(site, "production", "v1")
+
+	tester := startCaddy(t, stub.endpoint())
+	if status, _ := doGet(t, tester, site, "/"); status != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", status)
+	}
+
+	indexKey := site + "/deploys/v1/index.html"
+	heads := 0
+	for _, op := range stub.opsFor(indexKey) {
+		if strings.HasPrefix(op, http.MethodHead+" ") {
+			heads++
+		}
+	}
+	if heads > 1 {
+		t.Fatalf("HeadObject on %s: want at most 1, got %d (all=%v)", indexKey, heads, stub.allOps())
+	}
+}
+
 func TestIntegration_ServedObjectTellsTheBrowserToRevalidate(t *testing.T) {
 	stub := startS3Stub(t)
 	site := "site-a." + rootDomain

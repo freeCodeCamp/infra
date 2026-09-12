@@ -61,6 +61,7 @@ type R2FS struct {
 
 	client    *s3.Client
 	clientKey string
+	heads     *headCache
 	budget    *semaphore.Weighted
 	growWaits *semaphore.Weighted
 	logger    *zap.Logger
@@ -149,8 +150,11 @@ func (r *R2FS) Provision(ctx caddy.Context) error {
 	if r.fetcher == nil {
 		r.fetcher = r.getObject
 	}
+	if r.heads == nil {
+		r.heads = newHeadCache(defaultHeadCacheMaxEntries, defaultHeadCacheTTL)
+	}
 	if r.header == nil {
-		r.header = r.headObject
+		r.header = r.cachedHead
 	}
 	if r.indexProbe == nil {
 		r.indexProbe = r.hasIndex
@@ -380,6 +384,17 @@ func (r *R2FS) Stat(name string) (fs.FileInfo, error) {
 	return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
 }
 
+// Deploy prefixes are written once and never edited in place, so a HeadObject
+// answer, present or missing, stays true until GC moves the prefix (runbook 13).
+func (r *R2FS) cachedHead(ctx context.Context, key string) (*r2Object, error) {
+	if r.heads == nil {
+		return r.headObject(ctx, key)
+	}
+	return r.heads.Resolve(ctx, r.Bucket+"/"+key, func(ctx context.Context) (*r2Object, error) {
+		return r.headObject(ctx, key)
+	})
+}
+
 func (r *R2FS) headObject(ctx context.Context, key string) (*r2Object, error) {
 	out, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(r.Bucket),
@@ -455,12 +470,16 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 	if out.ContentType != nil {
 		ct = *out.ContentType
 	}
-	return &r2Object{
+	obj := &r2Object{
 		Body:         body,
 		Size:         int64(len(body)),
 		LastModified: modTime,
 		ContentType:  ct,
-	}, nil
+	}
+	if r.heads != nil {
+		r.heads.Store(r.Bucket+"/"+key, obj)
+	}
+	return obj, nil
 }
 
 // hasIndex reports whether a directory's index.html exists under dirPath by
@@ -468,7 +487,7 @@ func (r *R2FS) getObject(ctx context.Context, key string) (*r2Object, error) {
 // — matching the scope granted to the Caddy read-only key (RFC §4.2.4) —
 // where ListObjectsV2 would need s3:ListBucket, which is not granted.
 func (r *R2FS) hasIndex(ctx context.Context, dirPath string) (bool, error) {
-	_, err := r.headObject(ctx, dirPath+"/"+indexFile)
+	_, err := r.cachedHead(ctx, dirPath+"/"+indexFile)
 	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
