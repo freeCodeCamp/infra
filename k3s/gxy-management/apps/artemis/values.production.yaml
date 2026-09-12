@@ -31,7 +31,7 @@ resources:
 
 # Production env defaults (non-secret). Match artemis.env.sample.
 env:
-  R2_BUCKET: "universe-static-apps-01"
+  R2_BUCKET: "universe-static-apps-weur"
   GH_ORG: "freeCodeCamp-Universe"
   GH_API_BASE: "https://api.github.com"
   # Valkey registry (replaces SITES_YAML_PATH; sites_yaml backend

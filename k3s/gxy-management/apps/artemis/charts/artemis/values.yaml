@@ -103,7 +103,7 @@ service:
 # live under `secretEnv:` and come from the sops overlay.
 # ---------------------------------------------------------------------
 env:
-  R2_BUCKET: "universe-static-apps-01"
+  R2_BUCKET: "universe-static-apps-weur"
   # Cloudflare zone id; empty keeps the post-deploy edge purge OFF.
   CF_ZONE_ID: ""
   GH_ORG: "freeCodeCamp-Universe"

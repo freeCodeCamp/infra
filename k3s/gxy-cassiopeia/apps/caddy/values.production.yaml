@@ -29,7 +29,7 @@ resources:
 goMemLimit: 400MiB
 
 r2:
-  bucket: universe-static-apps-01
+  bucket: universe-static-apps-weur
   # endpoint + accessKeyId + secretAccessKey come from the sops overlay
   # (endpoint embeds the CF account ID).
 
