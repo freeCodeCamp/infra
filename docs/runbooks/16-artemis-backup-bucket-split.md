@@ -42,14 +42,31 @@ Store the three values as `R2_BACKUP_ENDPOINT`, `R2_BACKUP_ACCESS_KEY_ID` and `R
 
 The chart refuses to render a backup CronJob while any `R2_BACKUP_*` value is absent.
 
-## 4. Rebuild the `postgres-rclone` image
+## 4. Rebuild the `postgres-rclone` image — DONE 2026-09-12
 
-The backup script posts a Sentry cron check-in with `curl`. Every image built before 2026-09-11 purged `curl` at build, so on those images the check-in is a silent no-op and a failed backup still pages nobody.
+The backup script posts a Sentry cron check-in with `curl`. Every image built before 2026-09-12 purged `curl` at build, so on those images the check-in is a silent no-op and a failed backup still pages nobody.
 
+Built from `10202c1c` and pinned at `sha256:b9da73ec…`. The `RUN` layer ends with `curl --version` after the `apt-get purge`, so a green build is the proof curl survived.
+
+To repeat the step after any Dockerfile change:
+
+1. **Push first.** The workflow builds `origin/main`, not your working tree.
 1. Run the `workflow_dispatch` build of `.github/workflows/docker--postgres-rclone.yml`.
-1. Read the new digest from the registry, not from the build log.
+1. Read the digest from the registry, not from the build log, and confirm the commit tag resolves to the same one:
+
+   ```sh
+   TOK=$(curl -s "https://ghcr.io/token?scope=repository:freecodecamp/postgres-rclone:pull&service=ghcr.io" | jq -r .token)
+   for REF in latest "sha-$(git rev-parse origin/main)"; do
+     printf '%s -> ' "$REF"
+     curl -sI -H "Authorization: Bearer $TOK" \
+       -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
+       "https://ghcr.io/v2/freecodecamp/postgres-rclone/manifests/$REF" \
+       | awk -F' ' '/[Dd]ocker-[Cc]ontent-[Dd]igest/{print $2}'
+   done
+   ```
+
 1. Repin `pgBackup.image` and `backup.image` in `k3s/gxy-management/apps/artemis/charts/artemis/values.yaml`. Both lines carry the same digest.
-1. Commit the repin.
+1. Commit the repin and bump the chart `version`.
 
 ## 5. Move the artefacts
 
