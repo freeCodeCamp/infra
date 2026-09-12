@@ -134,10 +134,15 @@ This case is live since 2026-09-12. Losing k3s-3 now pauses deploys **and** forc
 
 The promotion is no longer the slow part. It measured 18s on 2026-09-12 with `smartShutdownTimeout: 15`, against 183s before the field was set. Valkey's rebuild is the longer of the two, and deploys stay fenced for its whole length.
 
-Two ways out, and the cheap one first:
+**The CloudNativePG operator is also on k3s-3**, at one replica (`cnpg-system-cloudnative-pg`), with no `node.kubernetes.io/not-ready` toleration override. The operator is what performs a promotion. If k3s-3 is lost ungracefully, the promoter dies together with the primary it would promote, and the standby waits for the operator to be rescheduled onto another node first.
+
+This does not affect the 18s figure above — that was a graceful `kubectl delete pod` with the operator alive on a healthy node throughout. It applies to node loss, which is [15-artemis-pg-failover-drill.md](15-artemis-pg-failover-drill.md) §C, **and §C has never been run**. The node-loss RTO is therefore unmeasured, and the ordering above says it is worse than 18s. Found 2026-09-12; no fix chosen yet.
+
+Three ways out, and the cheap one first:
 
 1. **Fail back.** Delete the primary pod again; the standby on k3s-1 is promoted and k3s-3 returns to holding the standby. One command, about 30 seconds, and it restores the posture this ruling was written for.
 2. **Pin the pair** with a `nodeSelector` or node affinity on the `Cluster`. This holds the primary off k3s-3 for good and removes the scheduling freedom `podAntiAffinityType: required` exists to use. Only worth it if the roles keep landing badly.
+3. **Move the CNPG operator off the data nodes**, or give it an anti-affinity against `cnpg.io/cluster` pods. Fail-back does not address this: the operator stays co-located with whichever instance sits on k3s-3. Measuring §C first would tell you how much it costs.
 
 Doing nothing is also defensible — no single fault here reaches the serve plane — but decide deliberately rather than by drift. Check the current role before any planned maintenance:
 
