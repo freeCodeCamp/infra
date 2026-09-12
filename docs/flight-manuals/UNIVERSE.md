@@ -150,11 +150,13 @@ These resources live above any single galaxy. Provisioned once, referenced by ev
 | DO VPC                        | `universe-vpc-fra1` (CIDR `10.110.0.0/20`)       | private network for all FRA1 nodes                              |
 | DO Cloud Firewall             | `gxy-fw-fra1`                                    | tag-based attach: `gxy-<galaxy>-k3s`                            |
 | DO Spaces bucket (backups)    | `net-freecodecamp-universe-backups`              | etcd snapshots + CNPG WAL (TBC)                                 |
-| Cloudflare R2 bucket (static) | `universe-static-apps-01`                        | cassiopeia static apps deploys + `_meta/registry/<date>.rdb`    |
+| Cloudflare R2 bucket (static) | `universe-static-apps-weur` (WEUR)               | cassiopeia static apps deploys + `_meta/registry/<date>.rdb`    |
 | Cloudflare R2 admin token     | `infra-secrets/global/.env.enc:R2_ADMIN_*`       | sole-writer for artemis; sole-uploader for valkey RDB CronJob   |
 | Cloudflare R2 read-only token | `infra-secrets/k3s/gxy-cassiopeia/r2-ro.env.enc` | caddy-s3 read path                                              |
 | Tailscale tailnet             | freeCodeCamp tailnet                             | SSH + kubectl on platform-team nodes (under review per ADR-009) |
 | GHCR pull tokens              | implicit via `ghcr.io` direct anon-pull or PAT   | platform pillars pull images direct from GHCR (no zot mirror)   |
+
+R2 bucket location: the nodes run in DigitalOcean `fra1`, so every new bucket gets the explicit location hint `weur`. The hint is permanent per bucket name (see `docs/runbooks/16-artemis-backup-bucket-split.md` §1). `universe-static-apps-01` was created without a hint, landed in APAC, and was replaced by `universe-static-apps-weur` on 2026-09-12; it stays frozen as the rollback baseline until the soak ends.
 
 R2 bucket DR posture: versioning enabled; per-prefix retention is informal today (R2 lifecycle GC for orphan deploy bytes is parked per RFC §"Out of scope").
 
