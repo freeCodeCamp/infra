@@ -69,14 +69,15 @@ Save + exit. Sops re-encrypts on close.
 
 ### 3. Edit the YAML overlay directly (helm input)
 
-> **Do not run the mirror block. It destroys eight secrets.** The overlay
-> `k3s/gxy-management/artemis.values.yaml.enc` carries 17 secrets; eight exist
+> **Do not run the mirror block. It destroys nine secrets.** The overlay
+> `k3s/gxy-management/artemis.values.yaml.enc` carries 18 secrets; nine exist
 > **only** there: `ARTEMIS_DB_PASSWORD`, `POSTGRES_PASSWORD`,
 > `HATCHET_DB_PASSWORD`, `VALKEY_PASSWORD`, `SENTRY_DSN`, `GH_APP_ID`,
-> `GH_APP_INSTALLATION_ID`, `GH_APP_PRIVATE_KEY`. A mirror from the dotenv
-> seals 5 keys and drops all eight — both tenant databases, Valkey, Sentry and
-> the whole GitHub App identity. That is a worse outage than the one you are
-> repairing. Observed 2026-09-08: `mirror-artemis-secrets.sh` refused with
+> `GH_APP_INSTALLATION_ID`, `GH_APP_PRIVATE_KEY`, `CF_PURGE_API_TOKEN`. A
+> mirror from the dotenv seals 5 keys and drops all nine — both tenant
+> databases, Valkey, Sentry, the whole GitHub App identity and the CF purge
+> token. That is a worse outage than the one you are repairing.
+> Observed 2026-09-08: `mirror-artemis-secrets.sh` refused with
 > `keys sealed: 5, REFUSING`, and its `case` list does not name the three
 > `GH_APP_*` keys, so it drops them even from a complete dotenv.
 
