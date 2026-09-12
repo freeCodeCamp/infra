@@ -250,7 +250,8 @@ Provisioning order (`mgmt → cassiopeia → launchbase → backoffice → trian
 
 - T1 = in-cluster replicas (CNPG primary + replicas) — RPO 0, RTO seconds.
 - T2 = per-galaxy R2 bucket — CNPG base backup nightly + WAL archive continuous. RPO ≤ 5 min, RTO ≤ 60 min.
-- Per-galaxy bucket convention (never shared): `cassiopeia-cnpg-backups` (LIVE on Veritas land), `management-cnpg-backups` (gxy-management, chart-wired 2026-09-11, bucket not yet created), `triangulum-cnpg-backups` (future).
+- Per-galaxy bucket convention (never shared): `cassiopeia-cnpg-backups` (LIVE on Veritas land, APAC), `backups-gxy-management-cnpg` (gxy-management, created 2026-09-12, WEUR), `triangulum-cnpg-backups` (future).
+- **The two live names use opposite word order.** `cassiopeia-cnpg-backups` is `<galaxy>-cnpg-backups`; `backups-gxy-management-cnpg` is `backups-<galaxy>-cnpg`. ADR-019 (`:173`–`:179`) still names `management-cnpg-backups`, which does not exist. Amend the ADR or rename at the next chance to create a bucket; a location hint is permanent per name, so a rename is only free while the bucket is empty.
 - Restore drill documented in per-galaxy flight manual §G sub-section before GA.
 
 T3 (cross-vendor mirror) + T4 (Velero cluster-state) are deferred per the Universe cassiopeia-charter dossier §D2 + §D3 handoff registry; not blocking GA but tracked for revival.

@@ -103,7 +103,7 @@ postgres:
 # superuser password + R2 creds. See chart values.yaml `backup:` block.
 backup:
   enabled: true
-  bucket: "management-cnpg-backups"
+  bucket: "backups-gxy-management-cnpg"
 
 postgresCluster:
   enabled: true
@@ -111,7 +111,7 @@ postgresCluster:
 
 pgBackup:
   enabled: true
-  bucket: "management-cnpg-backups"
+  bucket: "backups-gxy-management-cnpg"
 
 pgLagWatch:
   enabled: true

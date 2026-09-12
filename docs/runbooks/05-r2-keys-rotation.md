@@ -1,6 +1,6 @@
 # R2 keys — provision + rotation
 
-**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Buckets:** `universe-static-apps-01` (serve, prefix-scoped per D8) and `management-cnpg-backups` (Postgres backups, ADR-019:86). **Spec:** ADR-016 §R2 layout; secret-envelope layout per `docs/architecture/rfc-secrets-layout.md`.
+**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Buckets:** `universe-static-apps-01` (serve, prefix-scoped per D8) and `backups-gxy-management-cnpg` (Postgres backups, ADR-019:86). **Spec:** ADR-016 §R2 layout; secret-envelope layout per `docs/architecture/rfc-secrets-layout.md`.
 
 Three role-keys exist across the two buckets. They live in different sops envelopes because the consumers run in different galaxies and different blast-radius domains.
 
@@ -8,7 +8,7 @@ Three role-keys exist across the two buckets. They live in different sops envelo
 | ------------- | ----------------- | --------------------------- | --------------------------------------------------------------- |
 | artemis-admin | Object Read+Write | `artemis` (gxy-management)  | `infra-secrets/management/artemis.env.enc` (dotenv SOT)         |
 | caddy-ro      | Object Read       | `caddy-s3` (gxy-cassiopeia) | `infra-secrets/k3s/gxy-cassiopeia/caddy.values.yaml.enc` (yaml) |
-| artemis-backup | Object Read+Write | `artemis-backup` + `artemis-pg-backup` CronJobs (gxy-management), scoped to `management-cnpg-backups` | `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` (yaml, `secretEnv.R2_BACKUP_*`) |
+| artemis-backup | Object Read+Write | `artemis-backup` + `artemis-pg-backup` CronJobs (gxy-management), scoped to `backups-gxy-management-cnpg` | `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` (yaml, `secretEnv.R2_BACKUP_*`) |
 
 Caddy is read-only by design: a compromised caddy pod cannot promote, rollback, or write artifacts. Artemis holds the only rw key on the serve bucket and gates every write behind GitHub team membership (see [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) and ADR-016).
 
@@ -44,9 +44,9 @@ Use this on first artemis bring-up or on rotation. Steps 1–4 are ClickOps; ste
 
 Since 2026-09-11 the backup CronJobs do not share the serve token. Mint this one in the same pass, with the same six items above and these three values changed:
 
-1. Token name: `management-cnpg-backups-artemis-backup-<YYYYMMDD>`.
+1. Token name: `backups-gxy-management-cnpg-artemis-backup-<YYYYMMDD>`.
 1. Permissions: **Object Read & Write**.
-1. Specify bucket: `management-cnpg-backups` only.
+1. Specify bucket: `backups-gxy-management-cnpg` only.
 
 Store the three captured values under their own names — `R2_BACKUP_ENDPOINT`, `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY` — in the dotenv SOT at step 2, then in the YAML overlay at step 3. **Never write them over `R2_ENDPOINT`, `R2_ACCESS_KEY_ID` or `R2_SECRET_ACCESS_KEY`**; those three are the serve token and overwriting them breaks the deploy path. The chart renders the `R2_BACKUP_*` set into `artemis-backup-secret` and refuses to render a backup CronJob without it.
 

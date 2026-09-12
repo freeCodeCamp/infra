@@ -2,7 +2,7 @@
 
 **Audience:** operator. **Trigger:** run once, before the next artemis chart release.
 
-Both artemis backup CronJobs wrote their dumps into `universe-static-apps-01`, the bucket artemis serves deploys from. ADR-019:86 forbids one shared bucket across stateful pillars. The chart now reads `backup.bucket` and `pgBackup.bucket` and both point at `management-cnpg-backups`, which does not exist yet.
+Both artemis backup CronJobs wrote their dumps into `universe-static-apps-01`, the bucket artemis serves deploys from. ADR-019:86 forbids one shared bucket across stateful pillars. The chart now reads `backup.bucket` and `pgBackup.bucket` and both point at `backups-gxy-management-cnpg`, which does not exist yet.
 
 **Do not release before step 5.** `RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"` stops rclone from creating the bucket. A release against a missing bucket fails every nightly run with `NoSuchBucket`, and `backoffLimit: 2` marks the Job Failed.
 
@@ -17,22 +17,24 @@ Related: [05](05-r2-keys-rotation.md) mints the tokens. [02](02-deploy-artemis-s
 | 3   | The serve token `R2_*` and the dotenv SOT decrypt                       | [04](04-secrets-decrypt.md)                     |
 | 4   | GitHub Actions `workflow_dispatch` is available to you                  | `.github/workflows/docker--postgres-rclone.yml` |
 
-## 1. Create the bucket
+## 1. Create the bucket — DONE 2026-09-12
+
+`backups-gxy-management-cnpg` exists, location **WEUR**, empty at creation. Made in the Cloudflare dashboard.
 
 The location hint is permanent. Cloudflare: "Location Hints are only honored the first time a bucket with a given name is created. If you delete and recreate a bucket with the same name, the original bucket's location will be used." — https://developers.cloudflare.com/r2/reference/data-location/
 
-The nodes run in DigitalOcean `fra1`, so the hint is `weur` (Western Europe).
+The nodes run in DigitalOcean `fra1`, so the hint is `weur`. `universe-static-apps-01` and `cassiopeia-cnpg-backups` both predate that rule and sit in APAC.
 
 ```sh
-wrangler r2 bucket create management-cnpg-backups --location weur
-wrangler r2 bucket list | grep management-cnpg-backups
+export CLOUDFLARE_ACCOUNT_ID=ad45585c4383c97ec7023d61b8aef8c8
+wrangler r2 bucket info backups-gxy-management-cnpg
 ```
 
-The name has no `-01` suffix. ADR-019:173 names `management-cnpg-backups`.
+**The name diverges from ADR-019 and from its sibling.** ADR-019 names `management-cnpg-backups` at `:173`, `:174`, `:175` and `:179`, and the live sibling is `cassiopeia-cnpg-backups`. The operator chose `backups-gxy-management-cnpg` on 2026-09-12 and this repo follows the live bucket. **ADR-019 needs amending in the `fCC-U/Architecture` repo**; until it is, that ADR names a bucket that does not exist.
 
 ## 2. Mint the backup-only token
 
-Follow [05](05-r2-keys-rotation.md) §1b. The token is scoped to `management-cnpg-backups` only. Do not widen the serve token; ADR-016:23 names the blast radius.
+Follow [05](05-r2-keys-rotation.md) §1b. The token is scoped to `backups-gxy-management-cnpg` only. Do not widen the serve token; ADR-016:23 names the blast radius.
 
 ## 3. Seal the token
 
@@ -70,8 +72,8 @@ export RCLONE_CONFIG_NEW_SECRET_ACCESS_KEY="$R2_BACKUP_SECRET_ACCESS_KEY"
 rclone ls old:universe-static-apps-01/artemis/gxy-management
 rclone move --progress \
   old:universe-static-apps-01/artemis/gxy-management \
-  new:management-cnpg-backups/artemis/gxy-management
-rclone ls new:management-cnpg-backups/artemis/gxy-management
+  new:backups-gxy-management-cnpg/artemis/gxy-management
+rclone ls new:backups-gxy-management-cnpg/artemis/gxy-management
 rclone ls old:universe-static-apps-01/artemis/gxy-management   # must print nothing
 ```
 
