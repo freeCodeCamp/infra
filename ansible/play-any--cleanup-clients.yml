@@ -10,14 +10,15 @@
 
 - name: Remove old releases
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: '{{ variable_serial | default(0) }}'
   gather_facts: false
   vars:
     dry_run: '{{ variable_dry_run | default(false) }}'
+    client_root: "{{ variable_client_root | default('/home/freecodecamp/client') }}"
   tasks:
     - name: Get all release directories
       ansible.builtin.find:
-        paths: /home/freecodecamp/client/releases
+        paths: '{{ client_root }}/releases'
         recurse: false
         file_type: directory
       register: all_releases
@@ -27,18 +28,54 @@
         sorted_releases:
           "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
 
-    - name: Get releases to delete (excluding last 3)
+    - name: Read the client start scripts
+      ansible.builtin.slurp:
+        src: '{{ client_root }}/client-start-{{ item }}.sh'
+      loop:
+        - primary
+        - secondary
+      register: start_scripts
+
+    - name: Get the release markers from the start scripts
       ansible.builtin.set_fact:
-        releases_to_delete: '{{ sorted_releases[3:] }}'
+        release_markers: "{{ start_scripts.results | map(attribute='content')
+          | map('b64decode') | map('regex_search', 'releases/([^\\s]+)', '\\1')
+          | list }}"
+
+    - name: Fail if a start script names no release
+      ansible.builtin.assert:
+        that:
+          - release_markers | select('none') | list | length == 0
+        fail_msg: "A start script under {{ client_root }} names no release:
+          {{ release_markers }}"
+
+    - name: Get the live release IDs from the release markers
+      ansible.builtin.set_fact:
+        live_release_ids: '{{ release_markers | map("first") | unique | list }}'
+
+    - name: Fail if a start script names a release directory that is absent
+      ansible.builtin.assert:
+        that:
+          - live_release_ids | length > 0
+          - live_release_ids | difference(sorted_releases | map(attribute='path')
+            | map('basename') | list) | length == 0
+        fail_msg: "Start scripts name {{ live_release_ids }}, but
+          {{ client_root }}/releases holds
+          {{ sorted_releases | map(attribute='path') | map('basename') | list }}"
+
+    - name: Get releases to delete (excluding last 2 and the live releases)
+      ansible.builtin.set_fact:
+        releases_to_delete: "{{ sorted_releases[2:] | map(attribute='path')
+          | map('basename') | difference(live_release_ids) | list }}"
 
     - name: Log releases to be deleted
       ansible.builtin.debug:
-        msg: '{{ item.path | basename }}'
+        msg: '{{ item }}'
       with_items: '{{ releases_to_delete }}'
 
     - name: Remove old releases
       ansible.builtin.file:
-        path: '{{ item.path }}'
+        path: '{{ client_root }}/releases/{{ item }}'
         state: absent
       with_items: '{{ releases_to_delete }}'
       when: not dry_run
