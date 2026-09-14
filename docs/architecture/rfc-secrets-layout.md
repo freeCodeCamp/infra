@@ -27,8 +27,8 @@ The 2026-04-21 cluster audit surfaced drift that blocks task #22:
 ```text
 .sops.yaml                       # single path_regex `.*` → platform age key
 README.md                        # existing directory-structure doc
-global/.env.enc                  # platform-wide tokens (CF, Tailscale, HCP, ...) — opt-in via INFRA_ADMIN=1 (2026-07-17), never auto-loaded
-r2-read/.env.enc                 # read-only R2 keys (added 2026-05-12) — same INFRA_ADMIN gate
+global/.env.enc                  # platform-wide tokens (CF, Tailscale, HCP, ...) — loaded by the root .envrc (gate retired 2026-09-14)
+r2-read/.env.enc                 # read-only R2 keys (added 2026-05-12) — loaded by the root .envrc
 do-primary/.env.enc              # DO API token — legacy account
 do-universe/.env.enc             # DO API token — Universe account
 argocd/.env.sample               # (empty — reserved platform-wide namespace)

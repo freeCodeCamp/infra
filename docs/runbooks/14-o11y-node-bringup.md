@@ -4,7 +4,7 @@
 
 The cluster is freeCodeCamp's management plane: Rancher, Flux, External Secrets, VictoriaMetrics and Grafana. It pulls node_exporter metrics from ~80 Linode VMs over Tailscale, keeps 12 months of history, and later scrapes the Hetzner estate under the same `job="node"`. The cluster name and every path stay `ops-o11y` until the rename is decided (RFC Q21).
 
-Every command runs from the repo root unless the line says otherwise. No `just`. Each `kubectl`, `helm` and `flux` line carries `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files, so OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and Ansible lines run from `ansible/` with `INFRA_ADMIN=1 direnv exec . uv run`.
+Every command runs from the repo root unless the line says otherwise. No `just`. Each `kubectl`, `helm` and `flux` line carries `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml`. `terraform/ops-o11y/` and `ansible/` carry `.envrc` files, so OpenTofu lines run through `direnv exec .` in `terraform/ops-o11y/`, and Ansible lines run from `ansible/` with `direnv exec . uv run`.
 
 Four layers, one tool each: OpenTofu builds the droplets, Ansible builds the K3s servers, `flux install` puts Flux on the cluster, and Flux installs everything else from git. Flux reads GitHub, never a checkout, so the files under `k3s/ops-o11y/` must be pushed on the branch the GitRepository pins (`main`).
 
@@ -41,7 +41,7 @@ Git layout under `k3s/ops-o11y/`:
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `tofu` 1.12.x on PATH; `infra-secrets/tfstate/.env.enc` carries `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`; `do-universe/.env.enc` decrypts; bucket `infra-tfstate` exists                                                                                                                                                                                                                                                                                                                     | `cd terraform/ops-o11y && direnv exec . tofu init`                                                                              |
 | 2   | The `do-universe` token owns project `o11y`                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `cd terraform/ops-o11y && direnv exec . sh -c 'DIGITALOCEAN_ACCESS_TOKEN=$DIGITALOCEAN_TOKEN doctl account get --format Team'`  |
-| 3   | `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (minted 2026-09-06, rotate before 2026-12-05)                                                                                                                                                                                                                                                                                                                                                                                                                      | `test -n "$TAILSCALE_AUTH_KEY"` under `INFRA_ADMIN=1`                                                                           |
+| 3   | `TAILSCALE_AUTH_KEY` in `global/.env.enc` is current (minted 2026-09-06, rotate before 2026-12-05)                                                                                                                                                                                                                                                                                                                                                                                                                      | `test -n "$TAILSCALE_AUTH_KEY"`                                                                                                 |
 | 4   | Tailnet ACL permits operator → nodes on tcp/6443, and `tag:added-by-ops` → `tag:added-by-ops` on 9100                                                                                                                                                                                                                                                                                                                                                                                                                   | the servers play, then the target count, fail without it                                                                        |
 | 5   | node_exporter v1.12.1 on the fleet and on every mgmt node, bound to the tailnet address                                                                                                                                                                                                                                                                                                                                                                                                                                 | `play-o11y--node-exporter-0-install.yml`                                                                                        |
 | 6   | `helm` 3.14+, `kubectl`, `flux` v2.9.5 on PATH (`brew install fluxcd/tap/flux`); `flux` is optional, every `flux` line has a `kubectl` twin below                                                                                                                                                                                                                                                                                                                                                                       | `flux version --client`                                                                                                         |
@@ -77,10 +77,10 @@ for ip in $(cd terraform/ops-o11y && direnv exec . tofu output -json ipv4_addres
 From `ansible/`:
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml          -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml              -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml          -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml              -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml                  -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
 `play-k3s--servers.yml` reads the K3s version from the first host of the group when one runs, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). The first host gets `--cluster-init`; the others join it over the VPC. The play installs the Gateway API CRDs v1.4.0, writes the Traefik `HelmChartConfig`, saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
@@ -211,8 +211,8 @@ cd terraform/ops-o11y && direnv exec . tofu plan && direnv exec . tofu apply && 
 The plan shows node 01 resized to `s-4vcpu-16gb-amd` in place (a power-off and on), nodes 02 and 03 created, and four firewall rules added. Nothing is destroyed; stop if the plan says otherwise. Wait for cloud-init on 02 and 03 (fresh-bringup step 1), then join them to the tailnet:
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--0-install.yml -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-tailscale--1a-up.yml     -e variable_host=ops_o11y
 ```
 
 Exit check: `tailscale status | grep ops-vm-o11y` lists three devices; `KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get nodes` still shows one `Ready` node with 16 GB (`kubectl describe node … | grep memory:`).
@@ -222,7 +222,7 @@ Exit check: `tailscale status | grep ops-vm-o11y` lists three devices; `KUBECONF
 The servers play with `--limit` on node 01 alone rewrites its unit with `--cluster-init` and restarts K3s, which converts the SQLite datastore in place (docs.k3s.io/datastore/ha-embedded, "Existing single-node clusters"). The same run moves `--node-ip` to the VPC address and enables Traefik.
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01
 ```
 
 Exit check, in this order:
@@ -245,9 +245,9 @@ ssh root@ops-vm-o11y-k3s-fra1-01 'systemctl stop k3s && rm -rf /var/lib/rancher/
 One node per run, node 01 always in the limit. Each run saves a snapshot.
 
 ```sh
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
-INFRA_ADMIN=1 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y -l ops-vm-o11y-k3s-fra1-01,ops-vm-o11y-k3s-fra1-02
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
+direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
 Exit check: three `Ready` nodes at `v1.36.4+k3s1`; `k3s etcd-snapshot ls` on node 01 lists three `play-*` snapshots; `count(up{job="o11y-node"})` stays 1: the job is a static target list in the VictoriaMetrics values and names node 01 only. Extend it to the three nodes as a follow-up.

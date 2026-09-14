@@ -68,8 +68,8 @@ just configure-kubeconfig gxy-launchbase
 
 direnv `.envrc` hierarchy still loads:
 
-- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load ONLY with `INFRA_ADMIN=1` (shell export or untracked `.env`) — never auto-loaded (ADR-010, scoped 2026-07-17)
-- `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` **ungated**, so `ansible-playbook` against the DigitalOcean dynamic inventory needs no `INFRA_ADMIN` (added 2026-09-04)
+- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. The `INFRA_ADMIN=1` gate is retired (operator 2026-09-14); the session hooks now keep an agent out of the plaintext. This supersedes the ADR-010 shape for this repo.
+- `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (added 2026-09-04)
 - `k3s/<galaxy>/.envrc` → sources root + adds galaxy-scoped tokens (e.g. `$SECRETS_DIR/do-universe/.env.enc`) + exports `KUBECONFIG`
 
 The galaxy-scoped `KUBECONFIG` export is now belt-and-suspenders — recipes that need it set it themselves. The galaxy-scoped DO tokens still matter for recipes that hit DO API directly (terraform `provision`, ansible `bootstrap` with DO dynamic inventory) — but those recipes either accept `cluster` as an arg (`provision`) or operate on ansible inventory unrelated to live cluster state (`bootstrap`).
@@ -102,11 +102,11 @@ Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Architecture
 
 Inventory groups (matches `ansible/inventory/group_vars/`):
 
-| Galaxy           | Inventory Group      | Role                                                                 |
-| ---------------- | -------------------- | -------------------------------------------------------------------- |
-| `gxy-management` | `gxy_management_k3s` | Control plane — artemis + Hatchet + Valkey (`uploads.freecode.camp`) |
+| Galaxy           | Inventory Group      | Role                                                                                         |
+| ---------------- | -------------------- | -------------------------------------------------------------------------------------------- |
+| `gxy-management` | `gxy_management_k3s` | Control plane — artemis + Hatchet + Valkey (`uploads.freecode.camp`)                         |
 | `gxy-launchbase` | `gxy_launchbase_k3s` | **NOT LIVE — never probe it** (operator, 2026-09-11). Standby; woodpecker retired 2026-05-03 |
-| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2     |
+| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2                             |
 
 Retired:
 
