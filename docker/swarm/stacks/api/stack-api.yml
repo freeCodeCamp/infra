@@ -100,6 +100,9 @@ x-deploy-config: &deploy-config
     - SOCRATES_ENDPOINT=${SOCRATES_ENDPOINT}
     # -- Donations
     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - PAYPAL_API_URL=${PAYPAL_API_URL}
+    - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID}
+    - PAYPAL_CLIENT_SECRET=${PAYPAL_CLIENT_SECRET}
 
 services:
   svc-api-alpha:
