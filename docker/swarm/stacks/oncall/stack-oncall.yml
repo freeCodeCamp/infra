@@ -128,9 +128,8 @@ services:
       - "GANTRY_ROLLBACK_ON_FAILURE=true"
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
       - "GANTRY_UPDATE_OPTIONS=--with-registry-auth"
-      - "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-apprise:8000/notify"
+      - "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-chat-relay:9000/hooks/gantry?trigger=hourly"
       - "GANTRY_NOTIFICATION_CONDITION=on-change"
-      - "GANTRY_NOTIFICATION_TITLE=· hourly"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
@@ -175,10 +174,22 @@ services:
       restart_policy:
         condition: none
 
-  svc-apprise:
-    image: caronc/apprise:1.5.4
+  svc-chat-relay:
+    image: lwlook/webhook@sha256:93f708c6c0d6469b4a0f7f654d5f25054e54dccba1cf316a1d7e48e2be736c9a
+    command:
+      - "-verbose"
+      - "-hooks=/hooks.json"
     environment:
-      - "APPRISE_STATELESS_URLS=${GOOGLE_CHAT_WEBHOOK}"
+      - "GOOGLE_CHAT_WEBHOOK=${GOOGLE_CHAT_WEBHOOK}"
+    configs:
+      - source: hooks_relay
+        target: /hooks.json
+      - source: scripts_lib
+        target: /scripts/lib.sh
+        mode: 0444
+      - source: scripts_relay
+        target: /scripts/relay.sh
+        mode: 0555
     <<: *logging-config
     deploy:
       replicas: 1
@@ -235,3 +246,9 @@ configs:
   scripts_watchdog:
     name: oncall_scripts_watchdog_v1
     file: ./scripts/watchdog.sh
+  hooks_relay:
+    name: oncall_hooks_relay_v1
+    file: ./hooks-relay.json
+  scripts_relay:
+    name: oncall_scripts_relay_v1
+    file: ./scripts/relay.sh

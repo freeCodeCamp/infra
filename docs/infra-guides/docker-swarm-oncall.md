@@ -14,7 +14,7 @@ The Oncall stack provides automated maintenance and monitoring services includin
 | **svc-update**                | Gantry service updater (auto-updates tagged services)         |
 | **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)   |
 | **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)   |
-| **svc-apprise**               | Apprise API relay (Gantry notifications to Google Chat)       |
+| **svc-chat-relay**            | Posts Gantry notices to Google Chat as one standard line      |
 | **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
 | **svc-dispatch-news-i18n**    | Starts the news `deploy-i18n.yml` workflow every 6 hours      |
 | **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
@@ -29,7 +29,7 @@ Cleanup Job → Weekly prune on all nodes
 Webhook Receiver → On-demand Gantry updates (via GHA)
 Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping)
 Watchdog → news RSS lastBuildDate → Google Chat when stale
-Gantry (cron and webhook) → Apprise → Google Chat
+Gantry (cron and webhook) → Chat relay → Google Chat
     ↓
 All services → json-file logging (local, rotated)
 ```
@@ -58,17 +58,17 @@ All services → json-file logging (local, rotated)
 
 Export these 3 variables before `docker stack deploy`. Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
 
-| Variable                | Used by                        | Value                                                                               |
-| ----------------------- | ------------------------------ | ----------------------------------------------------------------------------------- |
-| `WEBHOOK_SECRET`        | svc-webhook                    | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
-| `GITHUB_DISPATCH_TOKEN` | dispatchers                    | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
-| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdog, apprise | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
+| Variable                | Used by                      | Value                                                                               |
+| ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| `WEBHOOK_SECRET`        | svc-webhook                  | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
+| `GITHUB_DISPATCH_TOKEN` | dispatchers                  | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
+| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdog, relay | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
 
 Anyone with Docker access on the manager can read these values with `docker service inspect`. Rotate a value after you remove such access.
 
 ### Swarm Config Names
 
-Swarm configs are immutable. When you change `run_gantry.sh` or a file in `scripts/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails.
+Swarm configs are immutable. When you change `run_gantry.sh`, `hooks-relay.json` or a file in `scripts/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails.
 
 ### Dispatchers
 
@@ -98,7 +98,25 @@ The dispatcher posts to Google Chat when the API refuses the request or when a v
 
 ### Google Chat Notifications
 
-Gantry sends its notifications to `svc-apprise` (`http://svc-apprise:8000/notify`). Apprise sends them to `GOOGLE_CHAT_WEBHOOK`. Gantry posts only when it updates a service or when an update fails (`GANTRY_NOTIFICATION_CONDITION=on-change`). The title shows `· hourly` for the cron run and `· webhook` for a run from `/hooks/run-gantry`.
+Every message from this stack and from the GitHub workflows is one line:
+
+```text
+<icon> *<source>* · <subject> · <summary> · <link|label>
+```
+
+- Icon: ✅ ok, ⚠️ warn, 🔴 fail.
+- The link is optional. The GitHub workflows always link the run.
+- A warn or fail message from a GitHub workflow can add detail lines below the line.
+- `scripts/lib.sh` (`chat_notify`) and `.github/actions/notify-chat` make the line. Do not post to Google Chat in a different format.
+
+Gantry sends its notifications to `svc-chat-relay` (`http://svc-chat-relay:9000/hooks/gantry`). The relay makes the standard line and posts it to `GOOGLE_CHAT_WEBHOOK`. The subject is `hourly` for the cron run and `webhook` for a run from `/hooks/run-gantry`. Gantry posts only when it updates a service or when an update fails (`GANTRY_NOTIFICATION_CONDITION=on-change`).
+
+```text
+✅ *gantry* · webhook · 1 service(s) updated: prd-news_svc-eng
+🔴 *gantry* · hourly · 1 service(s) update failed: prd-news_svc-eng; 1 service(s) rollback failed: prd-news_svc-eng
+```
+
+`svc-chat-relay` publishes no port. Only services on the `oncall_default` network can reach it.
 
 ### Tests
 

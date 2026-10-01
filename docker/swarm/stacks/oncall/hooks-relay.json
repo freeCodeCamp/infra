@@ -1,0 +1,29 @@
+[
+  {
+    "id": "gantry",
+    "execute-command": "/scripts/relay.sh",
+    "command-working-directory": "/",
+    "pass-environment-to-command": [
+      {
+        "source": "payload",
+        "name": "title",
+        "envname": "RELAY_TITLE"
+      },
+      {
+        "source": "payload",
+        "name": "body",
+        "envname": "RELAY_BODY"
+      },
+      {
+        "source": "payload",
+        "name": "type",
+        "envname": "RELAY_TYPE"
+      },
+      {
+        "source": "url",
+        "name": "trigger",
+        "envname": "RELAY_TRIGGER"
+      }
+    ]
+  }
+]

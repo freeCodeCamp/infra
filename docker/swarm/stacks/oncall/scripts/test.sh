@@ -292,6 +292,83 @@ run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 30 * 60)) GOOGLE_CHAT_WEBHOOK
 check "stale with empty webhook exits 1" "$status" 1
 check "stale with empty webhook posts no chat" "$(chat_calls)" 0
 
+mkdir -p "$work/nocurl"
+for tool in sh dirname awk sed tr; do
+  ln -s "$(command -v "$tool")" "$work/nocurl/$tool"
+done
+cat >"$work/nocurl/wget" <<'EOF'
+#!/bin/sh
+url=""
+data=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --post-data) data=$2; shift 2 ;;
+    --header) printf 'H %s\n' "$2" >> "$FAKE_LOG"; shift 2 ;;
+    -O | -T) shift 2 ;;
+    http*) url=$1; shift ;;
+    *) shift ;;
+  esac
+done
+printf 'CHAT %s\n' "$url" >> "$FAKE_LOG"
+printf 'CHATDATA %s\n' "$data" >> "$FAKE_LOG"
+EOF
+chmod +x "$work/nocurl/wget"
+
+text_probe='import json, sys
+print(int(json.load(sys.stdin)["text"] == sys.argv[1]))'
+
+chat_text_is() {
+  grep '^CHATDATA ' "$log" | sed 's/^CHATDATA //' | python3 -c "$text_probe" "$1" 2>&1
+}
+
+run_relay() {
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" \
+    FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
+    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+    "$@" sh "$here/relay.sh" >"$work/out" 2>&1
+  status=$?
+}
+
+UPDATED=$(printf '1 service(s) updated: prd-news_svc-eng\n\n\n\n')
+FAILED=$(printf 'No services updated.\n\n1 service(s) update failed: prd-news_svc-eng\n%s\n' \
+  '1 service(s) rollback failed: prd-news_svc-eng')
+
+run_relay RELAY_TYPE=success RELAY_TRIGGER=webhook RELAY_BODY="$UPDATED" \
+  RELAY_TITLE='[gantry] 1 service(s) updated, no failures or errors'
+check "relay exits 0" "$status" 0
+check "relay posts one chat" "$(chat_calls)" 1
+check "relay update is a standard ok line" \
+  "$(chat_text_is '✅ *gantry* · webhook · 1 service(s) updated: prd-news_svc-eng')" 1
+
+run_relay RELAY_TYPE=failure RELAY_TRIGGER=hourly RELAY_BODY="$FAILED" \
+  RELAY_TITLE='[gantry] 0 service(s) updated, 1 update failed'
+check "relay failure joins the report lines" "$(chat_text_is "🔴 *gantry* · hourly · \
+1 service(s) update failed: prd-news_svc-eng; 1 service(s) rollback failed: prd-news_svc-eng")" 1
+
+run_relay RELAY_TYPE=info RELAY_BODY= \
+  RELAY_TITLE='[gantry] 0 service(s) updated, no failures or errors'
+check "relay falls back to the title" "$(chat_text_is \
+  '✅ *gantry* · update · 0 service(s) updated, no failures or errors')" 1
+
+run_relay RELAY_TYPE=warning RELAY_TRIGGER=hourly RELAY_BODY="$UPDATED"
+check "relay warning is a warn line" "$(chat_text_has '⚠️ *gantry* · hourly · ')" 1
+
+run_relay RELAY_TYPE=success RELAY_BODY="$UPDATED" GOOGLE_CHAT_WEBHOOK=
+check "relay with empty webhook exits 0" "$status" 0
+check "relay with empty webhook posts no chat" "$(chat_calls)" 0
+
+: >"$log"
+env -i PATH="$work/nocurl" FAKE_LOG="$log" GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+  RELAY_TYPE=success RELAY_TRIGGER=webhook RELAY_BODY="$UPDATED" \
+  sh "$here/relay.sh" >"$work/out" 2>&1
+check "relay without curl exits 0" "$?" 0
+check "relay without curl posts with wget" "$(chat_calls)" 1
+check "wget post sends JSON" \
+  "$(grep -c '^H Content-Type: application/json; charset=UTF-8$' "$log")" 1
+check "wget post is a standard ok line" \
+  "$(chat_text_is '✅ *gantry* · webhook · 1 service(s) updated: prd-news_svc-eng')" 1
+
 if [ "$failures" -gt 0 ]; then
   printf '%s check(s) failed\n' "$failures"
   exit 1

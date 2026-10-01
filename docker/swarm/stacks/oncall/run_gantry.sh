@@ -22,9 +22,8 @@ launch_new_gantry() {
     --env "GANTRY_ROLLBACK_ON_FAILURE=true" \
     --env "GANTRY_UPDATE_TIMEOUT_SECONDS=300" \
     --env "GANTRY_UPDATE_OPTIONS=--with-registry-auth" \
-    --env "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-apprise:8000/notify" \
+    --env "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-chat-relay:9000/hooks/gantry?trigger=webhook" \
     --env "GANTRY_NOTIFICATION_CONDITION=on-change" \
-    --env "GANTRY_NOTIFICATION_TITLE=· webhook" \
     --label "from-webhook=true" \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=bind,source=/home/freecodecamp/.docker,target=/root/.docker \
