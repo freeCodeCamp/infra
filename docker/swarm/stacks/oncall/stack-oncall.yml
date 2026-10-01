@@ -6,7 +6,77 @@ x-logging-config: &logging-config
       max-file: "3"
       compress: "true"
 
+x-dispatch-env: &dispatch-env
+  GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN}
+  GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+
+x-dispatch: &dispatch
+  <<: *logging-config
+  image: curlimages/curl:8.22.0
+  entrypoint: ["/scripts/dispatch.sh"]
+  configs:
+    - source: scripts_lib
+      target: /scripts/lib.sh
+      mode: 0444
+    - source: scripts_dispatch
+      target: /scripts/dispatch.sh
+      mode: 0555
+
+x-dispatch-deploy: &dispatch-deploy
+  mode: replicated
+  replicas: 0
+  restart_policy:
+    condition: none
+  placement:
+    constraints:
+      - "node.role == manager"
+
 services:
+  svc-dispatch-news-eng:
+    <<: *dispatch
+    environment:
+      <<: *dispatch-env
+      DISPATCH_REPO: freeCodeCamp/news
+      DISPATCH_WORKFLOW: deploy-eng.yml
+      WINDOW_POLICY: avoid
+    deploy:
+      <<: *dispatch-deploy
+      labels:
+        - "swarm.cronjob.enable=true"
+        - "swarm.cronjob.replicas=1"
+        - "swarm.cronjob.schedule=0 5 */3 * * *"
+        - "swarm.cronjob.skip-running=true"
+
+  svc-dispatch-news-i18n:
+    <<: *dispatch
+    environment:
+      <<: *dispatch-env
+      DISPATCH_REPO: freeCodeCamp/news
+      DISPATCH_WORKFLOW: deploy-i18n.yml
+      WINDOW_POLICY: avoid
+    deploy:
+      <<: *dispatch-deploy
+      labels:
+        - "swarm.cronjob.enable=true"
+        - "swarm.cronjob.replicas=1"
+        - "swarm.cronjob.schedule=0 5 */6 * * *"
+        - "swarm.cronjob.skip-running=true"
+
+  svc-dispatch-housekeeping:
+    <<: *dispatch
+    environment:
+      <<: *dispatch-env
+      DISPATCH_REPO: freeCodeCamp/infra
+      DISPATCH_WORKFLOW: ansible--housekeeping.yml
+      WINDOW_POLICY: require
+    deploy:
+      <<: *dispatch-deploy
+      labels:
+        - "swarm.cronjob.enable=true"
+        - "swarm.cronjob.replicas=1"
+        - "swarm.cronjob.schedule=0 30 1 * * 3,6"
+        - "swarm.cronjob.skip-running=true"
+
   svc-cronjob:
     image: crazymax/swarm-cronjob:1.16.0
     volumes:
@@ -118,3 +188,9 @@ configs:
     file: ./hooks.json
   run_gantry:
     file: ./run_gantry.sh
+  scripts_lib:
+    name: oncall_scripts_lib_v1
+    file: ./scripts/lib.sh
+  scripts_dispatch:
+    name: oncall_scripts_dispatch_v1
+    file: ./scripts/dispatch.sh
