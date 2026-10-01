@@ -259,7 +259,7 @@ jobs:
     # NO message means the workflow never ran at all -- the one failure no
     # in-workflow check can catch, because a workflow that does not run cannot
     # report on itself.
-    if: ${{ always() && needs.window.outputs.allowed == 'true' }}
+    if: ${{ always() && (needs.window.result != 'success' || needs.window.outputs.allowed == 'true') }}
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -280,6 +280,7 @@ jobs:
       - name: Build the run summary
         id: summary
         env:
+          WINDOW: ${{ needs.window.result }}
           UPTIME: ${{ needs.uptime.result }}
           UPDATE: ${{ needs.update.result }}
           REBOOT_WEB: ${{ needs.reboot-web.result }}
@@ -291,6 +292,7 @@ jobs:
           import glob, json, os
 
           stages = [
+              ("window", os.environ["WINDOW"]),
               ("uptime", os.environ["UPTIME"]),
               ("update", os.environ["UPDATE"]),
               ("reboot-web", os.environ["REBOOT_WEB"]),
