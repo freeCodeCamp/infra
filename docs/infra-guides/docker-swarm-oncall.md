@@ -8,12 +8,17 @@ The Oncall stack provides automated maintenance and monitoring services includin
 
 ## Components
 
-| Service         | Purpose                                                     |
-| --------------- | ----------------------------------------------------------- |
-| **svc-cronjob** | Swarm cronjob scheduler (manages scheduled tasks)           |
-| **svc-update**  | Gantry service updater (auto-updates tagged services)       |
-| **svc-cleanup** | Docker system cleanup (prunes old images/containers weekly) |
-| **svc-webhook** | Webhook receiver (triggers instant Gantry updates via HTTP) |
+| Service                       | Purpose                                                       |
+| ----------------------------- | ------------------------------------------------------------- |
+| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)             |
+| **svc-update**                | Gantry service updater (auto-updates tagged services)         |
+| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)   |
+| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)   |
+| **svc-apprise**               | Apprise API relay (Gantry notifications to Google Chat)       |
+| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
+| **svc-dispatch-news-i18n**    | Starts the news `deploy-i18n.yml` workflow every 6 hours      |
+| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
+| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale      |
 
 ## Architecture
 
@@ -22,6 +27,9 @@ Cronjob Scheduler → Scheduled Tasks
 Service Updater → Auto-update tagged services
 Cleanup Job → Weekly prune on all nodes
 Webhook Receiver → On-demand Gantry updates (via GHA)
+Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping)
+Watchdog → news RSS lastBuildDate → Google Chat when stale
+Gantry (cron and webhook) → Apprise → Google Chat
     ↓
 All services → json-file logging (local, rotated)
 ```
@@ -48,7 +56,55 @@ All services → json-file logging (local, rotated)
 
 ### Environment Variables
 
-Only `WEBHOOK_SECRET` is required (see below). Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
+Export these 3 variables before `docker stack deploy`. Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
+
+| Variable                | Used by                        | Value                                                                               |
+| ----------------------- | ------------------------------ | ----------------------------------------------------------------------------------- |
+| `WEBHOOK_SECRET`        | svc-webhook                    | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
+| `GITHUB_DISPATCH_TOKEN` | dispatchers                    | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
+| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdog, apprise | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
+
+Anyone with Docker access on the manager can read these values with `docker service inspect`. Rotate a value after you remove such access.
+
+### Swarm Config Names
+
+Swarm configs are immutable. When you change `run_gantry.sh` or a file in `scripts/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails.
+
+### Dispatchers
+
+GitHub `schedule` triggers start late or do not start at all (observed since 2026-08-26). The dispatchers start the time-critical workflows from this stack. Each dispatcher sends one `POST /repos/<repo>/actions/workflows/<file>/dispatches` request to the GitHub API. It does not retry this request, because a retry can start a second run.
+
+| Service                     | Schedule (UTC)   | Window policy |
+| --------------------------- | ---------------- | ------------- |
+| `svc-dispatch-news-eng`     | `0 5 */3 * * *`  | `avoid`       |
+| `svc-dispatch-news-i18n`    | `0 5 */6 * * *`  | `avoid`       |
+| `svc-dispatch-housekeeping` | `0 30 1 * * 3,6` | `require`     |
+
+The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it once.
+
+- `avoid`: inside the window, the dispatcher does nothing.
+- `require`: outside the window, the dispatcher refuses and posts to Google Chat.
+
+The dispatcher posts to Google Chat when the API refuses the request or when a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
+
+### Freshness Watchdog
+
+`svc-watchdog-news` runs every hour at minute 50. It reads `<lastBuildDate>` from `https://www.freecodecamp.org/news/rss.xml`.
+
+- Limit: 5 hours. The feed is stale when its build date is older than the limit.
+- Posts: the first hour past the limit, then every 6 hours while the feed stays stale.
+- Quiet hours: Wed/Sat 00:00–08:00 UTC. The first check after quiet hours posts if the feed is stale.
+- The watchdog also posts when it cannot read the feed or the date.
+
+### Google Chat Notifications
+
+Gantry sends its notifications to `svc-apprise` (`http://svc-apprise:8000/notify`). Apprise sends them to `GOOGLE_CHAT_WEBHOOK`. Gantry posts only when it updates a service or when an update fails (`GANTRY_NOTIFICATION_CONDITION=on-change`). The title shows `· hourly` for the cron run and `· webhook` for a run from `/hooks/run-gantry`.
+
+### Tests
+
+```bash
+sh docker/swarm/stacks/oncall/scripts/test.sh
+```
 
 ### Webhook Configuration
 
@@ -74,8 +130,10 @@ sudo chmod -R u+w /home/freecodecamp/.docker
 # Set Docker context
 docker context use <context_name>
 
-# Set WEBHOOK_SECRET (logging is local json-file — no logging env needed)
+# Set the stack secrets (logging is local json-file — no logging env needed)
 export WEBHOOK_SECRET="<strong-random-string>"
+export GITHUB_DISPATCH_TOKEN="<bot fine-grained PAT>"
+export GOOGLE_CHAT_WEBHOOK="<google chat webhook url>"
 
 # Deploy stack (run from the stack dir so relative configs resolve)
 cd docker/swarm/stacks/oncall
@@ -83,6 +141,8 @@ docker stack deploy -c stack-oncall.yml oncall
 ```
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
+
+**Cutover order:** Deploy this stack first. Then, on the same day, merge the workflow changes that remove the GitHub `schedule` triggers. Do not do the cutover on Wed/Sat before 06:00 UTC. Until the merge, a news deploy can run twice. This is harmless.
 
 ## GHA Integration
 
