@@ -157,6 +157,106 @@ check "bad policy exits 2" "$status" 2
 check "bad policy makes no API call" "$(api_calls)" 0
 check "bad policy posts chat" "$(chat_calls)" 1
 
+BUILT="Thu, 01 Oct 2026 13:24:51 +0000"
+BUILT_AT=1790861091
+FRI_BUILT="Fri, 02 Oct 2026 21:30:00 +0000"
+SAT_0759=1791014340
+SAT_0800=1791014400
+WED_0759=1790755140
+HOUR=3600
+
+feed_xml() {
+  printf '<rss>\n  <channel>\n    <ttl>60</ttl>\n'
+  printf '    <lastBuildDate>%s</lastBuildDate>\n  </channel>\n</rss>\n' "$1"
+}
+
+run_watchdog() {
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" \
+    FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" FAKE_CODE=200 \
+    FAKE_BODY="$(feed_xml "$BUILT")" \
+    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+    "$@" sh "$here/watchdog.sh" >"$work/out" 2>&1
+  status=$?
+}
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR - 60))
+check "fresh feed exits 0" "$status" 0
+check "fresh feed posts no chat" "$(chat_calls)" 0
+check "default feed URL" "$(grep '^API ' "$log")" "API https://www.freecodecamp.org/news/rss.xml"
+check "feed GET is retried" "$(grep -c '^RETRY 2$' "$log")" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR))
+check "age equal to the limit is fresh" "$(chat_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT - 30 * 60))
+check "build under 1h in the future is fresh" "$status" 0
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT - 2 * HOUR))
+check "build over 1h in the future exits 1" "$status" 1
+check "build over 1h in the future posts chat" "$(chat_text_has 'in the future')" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 30 * 60))
+check "first stale tick exits 1" "$status" 1
+check "first stale tick posts chat" "$(chat_calls)" 1
+check "stale chat names build, age and limit" \
+  "$(chat_text_has "$BUILT" '5h 30m' 'limit 5h')" 1
+check "stale chat links the deploy runs" \
+  "$(chat_text_has 'freeCodeCamp/news/actions/workflows/deploy-eng.yml')" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 6 * HOUR + 30 * 60))
+check "second stale tick exits 1" "$status" 1
+check "second stale tick posts no chat" "$(chat_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 10 * HOUR + 30 * 60))
+check "stale tick before the reminder posts no chat" "$(chat_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 11 * HOUR + 30 * 60))
+check "reminder tick posts chat" "$(chat_calls)" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR - 60)) \
+  FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 18:54:51 +0530')"
+check "positive offset is applied" "$(chat_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 60)) \
+  FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 09:24:51 -0400')"
+check "negative offset is applied" "$(chat_calls)" 1
+
+run_watchdog WATCHDOG_NOW=$SAT_0759 FAKE_BODY="$(feed_xml "$FRI_BUILT")"
+check "quiet hours exit 0" "$status" 0
+check "quiet hours fetch nothing" "$(api_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$WED_0759 FAKE_BODY="$(feed_xml "$FRI_BUILT")"
+check "quiet hours include Wed 07:59" "$(api_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$SAT_0800 FAKE_BODY="$(feed_xml "$FRI_BUILT")"
+check "first tick after quiet hours posts chat" "$(chat_calls)" 1
+
+run_watchdog WATCHDOG_NOW=$((SAT_0800 + 2 * HOUR)) FAKE_BODY="$(feed_xml "$FRI_BUILT")"
+check "later tick after quiet hours follows the reminder" "$(chat_calls)" 0
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_CODE=503
+check "feed 503 exits 1" "$status" 1
+check "feed 503 posts chat" "$(chat_text_has 'feed unreadable' 'HTTP 503')" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_CODE=000
+check "feed transport failure posts chat" "$(chat_text_has 'HTTP 000')" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_BODY='<rss></rss>'
+check "missing lastBuildDate exits 1" "$status" 1
+check "missing lastBuildDate posts chat" "$(chat_text_has 'lastBuildDate')" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_BODY="$(feed_xml 'yesterday')"
+check "unparseable lastBuildDate posts chat" "$(chat_text_has 'yesterday')" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) \
+  FAKE_BODY="$(feed_xml 'Thu, 01 Foo 2026 13:24:51 +0000')"
+check "unknown month posts chat" "$(chat_calls)" 1
+
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 30 * 60)) GOOGLE_CHAT_WEBHOOK=
+check "stale with empty webhook exits 1" "$status" 1
+check "stale with empty webhook posts no chat" "$(chat_calls)" 0
+
 if [ "$failures" -gt 0 ]; then
   printf '%s check(s) failed\n' "$failures"
   exit 1

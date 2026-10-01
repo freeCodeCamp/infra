@@ -5,7 +5,7 @@ utc_clock() {
 in_window() {
   clock=$(utc_clock "$1")
   case "${clock% *}" in
-  3 | 6) [ "${clock#* }" -lt 6 ] ;;
+  3 | 6) [ "${clock#* }" -lt "${2:-6}" ] ;;
   *) return 1 ;;
   esac
 }

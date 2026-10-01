@@ -22,7 +22,7 @@ x-dispatch: &dispatch
       target: /scripts/dispatch.sh
       mode: 0555
 
-x-dispatch-deploy: &dispatch-deploy
+x-job-deploy: &job-deploy
   mode: replicated
   replicas: 0
   restart_policy:
@@ -40,7 +40,7 @@ services:
       DISPATCH_WORKFLOW: deploy-eng.yml
       WINDOW_POLICY: avoid
     deploy:
-      <<: *dispatch-deploy
+      <<: *job-deploy
       labels:
         - "swarm.cronjob.enable=true"
         - "swarm.cronjob.replicas=1"
@@ -55,7 +55,7 @@ services:
       DISPATCH_WORKFLOW: deploy-i18n.yml
       WINDOW_POLICY: avoid
     deploy:
-      <<: *dispatch-deploy
+      <<: *job-deploy
       labels:
         - "swarm.cronjob.enable=true"
         - "swarm.cronjob.replicas=1"
@@ -70,11 +70,32 @@ services:
       DISPATCH_WORKFLOW: ansible--housekeeping.yml
       WINDOW_POLICY: require
     deploy:
-      <<: *dispatch-deploy
+      <<: *job-deploy
       labels:
         - "swarm.cronjob.enable=true"
         - "swarm.cronjob.replicas=1"
         - "swarm.cronjob.schedule=0 30 1 * * 3,6"
+        - "swarm.cronjob.skip-running=true"
+
+  svc-watchdog-news:
+    <<: *logging-config
+    image: curlimages/curl:8.22.0
+    entrypoint: ["/scripts/watchdog.sh"]
+    environment:
+      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+    configs:
+      - source: scripts_lib
+        target: /scripts/lib.sh
+        mode: 0444
+      - source: scripts_watchdog
+        target: /scripts/watchdog.sh
+        mode: 0555
+    deploy:
+      <<: *job-deploy
+      labels:
+        - "swarm.cronjob.enable=true"
+        - "swarm.cronjob.replicas=1"
+        - "swarm.cronjob.schedule=0 50 * * * *"
         - "swarm.cronjob.skip-running=true"
 
   svc-cronjob:
@@ -211,3 +232,6 @@ configs:
   scripts_dispatch:
     name: oncall_scripts_dispatch_v1
     file: ./scripts/dispatch.sh
+  scripts_watchdog:
+    name: oncall_scripts_watchdog_v1
+    file: ./scripts/watchdog.sh
