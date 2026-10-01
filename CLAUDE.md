@@ -48,13 +48,13 @@ Optional siblings: `PLAN.md` (wave list, multi-wave sprints only), `dispatches/W
 
 This repo owns:
 
-| Path                            | Purpose                                                          |
-| ------------------------------- | ---------------------------------------------------------------- |
-| `docs/universe/flight-manuals/` | Per-cluster doomsday rebuild (index `00-index.md`)               |
-| `docs/runbooks/`                | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
-| `docs/architecture/`            | RFCs for non-trivial work                                        |
-| `docs/infra-guides/`            | Generic primers (k3s layout, legacy fCC ops, etc.)               |
-| `docs/GUIDELINES.md`            | Field-note format spec (legacy; field-notes archived 2026-05-10) |
+| Path                 | Purpose                                                          |
+| -------------------- | ---------------------------------------------------------------- |
+| `docs/universe/`     | Universe platform docs: flight manuals, runbooks, RFCs, guides   |
+| `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
+| `docs/architecture/` | RFCs for non-trivial work                                        |
+| `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)               |
+| `docs/GUIDELINES.md` | Field-note format spec (legacy; field-notes archived 2026-05-10) |
 
 ## Working directory rule
 

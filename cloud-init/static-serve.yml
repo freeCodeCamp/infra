@@ -44,7 +44,7 @@ write_files:
     content: |
       {
         auto_https off
-        # Loopback-only admin API; NetworkPolicy blocks :2019 ingress.
+        # Loopback-only admin API.
         admin 127.0.0.1:2019
 
         order r2_alias before file_server
@@ -151,6 +151,7 @@ write_files:
       ExecStartPre=-/usr/bin/docker rm -f caddy-s3
       ExecStart=/usr/bin/docker run --rm --name caddy-s3 \
         --publish 80:80 \
+        --log-opt max-size=50m --log-opt max-file=3 \
         --user 1000:1000 \
         --read-only \
         --cap-drop ALL --cap-add NET_BIND_SERVICE \

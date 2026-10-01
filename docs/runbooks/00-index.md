@@ -69,5 +69,5 @@ Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-1
 
 ## Cross-doc references
 
-- [`../flight-manuals/00-index.md`](../universe/flight-manuals/00-index.md) — per-cluster rebuild manuals
+- [`../universe/flight-manuals/00-index.md`](../universe/flight-manuals/00-index.md) — per-cluster rebuild manuals
 - [`../architecture/`](../architecture/) — RFCs and design docs

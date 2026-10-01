@@ -421,8 +421,9 @@ backup:
   # postgres-rclone image -- pg_dumpall + rclone in one run-once-and-die
   # rootfs. Digest-pinned; build is workflow_dispatch-only
   # (.github/workflows/docker--postgres-rclone.yml). Its pg client MUST
-  # match postgres.image.tag above -- see docs/runbooks/08-artemis-pg-
-  # restore-drill.md and the Dockerfile header.
+  # match postgres.image.tag above -- see
+  # docs/universe/runbooks/08-artemis-pg-restore-drill.md and the
+  # Dockerfile header.
   image: ghcr.io/freecodecamp/postgres-rclone@sha256:b9da73ecd905b277b2a65d7ebf32369d66dde595f0a2c4155d64d2b5ab7fab23
   schedule: "0 2 * * *"
   # rclone --min-age threshold for the prune step (objects older than

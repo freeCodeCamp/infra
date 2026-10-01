@@ -4,7 +4,7 @@
 
 One droplet runs the `caddy-s3` image with Docker. It serves every site in R2 bucket `universe-static-apps-weur` that has a `production` pointer. Cloudflare proxies the traffic and terminates TLS (SSL mode Flexible). The origin is plain HTTP on port 80. Only Cloudflare ranges reach port 80.
 
-Run every command from the repo root.
+Run every command from the repo root. This runbook stays in `docs/runbooks/` because the droplet stays live after the Universe docs leave this repo.
 
 ## Topology
 
@@ -49,8 +49,8 @@ IP=$(doctl compute droplet get static-serve-fra1-01 --format PublicIPv4 --no-hea
 ## 3. Create the firewall
 
 ```sh
-CF=$({ curl -s https://www.cloudflare.com/ips-v4; echo; curl -s https://www.cloudflare.com/ips-v6; echo; } | grep . | sed 's/^/address:/' | paste -sd, -)
-doctl compute firewall create \
+CF=$({ curl -fsS https://www.cloudflare.com/ips-v4; echo; curl -fsS https://www.cloudflare.com/ips-v6; echo; } | grep . | sed 's/^/address:/' | paste -sd, -)
+test -n "$CF" && doctl compute firewall create \
   --name static-serve \
   --tag-names static-serve \
   --inbound-rules "protocol:tcp,ports:22,address:0.0.0.0/0,address:::/0 protocol:tcp,ports:80,$CF" \
@@ -61,24 +61,28 @@ SSH stays public and key-only, the same posture as the o11y node.
 
 ## 4. Start the service
 
-Wait for cloud-init. The first `ssh` can fail until cloud-init creates the `freecodecamp` user; retry until it connects:
+Wait for cloud-init. Only the SSH keys of GitHub users `camperbot` and `raisedadead` reach the `freecodecamp` user; root login is off, and `--ssh-keys` in step 2 only stops DigitalOcean from setting a root password. The first `ssh` fails until cloud-init creates the user. Cloud-init can also reboot the droplet after package upgrades; after a disconnect, run the command again:
 
 ```sh
 ssh freecodecamp@"$IP" cloud-init status --wait
 ```
 
-Write the env file with the values from step 1. Replace each `<…>`:
+Write the env file from the 1Password item of step 1. Replace each `op://` reference with the item's real path. The values do not reach your terminal or shell history:
 
 ```sh
-ssh freecodecamp@"$IP" 'sudo install -m 0600 -o root -g root /dev/stdin /etc/caddy-s3/r2.env' <<'EOF'
-R2_ENDPOINT=<endpoint>
-AWS_ACCESS_KEY_ID=<access-key-id>
-AWS_SECRET_ACCESS_KEY=<secret-access-key>
+ssh freecodecamp@"$IP" 'sudo install -m 0600 -o root -g root /dev/stdin /etc/caddy-s3/r2.env' <<EOF
+R2_ENDPOINT=$(op read "op://<vault>/<item>/endpoint")
+AWS_ACCESS_KEY_ID=$(op read "op://<vault>/<item>/access-key-id")
+AWS_SECRET_ACCESS_KEY=$(op read "op://<vault>/<item>/secret-access-key")
 EOF
 ssh freecodecamp@"$IP" sudo systemctl start caddy-s3
 ```
 
-**Verify:** `ssh freecodecamp@"$IP" curl -s http://127.0.0.1/healthz` prints `ok`.
+**Verify:** this prints `ok` within 10 seconds:
+
+```sh
+ssh freecodecamp@"$IP" 'for i in $(seq 10); do curl -sf http://127.0.0.1/healthz && break; sleep 1; done'
+```
 
 ## 5. Smoke the sites on the droplet
 
@@ -88,11 +92,7 @@ Port 80 accepts Cloudflare only, so test from the droplet itself:
 ssh freecodecamp@"$IP" 'curl -s -o /dev/null -w "%{http_code}\n" -H "Host: sudoku.freecode.camp" http://127.0.0.1/'
 ```
 
-Expect `200`. For the full set, pipe one slug per line:
-
-```sh
-ssh freecodecamp@"$IP" 'while read s; do printf "%s " "$s"; curl -s -o /dev/null -w "%{http_code}\n" -H "Host: $s.freecode.camp" http://127.0.0.1/; done' < slugs.txt
-```
+Expect `200`.
 
 ## 6. Cut DNS over
 
@@ -109,6 +109,8 @@ Cloudflare dashboard → zone `freecode.camp` → **DNS**:
 ## 7. Rebuild
 
 Destroy and repeat steps 2–6. The droplet holds no state. Step 3 is not needed when the firewall still exists, because it binds by tag.
+
+Cloudflare changes its IP ranges rarely. To re-sync the firewall, build `$CF` as in step 3, then run `doctl compute firewall update <firewall-id>` with the same flags as the `create` line.
 
 ## 8. Update the image
 
