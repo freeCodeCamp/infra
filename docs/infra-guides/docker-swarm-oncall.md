@@ -235,7 +235,7 @@ docker service logs --since 2h oncall_svc-cronjob
 docker service logs --since 2h oncall_svc-update
 docker service logs --since 2h oncall_svc-webhook
 docker service logs --since 2h oncall_svc-chat-relay
-docker service logs --since 2h oncall_svc-dispatch-news-eng
+docker service logs --since 3h oncall_svc-dispatch-news-eng
 docker service logs --since 6h oncall_svc-dispatch-news-i18n
 docker service logs --since 96h oncall_svc-dispatch-housekeeping
 docker service logs --since 2h oncall_svc-watchdog-news
