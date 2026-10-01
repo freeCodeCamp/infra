@@ -157,8 +157,8 @@ check "bad policy exits 2" "$status" 2
 check "bad policy makes no API call" "$(api_calls)" 0
 check "bad policy posts chat" "$(chat_calls)" 1
 
-BUILT="Thu, 01 Oct 2026 13:24:51 +0000"
-BUILT_AT=1790861091
+BUILT="Thu, 01 Oct 2026 13:24:00 +0000"
+BUILT_AT=1790861040
 FRI_BUILT="Fri, 02 Oct 2026 21:30:00 +0000"
 SAT_0759=1791014340
 SAT_0800=1791014400
@@ -204,6 +204,9 @@ check "stale chat names build, age and limit" \
 check "stale chat links the deploy runs" \
   "$(chat_text_has 'freeCodeCamp/news/actions/workflows/deploy-eng.yml')" 1
 
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 6 * HOUR + 2))
+check "first stale tick that starts late posts chat" "$(chat_calls)" 1
+
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 6 * HOUR + 30 * 60))
 check "second stale tick exits 1" "$status" 1
 check "second stale tick posts no chat" "$(chat_calls)" 0
@@ -215,11 +218,11 @@ run_watchdog WATCHDOG_NOW=$((BUILT_AT + 11 * HOUR + 30 * 60))
 check "reminder tick posts chat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR - 60)) \
-  FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 18:54:51 +0530')"
+  FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 18:54:00 +0530')"
 check "positive offset is applied" "$(chat_calls)" 0
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 60)) \
-  FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 09:24:51 -0400')"
+  FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 09:24:00 -0400')"
 check "negative offset is applied" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$SAT_0759 FAKE_BODY="$(feed_xml "$FRI_BUILT")"

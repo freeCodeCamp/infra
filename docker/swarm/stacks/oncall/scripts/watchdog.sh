@@ -10,6 +10,7 @@ remind=21600
 tick=3600
 quiet_until=8
 now=${WATCHDOG_NOW:-$(date -u +%s)}
+now=$((now - now % 60))
 
 rfc822_epoch() {
   printf '%s\n' "$1" | awk '
@@ -59,7 +60,7 @@ if [ "$age" -le "$limit" ]; then
   exit 0
 fi
 
-if [ $(((age - limit) % remind)) -lt "$tick" ] || in_window $((now - tick)) "$quiet_until"; then
+if [ $(((age - limit - 1) % remind)) -lt "$tick" ] || in_window $((now - tick)) "$quiet_until"; then
   chat_post "🔴 news stale · English
 last build $stamp, $((age / 3600))h $((age % 3600 / 60))m ago (limit $((limit / 3600))h)
 $feed
