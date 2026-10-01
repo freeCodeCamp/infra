@@ -1,6 +1,6 @@
 # Runbook — Rotate the Cloudflare origin certificate
 
-**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Zone:** `freecodecamp.net` (Full Strict — see `docs/flight-manuals/UNIVERSE.md` §1.1). **Spec:** `docs/architecture/rfc-secrets-layout.md` D1–D3 (canonical zone-wildcard + per-app override + zone-fallback probe). **Last verified:** 2026-07-05.
+**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Zone:** `freecodecamp.net` (Full Strict — see `docs/universe/flight-manuals/UNIVERSE.md` §1.1). **Spec:** `docs/architecture/rfc-secrets-layout.md` D1–D3 (canonical zone-wildcard + per-app override + zone-fallback probe). **Last verified:** 2026-07-05.
 
 The wildcard `*.freecodecamp.net` origin cert lives once, canonically, at `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` (RFC D1) — this replaced three galaxy-local duplicate copies (`argocd`/`windmill`/`zot` `.tls.*.enc`) that existed pre-RFC. Rotating the canonical pair rotates it for every consumer resolving the wildcard via zone-fallback in one pass. `freecode.camp` (cassiopeia/artemis) is CF Flexible — no origin cert exists on that zone today (`global/tls/freecode-camp.*.enc` is not yet created), so this runbook is scoped to `freecodecamp.net` unless/until that lands.
 
@@ -10,7 +10,7 @@ If instead you're rotating a **per-app override** cert (`k3s/<cluster>/<app>.tls
 
 - Cloudflare account owner or admin on the account holding the `freecodecamp.net` zone.
 - `infra-secrets/` checked out as a sibling of `infra/` with sops+age set up — see [`04-secrets-decrypt.md`](04-secrets-decrypt.md).
-- Know which (cluster, app) pairs currently resolve the wildcard via zone-fallback (no per-app override file present). **Windmill retired 2026-07-07** (`docs/runbooks/archive/2026-07-07/12-windmill-decommission.md`) — it was the sole live consumer (`gxy-management`, `cluster.tls.zone` = `freecodecamp-net`, Gateway `certificateRefs: windmill-tls-cloudflare`); that Gateway + Secret are gone with the namespace. There is **no live consumer today**. `argocd`/`zot` remain parked (chart on disk, deploy frozen — RFC D4) and don't currently render a Gateway or Secret either. The cert itself is not retired — keep rotating on schedule so it's ready the moment argocd/zot (or a future galaxy plane on this zone) reactivate.
+- Know which (cluster, app) pairs currently resolve the wildcard via zone-fallback (no per-app override file present). **Windmill retired 2026-07-07** (`docs/universe/runbooks/archive/2026-07-07/12-windmill-decommission.md`) — it was the sole live consumer (`gxy-management`, `cluster.tls.zone` = `freecodecamp-net`, Gateway `certificateRefs: windmill-tls-cloudflare`); that Gateway + Secret are gone with the namespace. There is **no live consumer today**. `argocd`/`zot` remain parked (chart on disk, deploy frozen — RFC D4) and don't currently render a Gateway or Secret either. The cert itself is not retired — keep rotating on schedule so it's ready the moment argocd/zot (or a future galaxy plane on this zone) reactivate.
 
 ## Steps
 
@@ -108,7 +108,7 @@ Prior cert content is recoverable from `infra-secrets` git history (`git show HE
 ## Cross-references
 
 - [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops decrypt/edit incantations
-- [`05-r2-keys-rotation.md`](05-r2-keys-rotation.md) — sibling rotation runbook (R2 keys), same house shape
+- [`05-r2-keys-rotation.md`](../universe/runbooks/05-r2-keys-rotation.md) — sibling rotation runbook (R2 keys), same house shape
 - `docs/architecture/rfc-secrets-layout.md` — D1 (single canonical wildcard), D2 (`cluster.tls.zone` marker), D3 (per-app override escape hatch)
-- `docs/flight-manuals/UNIVERSE.md` §1 — DNS + Cloudflare baseline, zone SSL matrix
-- `docs/flight-manuals/gxy-management.md` §B.2 — existing Gateway/HTTPRoute verify pattern this runbook reuses
+- `docs/universe/flight-manuals/UNIVERSE.md` §1 — DNS + Cloudflare baseline, zone SSL matrix
+- `docs/universe/flight-manuals/gxy-management.md` §B.2 — existing Gateway/HTTPRoute verify pattern this runbook reuses

@@ -157,7 +157,7 @@ env:
 # VALKEY_PASSWORD MUST match the value used by the valkey chart's
 # secretEnv.VALKEY_PASSWORD (single shared secret on this galaxy).
 # Mint procedure: same envelope-level rotate; see
-# `docs/flight-manuals/gxy-management.md §C-valkey`.
+# `docs/universe/flight-manuals/gxy-management.md §C-valkey`.
 secretEnv:
   R2_ENDPOINT: null
   R2_ACCESS_KEY_ID: null

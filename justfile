@@ -444,7 +444,7 @@ verify-r2 bucket:
 # Artemis post-deploy E2E. Source of truth for E2E correctness lives in the
 # artemis repo at `internal/integration/` (build-tagged Go suite, `make
 # integration`). This recipe is a thin wrapper that points the suite at a
-# deployed artemis. See `docs/runbooks/03-artemis-postdeploy-check.md`.
+# deployed artemis. See `docs/universe/runbooks/03-artemis-postdeploy-check.md`.
 #
 # Required env (or fall through to defaults):
 #   ARTEMIS_URL    default https://uploads.freecode.camp

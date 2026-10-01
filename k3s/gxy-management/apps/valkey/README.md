@@ -4,7 +4,7 @@ In-cluster Valkey serving the static-apps registry consumed by artemis (`/api/si
 
 **Valkey is not the source of truth.** After the artemis Postgres cutover of 2026-09-11, `pg.RegistryStore` is the registry Writer and the Reader source; Valkey is the cache front and the `registry.changed` transport (artemis `cmd/artemis/main.go`, `openRegistry`). A Valkey outage loses no registry data. It costs the artemis deploy fence, the GitHub team cache and the change channel.
 
-Selected over CF KV / R2 JSON / Postgres / etcd / Redis in `docs/architecture/rfc-gxy-cassiopeia-ga.md` §3 KV substrate matrix. Vendor-neutral, in-cluster, decouples the registry from the operator-on-PR loop that previously gated `artemis/config/sites.yaml`.
+Selected over CF KV / R2 JSON / Postgres / etcd / Redis in `docs/universe/architecture/rfc-gxy-cassiopeia-ga.md` §3 KV substrate matrix. Vendor-neutral, in-cluster, decouples the registry from the operator-on-PR loop that previously gated `artemis/config/sites.yaml`.
 
 ## Layout
 
@@ -49,7 +49,7 @@ All writes go through the artemis `POST /api/site/register` / `PATCH /api/site/{
 just release gxy-management valkey
 ```
 
-End-to-end recipe (mint envelope, deploy, verify, import seed data): `docs/flight-manuals/gxy-management.md §C-valkey`.
+End-to-end recipe (mint envelope, deploy, verify, import seed data): `docs/universe/flight-manuals/gxy-management.md §C-valkey`.
 
 ## One replica, and why
 
@@ -63,4 +63,4 @@ Real high availability needs Sentinel plus a failover-aware client in artemis. V
 
 **Order matters.** The PodDisruptionBudget change is safe only after the artemis release that carries artemis commits `50df4ba` and `9898b91`. Until that image is live a Valkey eviction still returns `503` from `/readyz` and ejects every artemis pod, and a rescheduled artemis pod crashloops at boot. Release artemis first, then valkey.
 
-**A drain still needs care.** The PVC is `local-path` and pinned by node affinity, so an evicted `valkey-0` stays `Pending` until the node returns. Valkey is down for the whole drain, not for a moment. From artemis `9898b91` a pod that restarts during that window boots degraded instead of crashlooping. Follow the drain procedure in `docs/runbooks/12-node-drain-maintenance.md`.
+**A drain still needs care.** The PVC is `local-path` and pinned by node affinity, so an evicted `valkey-0` stays `Pending` until the node returns. Valkey is down for the whole drain, not for a moment. From artemis `9898b91` a pod that restarts during that window boots degraded instead of crashlooping. Follow the drain procedure in `docs/universe/runbooks/12-node-drain-maintenance.md`.

@@ -407,7 +407,7 @@ A drill with no recorded date has not been run. Do not write the line before the
 
 - [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) — artemis deploy + staged durable-exec bootstrap + RELEASE-CUT CHECKLIST
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) §Durable-exec substrate check — post-deploy substrate verification
-- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — sops envelope usage (the overlay is YAML, not dotenv)
+- [`04-secrets-decrypt.md`](../../runbooks/04-secrets-decrypt.md) — sops envelope usage (the overlay is YAML, not dotenv)
 - [`06-windmill-pg-backup.md`](archive/2026-07-07/06-windmill-pg-backup.md) — the windmill precedent this backup mirrors (schedule, sentinel, rclone pattern)
 - ADR-019 §Stateful-pillar backup pattern — RPO/RTO floor + four-tier backup ladder
 - ADR-020 (durable-execution model) — bundled-PG M1 vs CNPG-sweep GA trajectory

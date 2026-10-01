@@ -18,7 +18,7 @@ Per-cluster doomsday-rebuild manuals for the Universe Platform. Read order, gala
 | `gxy-launchbase` | [gxy-launchbase.md](gxy-launchbase.md) | Standby — CNPG operator (workload-free)    | Decommissioned 2026-07-07, pending rebuild | DO FRA1 → Hetzner post-M5 (parked) |
 | `gxy-cassiopeia` | [gxy-cassiopeia.md](gxy-cassiopeia.md) | Static-apps serve plane — Caddy + R2       | Live                                       | DO FRA1 → Hetzner post-M5 (parked) |
 
-Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are **not** in this manual. When they're provisioned, add a chapter then. Active state for those galaxies lives in `Universe/spike/spike-plan.md` and `docs/architecture/universe-state-2026-07-17.md`.
+Parked-but-future galaxies (`gxy-backoffice`, `gxy-triangulum`) are **not** in this manual. When they're provisioned, add a chapter then. Active state for those galaxies lives in `Universe/spike/spike-plan.md` and `docs/universe/architecture/universe-state-2026-07-17.md`.
 
 Retired galaxies:
 
@@ -46,7 +46,7 @@ Operational gotchas that bite once per rebuild — full notes link out.
 | [`../architecture/universe-state-2026-07-17.md`](../architecture/universe-state-2026-07-17.md) | Current ADR-vs-reality audit + live-state snapshot (20 ADRs, verified findings)                       |
 | [`../architecture/adr-drift-2026-05-10.md`](../architecture/adr-drift-2026-05-10.md)           | Historical 2026-05-10 ADR-vs-reality record (closed, immutable)                                       |
 | [`../architecture/rfc-gxy-cassiopeia-ga.md`](../architecture/rfc-gxy-cassiopeia-ga.md)         | GA hardening RFC — Valkey KV decision, artemis trim, ingress/DNS posture                              |
-| [`../architecture/rfc-secrets-layout.md`](../architecture/rfc-secrets-layout.md)               | sops+age envelope contract, two-scope model, sample-twin discipline                                   |
+| [`../architecture/rfc-secrets-layout.md`](../../architecture/rfc-secrets-layout.md)            | sops+age envelope contract, two-scope model, sample-twin discipline                                   |
 | `Universe/spike/spike-plan.md`                                                                 | Galaxy placement, phase status, post-spike trigger conditions                                         |
 
 ## Operator runbooks (single-purpose)
@@ -57,7 +57,7 @@ Operational gotchas that bite once per rebuild — full notes link out.
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------- |
 | [`02-deploy-artemis-service.md`](../runbooks/02-deploy-artemis-service.md)     | Deep dive on artemis bring-up; flight-manual §D summarizes |
 | [`03-artemis-postdeploy-check.md`](../runbooks/03-artemis-postdeploy-check.md) | Post-deploy smoke for artemis                              |
-| [`04-secrets-decrypt.md`](../runbooks/04-secrets-decrypt.md)                   | sops envelope decrypt gotchas                              |
+| [`04-secrets-decrypt.md`](../../runbooks/04-secrets-decrypt.md)                | sops envelope decrypt gotchas                              |
 | [`05-r2-keys-rotation.md`](../runbooks/05-r2-keys-rotation.md)                 | R2 read-only / read-write key rotation                     |
 
 ## Working-directory rule (post-`cd3b3a32`, 2026-05-13)

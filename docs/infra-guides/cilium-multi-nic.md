@@ -115,7 +115,7 @@ Pods cannot reach node VPC IPs but service IPs work?
 - [`docs/infra-guides/cilium-cnp.md`](./cilium-cnp.md) — sibling guide on CiliumNetworkPolicy patterns and the DNS L7 trap.
 - ADR-009 §CNI — Cilium choice rationale.
 - ADR-001 §Spike topology — 3-node HA + DO VPC layout.
-- `docs/flight-manuals/UNIVERSE.md` §4 lifecycle row "Cilium" — reminder that MTU/devices pin must persist across Cilium bumps.
+- `docs/universe/flight-manuals/UNIVERSE.md` §4 lifecycle row "Cilium" — reminder that MTU/devices pin must persist across Cilium bumps.
 - `Universe/.archive/infra/2026-04-05-deployment-failures.md` — historical record of Failures 7, 8a, 8b.
 - Upstream: <https://docs.cilium.io/en/stable/installation/k3s/> + <https://docs.cilium.io/en/stable/network/concepts/routing/>
 - k3s issues describing the misdiagnosis trail: [k3s#5857](https://github.com/k3s-io/k3s/issues/5857), [k3s#7736](https://github.com/k3s-io/k3s/issues/7736).

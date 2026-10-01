@@ -83,7 +83,7 @@ spec:
           from: Same
 ```
 
-Adding `:443` requires CF zone in `Full (Strict)`, an origin certificate, and a chart-owned `Secret` carrying the cert. The per-zone SSL-mode table in [`../flight-manuals/UNIVERSE.md`](../flight-manuals/UNIVERSE.md) §1.1 (DNS / TLS posture) is the authoritative source on which galaxies/zones use which SSL mode today.
+Adding `:443` requires CF zone in `Full (Strict)`, an origin certificate, and a chart-owned `Secret` carrying the cert. The per-zone SSL-mode table in [`../flight-manuals/UNIVERSE.md`](../universe/flight-manuals/UNIVERSE.md) §1.1 (DNS / TLS posture) is the authoritative source on which galaxies/zones use which SSL mode today.
 
 ## Pitfall 5 — Gateway parentRef must point at an in-namespace Gateway
 
@@ -158,6 +158,6 @@ Hitting "missing managed-by" on a CRD?
 
 - [`docs/infra-guides/chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) point 5 — CF zone SSL mode gate.
 - [`docs/infra-guides/cilium-cnp.md`](./cilium-cnp.md) — when adding a CNP to a chart that uses Traefik hostNetwork, ingress must allow `fromEntities: [host]` (Cilium identifies hostNetwork pods as the `host` entity).
-- [`docs/flight-manuals/UNIVERSE.md`](../flight-manuals/UNIVERSE.md) §3.2 — new-galaxy pre-flight file list.
+- [`docs/universe/flight-manuals/UNIVERSE.md`](../universe/flight-manuals/UNIVERSE.md) §3.2 — new-galaxy pre-flight file list.
 - ADR-009 §Ingress — DaemonSet-over-LB rationale.
 - `Universe/.archive/infra/2026-04-20-pitfalls-reference.md` + `Universe/.archive/infra/2026-04-20-woodpecker-live.md` — historical record of the four hostNetwork gotchas (T32 Woodpecker stamp 2, 2026-04-20).

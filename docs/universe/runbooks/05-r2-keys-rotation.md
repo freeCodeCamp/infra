@@ -19,7 +19,7 @@ ______________________________________________________________________
 ## Prerequisites
 
 - Cloudflare account owner or admin on the **freeCodeCamp-Universe** account.
-- `infra-secrets/` checked out as a sibling of `infra/` with sops+age set up — see [`04-secrets-decrypt.md`](04-secrets-decrypt.md).
+- `infra-secrets/` checked out as a sibling of `infra/` with sops+age set up — see [`04-secrets-decrypt.md`](../../runbooks/04-secrets-decrypt.md).
 - `rclone` installed locally (verification only).
 
 ______________________________________________________________________
@@ -201,7 +201,7 @@ ______________________________________________________________________
 | `403 Forbidden` from artemis on `init`/`finalize`     | new key not yet propagated to pods               | re-run rollout; pods pick up new env on restart                               |
 | `502 r2_put_failed`                                   | new artemis-admin key revoked early              | mint replacement; re-roll                                                     |
 | `404` on production site immediately after caddy roll | new caddy-ro key wrong endpoint or revoked       | check sops envelope; mint replacement                                         |
-| `Error unmarshalling input json: invalid character`   | sops auto-detect on `.enc` routed to JSON parser | use canonical incantation in [`04-secrets-decrypt.md`](04-secrets-decrypt.md) |
+| `Error unmarshalling input json: invalid character`   | sops auto-detect on `.enc` routed to JSON parser | use canonical incantation in [`04-secrets-decrypt.md`](../../runbooks/04-secrets-decrypt.md) |
 
 ______________________________________________________________________
 
@@ -209,5 +209,5 @@ ______________________________________________________________________
 
 - [`02-deploy-artemis-service.md`](02-deploy-artemis-service.md) — operator-side artemis lifecycle (sops envelope structure)
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — E2E gate after rotation
-- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops dotenv decrypt pattern
+- [`04-secrets-decrypt.md`](../../runbooks/04-secrets-decrypt.md) — canonical sops dotenv decrypt pattern
 - ADR-016 — Universe deploy proxy

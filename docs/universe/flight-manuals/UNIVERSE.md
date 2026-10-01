@@ -22,7 +22,7 @@ Cross-galaxy steps that apply to every cluster. Read this before any per-galaxy 
 
 ### §0.1 Host tools
 
-Pinned versions live in `infra/docs/flight-manuals/00-index.md §"Lifecycle calendar"`. Operator floor:
+Pinned versions live in `infra/docs/universe/flight-manuals/00-index.md §"Lifecycle calendar"`. Operator floor:
 
 | Tool        | Floor            | Why                                                  |
 | ----------- | ---------------- | ---------------------------------------------------- |
@@ -81,7 +81,7 @@ Per RFC `infra/docs/architecture/rfc-secrets-layout.md` §"Current state" (`.sop
 | `freecodecamp.org` | Public app (separate fCC scope; not Universe)                                            | n/a         | n/a                           |
 | `freecode.camp`    | Static-apps surface (cassiopeia + artemis `uploads.…`)                                   | Flexible    | none (CF→origin HTTP)         |
 
-Per ADR-009 §"Domains" (with the audit-resolved cassiopeia re-routing per `docs/architecture/adr-drift-2026-05-10.md`).
+Per ADR-009 §"Domains" (with the audit-resolved cassiopeia re-routing per `docs/universe/architecture/adr-drift-2026-05-10.md`).
 
 ### §1.2 Per-galaxy DNS records
 
@@ -156,7 +156,7 @@ These resources live above any single galaxy. Provisioned once, referenced by ev
 | Tailscale tailnet             | freeCodeCamp tailnet                             | SSH + kubectl on platform-team nodes (under review per ADR-009) |
 | GHCR pull tokens              | implicit via `ghcr.io` direct anon-pull or PAT   | platform pillars pull images direct from GHCR (no zot mirror)   |
 
-R2 bucket location: the nodes run in DigitalOcean `fra1`, so every new bucket gets the explicit location hint `weur`. The hint is permanent per bucket name (see `docs/runbooks/16-artemis-backup-bucket-split.md` §1). `universe-static-apps-01` was created without a hint, landed in APAC, and was replaced by `universe-static-apps-weur` on 2026-09-12; it stays frozen as the rollback baseline until the soak ends.
+R2 bucket location: the nodes run in DigitalOcean `fra1`, so every new bucket gets the explicit location hint `weur`. The hint is permanent per bucket name (see `docs/universe/runbooks/16-artemis-backup-bucket-split.md` §1). `universe-static-apps-01` was created without a hint, landed in APAC, and was replaced by `universe-static-apps-weur` on 2026-09-12; it stays frozen as the rollback baseline until the soak ends.
 
 R2 bucket DR posture: versioning enabled; per-prefix retention is informal today (R2 lifecycle GC for orphan deploy bytes is parked per RFC §"Out of scope").
 

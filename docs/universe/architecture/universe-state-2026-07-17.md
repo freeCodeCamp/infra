@@ -113,7 +113,7 @@ Closed 2026-07-17/18: windmill repo archive + cron disarm · ADR-012 fixes · AD
 - Design authority: Universe ADRs 001–020 + `spike/spike-plan.md`.
 - Historical ADR-vs-reality provenance: [`adr-drift-2026-05-10.md`](./adr-drift-2026-05-10.md) (immutable, closed 2026-06-01).
 - Prior snapshots: [`archive/2026-07-17/`](./archive/2026-07-17/README.md).
-- Operator rebuild: `docs/flight-manuals/` (start `UNIVERSE.md`). cassiopeia GA gates: `rfc-gxy-cassiopeia-ga.md`.
+- Operator rebuild: `docs/universe/flight-manuals/` (start `UNIVERSE.md`). cassiopeia GA gates: `rfc-gxy-cassiopeia-ga.md`.
 
 ## Out of scope
 

@@ -32,7 +32,7 @@ the Metrics API does not answer (`kubectl top nodes` returns
 
 The one alerting channel in service is Sentry. artemis holds a `SENTRY_DSN`
 and reports cron check-ins for the `tombstone-purge` and `drift-detect`
-monitors (`docs/runbooks/12-node-drain-maintenance.md:74`).
+monitors (`docs/universe/runbooks/12-node-drain-maintenance.md:74`).
 
 ## Signals evaluated
 

@@ -27,7 +27,7 @@ This chapter feeds the cassiopeia GA design at [`../architecture/rfc-gxy-cassiop
 `infra-secrets/k3s/gxy-management/`:
 
 - `artemis.values.yaml.enc` — sops overlay for artemis chart (R2 admin creds, GH OAuth client id, JWT signing key)
-- `hatchet.values.yaml.enc` — sops overlay for hatchet chart (engine DB creds, `docs/runbooks/09-hatchet-engine-deploy.md` §A)
+- `hatchet.values.yaml.enc` — sops overlay for hatchet chart (engine DB creds, `docs/universe/runbooks/09-hatchet-engine-deploy.md` §A)
 - `valkey.values.yaml.enc` — sops overlay for valkey chart (AUTH password)
 
 `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` — CF Origin wildcard for the `freecodecamp.net` zone (reserved for future argocd/zot reactivation; Windmill was the last live consumer until its 2026-07-07 retirement).
@@ -85,7 +85,7 @@ kubectl exec -n kube-system $(kubectl get pods -n kube-system -l k8s-app=cilium 
 
 ## §B — Hatchet (durable execution engine)
 
-Windmill retired 2026-07-07 — this section covered its helm install / PG restore / CNPG-migration-parked notes; that operational history is preserved in [`../runbooks/archive/2026-07-07/12-windmill-decommission.md`](../runbooks/archive/2026-07-07/12-windmill-decommission.md) and the archived backup runbook `docs/runbooks/archive/2026-07-07/06-windmill-pg-backup.md`. Platform-ops durable execution (deploy-GC) now runs on Hatchet.
+Windmill retired 2026-07-07 — this section covered its helm install / PG restore / CNPG-migration-parked notes; that operational history is preserved in [`../runbooks/archive/2026-07-07/12-windmill-decommission.md`](../runbooks/archive/2026-07-07/12-windmill-decommission.md) and the archived backup runbook `docs/universe/runbooks/archive/2026-07-07/06-windmill-pg-backup.md`. Platform-ops durable execution (deploy-GC) now runs on Hatchet.
 
 ### B.1 Helm install
 
@@ -293,7 +293,7 @@ Identical output between rounds (modulo timestamps) → V3 idempotency holds end
 
 Side-finding (now closed): the artemis CiliumNetworkPolicy initially omitted in-cluster DNS L7 patterns. Cilium DNS proxy filtered the `valkey.valkey.svc.cluster.local` query, returning a malformed response that Go's resolver surfaced as `server misbehaving`. The new artemis pod CrashLoopBackOff'd on startup; old pods kept serving (RollingUpdate). Resolved by adding `matchName: valkey.valkey.svc.cluster.local` plus `matchPattern: *.*.svc.cluster.local` to the L7 rules (`*` doesn't cross dots in Cilium pattern semantics). Two follow-up commits during cutover: `fix(artemis): allow cluster.local DNS in CNP` (insufficient — single- label wildcard) and `fix(artemis): CNP DNS pattern crosses dots` (closed it).
 
-The trap had bitten before — woodpecker forge list on gxy-launchbase on 2026-04-07 with the same `server misbehaving` shape on a cross-namespace Postgres lookup. That history was captured in the archived field-notes (`Universe/.archive/infra/2026-04-20-pitfalls-reference.md` + `Universe/.archive/infra/2026-04-20-operational-findings.md`) but never promoted to canonical guidance, so the artemis chart re-discovered it from scratch. Promoted now to [`docs/infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) — read before adding any cross-namespace egress to a CNP'd pillar.
+The trap had bitten before — woodpecker forge list on gxy-launchbase on 2026-04-07 with the same `server misbehaving` shape on a cross-namespace Postgres lookup. That history was captured in the archived field-notes (`Universe/.archive/infra/2026-04-20-pitfalls-reference.md` + `Universe/.archive/infra/2026-04-20-operational-findings.md`) but never promoted to canonical guidance, so the artemis chart re-discovered it from scratch. Promoted now to [`docs/infra-guides/cilium-cnp.md`](../../infra-guides/cilium-cnp.md) — read before adding any cross-namespace egress to a CNP'd pillar.
 
 ## §D — Artemis (deploy proxy)
 
@@ -301,14 +301,14 @@ Public surface `https://uploads.freecode.camp` (NOT `*.freecodecamp.net` — Uni
 
 ### D.1 Preconditions (one-time per cluster)
 
-| #   | What                                                                           | Where                                                           |
-| --- | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| 1   | DNS A record `uploads.freecode.camp` → 3 node public IPs                       | CF dashboard                                                    |
-| 2   | CF zone `freecode.camp` SSL = `Flexible`                                       | CF dashboard                                                    |
-| 3   | GitHub OAuth App `Universe CLI` (Device Flow ✅)                               | freeCodeCamp org settings                                       |
-| 4   | Sealed dotenv `infra-secrets/management/artemis.env.enc`                       | `sops encrypt --input-type dotenv --output-type dotenv`         |
-| 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` | `docs/runbooks/02-deploy-artemis-service.md` §5                 |
-| 6   | Valkey running (§C.2 green)                                                    | this chapter §C                                                 |
+| #   | What                                                                           | Where                                                      |
+| --- | ------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| 1   | DNS A record `uploads.freecode.camp` → 3 node public IPs                       | CF dashboard                                               |
+| 2   | CF zone `freecode.camp` SSL = `Flexible`                                       | CF dashboard                                               |
+| 3   | GitHub OAuth App `Universe CLI` (Device Flow ✅)                               | freeCodeCamp org settings                                  |
+| 4   | Sealed dotenv `infra-secrets/management/artemis.env.enc`                       | `sops encrypt --input-type dotenv --output-type dotenv`    |
+| 5   | Sealed YAML overlay `infra-secrets/k3s/gxy-management/artemis.values.yaml.enc` | `docs/universe/runbooks/02-deploy-artemis-service.md` §5   |
+| 6   | Valkey running (§C.2 green)                                                    | this chapter §C                                            |
 | 7   | First GHCR image build for artemis                                             | merge the release-please PR (`chore(main): release X.Y.Z`) |
 
 ### D.2 Deploy
@@ -412,7 +412,7 @@ doctl compute droplet list --tag-name gxy-management-k3s --format Name,PublicIPv
 | `argocd.freecodecamp.net` | (parked)    | —     | —        | Phantom DNS deletion queued — do not recreate |
 | `zot.freecodecamp.net`    | (parked)    | —     | —        | Same                                          |
 
-`windmill.freecodecamp.net` deleted from Cloudflare 2026-07-07 alongside the Windmill teardown (`docs/runbooks/archive/2026-07-07/12-windmill-decommission.md` §5).
+`windmill.freecodecamp.net` deleted from Cloudflare 2026-07-07 alongside the Windmill teardown (`docs/universe/runbooks/archive/2026-07-07/12-windmill-decommission.md` §5).
 
 ### F.3 Auth gates
 
@@ -436,7 +436,7 @@ curl -fsS https://uploads.freecode.camp/healthz
 | Helm releases     | not backed up — chart values are source of truth   | n/a                   | infra repo                                                       | `just release`       |
 | Secrets           | not backed up — `infra-secrets` repo IS the backup | n/a                   | infra-secrets repo                                               | `just release`       |
 
-Windmill's `pg_dumpall` CronJob (formerly here) was removed with the Windmill teardown (`docs/runbooks/archive/2026-07-07/12-windmill-decommission.md` §4/§6); the final pre-teardown dump is archived outside the cluster per that runbook's Phase 1.
+Windmill's `pg_dumpall` CronJob (formerly here) was removed with the Windmill teardown (`docs/universe/runbooks/archive/2026-07-07/12-windmill-decommission.md` §4/§6); the final pre-teardown dump is archived outside the cluster per that runbook's Phase 1.
 
 ### G.1 Restore Valkey from R2 RDB mirror — DEFERRED (post-GA)
 
@@ -502,7 +502,7 @@ reverts it.
 Measured state on 2026-09-11:
 
 - Pod `metrics-server-84f58d4648-l9mtl`, started `2026-04-22T13:23:16Z`, **0 restarts**, `1/1 Ready`.
-- **Last log line `2026-08-04 09:19:36Z.**` Nothing for 38 days. A running scraper logs on every
+- \*\*Last log line `2026-08-04 09:19:36Z.**` Nothing for 38 days. A running scraper logs on every
   failure at `--metric-resolution=15s`, so silence means it stopped scraping, not that it succeeded.
 - `APIService v1beta1.metrics.k8s.io` reports `Available=True`, "all checks passed".
 - `kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes` answers

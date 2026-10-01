@@ -14,7 +14,7 @@ Related: [05](05-r2-keys-rotation.md) mints the tokens. [02](02-deploy-artemis-s
 | --- | ----------------------------------------------------------------------- | ----------------------------------------------- |
 | 1   | `wrangler` is authenticated against the freeCodeCamp Cloudflare account | `wrangler whoami`                               |
 | 2   | `rclone` is on PATH                                                     | `rclone version`                                |
-| 3   | The serve token `R2_*` and the dotenv SOT decrypt                       | [04](04-secrets-decrypt.md)                     |
+| 3   | The serve token `R2_*` and the dotenv SOT decrypt                       | [04](../../runbooks/04-secrets-decrypt.md)      |
 | 4   | GitHub Actions `workflow_dispatch` is available to you                  | `.github/workflows/docker--postgres-rclone.yml` |
 
 ## 1. Create the bucket — DONE 2026-09-12

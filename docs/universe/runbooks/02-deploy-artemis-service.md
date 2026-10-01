@@ -260,7 +260,7 @@ E2E proxy smoke:
 just verify-artemis
 ```
 
-Recipe wraps `make integration` against the deployed artemis (see `docs/runbooks/03-artemis-postdeploy-check.md` for the full suite shape): init→upload→finalize→preview→promote→prod against the `test` site, marker-content match on both surfaces, rollback on exit. Exit 0 on green.
+Recipe wraps `make integration` against the deployed artemis (see `docs/universe/runbooks/03-artemis-postdeploy-check.md` for the full suite shape): init→upload→finalize→preview→promote→prod against the `test` site, marker-content match on both surfaces, rollback on exit. Exit 0 on green.
 
 ## Rotate
 
@@ -460,7 +460,7 @@ Faster path when the regression is acute: `helm -n artemis history artemis` + `h
 - `~/DEV/fCC-U/Architecture/decisions/009-...` — Tailscale Operator rejected
 - [`01-deploy-new-constellation-site.md`](01-deploy-new-constellation-site.md) — staff-side deploy flow against this service
 - [`03-artemis-postdeploy-check.md`](03-artemis-postdeploy-check.md) — E2E post-deploy gate
-- [`04-secrets-decrypt.md`](04-secrets-decrypt.md) — canonical sops dotenv decrypt
+- [`04-secrets-decrypt.md`](../../runbooks/04-secrets-decrypt.md) — canonical sops dotenv decrypt
 - [`05-r2-keys-rotation.md`](05-r2-keys-rotation.md) — R2 admin key rotation
 - [`08-artemis-pg-restore-drill.md`](08-artemis-pg-restore-drill.md) — PG backup restore drill (RPO/RTO floor)
 - `infra/CLAUDE.md` §Secrets

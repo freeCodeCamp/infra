@@ -2,7 +2,7 @@
 
 **Status:** Proposed (universe-master-audit, 2026-05-10) — read-plane gates G1/G2/G4/G6 verified live 2026-07-06 (see §E gate-verification); GA held on G11 (no registry RDB→R2 backup) + operator drill (G7–G10, G12) · Owner: infra **Anchors:** ADR-007 (DX), ADR-009 (networking), ADR-010 (secrets), ADR-011 (security), ADR-016 (deploy proxy) **Supersedes:** archived `rfc-gxy-cassiopeia.md` (2026-04-30), archived `task-gxy-cassiopeia.md` (2026-04-30); also retires `rfc-gxy-cassiopeia-caddyfile-poc.md` (POC, NOT-VIABLE; archived 2026-06-01 to Universe `.archive/_crossrepo/cassiopeia/2026-04-18-caddyfile-poc.md`).
 
-> **Closeout note (2026-05-11, refreshed 2026-05-17):** The registry decouple section (§B / Phase 2 migration table) is **DONE**. The `sites_yaml` backend was retired in artemis @ `f115198`; Valkey is the sole backend, and operator writes go through the `universe sites register/ls/update/rm` CLI (universe-cli v0.6.0 GA published 2026-05-15, `POST /api/site/register` and siblings). Migration step rows are retained below as historical record — do not re-execute them. Live operator flow now lives in `docs/runbooks/01-deploy-new-constellation-site.md` §A. All other RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain in-scope.
+> **Closeout note (2026-05-11, refreshed 2026-05-17):** The registry decouple section (§B / Phase 2 migration table) is **DONE**. The `sites_yaml` backend was retired in artemis @ `f115198`; Valkey is the sole backend, and operator writes go through the `universe sites register/ls/update/rm` CLI (universe-cli v0.6.0 GA published 2026-05-15, `POST /api/site/register` and siblings). Migration step rows are retained below as historical record — do not re-execute them. Live operator flow now lives in `docs/universe/runbooks/01-deploy-new-constellation-site.md` §A. All other RFC sections (caddy-s3, R2 read-plane, gates G1-G11) remain in-scope.
 
 ## Context
 
@@ -87,7 +87,7 @@ Gaps to close at GA:
 | Gap                                                                    | Action                                                                                                                                                                                                         |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ADR-016 alias-key format echoes hard-coded across chart + caddy module | Document the contract in flight-manual §B; add chart values comment cross-linking artemis chart `ALIAS_*_KEY_FORMAT`.                                                                                          |
-| R2 read-only token rotation cadence                                    | Already runbooked at `docs/runbooks/05-r2-keys-rotation.md`. Ensure flight-manual links it from §B post-deploy.                                                                                                |
+| R2 read-only token rotation cadence                                    | Already runbooked at `docs/universe/runbooks/05-r2-keys-rotation.md`. Ensure flight-manual links it from §B post-deploy.                                                                                       |
 | caddy chart sidecar `rclone-sync`                                      | Existing manual line 99 mentions sidecar in pod (`2/2`). With D32 in-tree module the sidecar may be redundant — verify in T4 by reading `templates/deployment.yaml`; if sidecar is gone, drop the verify line. |
 | 503 fallback to previous deploy                                        | Already runbookable (`universe static promote --to <id>`). Encode in flight-manual §E smoke + "503 troubleshooting".                                                                                           |
 
@@ -144,7 +144,7 @@ Rationale:
 
 1. **Right-sized footprint.** Single pod (~50 MiB RAM idle), single PVC (~1 GiB sufficient for ~10K sites of the schema below), one Service. NetworkPolicy allows only `app=artemis` pods to connect.
 
-   **2026-05-11 amendment** — namespace decision: deployed to its own `valkey` namespace (PSS restricted) rather than co-located in `artemis` (PSS baseline). Stronger workload-isolation posture for the registry source-of-truth. Cross-namespace DNS: `valkey.valkey.svc.cluster.local:6379`. The artemis CNP needed a `*.*.svc.cluster.local` DNS L7 pattern as a result — see [`../infra-guides/cilium-cnp.md`](../infra-guides/cilium-cnp.md) Pattern B and `gxy-management.md §C.6` for the cutover transcript.
+   **2026-05-11 amendment** — namespace decision: deployed to its own `valkey` namespace (PSS restricted) rather than co-located in `artemis` (PSS baseline). Stronger workload-isolation posture for the registry source-of-truth. Cross-namespace DNS: `valkey.valkey.svc.cluster.local:6379`. The artemis CNP needed a `*.*.svc.cluster.local` DNS L7 pattern as a result — see [`../infra-guides/cilium-cnp.md`](../../infra-guides/cilium-cnp.md) Pattern B and `gxy-management.md §C.6` for the cutover transcript.
 
 1. **DR posture.** AOF (appendfsync everysec) + RDB snapshot every 6 h on PVC. Nightly RDB dump → `r2://universe-static-apps-01/_meta/registry/<date>.rdb`. On a cluster wipe: reattach PVC if it survived (`pv` reclaim policy `Retain`); otherwise restore latest RDB from R2 via `valkey-cli --rdb` on a fresh pod, then bring artemis back.
 
@@ -468,6 +468,6 @@ Items 3 and 4 are **planning** scope of this RFC; the **work** is a post-audit s
 ## Cites
 
 - Probes: `.scratchpad/dossier/probes/{02-cassiopeia,03-artemis-sites,04-management-apps}.md`.
-- ADR drift report: `docs/architecture/adr-drift-2026-05-10.md`.
+- ADR drift report: `docs/universe/architecture/adr-drift-2026-05-10.md`.
 - ADR-007, ADR-009, ADR-010, ADR-011, ADR-016 (Universe/decisions/).
-- Existing flight-manual: `docs/flight-manuals/gxy-cassiopeia.md` Phase 19-24.
+- Existing flight-manual: `docs/universe/flight-manuals/gxy-cassiopeia.md` Phase 19-24.
