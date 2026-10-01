@@ -48,10 +48,9 @@ jobs:
           webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
           status: warn
           source: housekeeping
-          subject: maintenance window
-          summary: >-
-            REFUSED: started ${{ steps.check.outputs.started }}, outside Wed/Sat 00:00-06:00 UTC;
-            nothing was patched or rebooted (window_check=false overrides)
+          subject: window Wed/Sat 00:00-06:00 UTC
+          summary: "REFUSED: started ${{ steps.check.outputs.started }}, nothing ran"
+          details: dispatch with window_check=false to override
 
   uptime:
     name: Uptime
