@@ -197,12 +197,6 @@ curl -X POST http://localhost:9889/hooks/run-gantry \
   -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
   -d '{"GANTRY_SERVICES_FILTERS":"name=<stack>_<service>"}'
 
-# Trigger update for all autoupdate-labeled services (no filter)
-curl -X POST http://localhost:9889/hooks/run-gantry \
-  -H "Content-Type: application/json" \
-  -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
-  -d '{}'
-
 # Invalid request (no secret — should return "Hook rules were not satisfied")
 curl -X POST http://localhost:9889/hooks/run-gantry \
   -H "Content-Type: application/json" \
@@ -212,25 +206,19 @@ curl -X POST http://localhost:9889/hooks/run-gantry \
 docker service logs oncall_svc-webhook
 ```
 
-## Querying Logs in Grafana
+Do not send an empty `GANTRY_SERVICES_FILTERS`. Gantry reads an empty filter as no filter and updates every service in the swarm, `stg-news` included. Always name the service.
 
-Use these LogQL queries to view logs by service:
+## Querying Logs
 
-```logql
-# All oncall logs
-{stack="oncall"}
+Run these commands on the manager node. Each command shows the logs of one service:
 
-# Cronjob scheduler logs only
-{stack="oncall", service="cronjob"}
-
-# Gantry update logs only
-{stack="oncall", service="update"}
-
-# Docker cleanup logs only
-{stack="oncall", service="cleanup"}
-
-# Webhook receiver logs
-{stack="oncall", service="webhook"}
+```bash
+docker service logs --since 2h oncall_svc-cronjob
+docker service logs --since 2h oncall_svc-update
+docker service logs --since 2h oncall_svc-webhook
+docker service logs --since 2h oncall_svc-dispatch-news-eng
+docker service logs --since 2h oncall_svc-watchdog-news
+docker service logs --since 168h oncall_svc-cleanup
 ```
 
 ## Maintenance
@@ -238,4 +226,4 @@ Use these LogQL queries to view logs by service:
 - Docker credentials must be kept current at `~/.docker/config.json`
 - Update service runs on manager node (placement constraint enforced)
 - Cleanup runs weekly on Monday at 03:30 UTC on all nodes
-- Monitor logs in Grafana to verify scheduled tasks are running correctly
+- Read the service logs to make sure that the scheduled tasks run

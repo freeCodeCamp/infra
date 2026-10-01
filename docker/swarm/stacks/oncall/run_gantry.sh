@@ -28,7 +28,7 @@ launch_new_gantry() {
     --label "from-webhook=true" \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=bind,source=/home/freecodecamp/.docker,target=/root/.docker \
-    shizunge/gantry:2025.0813.0
+    shizunge/gantry:2026.0415.1
   local return_value=$?
   docker service logs --raw "${service_name}"
   docker service rm "${service_name}"
