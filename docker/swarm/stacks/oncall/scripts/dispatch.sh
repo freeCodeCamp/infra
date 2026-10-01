@@ -4,10 +4,10 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 target="${DISPATCH_REPO:-?} ${DISPATCH_WORKFLOW:-?}"
+runs="https://github.com/${DISPATCH_REPO:-}/actions/workflows/${DISPATCH_WORKFLOW:-}"
 
 config_error() {
-  chat_post "🔴 dispatch misconfigured · $target
-$1"
+  chat_notify fail dispatch "$target" "misconfigured: $1"
   printf 'dispatch: %s\n' "$1" >&2
   exit 2
 }
@@ -28,8 +28,9 @@ avoid)
   ;;
 require)
   if ! in_window "$now"; then
-    chat_post "⚠️ dispatch refused · $target
-outside the maintenance window (Wed/Sat 00:00-06:00 UTC), nothing was started"
+    chat_notify warn dispatch "$target" \
+      "refused: outside the maintenance window (Wed/Sat 00:00-06:00 UTC), nothing was started" \
+      "$runs" runs
     printf 'dispatch: refused %s, outside the maintenance window\n' "$target" >&2
     exit 1
   fi
@@ -56,7 +57,7 @@ case "$code" in
   ;;
 esac
 
-chat_post "🔴 dispatch failed · $target · HTTP ${code:-000}
-$(ascii_excerpt "$body" 300)"
+chat_notify fail dispatch "$target" \
+  "failed: HTTP ${code:-000} $(ascii_excerpt "$body" 200)" "$runs" runs
 printf 'dispatch: %s failed (HTTP %s)\n' "$target" "${code:-000}" >&2
 exit 1

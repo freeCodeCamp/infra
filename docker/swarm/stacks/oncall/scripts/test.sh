@@ -44,6 +44,8 @@ THU_0605=1790834700
 THU_0130=1790818200
 WED_0905=1790759100
 
+RUNS_URL=https://github.com/freeCodeCamp/news/actions/workflows/deploy-eng.yml
+
 failures=0
 log="$work/log"
 status=0
@@ -78,6 +80,13 @@ print(int(all(arg in text for arg in sys.argv[1:])))'
 
 chat_text_has() {
   grep '^CHATDATA ' "$log" | sed 's/^CHATDATA //' | python3 -c "$json_probe" "$@" 2>&1
+}
+
+lines_probe='import json, sys
+print(len(json.load(sys.stdin)["text"].splitlines()))'
+
+chat_lines() {
+  grep '^CHATDATA ' "$log" | sed 's/^CHATDATA //' | python3 -c "$lines_probe" 2>&1
 }
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100
@@ -119,6 +128,9 @@ check "require outside window exits 1" "$status" 1
 check "require outside window makes no API call" "$(api_calls)" 0
 check "require outside window posts chat" "$(chat_calls)" 1
 check "refusal names the target" "$(grep -c 'freeCodeCamp/news deploy-eng.yml' "$log")" 1
+check "refusal is a standard warn line" \
+  "$(chat_text_has '⚠️ *dispatch* · freeCodeCamp/news deploy-eng.yml · refused: outside')" 1
+check "refusal is one line" "$(chat_lines)" 1
 
 run_dispatch DISPATCH_NOW=$WED_0100
 check "no policy dispatches inside window" "$(api_calls)" 1
@@ -130,6 +142,11 @@ run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=401 FAKE_BODY='{"message":"Bad cre
 check "API 401 exits 1" "$status" 1
 check "API 401 posts chat" "$(chat_calls)" 1
 check "chat is JSON with status and API message" "$(chat_text_has 'HTTP 401' 'Bad credentials')" 1
+check "API failure is a standard fail line" \
+  "$(chat_text_has '🔴 *dispatch* · freeCodeCamp/news deploy-eng.yml · failed: HTTP 401')" 1
+check "API failure links the workflow runs" \
+  "$(chat_text_has "<$RUNS_URL|runs>")" 1
+check "API failure is one line" "$(chat_lines)" 1
 
 run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=000
 check "transport failure exits 1" "$status" 1
@@ -142,6 +159,10 @@ run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=500 \
   FAKE_BODY="bad${tab}gate${cr} \"quoted\" back\\slash é and ✓"
 check "control characters still give valid JSON" "$(chat_text_has '"quoted"' 'back\slash')" 1
 
+run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=502 FAKE_BODY="$(printf 'bad\ngateway\n<html>')"
+check "multi-line API body still gives one line" "$(chat_lines)" 1
+check "angle brackets are dropped from the excerpt" "$(chat_text_has 'bad gateway html')" 1
+
 run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=401 GOOGLE_CHAT_WEBHOOK=
 check "empty webhook still exits 1" "$status" 1
 check "empty webhook posts no chat" "$(chat_calls)" 0
@@ -151,6 +172,9 @@ check "missing token exits 2" "$status" 2
 check "missing token makes no API call" "$(api_calls)" 0
 check "missing token posts chat" "$(chat_calls)" 1
 check "config chat names the variable" "$(chat_text_has GITHUB_DISPATCH_TOKEN)" 1
+check "config error is a standard fail line" \
+  "$(chat_text_has '🔴 *dispatch* · freeCodeCamp/news deploy-eng.yml · misconfigured: ')" 1
+check "config error is one line" "$(chat_lines)" 1
 
 run_dispatch DISPATCH_NOW=$THU_0605 WINDOW_POLICY=sometimes
 check "bad policy exits 2" "$status" 2
@@ -202,7 +226,10 @@ check "first stale tick posts chat" "$(chat_calls)" 1
 check "stale chat names build, age and limit" \
   "$(chat_text_has "$BUILT" '5h 30m' 'limit 5h')" 1
 check "stale chat links the deploy runs" \
-  "$(chat_text_has 'freeCodeCamp/news/actions/workflows/deploy-eng.yml')" 1
+  "$(chat_text_has "<$RUNS_URL|runs>")" 1
+check "stale chat is a standard fail line" \
+  "$(chat_text_has '🔴 *watchdog* · news English · stale: last build ')" 1
+check "stale chat is one line" "$(chat_lines)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 6 * HOUR + 2))
 check "first stale tick that starts late posts chat" "$(chat_calls)" 1
@@ -241,6 +268,11 @@ check "later tick after quiet hours follows the reminder" "$(chat_calls)" 0
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_CODE=503
 check "feed 503 exits 1" "$status" 1
 check "feed 503 posts chat" "$(chat_text_has 'feed unreadable' 'HTTP 503')" 1
+check "feed error is a standard fail line" \
+  "$(chat_text_has '🔴 *watchdog* · news English · feed unreadable: HTTP 503')" 1
+check "feed error links the feed" \
+  "$(chat_text_has '<https://www.freecodecamp.org/news/rss.xml|feed>')" 1
+check "feed error is one line" "$(chat_lines)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_CODE=000
 check "feed transport failure posts chat" "$(chat_text_has 'HTTP 000')" 1

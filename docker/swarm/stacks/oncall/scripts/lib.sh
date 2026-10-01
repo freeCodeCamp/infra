@@ -36,3 +36,18 @@ chat_post() {
   esac
   printf 'chat: Google Chat rejected the message (HTTP %s)\n' "${chat_code:-000}" >&2
 }
+
+one_line() {
+  printf '%s' "$1" | tr '\n\r\t' '   ' | tr -d '<>' | tr -s ' '
+}
+
+chat_notify() {
+  case "$1" in
+  ok) icon='✅' ;;
+  warn) icon='⚠️' ;;
+  *) icon='🔴' ;;
+  esac
+  text="$icon *$2* · $(one_line "$3") · $(one_line "$4")"
+  [ -z "${5:-}" ] || text="$text · <$5|${6:-open}>"
+  chat_post "$text"
+}

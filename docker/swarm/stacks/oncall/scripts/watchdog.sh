@@ -31,9 +31,7 @@ rfc822_epoch() {
 }
 
 unreadable() {
-  chat_post "🔴 news watchdog · feed unreadable
-$feed
-$1"
+  chat_notify fail watchdog "news English" "feed unreadable: $1" "$feed" feed
   printf 'watchdog: feed unreadable, %s\n' "$1" >&2
   exit 1
 }
@@ -61,10 +59,9 @@ if [ "$age" -le "$limit" ]; then
 fi
 
 if [ $(((age - limit - 1) % remind)) -lt "$tick" ] || in_window $((now - tick)) "$quiet_until"; then
-  chat_post "🔴 news stale · English
-last build $stamp, $((age / 3600))h $((age % 3600 / 60))m ago (limit $((limit / 3600))h)
-$feed
-$runs"
+  ago="$((age / 3600))h $((age % 3600 / 60))m"
+  chat_notify fail watchdog "news English" \
+    "stale: last build $stamp, $ago ago (limit $((limit / 3600))h)" "$runs" runs
 fi
 printf 'watchdog: stale, last build %s\n' "$stamp" >&2
 exit 1
