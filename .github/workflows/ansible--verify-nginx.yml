@@ -160,7 +160,6 @@ jobs:
         env:
           HOSTS: ${{ inputs.hosts }}
           STAGE: ${{ inputs.stage }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # No file has two causes and only one is a problem. An empty group
           # is NORMAL in this fleet -- staging tiers are not always deployed --
@@ -190,20 +189,18 @@ jobs:
               for reason in f["reasons"]:
                   print(f"::error::{f['host']} nginx {reason}")
 
-          lines = [f"housekeeping · {stage} · {group}", ""]
-          if bad:
-              for f in bad:
-                  lines.append(f["host"])
-                  lines += [f"  {r}" for r in f["reasons"]]
-          else:
-              lines.append(f"nginx active and enabled on {len(findings)}/{len(findings)} hosts")
-          lines += ["", os.environ.get("RUN_URL", "")]
+          details = []
+          for f in bad:
+              details.append(f["host"])
+              details += [f"  {r}" for r in f["reasons"]]
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"anomalies={len(bad)}\n")
               out.write(f"checked={len(findings)}\n")
-              out.write("text<<VERIFY_EOF\n")
-              out.write(("🔴 " if bad else "✅ ") + "\n".join(lines) + "\n")
+              out.write(f"subject={stage} · {group}\n")
+              out.write(f"summary=nginx anomaly on {len(bad)}/{len(findings)} hosts\n")
+              out.write("details<<VERIFY_EOF\n")
+              out.write("\n".join(details) + "\n")
               out.write("VERIFY_EOF\n")
 
           print(f"{len(bad)} anomaly/anomalies across {len(findings)} host(s)")
@@ -215,11 +212,15 @@ jobs:
       # standalone dispatch of this workflow alerts the moment it finds
       # something, and each group alerts without waiting for the other.
       - name: Alert Google Chat on an anomaly
-        if: always() && steps.findings.outputs.anomalies != '0' && steps.findings.outputs.text != ''
+        if: always() && steps.findings.outputs.anomalies != '0' && steps.findings.outputs.summary != ''
         uses: ./.github/actions/notify-chat
         with:
           webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
-          text: ${{ steps.findings.outputs.text }}
+          status: fail
+          source: housekeeping
+          subject: ${{ steps.findings.outputs.subject }}
+          summary: ${{ steps.findings.outputs.summary }}
+          details: ${{ steps.findings.outputs.details }}
 
       # Job outputs cannot carry per-host detail out of a matrix leg -- legs
       # overwrite each other. The end-of-run report reads these instead.

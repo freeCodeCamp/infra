@@ -1,6 +1,9 @@
 name: Notify Google Chat
 description: >-
-  Post a message to a Google Chat space webhook. This action NEVER fails a job.
+  Post one standard line to a Google Chat space webhook:
+  `<icon> *source* · subject · summary · <link|label>`, then optional detail
+  lines for warn and fail. The swarm scripts in docker/swarm/stacks/oncall
+  post the same line. This action NEVER fails a job.
   A missing webhook warns, a rejected delivery raises an error annotation, and
   both exit 0 -- an outage at Google must not make a healthy fleet look broken,
   and a notifier must never be able to stop the work it reports on. Read the
@@ -14,9 +17,30 @@ inputs:
       `required: false`, and an empty value is the documented skip path.
     required: false
     default: ""
-  text:
-    description: "The complete message to post."
+  status:
+    description: "ok, warn or fail. Sets the icon: ✅, ⚠️ or 🔴."
     required: true
+  source:
+    description: "The system that reports, in bold. For example housekeeping or news."
+    required: true
+  subject:
+    description: "What the message is about. For example the workflow or host group."
+    required: true
+  summary:
+    description: "One line: the verdict and its reason. Newlines become spaces."
+    required: true
+  details:
+    description: "Extra lines under the summary. Posted only when status is not ok."
+    required: false
+    default: ""
+  link:
+    description: "Target of the trailing link. Defaults to this workflow run."
+    required: false
+    default: ""
+  link_label:
+    description: "Text of the trailing link."
+    required: false
+    default: "run"
 
 runs:
   using: composite
@@ -25,7 +49,13 @@ runs:
       shell: bash
       env:
         WEBHOOK: ${{ inputs.webhook }}
-        TEXT: ${{ inputs.text }}
+        STATUS: ${{ inputs.status }}
+        SOURCE: ${{ inputs.source }}
+        SUBJECT: ${{ inputs.subject }}
+        SUMMARY: ${{ inputs.summary }}
+        DETAILS: ${{ inputs.details }}
+        LINK: ${{ inputs.link }}
+        LINK_LABEL: ${{ inputs.link_label }}
       run: |
         # Not an error: the secret may not exist yet, and a workflow must stay
         # dispatchable before anyone creates it.
@@ -34,9 +64,25 @@ runs:
           exit 0
         fi
 
-        if [ -z "$TEXT" ]; then
-          echo "::warning::notify-chat called with an empty message -- nothing sent"
-          exit 0
+        case "$STATUS" in
+          ok) icon='✅' ;;
+          warn) icon='⚠️' ;;
+          fail) icon='🔴' ;;
+          *)
+            echo "::warning::notify-chat status must be ok, warn or fail, got '$STATUS'"
+            icon='🔴'
+            ;;
+        esac
+
+        one_line() {
+          printf '%s' "$1" | tr '\n\r\t' '   ' | tr -d '<>' | tr -s ' '
+        }
+
+        TEXT="$icon *$(one_line "$SOURCE")* · $(one_line "$SUBJECT") · $(one_line "$SUMMARY")"
+        LINK="${LINK:-$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID}"
+        TEXT="$TEXT · <$LINK|$(one_line "${LINK_LABEL:-run}")>"
+        if [ "$STATUS" != ok ] && [ -n "$DETAILS" ]; then
+          TEXT="$TEXT"$'\n'"$DETAILS"
         fi
 
         # json.dumps, not string interpolation: the message carries newlines,

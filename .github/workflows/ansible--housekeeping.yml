@@ -46,14 +46,12 @@ jobs:
         uses: ./.github/actions/notify-chat
         with:
           webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
-          text: |
-            ⚠️ housekeeping · REFUSED
-
-            started ${{ steps.check.outputs.started }}
-            outside the maintenance window (Wed/Sat 00:00-06:00 UTC)
-            nothing was patched or rebooted; dispatch with window_check=false to override
-
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          status: warn
+          source: housekeeping
+          subject: maintenance window
+          summary: >-
+            REFUSED: started ${{ steps.check.outputs.started }}, outside Wed/Sat 00:00-06:00 UTC;
+            nothing was patched or rebooted (window_check=false overrides)
 
   uptime:
     name: Uptime
@@ -286,10 +284,10 @@ jobs:
           REBOOT_WEB: ${{ needs.reboot-web.result }}
           REBOOT: ${{ needs.reboot.result }}
           VERIFY: ${{ needs.verify-nginx.result }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           python3 - <<'PYEOF'
           import glob, json, os
+          from datetime import datetime, timezone
 
           stages = [
               ("window", os.environ["WINDOW"]),
@@ -314,39 +312,48 @@ jobs:
           # A skipped stage is not a passing one. Under this chain a failed
           # update skips every reboot stage, and a tick would hide that.
           if any(r == "failure" for _, r in stages) or bad:
-              verdict, mark = "ANOMALY", "🔴"
+              verdict, status = "ANOMALY", "fail"
           elif any(r == "cancelled" for _, r in stages):
-              verdict, mark = "CANCELLED", "⚠️"
+              verdict, status = "CANCELLED", "warn"
           elif any(r == "skipped" for _, r in stages):
-              verdict, mark = "INCOMPLETE", "⚠️"
+              verdict, status = "INCOMPLETE", "warn"
           else:
-              verdict, mark = "OK", "✅"
+              verdict, status = "OK", "ok"
 
-          lines = [f"{mark} housekeeping · {verdict}", ""]
           if bad:
-              for f in bad:
-                  lines.append(f["host"])
-                  lines += [f"  {r}" for r in f["reasons"]]
-              lines.append("")
+              nginx = f"nginx anomaly on {len(bad)}/{checked} pxy hosts"
           elif checked:
-              lines += [f"nginx active and enabled on {checked}/{checked} pxy hosts", ""]
+              nginx = f"nginx active and enabled on {checked}/{checked} pxy hosts"
           else:
-              lines += ["no nginx findings were collected this run", ""]
+              nginx = "no nginx findings collected"
+          off = [f"{name} {result}" for name, result in stages if result != "success"]
+          summary = f"{verdict}: " + "; ".join([nginx] + off)
+          subject = datetime.now(timezone.utc).strftime("%a %d %b")
 
-          lines.append("stages")
-          lines += [f"  {name:<12}{result}" for name, result in stages]
-          lines += ["", os.environ["RUN_URL"]]
+          details = []
+          for f in bad:
+              details.append(f["host"])
+              details += [f"  {r}" for r in f["reasons"]]
+          details.append("stages")
+          details += [f"  {name:<12}{result}" for name, result in stages]
 
-          text = "\n".join(lines)
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
-              out.write("text<<REPORT_EOF\n")
-              out.write(text + "\n")
+              out.write(f"status={status}\n")
+              out.write(f"subject={subject}\n")
+              out.write(f"summary={summary}\n")
+              out.write("details<<REPORT_EOF\n")
+              out.write("\n".join(details) + "\n")
               out.write("REPORT_EOF\n")
-          print(text)
+          print(summary)
+          print("\n".join(details))
           PYEOF
 
       - name: Post the run summary
         uses: ./.github/actions/notify-chat
         with:
           webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
-          text: ${{ steps.summary.outputs.text }}
+          status: ${{ steps.summary.outputs.status }}
+          source: housekeeping
+          subject: ${{ steps.summary.outputs.subject }}
+          summary: ${{ steps.summary.outputs.summary }}
+          details: ${{ steps.summary.outputs.details }}
