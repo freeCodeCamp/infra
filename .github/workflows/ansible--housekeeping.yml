@@ -2,12 +2,63 @@ name: Ansible --02- Houskeeping
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "30 1 * * 3,6" # 01:30 UTC on Wednesdays and Saturdays [maintenance window: 12:00-06:00 UTC]
+    inputs:
+      window_check:
+        description: Refuse to run outside the maintenance window (Wed/Sat 00:00-06:00 UTC)
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
+  window:
+    name: Maintenance Window
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      allowed: ${{ steps.check.outputs.allowed }}
+    steps:
+      - name: Check the start time
+        id: check
+        env:
+          WINDOW_CHECK: ${{ inputs.window_check }}
+        run: |
+          day=$(date -u +%u)
+          hour=$(date -u +%H)
+          allowed=false
+          if [ "$WINDOW_CHECK" = "false" ]; then
+            allowed=true
+          elif { [ "$day" = 3 ] || [ "$day" = 6 ]; } && [ "${hour#0}" -lt 6 ]; then
+            allowed=true
+          fi
+          echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
+          echo "started=$(date -u '+%a %H:%M UTC')" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.check.outputs.allowed != 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Post the refusal
+        if: steps.check.outputs.allowed != 'true'
+        uses: ./.github/actions/notify-chat
+        with:
+          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          text: |
+            ⚠️ housekeeping · REFUSED
+
+            started ${{ steps.check.outputs.started }}
+            outside the maintenance window (Wed/Sat 00:00-06:00 UTC)
+            nothing was patched or rebooted; dispatch with window_check=false to override
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   uptime:
     name: Uptime
+    needs: window
+    if: needs.window.outputs.allowed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -168,12 +219,6 @@ jobs:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  # ---------------------------------------------------------------------
-  # Everything above this line is unchanged. The two jobs below are
-  # APPENDED: no existing job gained a condition, a matrix entry or a
-  # different cadence.
-  # ---------------------------------------------------------------------
-
   # Terminal by design. Nothing runs after it, so a red verify can never stop
   # the fleet being patched -- which is the property the rest of this chain
   # does not have, since every other stage skips everything downstream when it
@@ -184,11 +229,11 @@ jobs:
   # finding rather than a normal absence.
   verify-nginx:
     name: Verify NGINX
-    needs: reboot
+    needs: [window, reboot]
     # The only new condition in this workflow, and it widens rather than
     # narrows: it makes the check run even when a stage above failed or was
     # skipped, which is exactly when a service is most likely to be down.
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.window.outputs.allowed == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -208,13 +253,13 @@ jobs:
 
   report:
     name: Report
-    needs: [uptime, update, reboot-web, reboot, verify-nginx]
+    needs: [window, uptime, update, reboot-web, reboot, verify-nginx]
     # always(), not success(): the run that most needs a message is the one
     # that failed. Once this posts on every run, a Wednesday or Saturday with
     # NO message means the workflow never ran at all -- the one failure no
     # in-workflow check can catch, because a workflow that does not run cannot
     # report on itself.
-    if: ${{ always() }}
+    if: ${{ always() && needs.window.outputs.allowed == 'true' }}
     permissions:
       contents: read
     runs-on: ubuntu-latest
