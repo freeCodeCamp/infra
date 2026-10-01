@@ -107,6 +107,9 @@ services:
       - "GANTRY_ROLLBACK_ON_FAILURE=true"
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
       - "GANTRY_UPDATE_OPTIONS=--with-registry-auth"
+      - "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-apprise:8000/notify"
+      - "GANTRY_NOTIFICATION_CONDITION=on-change"
+      - "GANTRY_NOTIFICATION_TITLE=· hourly"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
@@ -151,6 +154,19 @@ services:
       restart_policy:
         condition: none
 
+  svc-apprise:
+    image: caronc/apprise:1.5.4
+    environment:
+      - "APPRISE_STATELESS_URLS=${GOOGLE_CHAT_WEBHOOK}"
+    <<: *logging-config
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - "node.role == manager"
+
   svc-webhook:
     image: lwlook/webhook@sha256:93f708c6c0d6469b4a0f7f654d5f25054e54dccba1cf316a1d7e48e2be736c9a
     command:
@@ -187,6 +203,7 @@ configs:
   hooks_json:
     file: ./hooks.json
   run_gantry:
+    name: oncall_run_gantry_v2
     file: ./run_gantry.sh
   scripts_lib:
     name: oncall_scripts_lib_v1

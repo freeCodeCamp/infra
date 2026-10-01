@@ -8,6 +8,7 @@ launch_new_gantry() {
     --mode replicated-job \
     --detach=false \
     --constraint "node.role==manager" \
+    --network oncall_default \
     --env "GANTRY_NODE_NAME=$(hostname)" \
     --env "GANTRY_SLEEP_SECONDS=0" \
     --env "GANTRY_LOG_LEVEL=INFO" \
@@ -21,6 +22,9 @@ launch_new_gantry() {
     --env "GANTRY_ROLLBACK_ON_FAILURE=true" \
     --env "GANTRY_UPDATE_TIMEOUT_SECONDS=300" \
     --env "GANTRY_UPDATE_OPTIONS=--with-registry-auth" \
+    --env "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-apprise:8000/notify" \
+    --env "GANTRY_NOTIFICATION_CONDITION=on-change" \
+    --env "GANTRY_NOTIFICATION_TITLE=· webhook" \
     --label "from-webhook=true" \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=bind,source=/home/freecodecamp/.docker,target=/root/.docker \
