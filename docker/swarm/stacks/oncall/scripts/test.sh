@@ -311,6 +311,10 @@ while [ $# -gt 0 ]; do
 done
 printf 'CHAT %s\n' "$url" >> "$FAKE_LOG"
 printf 'CHATDATA %s\n' "$data" >> "$FAKE_LOG"
+if [ -n "${FAKE_WGET_FAIL:-}" ]; then
+  printf 'wget: %s: server returned error\n' "$url" >&2
+  exit 1
+fi
 EOF
 chmod +x "$work/nocurl/wget"
 
@@ -368,6 +372,21 @@ check "wget post sends JSON" \
   "$(grep -c '^H Content-Type: application/json; charset=UTF-8$' "$log")" 1
 check "wget post is a standard ok line" \
   "$(chat_text_is '✅ *gantry* · webhook · 1 service(s) updated: prd-news_svc-eng')" 1
+
+: >"$log"
+env -i PATH="$work/nocurl" FAKE_LOG="$log" FAKE_WGET_FAIL=1 \
+  GOOGLE_CHAT_WEBHOOK="http://chat.test/hook-secret" RELAY_TYPE=failure RELAY_BODY="$FAILED" \
+  sh "$here/relay.sh" >"$work/out" 2>&1
+check "relay with failed wget exits 0" "$?" 0
+check "failed wget is logged" \
+  "$(grep -c '^chat: Google Chat rejected the message (wget exit 1)$' "$work/out")" 1
+check "failed wget keeps the webhook out of the output" "$(grep -c 'hook-secret' "$work/out")" 0
+
+: >"$log"
+env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
+  GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+  sh -c ". '$here/lib.sh' && chat_notify ok '<b>src' subject summary" >"$work/out" 2>&1
+check "source loses its angle brackets" "$(chat_text_is '✅ *bsrc* · subject · summary')" 1
 
 if [ "$failures" -gt 0 ]; then
   printf '%s check(s) failed\n' "$failures"

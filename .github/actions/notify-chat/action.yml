@@ -82,7 +82,7 @@ runs:
         LINK="${LINK:-$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID}"
         TEXT="$TEXT · <$LINK|$(one_line "${LINK_LABEL:-run}")>"
         if [ "$STATUS" != ok ] && [ -n "$DETAILS" ]; then
-          TEXT="$TEXT"$'\n'"$DETAILS"
+          TEXT="$TEXT"$'\n'"$(printf '%s' "$DETAILS" | tr -d '<>')"
         fi
 
         # json.dumps, not string interpolation: the message carries newlines,

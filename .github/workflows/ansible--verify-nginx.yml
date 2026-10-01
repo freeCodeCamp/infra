@@ -197,7 +197,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"anomalies={len(bad)}\n")
               out.write(f"checked={len(findings)}\n")
-              out.write(f"subject={stage} · {group}\n")
+              out.write("subject=" + " ".join(f"{stage} · {group}".split()) + "\n")
               out.write(f"summary=nginx anomaly on {len(bad)}/{len(findings)} hosts\n")
               out.write("details<<VERIFY_EOF\n")
               out.write("\n".join(details) + "\n")

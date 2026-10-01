@@ -55,7 +55,7 @@ chat_notify() {
   warn) icon='⚠️' ;;
   *) icon='🔴' ;;
   esac
-  text="$icon *$2* · $(one_line "$3") · $(one_line "$4")"
+  text="$icon *$(one_line "$2")* · $(one_line "$3") · $(one_line "$4")"
   [ -z "${5:-}" ] || text="$text · <$5|${6:-open}>"
   chat_post "$text"
 }
