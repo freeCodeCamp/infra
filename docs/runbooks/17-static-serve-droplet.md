@@ -23,7 +23,7 @@ Run every command from the repo root. This runbook stays in `docs/runbooks/` bec
 
 1. Cloudflare dashboard → **R2** → **Manage API tokens** → **Create API token**.
 1. Permission: **Object Read only**. Bucket: `universe-static-apps-weur` only.
-1. Store the Access Key ID, the Secret Access Key and the S3 endpoint (`https://<account-id>.r2.cloudflarestorage.com`) in one 1Password item.
+1. In 1Password vault `infra`, create item `static-serve-r2-read` with fields `access-key-id`, `secret-access-key` and `endpoint` (`https://<account-id>.r2.cloudflarestorage.com`).
 
 Do not put these values in this repo, in `infra-secrets` or in the cloud-init file.
 
@@ -67,13 +67,13 @@ Wait for cloud-init. Only the SSH keys of GitHub users `camperbot` and `raisedad
 ssh freecodecamp@"$IP" cloud-init status --wait
 ```
 
-Write the env file from the 1Password item of step 1. Replace each `op://` reference with the item's real path. The values do not reach your terminal or shell history:
+Write the env file from the 1Password item of step 1. The values do not reach your terminal or shell history:
 
 ```sh
 ssh freecodecamp@"$IP" 'sudo install -m 0600 -o root -g root /dev/stdin /etc/caddy-s3/r2.env' <<EOF
-R2_ENDPOINT=$(op read "op://<vault>/<item>/endpoint")
-AWS_ACCESS_KEY_ID=$(op read "op://<vault>/<item>/access-key-id")
-AWS_SECRET_ACCESS_KEY=$(op read "op://<vault>/<item>/secret-access-key")
+R2_ENDPOINT=$(op read "op://infra/static-serve-r2-read/endpoint")
+AWS_ACCESS_KEY_ID=$(op read "op://infra/static-serve-r2-read/access-key-id")
+AWS_SECRET_ACCESS_KEY=$(op read "op://infra/static-serve-r2-read/secret-access-key")
 EOF
 ssh freecodecamp@"$IP" sudo systemctl start caddy-s3
 ```
