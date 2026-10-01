@@ -98,7 +98,7 @@ The dispatcher posts to Google Chat when the API refuses the request or when a v
 
 ### Google Chat Notifications
 
-Every message from this stack and from the GitHub workflows is one line:
+Every message from this stack and from the GitHub workflow notifiers is one line:
 
 ```text
 <icon> *<source>* · <subject> · <summary> · <link|label>
@@ -160,7 +160,7 @@ docker stack deploy -c stack-oncall.yml oncall
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
 
-**Cutover order:** Deploy this stack first. Then, on the same day, merge the workflow changes that remove the GitHub `schedule` triggers. Do not do the cutover on Wed/Sat before 06:00 UTC. Until the merge, a news deploy can run twice. This is harmless.
+**Cutover order:** Merge the infra changes first, then deploy this stack from `main`. Then, on the same day, merge the news changes that remove the news `schedule` triggers. Do not do the cutover on Wed/Sat before 06:00 UTC. The infra merge removes the housekeeping `schedule`, so deploy this stack before the next Wed/Sat 01:30 UTC. Until the news merge, a news deploy can run twice. This is harmless.
 
 ## GHA Integration
 
