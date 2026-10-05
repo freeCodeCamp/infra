@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-freeCodeCamp.org infra-as-code: the legacy fCC estate (Linode, Azure) and the DigitalOcean `ops-o11y` cluster.
+freeCodeCamp.org infra-as-code: the legacy fCC estate (Linode) and the DigitalOcean `ops-o11y` cluster.
 
 The Universe platform (`gxy-*` galaxies, artemis, Caddy-S3) was torn down in October 2026. Its docs live in `freeCodeCamp-Universe/Architecture` under `docs/infra/` (start at `REBUILD.md`). The last infra commit with the Universe code is `027d913d6f38`. The guides and RFCs here keep historical `gxy-*` examples; those paths exist only at that commit.
 
@@ -52,7 +52,8 @@ direnv `.envrc` hierarchy:
 - root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. The session hooks keep an agent out of the plaintext.
 - `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (DO token for the ansible DO inventory).
 - `terraform/ops-o11y/.envrc` → sources root + adds `do-universe/.env.enc` and `tfstate/.env.enc` (state in R2 `infra-tfstate`).
-- `k3s/<cluster>/.envrc` → sources root + exports `KUBECONFIG`.
+- `k3s/ops-o11y/.envrc` → sources root + exports `KUBECONFIG`.
+- `k3s/ops-backoffice-tools/.envrc` → sources root + adds `do-primary/.env.enc`.
 
 `do-universe/` and `tfstate/` keep their Universe-era names because non-Universe work reads them. They stay as they are until someone replaces them one by one (operator 2026-10-05).
 
@@ -76,12 +77,11 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Clusters
 
-- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplet `ops-vm-o11y-k3s-fra1-01`, the observability node and the seed of the bare-metal `mgmt` cluster. It sits in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
+- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplets `ops-vm-o11y-k3s-fra1-NN` (Terraform `node_count`, default 3; runbook 14), the observability cluster and the seed of the bare-metal `mgmt` cluster. `doctl` shows it in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
 - `ops-backoffice-tools`: legacy.
 
 Verify reality with `doctl compute droplet list` before acting.
 
 ## Non-obvious conventions
 
-- Helm chart repos: `k3s/<cluster>/apps/<app>/charts/<chart>/repo` (one-line file with URL); no repo file → `just release` falls back to the local chart dir.
 - `just bootstrap` prepends `play-` + appends `.yml` to playbook arg.

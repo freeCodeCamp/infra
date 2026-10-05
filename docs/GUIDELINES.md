@@ -32,7 +32,7 @@ one file per team. This repo's team owns `infra.md`.
   to build it up again."
 - Phases ordered: pre-flight → provision → bootstrap → ship apps → verify.
 - No design rationale. Design lives in Universe ADRs.
-- Lifecycle pins (k3s, Caddy, etc.) live in `flight-manuals/00-index.md`,
+- Lifecycle pins (k3s, Caddy, etc.) live in `Architecture/docs/infra/flight-manuals/00-index.md`,
   not duplicated per galaxy.
 
 ## Chart pre-merge checklist

@@ -1,72 +1,17 @@
 # Runbooks — Index
 
-Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric prefix orders by reader path: staff → operator → foundation → demoted-stack. Each file owns one operational concern; larger end-to-end procedures compose from these.
+Single-purpose ops runbooks. Each file owns one operational concern.
 
 ## Active runbooks
 
-| #   | File                                                                       | Audience  | Trigger                                            |
-| --- | -------------------------------------------------------------------------- | --------- | -------------------------------------------------- |
-| 01  | [01-deploy-new-constellation-site.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/01-deploy-new-constellation-site.md) | Staff dev | Ship a new `<site>.freecode.camp`                  |
-| 02  | [02-deploy-artemis-service.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/02-deploy-artemis-service.md)               | Operator  | Bring up / upgrade the artemis svc                 |
-| 03  | [03-artemis-postdeploy-check.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/03-artemis-postdeploy-check.md)           | Operator  | E2E gate after any artemis chart change            |
-| 04  | [04-secrets-decrypt.md](04-secrets-decrypt.md)                             | Operator  | Inspect / source a sops envelope                   |
-| 05  | [05-r2-keys-rotation.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/05-r2-keys-rotation.md)                           | Operator  | Rotate artemis-admin or caddy-ro R2 key            |
-| 07  | [07-artemis-registry-restore.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/07-artemis-registry-restore.md)           | Operator  | Rebuild artemis registry after Valkey wipe         |
-| 08  | [08-artemis-pg-restore-drill.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/08-artemis-pg-restore-drill.md)           | Operator  | Rehearse artemis-PG restore from R2 backup         |
-| 09  | [09-hatchet-engine-deploy.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/09-hatchet-engine-deploy.md)                 | Operator  | Stand up / rebuild the Hatchet durable-exec engine |
-| 10  | [10-rotate-cf-origin-cert.md](10-rotate-cf-origin-cert.md)                 | Operator  | Rotate the `freecodecamp.net` CF origin cert       |
-| 11  | [11-artemis-pg-outage-drill.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/11-artemis-pg-outage-drill.md)             | Operator  | Rehearse R7 — PG outage, serve plane unaffected    |
-| 12  | [12-node-drain-maintenance.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/12-node-drain-maintenance.md)               | Operator  | Drain a k3s node — PDB posture differs per node     |
-| 13  | [13-purge-orphaned-sites.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/13-purge-orphaned-sites.md)                   | Operator  | Take down a deregistered site that still serves    |
-| 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)                         | Operator  | Bring up / grow the ops-o11y mgmt cluster (T58)     |
-| 15  | [15-artemis-pg-failover-drill.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/15-artemis-pg-failover-drill.md)         | Operator  | Rehearse failover of the artemis-pg CNPG pair      |
-| 16  | [16-artemis-backup-bucket-split.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/16-artemis-backup-bucket-split.md)     | Operator  | One-off: move PG backups off the serve bucket      |
+| #   | File                                                       | Audience | Trigger                                         |
+| --- | ---------------------------------------------------------- | -------- | ----------------------------------------------- |
+| 04  | [04-secrets-decrypt.md](04-secrets-decrypt.md)             | Operator | Inspect / source a sops envelope                |
+| 10  | [10-rotate-cf-origin-cert.md](10-rotate-cf-origin-cert.md) | Operator | Rotate the `freecodecamp.net` CF origin cert    |
+| 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)         | Operator | Bring up / grow the ops-o11y mgmt cluster (T58) |
 
-## Reading order by scenario
-
-**New staff dev — ship a site:** 01 only.
-
-**New operator — onboard the platform:** 02 → 03 → 04 → 05.
-
-**Rotate an R2 key:** 05 (links to 04 + 03 internally).
-
-**Recover artemis registry (Valkey wipe):** 07 (RDB-restore path or universe-cli replay against R2-derived site list; links to 02 + 04 internally).
-
-**Rehearse artemis-PG restore (durable-exec DR):** 08 (pull newest R2 dump, restore into scratch PG, row-count sanity, RPO/RTO statement; links to 02 + 03 + 04 internally).
-
-**Stand up / rebuild the Hatchet engine (durable-exec stage 2):** 09 (wires into 02 §Staged durable-exec bootstrap; operator-only).
-
-**Rotate the CF origin cert:** 10 (links to 04 internally; consolidated single-copy wildcard per `docs/architecture/rfc-secrets-layout.md` D1).
-
-**Split the backup bucket (one-off, 2026-09):** 16 (create the bucket, mint the backup-only token, rebuild the image, move the artefacts, release, drill; links to 05 + 02 + 03 + 08 internally).
-
-**Drain a node for maintenance:** 12 (per-node PDB posture, the blocked-drain procedure for Postgres, and the undeployed hatchet PDB; links to 11 internally).
-
-**Bring up the mgmt cluster (ops-o11y):** 14 (OpenTofu droplets, K3s servers play, Flux, ESO + 1Password, DO CSI, VictoriaMetrics, Grafana, Rancher; T58 growth path).
-
-**Rehearse the artemis PG-outage boundary (R7):** 11 (scale bundled PG to 0, assert serve plane + degraded readyz, restore; links to 03 + 08 internally; operator-only, destructive to control plane).
-
-## Block ordering rationale
-
-| Block | Files | Why grouped                                           |
-| ----- | ----- | ----------------------------------------------------- |
-| 01    | 01    | Staff-facing primary — most reads                     |
-| 02–03 | 02–03 | Artemis lifecycle (deploy + verify)                   |
-| 04–05 | 04–05 | Foundations consumed by 02/03 (secrets + R2 keys)     |
-| 07    | 07    | Backup / DR for artemis registry (calls 02 + 04)      |
-| 08    | 08    | Backup / DR for artemis PG (calls 02 + 03 + 04)       |
-| 09    | 09    | Durable-exec engine stand-up (Hatchet); wires into 02 |
-| 10    | 10    | CF origin-cert rotation; foundation-adjacent to 04/05 |
-| 11    | 11    | Artemis PG-outage drill (R7); DR-adjacent to 08       |
-| 14    | 14    | ops-o11y mgmt cluster bringup + T58 growth; standalone |
-| 15    | 15    | Artemis PG failover drill; DR-adjacent to 08 and 11    |
-| 16    | 16    | One-off backup bucket split; calls 05, 02, 03, 08      |
-
-Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
-
-Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook, slot `08` for the artemis-PG restore drill, and slot `09` for the Hatchet engine deploy runbook. The windmill PG-backup runbook (formerly `06`) and the windmill decommission runbook (formerly `12`) are archived under [`archive/2026-07-07/`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/archive/2026-07-07/) (Windmill retired 2026-07-07); slots `06` and `12` are left vacant.
+Numbers are not reused. The Universe runbooks (01–03, 05, 07–09, 11–13, 15, 16) moved to [`Architecture/docs/infra/runbooks/`](https://github.com/freeCodeCamp-Universe/Architecture/tree/main/docs/infra/runbooks) at the Universe sunset (October 2026).
 
 ## Cross-doc references
 
-- [`Architecture/docs/infra/flight-manuals/00-index.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/flight-manuals/00-index.md) — per-cluster rebuild manuals
 - [`../architecture/`](../architecture/) — RFCs and design docs

@@ -26,7 +26,7 @@ provision cmd workspace="all":
     fi
 
 # Run any ansible playbook (logs to ansible/.ansible/logs/).
-# Example: just bootstrap k3s--single-node ops_o11y
+# Example: just bootstrap k3s--servers ops_o11y
 [group('bootstrap')]
 [positional-arguments]
 bootstrap playbook host *args:
@@ -197,15 +197,6 @@ configure-policy cluster:
     kubectl apply --server-side -f "$SRC"
     kubectl get resourcequota,limitrange -A | grep -v kube-system || true
 
-# Trim aged journal entries from a field-notes file into
-# `journal-archive/YYYY-MM.md` siblings. Default cutoff 30 days.
-# Run from a clean working tree — emits a cross-repo diff in Universe.
-[group('configure')]
-configure-field-notes-trim area="infra" age="30":
-    python3 scripts/trim-field-notes.py \
-        ../Architecture/spike/field-notes/{{ area }}.md \
-        --age-days {{ age }}
-
 # Verify encrypted secrets:
 #   stage 1 — each `*.enc` decrypts with the operator's age key
 #   stage 2 — path-layout contract per `docs/architecture/rfc-secrets-layout.md`
@@ -241,7 +232,7 @@ verify-secrets:
         do-primary/.env.enc|do-universe/.env.enc) ;;
         # Per-app platform-wide namespace stubs / r2 reader
         outline/.env.enc|appsmith/.env.enc|r2-read/.env.enc) ;;
-        # Legacy (retire post-Universe per RFC)
+        # Legacy
         archive/*|k3s/ops-backoffice-tools/*) ;;
         # Operator scratchpad (dev-only)
         scratchpad/*) ;;
@@ -283,12 +274,8 @@ verify-app cluster app:
 
 # Validate K8s manifests with kubeconform.
 #
-# Two stages:
-#   1. raw manifests in k3s/ (kustomize bases, plain YAML) —
-#      chart templates excluded because Go template syntax isn't YAML.
-#   2. first-party chart templates rendered via `helm template` against
-#      each chart's values.production.yaml + a stub set for the
-# sops-only required keys, then piped to kubeconform.
+# Checks the raw manifests in k3s/ (kustomize bases, plain YAML). Chart
+# templates are excluded because Go template syntax is not YAML.
 [group('verify')]
 verify-manifests version="1.32.0":
     #!/usr/bin/env bash
@@ -309,8 +296,6 @@ verify-manifests version="1.32.0":
       -ignore-filename-pattern 'values(\.[^/]+)?\.yaml' \
       -ignore-filename-pattern 'operator-values\.yaml' \
       -ignore-filename-pattern 'pnpm-lock\.yaml' \
-      -ignore-filename-pattern 'pss-admission\.yaml' \
-      -ignore-filename-pattern 'audit-policy\.yaml' \
       -ignore-filename-pattern '\.sample' \
       -ignore-filename-pattern 'node_modules' \
       -ignore-filename-pattern '\.json' \
@@ -346,19 +331,3 @@ inspect-crds cluster filter:
 [group('inspect')]
 inspect-tf:
     @find terraform -name ".terraform.lock.hcl" -exec dirname {} \; | sort
-
-# List canonical journal entries (### YYYY-MM-DD —) in a field-notes file
-# with their ages in days. Useful before running `configure-field-notes-trim`.
-[group('inspect')]
-inspect-field-notes area="infra":
-    python3 scripts/trim-field-notes.py \
-        ../Architecture/spike/field-notes/{{ area }}.md --list
-
-# Dry-run: show which dated journal entries would be archived by
-# `configure-field-notes-trim`. Default cutoff 30 days. Override with `age=N`.
-[group('inspect')]
-inspect-field-notes-trim area="infra" age="30":
-    python3 scripts/trim-field-notes.py \
-        ../Architecture/spike/field-notes/{{ area }}.md \
-        --age-days {{ age }} --dry-run
-

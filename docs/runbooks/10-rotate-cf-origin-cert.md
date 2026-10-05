@@ -10,7 +10,7 @@ If instead you're rotating a **per-app override** cert (`k3s/<cluster>/<app>.tls
 
 - Cloudflare account owner or admin on the account holding the `freecodecamp.net` zone.
 - `infra-secrets/` checked out as a sibling of `infra/` with sops+age set up — see [`04-secrets-decrypt.md`](04-secrets-decrypt.md).
-- Know which (cluster, app) pairs currently resolve the wildcard via zone-fallback (no per-app override file present). **Windmill retired 2026-07-07** (`Architecture/docs/infra/runbooks/archive/2026-07-07/12-windmill-decommission.md`) — it was the sole live consumer (`gxy-management`, `cluster.tls.zone` = `freecodecamp-net`, Gateway `certificateRefs: windmill-tls-cloudflare`); that Gateway + Secret are gone with the namespace. There is **no live consumer today**. `argocd`/`zot` remain parked (chart on disk, deploy frozen — RFC D4) and don't currently render a Gateway or Secret either. The cert itself is not retired — keep rotating on schedule so it's ready the moment argocd/zot (or a future galaxy plane on this zone) reactivate.
+- Know which (cluster, app) pairs currently resolve the wildcard via zone-fallback (no per-app override file present). **Windmill retired 2026-07-07** (`Architecture/docs/infra/runbooks/archive/2026-07-07/12-windmill-decommission.md`) — it was the sole live consumer (`gxy-management`, `cluster.tls.zone` = `freecodecamp-net`, Gateway `certificateRefs: windmill-tls-cloudflare`); that Gateway + Secret are gone with the namespace. There is **no live consumer today**. The `gxy-*` clusters and their `argocd`/`zot` charts were removed at the Universe sunset (October 2026; last commit `027d913d6f38`). The `gxy-management` commands below are historical examples from that tree.
 
 ## Steps
 
