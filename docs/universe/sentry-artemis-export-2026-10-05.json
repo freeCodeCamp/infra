@@ -1,0 +1,3015 @@
+{
+  "project": "freecodecamp/artemis",
+  "exported": "2026-10-05",
+  "filter": "lastSeen:-90d, all statuses",
+  "issues": [
+    {
+      "id": "7695312851",
+      "shortId": "ARTEMIS-F",
+      "title": "Cron failure: artemis-oom-watch",
+      "culprit": "",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-27T10:55:00Z",
+      "lastSeen": "2026-09-17T17:10:00Z",
+      "count": "5",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "73e0f25182034094bcd6a1ee28a51cc5",
+        "dateCreated": "2026-09-17T17:10:00Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error"
+        },
+        "exception": []
+      }
+    },
+    {
+      "id": "7728192599",
+      "shortId": "ARTEMIS-N",
+      "title": "*pgconn.ConnectError: failed to connect to `user=artemis database=artemis`: 10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-09-12T12:06:28Z",
+      "lastSeen": "2026-09-12T12:06:28Z",
+      "count": "1",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "35bf8ab96be44b91ab5482e491b80ba1",
+        "dateCreated": "2026-09-12T12:06:28.091000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.12.4+db034d3a6029cbc46ae404fd40ff74ebf7cd44bf",
+          "runtime": "go go1.26.6",
+          "server_name": "artemis-5d5b6bd445-z4nt4"
+        },
+        "exception": [
+          {
+            "type": "syscall.Errno",
+            "value": "operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*os.SyscallError",
+            "value": "connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*net.OpError",
+            "value": "dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*pgconn.perDialConnectError",
+            "value": "10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*errors.joinError",
+            "value": "10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*pgconn.ConnectError",
+            "value": "failed to connect to `user=artemis database=artemis`: 10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": [
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "runRelayLoop",
+                "lineNo": 119,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 409,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func1",
+                "lineNo": 414,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7725916978",
+      "shortId": "ARTEMIS-M",
+      "title": "*pgconn.ConnectError: failed to connect to `user=artemis database=artemis`: 10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func2",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-09-11T08:22:39Z",
+      "lastSeen": "2026-09-11T10:15:58Z",
+      "count": "9",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "422d7728080f4491bfa370fafed9a7da",
+        "dateCreated": "2026-09-11T10:15:58.351000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.12.3+bef25b65182ba40f8c7aaee26d330c332942e053",
+          "runtime": "go go1.26.6",
+          "server_name": "artemis-7955b78569-r2j8l"
+        },
+        "exception": [
+          {
+            "type": "syscall.Errno",
+            "value": "operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*os.SyscallError",
+            "value": "connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*net.OpError",
+            "value": "dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*pgconn.perDialConnectError",
+            "value": "10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*errors.joinError",
+            "value": "10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": []
+          },
+          {
+            "type": "*pgconn.ConnectError",
+            "value": "failed to connect to `user=artemis database=artemis`: 10.11.196.31:5432 (artemis-pg-rw): dial error: dial tcp 10.11.196.31:5432: connect: operation not permitted",
+            "frames": [
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "runRelayLoop",
+                "lineNo": 119,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 419,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func2",
+                "lineNo": 423,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7716286883",
+      "shortId": "ARTEMIS-K",
+      "title": "Cron failure: tombstone-purge",
+      "culprit": "",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-09-07T03:10:23Z",
+      "lastSeen": "2026-09-09T03:06:14Z",
+      "count": "3",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "aea5f5a1d9fb4903a605b6a8ba374f37",
+        "dateCreated": "2026-09-09T03:06:14Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error"
+        },
+        "exception": []
+      }
+    },
+    {
+      "id": "7716286148",
+      "shortId": "ARTEMIS-J",
+      "title": "*fmt.wrapError: tombstone-purge: delete teleprompter.freecode.camp/20260723-205349-24e0cd6: r2 deleteobjects: operation error S3: DeleteObjects, https response error StatusCode: 429, RequestID: , HostID: , api error ServiceUnavailable: Reduce your concurrent request ra...",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func2",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-09-07T03:10:23Z",
+      "lastSeen": "2026-09-09T03:05:22Z",
+      "count": "3",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "9fb07391b9f44d9f986c8a17104dbb5b",
+        "dateCreated": "2026-09-09T03:05:22.211000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.11.0+b0eb2cc7ad2a020eef8098dda58f53cd8cfada97",
+          "runtime": "go go1.26.6",
+          "server_name": "artemis-7758f44747-dt2np"
+        },
+        "exception": [
+          {
+            "type": "*smithy.GenericAPIError",
+            "value": "api error ServiceUnavailable: Reduce your concurrent request rate for the same object.",
+            "frames": []
+          },
+          {
+            "type": "*s3shared.ResponseError",
+            "value": "https response error StatusCode: 429, RequestID: , HostID: , api error ServiceUnavailable: Reduce your concurrent request rate for the same object.",
+            "frames": []
+          },
+          {
+            "type": "*smithy.OperationError",
+            "value": "operation error S3: DeleteObjects, https response error StatusCode: 429, RequestID: , HostID: , api error ServiceUnavailable: Reduce your concurrent request rate for the same object.",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "r2 deleteobjects: operation error S3: DeleteObjects, https response error StatusCode: 429, RequestID: , HostID: , api error ServiceUnavailable: Reduce your concurrent request rate for the same object.",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "tombstone-purge: delete teleprompter.freecode.camp/20260723-205349-24e0cd6: r2 deleteobjects: operation error S3: DeleteObjects, https response error StatusCode: 429, RequestID: , HostID: , api error ServiceUnavailable: Reduce your concurrent request rate for the same object.",
+            "frames": []
+          },
+          {
+            "type": "*errors.joinError",
+            "value": "tombstone-purge: delete teleprompter.freecode.camp/20260723-205349-24e0cd6: r2 deleteobjects: operation error S3: DeleteObjects, https response error StatusCode: 429, RequestID: , HostID: , api error ServiceUnavailable: Reduce your concurrent request rate for the same object.",
+            "frames": [
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/worker.go",
+                "function": "(*Worker).startBlocking.func2.1",
+                "lineNo": 632,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/worker.go",
+                "function": "(*Worker).executeAction",
+                "lineNo": 660,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun",
+                "lineNo": 723,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 41,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware-fm.(*Worker).panicMiddleware.func1",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "run.func1",
+                "lineNo": 42,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2",
+                "lineNo": 724,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2.1",
+                "lineNo": 733,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/worker.go",
+                "function": "(*actionImpl).Run",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/pkg/worker/method.go",
+                "function": "getFnFromMethod.func1",
+                "lineNo": 85,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go/internal",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/sdks/go/internal/declaration.go",
+                "function": "(*workflowDeclarationImpl[...]).Dump.func1",
+                "lineNo": 685,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go",
+                "filename": "github.com/hatchet-dev/hatchet@v0.91.2/sdks/go/workflow.go",
+                "function": "(*Workflow).NewTask.func1",
+                "lineNo": 491,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/hatchet",
+                "filename": "github.com/freeCodeCamp/artemis/internal/hatchet/adapter.go",
+                "function": "(*Adapter).buildWorkflow.func1",
+                "lineNo": 157,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.withCheckIn.func9",
+                "lineNo": 58,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.observeWorkflow.func8",
+                "lineNo": 152,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.func3",
+                "lineNo": 201,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 418,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func2",
+                "lineNo": 422,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7710504478",
+      "shortId": "ARTEMIS-H",
+      "title": "*fmt.wrapError: r2 ping: operation error S3: ListObjectsV2, https response error StatusCode: 401, RequestID: , HostID: , api error Unauthorized: Unauthorized",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/handler in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-09-03T21:17:54Z",
+      "lastSeen": "2026-09-08T18:22:53Z",
+      "count": "7",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "6b807b04ea9d4ddfb8cac17db19b2802",
+        "dateCreated": "2026-09-08T18:22:53.308000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.11.0+b0eb2cc7ad2a020eef8098dda58f53cd8cfada97",
+          "runtime": "go go1.26.6",
+          "server_name": "artemis-66457f974f-fjf67"
+        },
+        "exception": [
+          {
+            "type": "*smithy.GenericAPIError",
+            "value": "api error Unauthorized: Unauthorized",
+            "frames": []
+          },
+          {
+            "type": "*s3shared.ResponseError",
+            "value": "https response error StatusCode: 401, RequestID: , HostID: , api error Unauthorized: Unauthorized",
+            "frames": []
+          },
+          {
+            "type": "*smithy.OperationError",
+            "value": "operation error S3: ListObjectsV2, https response error StatusCode: 401, RequestID: , HostID: , api error Unauthorized: Unauthorized",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "r2 ping: operation error S3: ListObjectsV2, https response error StatusCode: 401, RequestID: , HostID: , api error Unauthorized: Unauthorized",
+            "frames": [
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "(*conn).serve",
+                "lineNo": 2067,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "serverHandler.ServeHTTP",
+                "lineNo": 3309,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 90,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "RequestID.func1",
+                "lineNo": 188,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "newWithUploadTimeout.VersionHeader.func2.1",
+                "lineNo": 165,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "AccessLog.func1",
+                "lineNo": 224,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/freeCodeCamp/artemis/internal/server/server.go",
+                "function": "retagTransaction.func1",
+                "lineNo": 135,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "Recoverer.func1",
+                "lineNo": 209,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2284,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/readyz.go",
+                "function": "(*Handlers).ReadyZ",
+                "lineNo": 70,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/readyz.go",
+                "function": "captureProbeFailure",
+                "lineNo": 116,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/readyz.go",
+                "function": "func1",
+                "lineNo": 120,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7530879110",
+      "shortId": "ARTEMIS-4",
+      "title": "*fmt.wrapError: r2 put vim-course.freecode.camp/deploys/20260902-134456-f5c8220/learn/6a9739dff0c3a37f2239211a/index.html: operation error S3: PutObject, failed to rewind transport stream for retry, request stream is not seekable",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/handler in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-09-02T13:46:31Z",
+      "lastSeen": "2026-09-02T13:46:31Z",
+      "count": "1",
+      "userCount": 1,
+      "latestEvent": {
+        "eventID": "2bbe11fa06594597a03ea9d68cf6b335",
+        "dateCreated": "2026-09-02T13:46:31.119000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.10.2+982388ef356883258c18e461f9f6922dec526bbb",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-864f4574df-lmgdj"
+        },
+        "exception": [
+          {
+            "type": "*errors.errorString",
+            "value": "request stream is not seekable",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "failed to rewind transport stream for retry, request stream is not seekable",
+            "frames": []
+          },
+          {
+            "type": "*smithy.OperationError",
+            "value": "operation error S3: PutObject, failed to rewind transport stream for retry, request stream is not seekable",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "r2 put vim-course.freecode.camp/deploys/20260902-134456-f5c8220/learn/6a9739dff0c3a37f2239211a/index.html: operation error S3: PutObject, failed to rewind transport stream for retry, request stream is not seekable",
+            "frames": [
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "(*conn).serve",
+                "lineNo": 2073,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "serverHandler.ServeHTTP",
+                "lineNo": 3311,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 90,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "RequestID.func1",
+                "lineNo": 177,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "AccessLog.func1",
+                "lineNo": 213,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/freeCodeCamp/artemis/internal/server/server.go",
+                "function": "retagTransaction.func1",
+                "lineNo": 130,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "Recoverer.func1",
+                "lineNo": 198,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).Mount.func1",
+                "lineNo": 321,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/chain.go",
+                "function": "(*ChainHandler).ServeHTTP",
+                "lineNo": 31,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "(*Handlers).RequireDeployJWT-fm.(*Handlers).RequireDeployJWT.func1",
+                "lineNo": 155,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/middleware/timeout.go",
+                "function": "newWithUploadTimeout.func1.2.Timeout.1.1",
+                "lineNo": 44,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/deploy.go",
+                "function": "(*Handlers).DeployUpload",
+                "lineNo": 163,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "writeUpstreamError",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "reportUpstream",
+                "lineNo": 381,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "func1",
+                "lineNo": 391,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7698926743",
+      "shortId": "ARTEMIS-G",
+      "title": "*errors.errorString: 36 deploys are reclaimable across the-story-of-the-moon.freecode.camp (9), teleprompter.freecode.camp (8), latex.freecode.camp (6), omotenashi-training.freecode.camp (4), palette-contrast-checker.freecode.camp (2), plumb-select.freecode.camp (2), svg-dr...",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func2",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-29T04:01:44Z",
+      "lastSeen": "2026-08-29T04:01:44Z",
+      "count": "1",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "651510b9ab87471db083759b53c77b94",
+        "dateCreated": "2026-08-29T04:01:44.179000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "os": "linux",
+          "release": "artemis@1.10.2+982388ef356883258c18e461f9f6922dec526bbb",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-864f4574df-q6npc"
+        },
+        "exception": [
+          {
+            "type": "*errors.errorString",
+            "value": "36 deploys are reclaimable across the-story-of-the-moon.freecode.camp (9), teleprompter.freecode.camp (8), latex.freecode.camp (6), omotenashi-training.freecode.camp (4), palette-contrast-checker.freecode.camp (2), plumb-select.freecode.camp (2), svg-draw.freecode.camp (2), wave-forge.freecode.camp (2), hexnova.freecode.camp (1) (>= 25): these bytes have no index row and are past the grace window; run `artemis reconcile <site> --apply` for each",
+            "frames": [
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startBlocking.func2.1",
+                "lineNo": 632,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).executeAction",
+                "lineNo": 660,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun",
+                "lineNo": 723,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 41,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware-fm.(*Worker).panicMiddleware.func1",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run.func1",
+                "lineNo": 42,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2",
+                "lineNo": 724,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2.1",
+                "lineNo": 733,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*actionImpl).Run",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/method.go",
+                "function": "getFnFromMethod.func1",
+                "lineNo": 85,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go/internal",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/internal/declaration.go",
+                "function": "(*workflowDeclarationImpl[...]).Dump.func1",
+                "lineNo": 669,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/workflow.go",
+                "function": "(*Workflow).NewTask.func1",
+                "lineNo": 490,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/hatchet",
+                "filename": "github.com/freeCodeCamp/artemis/internal/hatchet/adapter.go",
+                "function": "(*Adapter).buildWorkflow.func1",
+                "lineNo": 143,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.withCheckIn.func5",
+                "lineNo": 43,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.observeWorkflow.func4",
+                "lineNo": 148,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.func1",
+                "lineNo": 170,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/driftalert.go",
+                "function": "alertOnDrift",
+                "lineNo": 154,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 413,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func2",
+                "lineNo": 417,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7682110521",
+      "shortId": "ARTEMIS-D",
+      "title": "*errors.errorString: 36 deploys are reclaimable across the-story-of-the-moon.freecode.camp (9), teleprompter.freecode.camp (8), latex.freecode.camp (6), omotenashi-training.freecode.camp (4), palette-contrast-checker.freecode.camp (2), plumb-select.freecode.camp (2), svg-dr...",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func2",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-20T04:01:20Z",
+      "lastSeen": "2026-08-28T04:02:01Z",
+      "count": "9",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "4469d83ac1d54ef898dd4ff185e01f26",
+        "dateCreated": "2026-08-28T04:02:01.059000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "os": "linux",
+          "release": "artemis@1.9.1+bb5e0d4db17723cbe5677aa96383aa93add67c70",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-76c99d499f-pg4qf"
+        },
+        "exception": [
+          {
+            "type": "*errors.errorString",
+            "value": "36 deploys are reclaimable across the-story-of-the-moon.freecode.camp (9), teleprompter.freecode.camp (8), latex.freecode.camp (6), omotenashi-training.freecode.camp (4), palette-contrast-checker.freecode.camp (2), plumb-select.freecode.camp (2), svg-draw.freecode.camp (2), wave-forge.freecode.camp (2), hexnova.freecode.camp (1) (>= 25): storage is accruing faster than it is collected; run `artemis reconcile <site> --apply` for each and find what stopped expiring",
+            "frames": [
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startBlocking.func2.1",
+                "lineNo": 632,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).executeAction",
+                "lineNo": 660,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun",
+                "lineNo": 723,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 41,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware-fm.(*Worker).panicMiddleware.func1",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run.func1",
+                "lineNo": 42,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2",
+                "lineNo": 724,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2.1",
+                "lineNo": 733,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*actionImpl).Run",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/method.go",
+                "function": "getFnFromMethod.func1",
+                "lineNo": 85,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go/internal",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/internal/declaration.go",
+                "function": "(*workflowDeclarationImpl[...]).Dump.func1",
+                "lineNo": 669,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/workflow.go",
+                "function": "(*Workflow).NewTask.func1",
+                "lineNo": 490,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/hatchet",
+                "filename": "github.com/freeCodeCamp/artemis/internal/hatchet/adapter.go",
+                "function": "(*Adapter).buildWorkflow.func1",
+                "lineNo": 125,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.withCheckIn.func5",
+                "lineNo": 43,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.observeWorkflow.func4",
+                "lineNo": 99,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.func1",
+                "lineNo": 121,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/driftalert.go",
+                "function": "alertOnDrift",
+                "lineNo": 133,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 408,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func2",
+                "lineNo": 411,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7666168358",
+      "shortId": "ARTEMIS-B",
+      "title": "*fmt.wrapError: r2 hasprefix _artemis_readyz_probe_no_match: operation error S3: ListObjectsV2, https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/handler in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-11T16:23:51Z",
+      "lastSeen": "2026-08-24T03:08:31Z",
+      "count": "16",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "e5612ce8b2e742a3a5404822dbbd7d3a",
+        "dateCreated": "2026-08-24T03:08:31.634000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.9.1+bb5e0d4db17723cbe5677aa96383aa93add67c70",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-69bf85645b-cxh9t"
+        },
+        "exception": [
+          {
+            "type": "context.deadlineExceededError",
+            "value": "context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*smithy.CanceledError",
+            "value": "canceled, context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*s3shared.ResponseError",
+            "value": "https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*smithy.OperationError",
+            "value": "operation error S3: ListObjectsV2, https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "r2 hasprefix _artemis_readyz_probe_no_match: operation error S3: ListObjectsV2, https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+            "frames": [
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "(*conn).serve",
+                "lineNo": 2073,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "serverHandler.ServeHTTP",
+                "lineNo": 3311,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 90,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "RequestID.func1",
+                "lineNo": 177,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "AccessLog.func1",
+                "lineNo": 213,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/freeCodeCamp/artemis/internal/server/server.go",
+                "function": "retagTransaction.func1",
+                "lineNo": 126,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "Recoverer.func1",
+                "lineNo": 198,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/readyz.go",
+                "function": "(*Handlers).ReadyZ",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/readyz.go",
+                "function": "writeProbeUnavailable",
+                "lineNo": 116,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/readyz.go",
+                "function": "func1",
+                "lineNo": 120,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7564983854",
+      "shortId": "ARTEMIS-7",
+      "title": "*pgconn.ConnectError: failed to connect to `user=artemis database=artemis`: hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func2",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-07-16T04:00:10Z",
+      "lastSeen": "2026-08-23T06:03:30Z",
+      "count": "19",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "65b6c581065c4261998a8bd463b04bc4",
+        "dateCreated": "2026-08-23T06:03:30.529000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.9.1+bb5e0d4db17723cbe5677aa96383aa93add67c70",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-b68845b5-hs9f6"
+        },
+        "exception": [
+          {
+            "type": "*net.DNSError",
+            "value": "lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*errors.joinError",
+            "value": "lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*pgconn.ConnectError",
+            "value": "failed to connect to `user=artemis database=artemis`: hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": [
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "runRelayLoop",
+                "lineNo": 89,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 408,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func2",
+                "lineNo": 411,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7582376447",
+      "shortId": "ARTEMIS-8",
+      "title": "*fmt.wrapError: pg registry list: failed to connect to `user=artemis database=artemis`: hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func2",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-23T05:50:59Z",
+      "lastSeen": "2026-08-23T06:03:25Z",
+      "count": "3",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "cd0e15d5034548d5889754c7f2e373e4",
+        "dateCreated": "2026-08-23T06:03:25.515000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.9.1+bb5e0d4db17723cbe5677aa96383aa93add67c70",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-b68845b5-hs9f6"
+        },
+        "exception": [
+          {
+            "type": "*net.DNSError",
+            "value": "lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*errors.joinError",
+            "value": "lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*pgconn.ConnectError",
+            "value": "failed to connect to `user=artemis database=artemis`: hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "pg registry list: failed to connect to `user=artemis database=artemis`: hostname resolving error: lookup artemis-postgresql on 10.11.0.10:53: server misbehaving",
+            "frames": [
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/registry/valkey",
+                "filename": "github.com/freeCodeCamp/artemis/internal/registry/valkey/reader.go",
+                "function": "(*Reader).run",
+                "lineNo": 176,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/registry/valkey",
+                "filename": "github.com/freeCodeCamp/artemis/internal/registry/valkey/reader.go",
+                "function": "(*Reader).invokeOnRefreshError",
+                "lineNo": 201,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/main.go",
+                "function": "runWith.func1",
+                "lineNo": 242,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 408,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func2",
+                "lineNo": 411,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7685295195",
+      "shortId": "ARTEMIS-E",
+      "title": "*fmt.wrapError: r2 moveprefix copy prd-with-scaffolding.freecode.camp/deploys/20260806-210023-e57d1ed/learn/session-4-breathing-and-airway-42-airway-map-the-breath-route/index.html->_trash/prd-with-scaffolding.freecode.camp/deploys/20260806-210023-e57d1ed/learn/session...",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/handler in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-21T18:32:23Z",
+      "lastSeen": "2026-08-21T19:03:16Z",
+      "count": "3",
+      "userCount": 1,
+      "latestEvent": {
+        "eventID": "8c20f237658149daa183c233fc9d7dff",
+        "dateCreated": "2026-08-21T19:03:16.738000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.9.1+bb5e0d4db17723cbe5677aa96383aa93add67c70",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-6c8f6d69f5-4t5xr"
+        },
+        "exception": [
+          {
+            "type": "context.deadlineExceededError",
+            "value": "context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*smithy.CanceledError",
+            "value": "canceled, context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*s3shared.ResponseError",
+            "value": "https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*smithy.OperationError",
+            "value": "operation error S3: CopyObject, https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "r2 moveprefix copy prd-with-scaffolding.freecode.camp/deploys/20260806-210023-e57d1ed/learn/session-4-breathing-and-airway-42-airway-map-the-breath-route/index.html->_trash/prd-with-scaffolding.freecode.camp/deploys/20260806-210023-e57d1ed/learn/session-4-breathing-and-airway-42-airway-map-the-breath-route/index.html: operation error S3: CopyObject, https response error StatusCode: 0, RequestID: , HostID: , canceled, context deadline exceeded",
+            "frames": [
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "(*conn).serve",
+                "lineNo": 2073,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "serverHandler.ServeHTTP",
+                "lineNo": 3311,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 90,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "RequestID.func1",
+                "lineNo": 177,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "AccessLog.func1",
+                "lineNo": 213,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/freeCodeCamp/artemis/internal/server/server.go",
+                "function": "retagTransaction.func1",
+                "lineNo": 126,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "Recoverer.func1",
+                "lineNo": 198,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).Mount.func1",
+                "lineNo": 321,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/chain.go",
+                "function": "(*ChainHandler).ServeHTTP",
+                "lineNo": 31,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "(*Handlers).RequireGitHubBearer-fm.(*Handlers).RequireGitHubBearer.func1",
+                "lineNo": 118,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/middleware/timeout.go",
+                "function": "newWithUploadTimeout.func1.1.Timeout.1.1",
+                "lineNo": 44,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/site_register.go",
+                "function": "(*Handlers).SiteDelete",
+                "lineNo": 256,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "(*Handlers).withSiteLock",
+                "lineNo": 167,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/pg",
+                "filename": "github.com/freeCodeCamp/artemis/internal/pg/lock.go",
+                "function": "(*Repo).WithSiteLock",
+                "lineNo": 23,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/pg",
+                "filename": "github.com/freeCodeCamp/artemis/internal/pg/lock.go",
+                "function": "(*lockSession).WithSiteLock",
+                "lineNo": 68,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/site_register.go",
+                "function": "(*Handlers).SiteDelete.func1",
+                "lineNo": 264,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "writeUpstreamError",
+                "lineNo": 297,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "reportUpstream",
+                "lineNo": 309,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "func1",
+                "lineNo": 319,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7671154171",
+      "shortId": "ARTEMIS-C",
+      "title": "*fmt.wrapError: hatchet: publish site.reconcile: rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-08-14T04:00:14Z",
+      "lastSeen": "2026-08-14T04:00:14Z",
+      "count": "1",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "3f7c307c4e4443d498678740d3a5bf9a",
+        "dateCreated": "2026-08-14T04:00:14.835000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.6.3+4030bea9a0f41d50c5b2abed4763a76124500b66",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-64b6b7567-ml8sz"
+        },
+        "exception": [
+          {
+            "type": "*status.Error",
+            "value": "rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "hatchet: publish site.reconcile: rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+            "frames": [
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startBlocking.func2.1",
+                "lineNo": 632,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).executeAction",
+                "lineNo": 660,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun",
+                "lineNo": 723,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 41,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware-fm.(*Worker).panicMiddleware.func1",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run.func1",
+                "lineNo": 42,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2",
+                "lineNo": 724,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2.1",
+                "lineNo": 733,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*actionImpl).Run",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/method.go",
+                "function": "getFnFromMethod.func1",
+                "lineNo": 85,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go/internal",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/internal/declaration.go",
+                "function": "(*workflowDeclarationImpl[...]).Dump.func1",
+                "lineNo": 669,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/workflow.go",
+                "function": "(*Workflow).NewTask.func1",
+                "lineNo": 490,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/hatchet",
+                "filename": "github.com/freeCodeCamp/artemis/internal/hatchet/adapter.go",
+                "function": "(*Adapter).buildWorkflow.func1",
+                "lineNo": 121,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.withCheckIn.func6",
+                "lineNo": 43,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.observeWorkflow.func5",
+                "lineNo": 104,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.func1",
+                "lineNo": 145,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 384,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func1",
+                "lineNo": 388,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7611760708",
+      "shortId": "ARTEMIS-A",
+      "title": "Cron failure: reconcile-scheduler",
+      "culprit": "",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-07-15T04:00:13Z",
+      "lastSeen": "2026-08-13T04:00:14Z",
+      "count": "30",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "110aef9ff766414891220b87b9cba3de",
+        "dateCreated": "2026-08-13T04:00:14Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error"
+        },
+        "exception": []
+      }
+    },
+    {
+      "id": "7557111351",
+      "shortId": "ARTEMIS-6",
+      "title": "*fmt.wrapError: site lock teleprompter.freecode.camp: context canceled",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/handler in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-07-31T16:22:52Z",
+      "lastSeen": "2026-08-03T12:37:48Z",
+      "count": "6",
+      "userCount": 1,
+      "latestEvent": {
+        "eventID": "a4cd276d704844d19cf58f7c6e4cea2c",
+        "dateCreated": "2026-08-03T12:37:48.142000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.6.3+4030bea9a0f41d50c5b2abed4763a76124500b66",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-64b6b7567-7clss"
+        },
+        "exception": [
+          {
+            "type": "*errors.errorString",
+            "value": "context canceled",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "site lock teleprompter.freecode.camp: context canceled",
+            "frames": [
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "(*conn).serve",
+                "lineNo": 2073,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "serverHandler.ServeHTTP",
+                "lineNo": 3311,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 90,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "RequestID.func1",
+                "lineNo": 177,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "AccessLog.func1",
+                "lineNo": 213,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/server",
+                "filename": "github.com/freeCodeCamp/artemis/internal/server/server.go",
+                "function": "retagTransaction.func1",
+                "lineNo": 114,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "Recoverer.func1",
+                "lineNo": 198,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).Mount.func1",
+                "lineNo": 321,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).ServeHTTP",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/mux.go",
+                "function": "(*Mux).routeHTTP",
+                "lineNo": 477,
+                "inApp": false
+              },
+              {
+                "module": "github.com/go-chi/chi/v5",
+                "filename": "github.com/go-chi/chi/v5@v5.3.0/chain.go",
+                "function": "(*ChainHandler).ServeHTTP",
+                "lineNo": 31,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/middleware.go",
+                "function": "(*Handlers).RequireDeployJWT-fm.(*Handlers).RequireDeployJWT.func1",
+                "lineNo": 155,
+                "inApp": false
+              },
+              {
+                "module": "net/http",
+                "filename": "net/http/server.go",
+                "function": "HandlerFunc.ServeHTTP",
+                "lineNo": 2286,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/deploy.go",
+                "function": "(*Handlers).DeployFinalize",
+                "lineNo": 298,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "writeLockError",
+                "lineNo": 305,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "writeUpstreamError",
+                "lineNo": 274,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "reportUpstream",
+                "lineNo": 281,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/handler",
+                "filename": "github.com/freeCodeCamp/artemis/internal/handler/handler.go",
+                "function": "func1",
+                "lineNo": 291,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7611758162",
+      "shortId": "ARTEMIS-9",
+      "title": "*fmt.wrapError: hatchet: publish site.reconcile: rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-07-15T04:00:13Z",
+      "lastSeen": "2026-07-17T04:00:13Z",
+      "count": "99",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "fe687eb582fd41a796607ef41174a8ea",
+        "dateCreated": "2026-07-17T04:00:13.783000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.5.0+aa1f7e319a5d0c1ef643be6127bdb76577e60ab9",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-d679f464b-fvlzk"
+        },
+        "exception": [
+          {
+            "type": "*status.Error",
+            "value": "rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "hatchet: publish site.reconcile: rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+            "frames": [
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startBlocking.func2.1",
+                "lineNo": 632,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).executeAction",
+                "lineNo": 660,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun",
+                "lineNo": 723,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 41,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware-fm.(*Worker).panicMiddleware.func1",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run.func1",
+                "lineNo": 42,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2",
+                "lineNo": 724,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2.1",
+                "lineNo": 733,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*actionImpl).Run",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/method.go",
+                "function": "getFnFromMethod.func1",
+                "lineNo": 85,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go/internal",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/internal/declaration.go",
+                "function": "(*workflowDeclarationImpl[...]).Dump.func1",
+                "lineNo": 669,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/workflow.go",
+                "function": "(*Workflow).NewTask.func1",
+                "lineNo": 490,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/hatchet",
+                "filename": "github.com/freeCodeCamp/artemis/internal/hatchet/adapter.go",
+                "function": "(*Adapter).buildWorkflow.func1",
+                "lineNo": 121,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.withCheckIn.func6",
+                "lineNo": 31,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.observeWorkflow.func5",
+                "lineNo": 92,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.func1",
+                "lineNo": 121,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 383,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func1",
+                "lineNo": 386,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "7532893651",
+      "shortId": "ARTEMIS-5",
+      "title": "*fmt.wrapError: gc professional-email-writing.freecode.camp: site lock professional-email-writing.freecode.camp: ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)",
+      "culprit": "github.com/freeCodeCamp/artemis/internal/observability in func1",
+      "level": "error",
+      "status": "resolved",
+      "firstSeen": "2026-07-10T07:11:41Z",
+      "lastSeen": "2026-07-16T14:00:33Z",
+      "count": "2",
+      "userCount": 0,
+      "latestEvent": {
+        "eventID": "1d27a7a461cd4094bd4eaabac82876a5",
+        "dateCreated": "2026-07-16T14:00:33.339000Z",
+        "message": "",
+        "tags": {
+          "environment": "production",
+          "level": "error",
+          "mechanism": "generic",
+          "os": "linux",
+          "release": "artemis@1.5.0+aa1f7e319a5d0c1ef643be6127bdb76577e60ab9",
+          "runtime": "go go1.26.4",
+          "server_name": "artemis-d679f464b-vnhpp"
+        },
+        "exception": [
+          {
+            "type": "*pgconn.PgError",
+            "value": "ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "site lock professional-email-writing.freecode.camp: ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)",
+            "frames": []
+          },
+          {
+            "type": "*fmt.wrapError",
+            "value": "gc professional-email-writing.freecode.camp: site lock professional-email-writing.freecode.camp: ERROR: canceling statement due to lock timeout (SQLSTATE 55P03)",
+            "frames": [
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startBlocking.func2.1",
+                "lineNo": 632,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).executeAction",
+                "lineNo": 660,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun",
+                "lineNo": 723,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 41,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*Worker).panicMiddleware-fm.(*Worker).panicMiddleware.func1",
+                "lineNo": 73,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run.func1",
+                "lineNo": 42,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2",
+                "lineNo": 724,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "(*middlewares).runAll",
+                "lineNo": 32,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/middleware.go",
+                "function": "run",
+                "lineNo": 38,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*Worker).startStepRun.func2.1",
+                "lineNo": 733,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/worker.go",
+                "function": "(*actionImpl).Run",
+                "lineNo": 74,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/pkg/worker",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/pkg/worker/method.go",
+                "function": "getFnFromMethod.func1",
+                "lineNo": 85,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go/internal",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/internal/declaration.go",
+                "function": "(*workflowDeclarationImpl[...]).Dump.func1",
+                "lineNo": 669,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/hatchet-dev/hatchet/sdks/go",
+                "filename": "github.com/hatchet-dev/hatchet@v0.88.6/sdks/go/workflow.go",
+                "function": "(*Workflow).NewTask.func1",
+                "lineNo": 490,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.Call",
+                "lineNo": 369,
+                "inApp": false
+              },
+              {
+                "module": "reflect",
+                "filename": "reflect/value.go",
+                "function": "Value.call",
+                "lineNo": 586,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/hatchet",
+                "filename": "github.com/freeCodeCamp/artemis/internal/hatchet/adapter.go",
+                "function": "(*Adapter).buildWorkflow.func1",
+                "lineNo": 121,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.observeWorkflow.func7",
+                "lineNo": 92,
+                "inApp": false
+              },
+              {
+                "module": "main",
+                "filename": "github.com/freeCodeCamp/artemis/cmd/artemis/gcworkflows.go",
+                "function": "gcWorkflowDefs.func2",
+                "lineNo": 140,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "CaptureBackground",
+                "lineNo": 383,
+                "inApp": false
+              },
+              {
+                "module": "github.com/freeCodeCamp/artemis/internal/observability",
+                "filename": "github.com/freeCodeCamp/artemis/internal/observability/sentry.go",
+                "function": "func1",
+                "lineNo": 386,
+                "inApp": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
