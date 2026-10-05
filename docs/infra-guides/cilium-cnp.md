@@ -153,6 +153,6 @@ A `CiliumClusterwideNetworkPolicy` (CCWNP) at cluster scope would provide conste
 - [`docs/infra-guides/cilium-multi-nic.md`](./cilium-multi-nic.md) — sibling guide on multi-NIC MTU + device pinning. Read alongside this one when bringing up a new galaxy.
 - ADR-009 §CNI — Cilium choice rationale.
 - ADR-011 §Within-galaxy — constellation isolation posture.
-- `docs/universe/flight-manuals/gxy-management.md §C.6` — 2026-05-11 cutover smoke transcript including the side-finding write-up.
+- `Architecture/docs/infra/flight-manuals/gxy-management.md §C.6` — 2026-05-11 cutover smoke transcript including the side-finding write-up.
 - `Universe/.archive/infra/2026-04-07-spike-adr-corrections.md` — historical record of the 2026-04-07 woodpecker incident.
 - Cilium docs: <https://docs.cilium.io/en/stable/security/policy/language/#dns-policy-and-ip-discovery>

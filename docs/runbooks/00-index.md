@@ -6,21 +6,21 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 
 | #   | File                                                                       | Audience  | Trigger                                            |
 | --- | -------------------------------------------------------------------------- | --------- | -------------------------------------------------- |
-| 01  | [01-deploy-new-constellation-site.md](../universe/runbooks/01-deploy-new-constellation-site.md) | Staff dev | Ship a new `<site>.freecode.camp`                  |
-| 02  | [02-deploy-artemis-service.md](../universe/runbooks/02-deploy-artemis-service.md)               | Operator  | Bring up / upgrade the artemis svc                 |
-| 03  | [03-artemis-postdeploy-check.md](../universe/runbooks/03-artemis-postdeploy-check.md)           | Operator  | E2E gate after any artemis chart change            |
+| 01  | [01-deploy-new-constellation-site.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/01-deploy-new-constellation-site.md) | Staff dev | Ship a new `<site>.freecode.camp`                  |
+| 02  | [02-deploy-artemis-service.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/02-deploy-artemis-service.md)               | Operator  | Bring up / upgrade the artemis svc                 |
+| 03  | [03-artemis-postdeploy-check.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/03-artemis-postdeploy-check.md)           | Operator  | E2E gate after any artemis chart change            |
 | 04  | [04-secrets-decrypt.md](04-secrets-decrypt.md)                             | Operator  | Inspect / source a sops envelope                   |
-| 05  | [05-r2-keys-rotation.md](../universe/runbooks/05-r2-keys-rotation.md)                           | Operator  | Rotate artemis-admin or caddy-ro R2 key            |
-| 07  | [07-artemis-registry-restore.md](../universe/runbooks/07-artemis-registry-restore.md)           | Operator  | Rebuild artemis registry after Valkey wipe         |
-| 08  | [08-artemis-pg-restore-drill.md](../universe/runbooks/08-artemis-pg-restore-drill.md)           | Operator  | Rehearse artemis-PG restore from R2 backup         |
-| 09  | [09-hatchet-engine-deploy.md](../universe/runbooks/09-hatchet-engine-deploy.md)                 | Operator  | Stand up / rebuild the Hatchet durable-exec engine |
+| 05  | [05-r2-keys-rotation.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/05-r2-keys-rotation.md)                           | Operator  | Rotate artemis-admin or caddy-ro R2 key            |
+| 07  | [07-artemis-registry-restore.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/07-artemis-registry-restore.md)           | Operator  | Rebuild artemis registry after Valkey wipe         |
+| 08  | [08-artemis-pg-restore-drill.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/08-artemis-pg-restore-drill.md)           | Operator  | Rehearse artemis-PG restore from R2 backup         |
+| 09  | [09-hatchet-engine-deploy.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/09-hatchet-engine-deploy.md)                 | Operator  | Stand up / rebuild the Hatchet durable-exec engine |
 | 10  | [10-rotate-cf-origin-cert.md](10-rotate-cf-origin-cert.md)                 | Operator  | Rotate the `freecodecamp.net` CF origin cert       |
-| 11  | [11-artemis-pg-outage-drill.md](../universe/runbooks/11-artemis-pg-outage-drill.md)             | Operator  | Rehearse R7 — PG outage, serve plane unaffected    |
-| 12  | [12-node-drain-maintenance.md](../universe/runbooks/12-node-drain-maintenance.md)               | Operator  | Drain a k3s node — PDB posture differs per node     |
-| 13  | [13-purge-orphaned-sites.md](../universe/runbooks/13-purge-orphaned-sites.md)                   | Operator  | Take down a deregistered site that still serves    |
+| 11  | [11-artemis-pg-outage-drill.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/11-artemis-pg-outage-drill.md)             | Operator  | Rehearse R7 — PG outage, serve plane unaffected    |
+| 12  | [12-node-drain-maintenance.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/12-node-drain-maintenance.md)               | Operator  | Drain a k3s node — PDB posture differs per node     |
+| 13  | [13-purge-orphaned-sites.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/13-purge-orphaned-sites.md)                   | Operator  | Take down a deregistered site that still serves    |
 | 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)                         | Operator  | Bring up / grow the ops-o11y mgmt cluster (T58)     |
-| 15  | [15-artemis-pg-failover-drill.md](../universe/runbooks/15-artemis-pg-failover-drill.md)         | Operator  | Rehearse failover of the artemis-pg CNPG pair      |
-| 16  | [16-artemis-backup-bucket-split.md](../universe/runbooks/16-artemis-backup-bucket-split.md)     | Operator  | One-off: move PG backups off the serve bucket      |
+| 15  | [15-artemis-pg-failover-drill.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/15-artemis-pg-failover-drill.md)         | Operator  | Rehearse failover of the artemis-pg CNPG pair      |
+| 16  | [16-artemis-backup-bucket-split.md](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/16-artemis-backup-bucket-split.md)     | Operator  | One-off: move PG backups off the serve bucket      |
 
 ## Reading order by scenario
 
@@ -64,9 +64,9 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 
 Two-digit prefix gives 99 slots. Promote to three-digit if count grows past 99.
 
-Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](../universe/runbooks/archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook, slot `08` for the artemis-PG restore drill, and slot `09` for the Hatchet engine deploy runbook. The windmill PG-backup runbook (formerly `06`) and the windmill decommission runbook (formerly `12`) are archived under [`archive/2026-07-07/`](../universe/runbooks/archive/2026-07-07/) (Windmill retired 2026-07-07); slots `06` and `12` are left vacant.
+Woodpecker runbooks formerly at `07–09` are archived under [`archive/2026-05-10/`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/archive/2026-05-10/) (Woodpecker CI retired 2026-05-03); slot `07` was reclaimed for the artemis registry restore runbook, slot `08` for the artemis-PG restore drill, and slot `09` for the Hatchet engine deploy runbook. The windmill PG-backup runbook (formerly `06`) and the windmill decommission runbook (formerly `12`) are archived under [`archive/2026-07-07/`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/archive/2026-07-07/) (Windmill retired 2026-07-07); slots `06` and `12` are left vacant.
 
 ## Cross-doc references
 
-- [`../universe/flight-manuals/00-index.md`](../universe/flight-manuals/00-index.md) — per-cluster rebuild manuals
+- [`Architecture/docs/infra/flight-manuals/00-index.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/flight-manuals/00-index.md) — per-cluster rebuild manuals
 - [`../architecture/`](../architecture/) — RFCs and design docs

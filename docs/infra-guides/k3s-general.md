@@ -58,7 +58,7 @@ k3s/
     └── traefik-config.yaml
 ```
 
-Retired chart trees (argocd, zot, woodpecker) tracked in [`../architecture/retired-stacks.md`](../universe/architecture/retired-stacks.md).
+Retired chart trees (argocd, zot, woodpecker) tracked in [`../architecture/retired-stacks.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/architecture/retired-stacks.md).
 
 ______________________________________________________________________
 
@@ -195,7 +195,7 @@ CNI: Cilium    Storage: local-path
 | artemis | `uploads.freecode.camp` (staff via GH team) | Deploy-proxy; Valkey-backed sites registry     |
 | Valkey  | in-cluster only (`valkey.valkey.svc`)       | Single-replica; AOF; backs artemis sites + JWT |
 
-Windmill (platform-ops tooling) was retired 2026-07-07 — see [`docs/universe/runbooks/archive/2026-07-07/12-windmill-decommission.md`](../universe/runbooks/archive/2026-07-07/12-windmill-decommission.md).
+Windmill (platform-ops tooling) was retired 2026-07-07 — see [`Architecture/docs/infra/runbooks/archive/2026-07-07/12-windmill-decommission.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/archive/2026-07-07/12-windmill-decommission.md).
 
 ### gxy-cassiopeia
 
