@@ -227,9 +227,9 @@ jobs:
   verify-nginx:
     name: Verify NGINX
     needs: [window, reboot]
-    # The only new condition in this workflow, and it widens rather than
-    # narrows: it makes the check run even when a stage above failed or was
-    # skipped, which is exactly when a service is most likely to be down.
+    # This condition widens rather than narrows: it makes the check run even
+    # when a stage above failed or was skipped, which is exactly when a
+    # service is most likely to be down.
     if: ${{ !cancelled() && needs.window.outputs.allowed == 'true' }}
     strategy:
       fail-fast: false
