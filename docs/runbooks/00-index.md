@@ -21,7 +21,6 @@ Single-purpose ops runbooks for the freeCodeCamp Universe platform. Numeric pref
 | 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)                         | Operator  | Bring up / grow the ops-o11y mgmt cluster (T58)     |
 | 15  | [15-artemis-pg-failover-drill.md](../universe/runbooks/15-artemis-pg-failover-drill.md)         | Operator  | Rehearse failover of the artemis-pg CNPG pair      |
 | 16  | [16-artemis-backup-bucket-split.md](../universe/runbooks/16-artemis-backup-bucket-split.md)     | Operator  | One-off: move PG backups off the serve bucket      |
-| 17  | [17-static-serve-droplet.md](17-static-serve-droplet.md)                   | Operator  | Bring up / rebuild the `*.freecode.camp` droplet   |
 
 ## Reading order by scenario
 
