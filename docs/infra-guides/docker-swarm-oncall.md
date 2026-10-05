@@ -160,6 +160,8 @@ docker stack deploy -c stack-oncall.yml oncall
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
 
+**Portainer:** Portainer lists this stack, but its stored copy is old and has no config files. Deploy only with `docker stack deploy` from this directory. Do not press Update for this stack in Portainer, because that replaces the live stack with the old copy.
+
 **Cutover order:** Merge the infra changes first, then deploy this stack from `main`. Then, on the same day, merge the news changes that remove the news `schedule` triggers. Do not do the cutover on Wed/Sat before 06:00 UTC. The infra merge removes the housekeeping `schedule`, so deploy this stack before the next Wed/Sat 01:30 UTC. Until the news merge, a news deploy can run twice. This is harmless.
 
 ## GHA Integration
