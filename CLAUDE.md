@@ -1,26 +1,14 @@
 # CLAUDE.md
 
-freeCodeCamp.org infra-as-code. Primary: freeCodeCamp Universe platform (DigitalOcean + Hetzner planned, Cloudflare, R2). Legacy fCC infra (Linode, Azure) coexist, retire post-Universe.
+freeCodeCamp.org infra-as-code: the legacy fCC estate (Linode, Azure) and the DigitalOcean `ops-o11y` cluster.
+
+The Universe platform (`gxy-*` galaxies, artemis, Caddy-S3) was torn down in October 2026. Its docs live in `freeCodeCamp-Universe/Architecture` under `docs/infra/` (start at `REBUILD.md`). The last infra commit with the Universe code is `027d913d6f38`. The guides and RFCs here keep historical `gxy-*` examples; those paths exist only at that commit.
 
 Related repos:
 
 - `../infra-secrets` — sops+age vault. Hard-coded relative-path sibling (see "infra-secrets coupling" below).
-- `../artemis` — static-apps deploy proxy. Deployed via `docs/universe/runbooks/02-deploy-artemis-service.md`.
-- `~/DEV/fCC-U/Architecture/` — Universe team's design repo. **Absolute path** (NOT a `..` sibling of this repo). Holds 22 ADRs at `decisions/0{01..22}-*.md` and the spike plan at `spike/spike-plan.md`.
-
-**Design lives in Universe ADRs + spike plan. No dup design content this repo.**
 
 ## Doc ownership
-
-Authoritative model + flow diagram in `~/DEV/fCC-U/Architecture/CLAUDE.md`.
-
-Operator-runnable flight manuals live in `docs/universe/flight-manuals/` (this repo). Index at `docs/universe/flight-manuals/00-index.md`; read order starts with `UNIVERSE.md`.
-
-Platform-wide live-state + full 20-ADR-vs-reality audit (live-verified 2026-07-17, adversarially re-verified findings): `docs/universe/architecture/universe-state-2026-07-17.md`. Prior snapshots archived in `docs/universe/architecture/archive/2026-07-17/`; immutable 2026-05-10 provenance record stays at `docs/universe/architecture/adr-drift-2026-05-10.md`.
-
-Cassiopeia GA hardening RFC (Valkey KV substrate, artemis trim, ingress/DNS posture): `docs/universe/architecture/rfc-gxy-cassiopeia-ga.md`.
-
-Pre-2026-05-10 field-notes are consolidated in `~/DEV/fCC-U/Architecture/.archive/` as §1 of the master federation index (`INDEX.md`): the frozen 40-shard grid across 7 topic dirs (artemis, cassiopeia, gxy-static, windmill, universe-cli, infra, audits). §1 is do-not-extend; §2/§3/§4 (cross-repo cold-store, federated in-repo catalogue, gitignored-scratchpad pointers) are extendable. New durable operator content goes into the flight-manuals or runbooks, not new field-notes.
 
 Internal-only material (sprints, planning conventions, parked items, audit dossiers) lives in `.scratchpad/` (gitignored). Not tracked, treat as sensitive.
 
@@ -50,7 +38,6 @@ This repo owns:
 
 | Path                 | Purpose                                                          |
 | -------------------- | ---------------------------------------------------------------- |
-| `docs/universe/`     | Universe platform docs: flight manuals, runbooks, RFCs, guides   |
 | `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
 | `docs/architecture/` | RFCs for non-trivial work                                        |
 | `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)               |
@@ -58,23 +45,16 @@ This repo owns:
 
 ## Working directory rule
 
-Post-`cd3b3a32` (lifecycle-verb refactor 2026-05-13), `just` is no longer cwd-sensitive for the `release` family. Recipes carry the cluster as an arg and self-export `KUBECONFIG` from the recipe body (`justfile:80` — `export KUBECONFIG="$(pwd)/k3s/{{ cluster }}/.kubeconfig.yaml"`). All `release`/`configure`/`inspect`/`destroy`/`backup` recipes run from repo root:
+Run every recipe from the repo root. Recipes that need a cluster take it as an arg and export `KUBECONFIG` themselves.
 
-```
-just release gxy-management artemis
-just inspect-crds gxy-cassiopeia cnpg
-just configure-kubeconfig gxy-launchbase
-```
+direnv `.envrc` hierarchy:
 
-direnv `.envrc` hierarchy still loads:
+- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. The session hooks keep an agent out of the plaintext.
+- `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (DO token for the ansible DO inventory).
+- `terraform/ops-o11y/.envrc` → sources root + adds `do-universe/.env.enc` and `tfstate/.env.enc` (state in R2 `infra-tfstate`).
+- `k3s/<cluster>/.envrc` → sources root + exports `KUBECONFIG`.
 
-- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. The `INFRA_ADMIN=1` gate is retired (operator 2026-09-14); the session hooks now keep an agent out of the plaintext. This supersedes the ADR-010 shape for this repo.
-- `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (added 2026-09-04)
-- `k3s/<galaxy>/.envrc` → sources root + adds galaxy-scoped tokens (e.g. `$SECRETS_DIR/do-universe/.env.enc`) + exports `KUBECONFIG`
-
-The galaxy-scoped `KUBECONFIG` export is now belt-and-suspenders — recipes that need it set it themselves. The galaxy-scoped DO tokens still matter for recipes that hit DO API directly (terraform `provision`, ansible `bootstrap` with DO dynamic inventory) — but those recipes either accept `cluster` as an arg (`provision`) or operate on ansible inventory unrelated to live cluster state (`bootstrap`).
-
-Practical rule: run from repo root unless a specific recipe documents otherwise. The pre-`cd3b3a32` "cd into `k3s/<galaxy>/` first or helm hits wrong cluster" foot-gun is gone.
+`do-universe/` and `tfstate/` keep their Universe-era names because non-Universe work reads them. They stay as they are until someone replaces them one by one (operator 2026-10-05).
 
 ## infra-secrets coupling
 
@@ -86,35 +66,20 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Operations
 
-`just` lists recipes. Run from repo root — recipes carry the galaxy as an arg and self-export `KUBECONFIG`. See Working-directory rule above.
-
-**New work adds no `just` recipes (operator 2026-09-03).** The recipes are brittle and abstract too much. Write standard-toolchain commands instead: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. The existing recipes and the docs that reference them stay as they are — they serve `gxy-*`, artemis and the legacy estate.
+**New work adds no `just` recipes (operator 2026-09-03).** The recipes are brittle and abstract too much. Write standard-toolchain commands instead: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. The existing recipes and the docs that reference them stay as they are.
 
 ## Ansible
 
-- Per-galaxy config: `ansible/inventory/group_vars/<group>.yml`
+- Per-group config: `ansible/inventory/group_vars/<group>.yml`
 - Playbooks generic orchestrators — reference variables, not literal values
-- Add galaxy: create group_vars file matching DO inventory tag
+- Add a group: create a group_vars file matching the DO inventory tag
 
 ## Clusters
 
-Per-galaxy state, providers, and rollout phase live in `~/DEV/fCC-U/Architecture/spike/spike-plan.md` (canonical, Universe-team-owned). Cluster-vs-ADR reconciliation: `docs/universe/architecture/universe-state-2026-07-17.md`. Verify reality with `doctl compute droplet list` before acting.
+- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplet `ops-vm-o11y-k3s-fra1-01`, the observability node and the seed of the bare-metal `mgmt` cluster. It sits in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
+- `ops-backoffice-tools`: legacy.
 
-Inventory groups (matches `ansible/inventory/group_vars/`):
-
-| Galaxy           | Inventory Group      | Role                                                                                         |
-| ---------------- | -------------------- | -------------------------------------------------------------------------------------------- |
-| `gxy-management` | `gxy_management_k3s` | Control plane — artemis + Hatchet + Valkey (`uploads.freecode.camp`)                         |
-| `gxy-launchbase` | `gxy_launchbase_k3s` | **NOT LIVE — never probe it** (operator, 2026-09-11). Standby; woodpecker retired 2026-05-03 |
-| `gxy-cassiopeia` | `gxy_cassiopeia_k3s` | Static-serve plane — Caddy-S3 fronting `*.freecode.camp` from R2                             |
-
-Retired:
-
-- `gxy-static` — RETIRED 2026-04-27 (cutover to gxy-cassiopeia for `*.freecode.camp`). Historical journal: `~/DEV/fCC-U/Architecture/.archive/gxy-static/2026-04-27-teardown.md`.
-
-Legacy clusters (out of scope Universe baseline; retire post-Universe): `ops-backoffice-tools`, `ops-mgmt`. No touch when executing Universe work.
-
-**`gxy-launchbase` is not live. Never run a command against it** — no `kubectl`, no `just`, no kubeconfig read, not even in a cluster-wide sweep. Operator instruction, 2026-09-11. A sweep over `k3s/*/` must skip it by name.
+Verify reality with `doctl compute droplet list` before acting.
 
 ## Non-obvious conventions
 
