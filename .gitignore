@@ -69,9 +69,6 @@ secrets.overrides.yaml
 # CocoIndex Code (ccc)
 /.cocoindex_code/
 
-# k6 load test outputs
-loadtest/results/
-
 # dossier: internal scratchpad theater tooling
 .scratchpad/
 

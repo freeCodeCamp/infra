@@ -9,7 +9,7 @@ default:
 
 # Run terraform on one or all workspaces. Examples:
 #   just provision plan all
-# just provision apply gxy-management
+# just provision apply ops-o11y
 [group('provision')]
 provision cmd workspace="all":
     #!/usr/bin/env bash
@@ -26,7 +26,7 @@ provision cmd workspace="all":
     fi
 
 # Run any ansible playbook (logs to ansible/.ansible/logs/).
-# Example: just bootstrap k3s--install gxy_management_k3s
+# Example: just bootstrap k3s--single-node ops_o11y
 [group('bootstrap')]
 [positional-arguments]
 bootstrap playbook host *args:
@@ -62,8 +62,6 @@ bootstrap-tools:
 # `--set-file` knobs the chart needs from operator-local data).
 #
 # Examples:
-#   just release gxy-cassiopeia caddy      → helm only
-#   just release gxy-management artemis    → helm only
 # just release ops-backoffice-tools outline → kustomize only
 [group('release')]
 release cluster app:
@@ -199,19 +197,6 @@ configure-policy cluster:
     kubectl apply --server-side -f "$SRC"
     kubectl get resourcequota,limitrange -A | grep -v kube-system || true
 
-
-# Apply declarative Cloudflare Notifications from cloudflare/notifications.yaml.
-# Use --dry-run to preview without writing.
-[group('configure')]
-configure-cf-notifications *args:
-    scripts/cf-notifications-apply.sh {{ args }}
-
-# Apply declarative Uptime Robot monitors from uptime-robot/monitors.yaml.
-# Use --dry-run to preview without writing.
-[group('configure')]
-configure-uptime-robot *args:
-    scripts/uptime-robot-apply.sh {{ args }}
-
 # Trim aged journal entries from a field-notes file into
 # `journal-archive/YYYY-MM.md` siblings. Default cutoff 30 days.
 # Run from a clean working tree — emits a cross-repo diff in Universe.
@@ -224,7 +209,7 @@ configure-field-notes-trim area="infra" age="30":
 # Verify encrypted secrets:
 #   stage 1 — each `*.enc` decrypts with the operator's age key
 #   stage 2 — path-layout contract per `docs/architecture/rfc-secrets-layout.md`
-#             (universe-scope under `k3s/<gxy-*>/`, platform-wide under
+#             (platform-wide under
 #             `global/`, do-context creds under `do-*/`, per-app namespace
 # stubs at `<app>/.env.enc`; archive/legacy paths allowed)
 [group('verify')]
@@ -249,14 +234,6 @@ verify-secrets:
     while IFS= read -r f; do
       rel="${f#${SECRETS_ROOT}/}"
       case "$rel" in
-        # Universe k3s clusters — RFC §"Cluster-local"
-        k3s/gxy-management/*.values.yaml.enc|k3s/gxy-launchbase/*.values.yaml.enc|k3s/gxy-cassiopeia/*.values.yaml.enc) ;;
-        k3s/gxy-management/*.secrets.env.enc|k3s/gxy-launchbase/*.secrets.env.enc|k3s/gxy-cassiopeia/*.secrets.env.enc) ;;
-        k3s/gxy-management/*-backup.secrets.env.enc|k3s/gxy-launchbase/*-backup.secrets.env.enc|k3s/gxy-cassiopeia/*-backup.secrets.env.enc) ;;
-        k3s/gxy-management/*.tls.crt.enc|k3s/gxy-management/*.tls.key.enc) ;;
-        k3s/gxy-launchbase/*.tls.crt.enc|k3s/gxy-launchbase/*.tls.key.enc) ;;
-        k3s/gxy-cassiopeia/*.tls.crt.enc|k3s/gxy-cassiopeia/*.tls.key.enc) ;;
-        k3s/gxy-management/kubeconfig.yaml.enc|k3s/gxy-launchbase/kubeconfig.yaml.enc|k3s/gxy-cassiopeia/kubeconfig.yaml.enc) ;;
         # Platform-wide — RFC §"Two explicit scopes"
         global/.env.enc) ;;
         global/tls/*.crt.enc|global/tls/*.key.enc) ;;
@@ -264,8 +241,6 @@ verify-secrets:
         do-primary/.env.enc|do-universe/.env.enc) ;;
         # Per-app platform-wide namespace stubs / r2 reader
         outline/.env.enc|appsmith/.env.enc|r2-read/.env.enc) ;;
-        # Pre-Universe artemis SoT (audit F42 — flagged for unification)
-        management/artemis.env.enc) ;;
         # Legacy (retire post-Universe per RFC)
         archive/*|k3s/ops-backoffice-tools/*) ;;
         # Operator scratchpad (dev-only)
@@ -306,69 +281,6 @@ verify-app cluster app:
     echo "--- recent warning events ---"
     kubectl -n "$NS" get events --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -10 || true
 
-# Wait for a CNPG Cluster CR to become Ready, then surface health
-# beyond Ready: instance/primary roll, replica streaming lag, WAL
-# archive freshness, last successful barman backup age.
-#
-# Optional env (warn thresholds; exit code stays 0 unless wait fails):
-#   BACKUP_WARN_HOURS    default 26 (1 day + 2h slack)
-# WAL_WARN_SECONDS     default 300 (5min)
-[group('verify')]
-verify-cnpg cluster namespace name timeout="5m":
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    : "${BACKUP_WARN_HOURS:=26}"
-    : "${WAL_WARN_SECONDS:=300}"
-    NS={{ namespace }}
-    NAME={{ name }}
-
-    echo "Waiting for CNPG Cluster ${NS}/${NAME} (timeout {{ timeout }})..."
-    kubectl -n "$NS" wait --for=condition=Ready "cluster/${NAME}" --timeout={{ timeout }}
-
-    echo "--- cluster summary ---"
-    kubectl -n "$NS" get "cluster/${NAME}" \
-      -o jsonpath='instances={.status.instances} readyInstances={.status.readyInstances} primary={.status.currentPrimary}{"\n"}'
-
-    echo "--- pods ---"
-    kubectl -n "$NS" get pods -l "cnpg.io/cluster=${NAME}" -o wide
-
-    echo "--- last successful backup ---"
-    LAST_BACKUP=$(kubectl -n "$NS" get "cluster/${NAME}" -o jsonpath='{.status.lastSuccessfulBackup}' 2>/dev/null || true)
-    if [[ -z "$LAST_BACKUP" ]]; then
-      echo "WARN: no lastSuccessfulBackup recorded yet"
-    else
-      LAST_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${LAST_BACKUP%.*}Z" "+%s" 2>/dev/null || date -d "$LAST_BACKUP" "+%s" 2>/dev/null || echo 0)
-      NOW_EPOCH=$(date "+%s")
-      AGE_H=$(( (NOW_EPOCH - LAST_EPOCH) / 3600 ))
-      echo "lastSuccessfulBackup=$LAST_BACKUP (age ${AGE_H}h)"
-      [[ "$AGE_H" -lt "$BACKUP_WARN_HOURS" ]] || echo "WARN: backup older than ${BACKUP_WARN_HOURS}h"
-    fi
-
-    echo "--- first recoverability point (PITR floor) ---"
-    kubectl -n "$NS" get "cluster/${NAME}" -o jsonpath='{.status.firstRecoverabilityPoint}{"\n"}'
-
-    PRIMARY=$(kubectl -n "$NS" get "cluster/${NAME}" -o jsonpath='{.status.currentPrimary}')
-    if [[ -n "$PRIMARY" ]]; then
-      echo "--- WAL archive freshness (primary=$PRIMARY) ---"
-      kubectl -n "$NS" exec -c postgres "$PRIMARY" -- \
-        psql -tA -U postgres -c "SELECT EXTRACT(EPOCH FROM (now() - last_archived_time))::int FROM pg_stat_archiver;" 2>/dev/null \
-        | awk -v warn="$WAL_WARN_SECONDS" '{
-            if ($1 == "") print "WARN: pg_stat_archiver returned no row";
-            else if ($1+0 > warn) printf "WARN: last WAL archive %ss ago (>%ss)\n", $1, warn;
-            else printf "OK: last WAL archive %ss ago\n", $1;
-          }'
-
-      echo "--- replica streaming lag (from primary) ---"
-      kubectl -n "$NS" exec -c postgres "$PRIMARY" -- \
-        psql -tA -U postgres -c "SELECT application_name, state, COALESCE(pg_wal_lsn_diff(sent_lsn, replay_lsn)::text, 'n/a') AS bytes_lag FROM pg_stat_replication;" 2>/dev/null \
-        | awk -F'|' 'NF>0 {printf "  %-20s state=%s lag_bytes=%s\n", $1, $2, $3}' \
-        || echo "  (no replicas connected — single-instance cluster)"
-    else
-      echo "WARN: currentPrimary unset; skipping WAL + replica probes"
-    fi
-
 # Validate K8s manifests with kubeconform.
 #
 # Two stages:
@@ -406,193 +318,7 @@ verify-manifests version="1.32.0":
       -ignore-filename-pattern 'charts/.*/(Chart\.yaml|templates/)' \
       k3s/ || fail=1
 
-    echo "=== stage 2: rendered chart templates ==="
-    KC_ARGS=(
-      -summary -output text -strict -ignore-missing-schemas
-      -kubernetes-version "{{ version }}"
-      -schema-location default
-      -schema-location "{{ crds_schema }}"
-    )
-    for entry in \
-      "gxy-management:artemis:--set,secretEnv.R2_ENDPOINT=x,--set,secretEnv.R2_ACCESS_KEY_ID=x,--set,secretEnv.R2_SECRET_ACCESS_KEY=x,--set,secretEnv.GH_CLIENT_ID=x,--set,secretEnv.JWT_SIGNING_KEY=x,--set,secretEnv.VALKEY_PASSWORD=x,--set,secretEnv.POSTGRES_PASSWORD=x,--set,secretEnv.ARTEMIS_DB_PASSWORD=x,--set,secretEnv.HATCHET_DB_PASSWORD=x,--set,postgresCluster.enabled=true,--set,pgBackup.enabled=true,--set,pgLagWatch.enabled=true" \
-      "gxy-management:valkey:--set,secretEnv.VALKEY_PASSWORD=x" \
-      "gxy-management:hatchet:--set,secretEnv.DATABASE_URL=postgres://x" \
-      "gxy-cassiopeia:caddy:--set,r2.accessKeyId=x,--set,r2.secretAccessKey=y,--set,r2.bucket=z,--set,r2.endpoint=https://example" \
-      ; do
-      galaxy="${entry%%:*}"
-      rest="${entry#*:}"
-      app="${rest%%:*}"
-      stubs="${rest#*:}"
-      IFS=',' read -ra STUB_ARR <<<"$stubs"
-      chart="k3s/${galaxy}/apps/${app}/charts/${app}"
-      values="k3s/${galaxy}/apps/${app}/values.production.yaml"
-      [[ -d "$chart" && -f "$values" ]] || { echo "skip ${galaxy}/${app} (chart or values absent)"; continue; }
-      echo "--- ${galaxy}/${app} ---"
-      if ! helm template "$app" "$chart" --values "$values" "${STUB_ARR[@]}" | kubeconform "${KC_ARGS[@]}"; then
-        fail=1
-      fi
-    done
     exit "$fail"
-
-# Verify an R2 bucket is provisioned correctly (exists, rw/ro keys work, ro
-# cannot write). Reads credentials from
-# infra-secrets/<bucket-cluster>/r2-{rw,ro}.env.enc via sops.
-[group('verify')]
-verify-r2 bucket:
-    scripts/r2-bucket-verify.sh {{ bucket }}
-
-# Artemis post-deploy E2E. Source of truth for E2E correctness lives in the
-# artemis repo at `internal/integration/` (build-tagged Go suite, `make
-# integration`). This recipe is a thin wrapper that points the suite at a
-# deployed artemis. See `docs/universe/runbooks/03-artemis-postdeploy-check.md`.
-#
-# Required env (or fall through to defaults):
-#   ARTEMIS_URL    default https://uploads.freecode.camp
-#   ARTEMIS_REPO   default $HOME/DEV/fCC/artemis
-#   GH_TOKEN       default `gh auth token`
-#   SITE           default test
-# ROOT_DOMAIN    default freecode.camp
-[group('verify')]
-verify-artemis:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    : "${ARTEMIS_URL:=https://uploads.freecode.camp}"
-    : "${ARTEMIS_REPO:=$HOME/DEV/fCC/artemis}"
-    : "${SITE:=test}"
-    : "${ROOT_DOMAIN:=freecode.camp}"
-    GH_TOKEN="${GH_TOKEN:-$(gh auth token 2>/dev/null || true)}"
-
-    printf '[1/3] healthz %s/healthz\n' "$ARTEMIS_URL"
-    if ! curl -fsS -o /dev/null --max-time 10 "$ARTEMIS_URL/healthz"; then
-      printf 'FAIL: %s/healthz unreachable\n' "$ARTEMIS_URL" >&2
-      exit 1
-    fi
-
-    if [[ -z "$GH_TOKEN" ]]; then
-      printf 'FAIL: GH_TOKEN unset and `gh auth token` returned empty\n' >&2
-      exit 2
-    fi
-
-    printf '[2/3] valkey-reach + jwt-mint — GET /api/sites + POST /api/deploy/init\n'
-    # /api/sites hits the Valkey-backed registry; a 200 confirms artemis
-    # holds a live read connection. JWT mint check follows so we surface
-    # auth-side failure separately from Valkey-side failure.
-    SITES_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
-      -H "Authorization: Bearer ${GH_TOKEN}" "${ARTEMIS_URL}/api/sites")
-    if [[ "$SITES_CODE" != "200" ]]; then
-      printf 'FAIL: GET /api/sites returned %s (expected 200; Valkey reachable + staff team gated)\n' "$SITES_CODE" >&2
-      exit 1
-    fi
-    JWT_BODY=$(curl -sS --max-time 10 \
-      -H "Authorization: Bearer ${GH_TOKEN}" \
-      -H 'content-type: application/json' \
-      -d "{\"site\":\"${SITE}\",\"sha\":\"0000000000000000000000000000000000000000\"}" \
-      "${ARTEMIS_URL}/api/deploy/init")
-    if ! echo "$JWT_BODY" | grep -qE '"token"|"deployId"'; then
-      # Strip jwt/token fields before logging; fall back to first 200
-      # chars so a non-JSON body (gateway HTML page, etc) doesn't echo
-      # an entire CF block-page response either.
-      SAFE_BODY=$(echo "$JWT_BODY" | jq -c 'del(.jwt, .token)' 2>/dev/null || printf '%s' "${JWT_BODY:0:200}")
-      printf 'FAIL: /api/deploy/init body lacked token/deployId — %s\n' "$SAFE_BODY" >&2
-      exit 1
-    fi
-    printf '  /api/sites=200; /api/deploy/init returned JWT envelope\n'
-
-    if [[ ! -d "$ARTEMIS_REPO" ]]; then
-      printf 'FAIL: ARTEMIS_REPO=%s not a directory\n' "$ARTEMIS_REPO" >&2
-      exit 2
-    fi
-
-    printf '[3/3] artemis E2E — repo=%s url=%s site=%s\n' \
-      "$ARTEMIS_REPO" "$ARTEMIS_URL" "$SITE"
-    cd "$ARTEMIS_REPO"
-    ARTEMIS_URL="$ARTEMIS_URL" GH_TOKEN="$GH_TOKEN" \
-      SITE="$SITE" ROOT_DOMAIN="$ROOT_DOMAIN" \
-      just integration
-
-# Caddy cluster-side health on cassiopeia: chart pods 3/3, Gateway +
-# HTTPRoute programmed, e2e curl against a probe site.
-#
-# Optional env:
-#   PROBE_SITE     default test
-# ROOT_DOMAIN    default freecode.camp
-[group('verify')]
-verify-caddy cluster="gxy-cassiopeia":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    : "${PROBE_SITE:=test}"
-    : "${ROOT_DOMAIN:=freecode.camp}"
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-
-    printf '[1/4] caddy pods in caddy ns\n'
-    READY=$(kubectl -n caddy get pods -l app.kubernetes.io/name=caddy \
-      -o jsonpath='{range .items[*]}{.status.containerStatuses[0].ready}{"\n"}{end}' | grep -c true || true)
-    TOTAL=$(kubectl -n caddy get pods -l app.kubernetes.io/name=caddy --no-headers | wc -l | tr -d ' ')
-    printf '    ready=%s total=%s\n' "$READY" "$TOTAL"
-    [[ "$READY" -ge 1 && "$READY" -eq "$TOTAL" ]] || { echo "FAIL: caddy pods not all Ready"; exit 1; }
-
-    printf '[2/4] gateway caddy-gateway Programmed\n'
-    GW=$(kubectl -n caddy get gateway caddy-gateway \
-      -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}')
-    [[ "$GW" == "True" ]] || { echo "FAIL: Gateway Programmed=$GW"; exit 1; }
-
-    printf '[3/4] httproute caddy Accepted + ResolvedRefs\n'
-    ACC=$(kubectl -n caddy get httproute caddy \
-      -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}')
-    RES=$(kubectl -n caddy get httproute caddy \
-      -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}')
-    [[ "$ACC" == "True" && "$RES" == "True" ]] || { echo "FAIL: HTTPRoute Accepted=$ACC ResolvedRefs=$RES"; exit 1; }
-
-    URL="https://${PROBE_SITE}.${ROOT_DOMAIN}/"
-    printf '[4/4] e2e %s\n' "$URL"
-    HTTP=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 10 "$URL") || true
-    [[ "$HTTP" == "200" ]] || { echo "FAIL: $URL returned $HTTP (expected 200)"; exit 1; }
-
-    echo "OK: caddy chart healthy on {{ cluster }}; ${URL} → 200"
-
-# Verify the locally-built caddy-s3 image lists both in-tree modules AND does
-# NOT list the third-party caddy.fs.s3 (D32 — no third-party Caddy plugins).
-# Runs the image under emulation since the host is usually arm64.
-[group('verify')]
-verify-caddy-s3:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    TAG="dev-$(git rev-parse --short HEAD)"
-    IMG="ghcr.io/freecodecamp/caddy-s3:${TAG}"
-    MODULES=$(docker run --rm --platform linux/amd64 "${IMG}" caddy list-modules)
-    echo "${MODULES}" | grep -q '^http.handlers.r2_alias$' || { echo "FAIL: http.handlers.r2_alias not listed"; exit 1; }
-    echo "${MODULES}" | grep -q '^caddy.fs.r2$' || { echo "FAIL: caddy.fs.r2 not listed"; exit 1; }
-    ! echo "${MODULES}" | grep -q '^caddy.fs.s3$' || { echo "FAIL: caddy.fs.s3 present (D32 violated)"; exit 1; }
-    echo "OK: http.handlers.r2_alias + caddy.fs.r2 present; caddy.fs.s3 absent"
-
-# k6 load test — pick a scenario from `loadtest/scenarios/`.
-#
-# Scenarios:
-#   caddy-serve         high-RPS GET against served production site
-#   caddy-serve-preview high-RPS GET against preview alias
-#   artemis-whoami      moderate-RPS GH-bearer probe of /api/whoami
-#   artemis-deploy      sustained init+upload+finalize bursts (write-heavy)
-#
-# Required env: see `loadtest/README.md` per scenario.
-[group('test')]
-test-loadtest scenario:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    SCRIPT="loadtest/scenarios/{{ scenario }}.js"
-    if [[ ! -f "$SCRIPT" ]]; then
-      printf 'FAIL: scenario %s not found at %s\n' '{{ scenario }}' "$SCRIPT" >&2
-      printf 'available:\n' >&2
-      ls loadtest/scenarios/*.js 2>/dev/null | sed 's|loadtest/scenarios/||;s|\.js||;s|^|  |' >&2
-      exit 2
-    fi
-    if ! command -v k6 >/dev/null 2>&1; then
-      printf 'FAIL: k6 not on PATH (brew install k6)\n' >&2
-      exit 2
-    fi
-    k6 run "$SCRIPT"
-
-
 
 # View a decrypted secret (auto-detects format from extension).
 [group('inspect')]
@@ -636,129 +362,3 @@ inspect-field-notes-trim area="infra" age="30":
         ../Architecture/spike/field-notes/{{ area }}.md \
         --age-days {{ age }} --dry-run
 
-
-
-# Ad-hoc Valkey snapshot (local file). Triggers BGSAVE in the pod,
-# polls LASTSAVE until the timestamp advances, then `kubectl cp`s the
-# resulting `dump.rdb` out to `.backups/valkey-<timestamp>.rdb`.
-#
-# BGSAVE is non-blocking but fork-heavy; on a single-replica AOF-on
-# Valkey this is the safest operator-runnable snapshot. For nightly
-# RDB→R2 mirror see the chart (T18) — this recipe is the manual
-# escape hatch.
-[group('backup')]
-backup-valkey cluster="gxy-management":
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    mkdir -p .backups
-    NS=valkey
-    POD=$(kubectl -n "$NS" get pod -l app.kubernetes.io/name=valkey -o jsonpath='{.items[0].metadata.name}')
-    [ -n "$POD" ] || { echo "Error: no valkey pod in $NS namespace"; exit 1; }
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    FILENAME="valkey-${TIMESTAMP}.rdb"
-
-    BEFORE=$(kubectl exec -n "$NS" "$POD" -- valkey-cli LASTSAVE | tr -d '[:space:]')
-    echo "Triggering BGSAVE on ${POD} (lastsave=${BEFORE})..."
-    kubectl exec -n "$NS" "$POD" -- valkey-cli BGSAVE >/dev/null
-
-    for i in $(seq 1 30); do
-      sleep 2
-      NOW=$(kubectl exec -n "$NS" "$POD" -- valkey-cli LASTSAVE | tr -d '[:space:]')
-      if [ "$NOW" != "$BEFORE" ]; then
-        echo "BGSAVE complete (lastsave=${NOW}, ${i} polls)"
-        break
-      fi
-    done
-    [ "$NOW" != "$BEFORE" ] || { echo "Error: BGSAVE LASTSAVE did not advance after 60s"; exit 1; }
-
-    kubectl cp "${NS}/${POD}:/data/dump.rdb" ".backups/${FILENAME}"
-    FILESIZE=$(stat -f%z ".backups/${FILENAME}" 2>/dev/null || stat -c%s ".backups/${FILENAME}")
-    [ "${FILESIZE}" -gt 100 ] || { echo "Error: snapshot too small (${FILESIZE} bytes)"; rm -f ".backups/${FILENAME}"; exit 1; }
-    echo "Saved: .backups/${FILENAME} (${FILESIZE} bytes)"
-
-# Build the caddy-s3 image locally and tag with dev-<sha>. Platform pinned to
-# linux/amd64 — DO droplets run on AMD64, and buildx defaults to the host
-# architecture (arm64 on Apple Silicon → exec format error in cluster).
-# GitHub Actions (`.github/workflows/docker--caddy-s3.yml`) builds the
-# canonical `ghcr.io/freecodecamp/caddy-s3:{sha}` tag on push (build-
-# residency principle: platform pillars build outside Universe).
-[group('build')]
-build-caddy-s3:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    TAG="dev-$(git rev-parse --short HEAD)"
-    docker buildx build \
-        --platform linux/amd64 \
-        --load \
-        -t "ghcr.io/freecodecamp/caddy-s3:${TAG}" \
-        -f docker/images/caddy-s3/Dockerfile \
-        .
-    echo "Built: ghcr.io/freecodecamp/caddy-s3:${TAG} (linux/amd64)"
-
-# Build the postgres-rclone image locally (postgres:18-bookworm + baked
-# rclone for the artemis backup CronJob). GitHub Actions
-# (`.github/workflows/docker--postgres-rclone.yml`) builds the canonical
-# `ghcr.io/freecodecamp/postgres-rclone:{sha}` tag on workflow_dispatch.
-[group('build')]
-build-postgres-rclone:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    TAG="dev-$(git rev-parse --short HEAD)"
-    docker buildx build \
-        --platform linux/amd64 \
-        --load \
-        -t "ghcr.io/freecodecamp/postgres-rclone:${TAG}" \
-        docker/images/postgres-rclone/
-    echo "Built: ghcr.io/freecodecamp/postgres-rclone:${TAG} (linux/amd64)"
-
-# Reset a CNPG Cluster: delete the CR, all PVCs, and pods. DESTRUCTIVE.
-# After reset, re-run `just release {{cluster}} {{app}}` to recreate.
-[group('destroy')]
-destroy-cnpg cluster namespace name:
-    #!/usr/bin/env bash
-    set -eu
-    cd k3s/{{ cluster }}
-    export KUBECONFIG="$(pwd)/.kubeconfig.yaml"
-    echo "Deleting CNPG Cluster {{ namespace }}/{{ name }} ..."
-    kubectl -n {{ namespace }} delete cluster/{{ name }} --ignore-not-found
-    echo "Waiting for cluster pods to terminate ..."
-    kubectl -n {{ namespace }} wait --for=delete pod -l cnpg.io/cluster={{ name }} --timeout=120s 2>/dev/null || true
-    echo "Deleting PVCs for {{ name }} ..."
-    kubectl -n {{ namespace }} delete pvc -l cnpg.io/cluster={{ name }} --ignore-not-found
-    kubectl -n {{ namespace }} get pvc -o name | grep -E "{{ name }}-[0-9]+$" | xargs -r kubectl -n {{ namespace }} delete --ignore-not-found
-    echo 'Done. Re-run "just release {{ cluster }} <app>" to recreate.'
-
-# Tear down a Universe galaxy: runs the k3s--teardown playbook, optionally
-# deletes droplets via doctl. Preserves shared infra (VPC, firewall, R2).
-# DESTRUCTIVE — operator-fired only.
-#
-# Galaxy slug → inventory group via `tr '-' '_' + _k3s` suffix:
-#   gxy-management → gxy_management_k3s
-#
-# Set `delete_droplets=true` to also `doctl compute droplet delete --tag-name`.
-# Idempotent: re-runnable if first attempt aborts mid-stream.
-[group('destroy')]
-destroy-galaxy galaxy delete_droplets="false":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    GALAXY="{{ galaxy }}"
-    case "$GALAXY" in
-      gxy-management|gxy-launchbase|gxy-cassiopeia) ;;
-      *) echo "Refusing: unknown galaxy '$GALAXY' (expected one of gxy-{management,launchbase,cassiopeia})"; exit 1 ;;
-    esac
-    INVENTORY_GROUP=$(echo "$GALAXY" | tr '-' '_')_k3s
-
-    echo "==> k3s teardown via ansible: $INVENTORY_GROUP"
-    just bootstrap k3s--teardown "$INVENTORY_GROUP"
-
-    if [[ "{{ delete_droplets }}" == "true" ]]; then
-      DROPLET_TAG="${GALAXY}-k3s"
-      echo "==> doctl compute droplet delete --tag-name $DROPLET_TAG --force"
-      doctl compute droplet delete --tag-name "$DROPLET_TAG" --force
-    else
-      echo "==> Skipping droplet delete (pass delete_droplets=true to remove DO droplets)"
-    fi
-
-    echo "Done. Shared infra (VPC, firewall, R2) preserved."

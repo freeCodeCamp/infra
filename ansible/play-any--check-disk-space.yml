@@ -9,7 +9,7 @@
 #   ansible-playbook -i inventory/tailscale.yml play-any--check-disk-space.yml \
 #     -e variable_host='prd-vm-oldeworld-api-*'
 #
-#   just bootstrap any--check-disk-space gxy_management_k3s
+#   just bootstrap any--check-disk-space ops_o11y
 #
 # Read-only. It measures, it never frees anything.
 #
