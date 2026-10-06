@@ -16,7 +16,6 @@ The Oncall stack provides automated maintenance and monitoring services includin
 | **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)   |
 | **svc-chat-relay**            | Posts Gantry notices to Google Chat as one standard line      |
 | **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
-| **svc-dispatch-news-i18n**    | Starts the news `deploy-i18n.yml` workflow every 6 hours      |
 | **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
 | **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale      |
 
@@ -77,7 +76,6 @@ GitHub `schedule` triggers start late or do not start at all (observed since 202
 | Service                     | Schedule (UTC)   | Window policy |
 | --------------------------- | ---------------- | ------------- |
 | `svc-dispatch-news-eng`     | `0 5 */3 * * *`  | `avoid`       |
-| `svc-dispatch-news-i18n`    | `0 5 */6 * * *`  | `avoid`       |
 | `svc-dispatch-housekeeping` | `0 30 1 * * 3,6` | `require`     |
 
 The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it once.
@@ -238,7 +236,6 @@ docker service logs --since 2h oncall_svc-update
 docker service logs --since 2h oncall_svc-webhook
 docker service logs --since 2h oncall_svc-chat-relay
 docker service logs --since 3h oncall_svc-dispatch-news-eng
-docker service logs --since 6h oncall_svc-dispatch-news-i18n
 docker service logs --since 96h oncall_svc-dispatch-housekeeping
 docker service logs --since 2h oncall_svc-watchdog-news
 docker service logs --since 168h oncall_svc-cleanup

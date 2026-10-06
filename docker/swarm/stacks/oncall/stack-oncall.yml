@@ -47,21 +47,6 @@ services:
         - "swarm.cronjob.schedule=0 5 */3 * * *"
         - "swarm.cronjob.skip-running=true"
 
-  svc-dispatch-news-i18n:
-    <<: *dispatch
-    environment:
-      <<: *dispatch-env
-      DISPATCH_REPO: freeCodeCamp/news
-      DISPATCH_WORKFLOW: deploy-i18n.yml
-      WINDOW_POLICY: avoid
-    deploy:
-      <<: *job-deploy
-      labels:
-        - "swarm.cronjob.enable=true"
-        - "swarm.cronjob.replicas=1"
-        - "swarm.cronjob.schedule=0 5 */6 * * *"
-        - "swarm.cronjob.skip-running=true"
-
   svc-dispatch-housekeeping:
     <<: *dispatch
     environment:
