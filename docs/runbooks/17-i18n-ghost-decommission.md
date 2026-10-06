@@ -28,14 +28,14 @@ The `freeCodeCamp/news` workflow `i18n - Build and Deploy` reads the Ghost Conte
 
 ```sh
 gh workflow disable deploy-i18n.yml -R freeCodeCamp/news
-ssh freecodecamp@ops-vm-backoffice 'docker service rm oncall_svc-dispatch-news-i18n'
+docker --context backoffice service rm oncall_svc-dispatch-news-i18n
 ```
 
 **Verify:**
 
 ```sh
 gh api repos/freeCodeCamp/news/actions/workflows/deploy-i18n.yml --jq .state
-ssh freecodecamp@ops-vm-backoffice 'docker service ls -q --filter name=oncall_svc-dispatch-news-i18n | wc -l'
+docker --context backoffice service ls -q --filter name=oncall_svc-dispatch-news-i18n | wc -l
 ```
 
 The state must be `disabled_manually`. The count must be `0`. `docker/swarm/stacks/oncall/stack-oncall.yml` no longer has this service, so a later `docker stack deploy` does not create it again.
