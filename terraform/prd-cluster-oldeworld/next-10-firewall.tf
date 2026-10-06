@@ -96,14 +96,6 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
     ])
   }
 
-  inbound {
-    label    = "allow-ghost_from-anywhere"
-    ports    = "32323"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4     = ["0.0.0.0/0"]
-    ipv6     = ["::/0"]
-  }
   # outbound { }
 
   inbound_policy  = "DROP"
@@ -115,9 +107,6 @@ resource "linode_firewall" "prd_oldeworld_firewall" {
 
     # All Client nodes.
     [for i in linode_instance.prd_oldeworld_clt : i.id],
-
-    # All News Nodes.
-    [for i in linode_instance.prd_oldeworld_nws : i.id],
 
     # All JMS Nodes.
     [for i in linode_instance.prd_oldeworld_jms : i.id],

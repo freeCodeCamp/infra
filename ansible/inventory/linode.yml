@@ -42,14 +42,12 @@ groups:
   prd_oldeworld_api_new: "'prd_oldeworld_api' in (tags|list) and 'new_api' in (tags|list)"
   prd_oldeworld_clt: "'prd_oldeworld_clt' in (tags|list)"
   prd_oldeworld_pxy: "'prd_oldeworld_pxy' in (tags|list)"
-  prd_oldeworld_nws: "'prd_oldeworld_nws' in (tags|list)"
   prd_oldeworld_jms: "'prd_oldeworld_jms' in (tags|list)"
 
-  # Oldeworld Cluster -- role families across STG and PRD (nws is PRD only)
+  # Oldeworld Cluster -- role families across STG and PRD
   oldeworld_api: "'stg_oldeworld_api' in (tags|list) or 'prd_oldeworld_api' in (tags|list)"
   oldeworld_clt: "'stg_oldeworld_clt' in (tags|list) or 'prd_oldeworld_clt' in (tags|list)"
   oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list) or 'prd_oldeworld_pxy' in (tags|list)"
-  oldeworld_nws: "'prd_oldeworld_nws' in (tags|list)"
   oldeworld_jms: "'stg_oldeworld_jms' in (tags|list) or 'prd_oldeworld_jms' in (tags|list)"
 
   # Every Linode VM that carries node_exporter: oldeworld_all plus ops_backoffice.
