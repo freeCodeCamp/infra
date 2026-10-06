@@ -65,7 +65,6 @@ jobs:
           - prd_oldeworld_api
           - stg_oldeworld_pxy
           - prd_oldeworld_pxy
-          - prd_oldeworld_nws
           - stg_oldeworld_jms
           - prd_oldeworld_jms
           - stg_oldeworld_clt
@@ -114,7 +113,6 @@ jobs:
           - prd_oldeworld_api
           - stg_oldeworld_pxy
           - prd_oldeworld_pxy
-          - prd_oldeworld_nws
           - stg_oldeworld_jms
           - prd_oldeworld_jms
           - stg_oldeworld_clt
@@ -190,7 +188,6 @@ jobs:
           - ops_all
           - stg_oldeworld_api
           - prd_oldeworld_api
-          - prd_oldeworld_nws
           - stg_oldeworld_jms
           - prd_oldeworld_jms
           - stg_oldeworld_clt
