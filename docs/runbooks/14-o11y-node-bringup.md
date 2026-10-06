@@ -373,7 +373,7 @@ Delete the three devices in the tailnet admin console, then revoke the tokens: t
 - **The tailnet suffix is hard-coded** as `batfish-ray.ts.net` in the VictoriaMetrics values. A tailnet rename breaks all 80 targets at once.
 - **Linode label must equal the Tailscale hostname.** A rebuilt host that re-registers as `<name>-1` fails at DNS while its label is unchanged.
 - **A powered-off Linode stays a target** and reports `up=0`. That is the host-down signal.
-- **No alert rules yet.** Contact points and the policy exist; the capacity rules from the single-node era (`vm_storage_is_read_only`, free disk under `1.5 × vm_free_disk_space_limit_bytes`, root filesystem under 25 %, `vm_promscrape_discovery_linode_failures_total > 0`, `count(up{job="node"}) < 75`) are the first rules to write, as provisioned `rules.yaml` under `alerting`.
+- **No alert rules yet.** Contact points and the policy exist; the capacity rules from the single-node era (`vm_storage_is_read_only`, free disk under `1.5 × vm_free_disk_space_limit_bytes`, root filesystem under 25 %, `vm_promscrape_discovery_linode_failures_total > 0`, `count(up{job="node"}) < 68`) are the first rules to write, as provisioned `rules.yaml` under `alerting`.
 - **6443 and 10250 bind `0.0.0.0`.** The DigitalOcean firewall is their only control from the internet; between droplets the four tagged rules are the control. A host firewall for `100.64.0.0/10` only is the non-breaking second layer.
 - **No PSS labels on the `o11y` namespace.** Upstream charts; compliance untested.
 

@@ -122,7 +122,7 @@ alerting:
                 datasourceUid: __expr__
                 model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: gt, params: [0] } }] }
           - uid: fleet-degraded
-            title: Fewer than 75 fleet hosts are up
+            title: Fewer than 68 fleet hosts are up
             condition: C
             for: 10m
             noDataState: Alerting
@@ -138,4 +138,4 @@ alerting:
                 model: { refId: A, instant: true, expr: 'count(up{job="node"} == 1)' }
               - refId: C
                 datasourceUid: __expr__
-                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [75] } }] }
+                model: { refId: C, type: threshold, expression: A, conditions: [{ evaluator: { type: lt, params: [68] } }] }
