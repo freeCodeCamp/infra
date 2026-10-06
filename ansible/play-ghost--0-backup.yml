@@ -98,7 +98,7 @@
               no_check_bucket=true
             executable: /bin/bash
           when: rclone_config_check.rc != 0
-          # no_log: true
+          no_log: true
 
         - name: Create backup directory
           file:
@@ -120,6 +120,7 @@
               -u"{{ variable_mysql_db_root_user }}" \
               -p"{{ variable_mysql_db_root_password }}" \
               -h"{{ variable_mysql_db_root_host }}" \
+              -P"{{ variable_mysql_db_root_port | default('3306') }}" \
               --single-transaction \
               --protocol=tcp \
               --column-statistics=0 \
@@ -129,7 +130,7 @@
             executable: /bin/bash
           register: backup_database
           changed_when: backup_database.rc == 0
-          # no_log: true
+          no_log: true
 
         - name: Execute S3 sync tasks for non-English Ghost instances
           when: not ignore_run
