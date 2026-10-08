@@ -7,17 +7,6 @@
     backup: yes
   when: not dry_run | bool
 
-- name: "Restart PM2 client-{{ service_type }} service"
-  ansible.builtin.shell: |
-    export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    pm2 restart client-{{ service_type }}
-  args:
-    executable: /bin/bash
-    chdir: /home/freecodecamp/client
-  when: not dry_run | bool
-
-- name: "Wait for client-{{ service_type }} to stabilize"
-  ansible.builtin.pause:
-    seconds: 10
-  when: not dry_run | bool
+- name: "Restart client-{{ service_type }}"
+  ansible.builtin.include_tasks:
+    file: restart-client-service.yml

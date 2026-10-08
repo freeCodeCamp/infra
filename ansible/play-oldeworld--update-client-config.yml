@@ -19,6 +19,6 @@
     - name: Check if Git Repository was Updated
       debug:
         msg:
-          'Git Repository was updated, you should run the pipeline for a new
-          deployment.'
+          'Git Repository was updated. Run play-oldeworld--clients-restart.yml
+          or the deploy pipeline to load the new config.'
       when: git_update.changed
