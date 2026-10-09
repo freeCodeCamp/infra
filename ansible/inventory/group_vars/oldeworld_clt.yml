@@ -1,2 +1,5 @@
 ---
 node_exporter_systemd_unit_include: "^(cron|node_exporter|pm2-freecodecamp|ssh|tailscaled)[.]service"
+pm2_required_bins: [pm2, serve]
+pm2_app_ports: [50505, 52525]
+nodejs_extra_global_packages: [serve@13]

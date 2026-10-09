@@ -5,6 +5,8 @@
   become: true
   become_user: freecodecamp
   gather_facts: false
+  vars:
+    nodejs_global_packages: [npm, pnpm, pm2]
   tasks:
     - name: Install or Update Node.js
       include_role:
@@ -31,14 +33,27 @@
         cmd: |
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-          npm i -g npm pnpm pm2
-          sleep 2
-          pm2 install pm2-logrotate
-          sleep 2
-          pm2 update
-          sleep 2
-          pm2 resurrect
-          sleep 2
-          pm2 save
+          npm i -g {{ (nodejs_global_packages + nodejs_extra_global_packages | default([])) | join(' ') }}
+          pm2 jlist | grep -q '"name":"pm2-logrotate"' || pm2 install pm2-logrotate
         chdir: /home/freecodecamp
         executable: /bin/bash
+
+    - name: Refresh PM2
+      include_tasks:
+        file: tasks/pm2-refresh.yml
+
+    - name: Remove Node.js versions other than the default
+      shell:
+        cmd: |
+          export NVM_DIR="$HOME/.nvm"
+          . "$NVM_DIR/nvm.sh"
+          default=$(nvm version default)
+          [[ "$default" == v* ]] || exit 1
+          for version in $(ls "$NVM_DIR/versions/node"); do
+            [[ "$version" == "$default" ]] && continue
+            nvm uninstall "$version" > /dev/null || exit 1
+            echo "$version"
+          done
+        executable: /bin/bash
+      register: removed_node_versions
+      changed_when: removed_node_versions.stdout | length > 0

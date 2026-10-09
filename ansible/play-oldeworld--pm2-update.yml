@@ -1,0 +1,9 @@
+---
+- name: Move PM2 and its unit to the default Node.js
+  hosts: "{{ variable_host | default('null') }}"
+  serial: 1
+  gather_facts: false
+  tasks:
+    - name: Refresh PM2
+      ansible.builtin.include_tasks:
+        file: tasks/pm2-refresh.yml

@@ -1,0 +1,218 @@
+---
+- name: Resolve the default Node.js and its PM2
+  ansible.builtin.shell: |
+    export NVM_DIR="$HOME/.nvm"
+    . "$NVM_DIR/nvm.sh"
+    node_bin=$(dirname "$(nvm which default)")
+    printf '%s\n%s\n' "$node_bin" "$(readlink -f "$node_bin/pm2")"
+  args:
+    executable: /bin/bash
+  register: pm2_default_node
+  changed_when: false
+
+- name: Set the PM2 paths
+  ansible.builtin.set_fact:
+    pm2_node_bin: '{{ pm2_default_node.stdout_lines[0] }}'
+    pm2_bin: '{{ pm2_default_node.stdout_lines[1] }}'
+    pm2_unit: 'pm2-{{ pm2_user }}'
+
+- name: Check the required binaries in the default Node.js
+  ansible.builtin.stat:
+    path: '{{ pm2_node_bin }}/{{ item }}'
+  loop: '{{ pm2_required_bins }}'
+  register: pm2_required_bin_stats
+
+- name: Fail if a required binary is missing
+  ansible.builtin.assert:
+    that:
+      - pm2_required_bin_stats.results | rejectattr('stat.exists') | list | length == 0
+    fail_msg: '{{ pm2_node_bin }} must contain {{ pm2_required_bins }}'
+
+- name: Check that the app ports listen before any change
+  ansible.builtin.wait_for:
+    port: '{{ item }}'
+    timeout: 5
+  loop: '{{ pm2_app_ports }}'
+
+- name: Compare the PM2 unit with the template
+  ansible.builtin.template:
+    src: pm2/pm2-freecodecamp.service.j2
+    dest: '/etc/systemd/system/{{ pm2_unit }}.service'
+    mode: '0644'
+  check_mode: true
+  become: true
+  become_user: root
+  register: pm2_unit_drift
+
+- name: Find processes that run a Node.js other than the default
+  ansible.builtin.shell: &pm2_stale_processes |
+    for pid in $(pgrep -u {{ pm2_user }}); do
+      exe=$(readlink "/proc/$pid/exe" 2>/dev/null) || continue
+      if [[ "$exe" == */versions/node/* && "$exe" != "{{ pm2_node_bin }}/"* ]]; then
+        printf '%s %s\n' "$pid" "$exe"
+      fi
+    done
+  args:
+    executable: /bin/bash
+  register: pm2_stale_before
+  changed_when: false
+
+- name: Read the PM2 daemon status
+  ansible.builtin.shell: &pm2_ls |
+    export NVM_DIR="$HOME/.nvm"
+    . "$NVM_DIR/nvm.sh"
+    pm2 ls 2>&1
+  args:
+    executable: /bin/bash
+  register: pm2_status_before
+  changed_when: false
+
+- name: Decide if PM2 needs a refresh
+  ansible.builtin.set_fact:
+    pm2_needs_refresh: "{{ pm2_unit_drift.changed or pm2_stale_before.stdout | length > 0 or 'out-of-date' in pm2_status_before.stdout }}"
+
+- name: Refresh the PM2 unit and daemon
+  when: pm2_needs_refresh | bool
+  block:
+    - name: Save the PM2 process list
+      ansible.builtin.shell: &pm2_save |
+        export NVM_DIR="$HOME/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        pm2 save
+      args:
+        executable: /bin/bash
+      register: pm2_save_before
+      changed_when: true
+      failed_when: pm2_save_before.rc != 0 or 'skipping save' in pm2_save_before.stdout
+
+    - name: Read the PM2 process list
+      ansible.builtin.slurp:
+        src: '{{ pm2_home }}/dump.pm2'
+      register: pm2_dump
+
+    - name: Set the PM2 app names
+      ansible.builtin.set_fact:
+        pm2_apps: "{{ pm2_dump.content | b64decode | from_json | map(attribute='name') | list }}"
+
+    - name: Fail if the PM2 process list is empty
+      ansible.builtin.assert:
+        that:
+          - pm2_apps | length > 0
+        fail_msg: '{{ pm2_home }}/dump.pm2 lists no apps'
+
+    - name: Write the PM2 unit
+      ansible.builtin.template:
+        src: pm2/pm2-freecodecamp.service.j2
+        dest: '/etc/systemd/system/{{ pm2_unit }}.service'
+        mode: '0644'
+      become: true
+      become_user: root
+
+    - name: Enable the PM2 unit
+      ansible.builtin.systemd_service:
+        name: '{{ pm2_unit }}'
+        enabled: true
+        daemon_reload: true
+      become: true
+      become_user: root
+
+    - name: Move the daemon and apps to the default Node.js
+      block:
+        - name: Replace the running PM2 daemon with the unit
+          ansible.builtin.shell: |
+            runuser -l {{ pm2_user }} -c 'export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; pm2 kill'
+            systemctl restart {{ pm2_unit }}
+          args:
+            executable: /bin/bash
+          become: true
+          become_user: root
+          async: 120
+          poll: 5
+          changed_when: true
+
+        - name: Wait for the app ports after the unit start
+          ansible.builtin.wait_for:
+            port: '{{ item }}'
+            timeout: 60
+          loop: '{{ pm2_app_ports }}'
+
+        - name: Restart each app with the default Node.js environment
+          ansible.builtin.shell: |
+            set -e
+            export NVM_DIR="$HOME/.nvm"
+            . "$NVM_DIR/nvm.sh"
+            pm2 restart {{ item | quote }} --update-env
+            for port in {{ pm2_app_ports | join(' ') }}; do
+              timeout 60 bash -c "until (: > /dev/tcp/127.0.0.1/$port) 2>/dev/null; do sleep 1; done"
+            done
+          args:
+            executable: /bin/bash
+          loop: '{{ pm2_apps }}'
+          changed_when: true
+
+        - name: Save the refreshed PM2 process list
+          ansible.builtin.shell: *pm2_save
+          args:
+            executable: /bin/bash
+          changed_when: true
+      rescue:
+        - name: Restore the apps from the saved process list
+          ansible.builtin.shell: |
+            set -o pipefail
+            export NVM_DIR="$HOME/.nvm"
+            . "$NVM_DIR/nvm.sh"
+            for app in {{ pm2_apps | map('quote') | join(' ') }}; do
+              pid=$(pm2 pid "$app" 2> /dev/null | grep -Ex '[1-9][0-9]*' | head -1)
+              if [[ -z "$pid" ]]; then
+                pm2 kill
+                pm2 resurrect
+                break
+              fi
+            done
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Wait for the app ports after the restore
+          ansible.builtin.wait_for:
+            port: '{{ item }}'
+            timeout: 60
+          loop: '{{ pm2_app_ports }}'
+
+        - name: Stop on this host after the restore
+          ansible.builtin.fail:
+            msg: 'The PM2 refresh failed on {{ inventory_hostname }}; the apps run from {{ pm2_home }}/dump.pm2'
+
+- name: Find processes that still run a Node.js other than the default
+  ansible.builtin.shell: *pm2_stale_processes
+  args:
+    executable: /bin/bash
+  register: pm2_stale_after
+  changed_when: false
+
+- name: Read the PM2 unit start command
+  ansible.builtin.systemd_service:
+    name: '{{ pm2_unit }}'
+  register: pm2_unit_exec
+
+- name: Read the PM2 daemon status again
+  ansible.builtin.shell: *pm2_ls
+  args:
+    executable: /bin/bash
+  register: pm2_status_after
+  changed_when: false
+
+- name: Fail if PM2 is not on the default Node.js
+  ansible.builtin.assert:
+    that:
+      - pm2_stale_after.stdout | length == 0
+      - pm2_bin in pm2_unit_exec.status.ExecStart
+      - pm2_unit_exec.status.ActiveState == 'active'
+      - "'out-of-date' not in pm2_status_after.stdout"
+    fail_msg: "stale={{ pm2_stale_after.stdout_lines }} unit={{ pm2_unit_exec.status.ExecStart }}"
+
+- name: Check that the app ports listen
+  ansible.builtin.wait_for:
+    port: '{{ item }}'
+    timeout: 5
+  loop: '{{ pm2_app_ports }}'
