@@ -6,7 +6,7 @@
   become_user: freecodecamp
   gather_facts: false
   vars:
-    nodejs_global_packages: [npm, pnpm, pm2]
+    nodejs_global_packages: [npm, pnpm, pm2@7]
   tasks:
     - name: Install or Update Node.js
       include_role:
