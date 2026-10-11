@@ -226,7 +226,7 @@ configs:
     name: oncall_scripts_lib_v1
     file: ./scripts/lib.sh
   scripts_dispatch:
-    name: oncall_scripts_dispatch_v1
+    name: oncall_scripts_dispatch_v2
     file: ./scripts/dispatch.sh
   scripts_watchdog:
     name: oncall_scripts_watchdog_v1
