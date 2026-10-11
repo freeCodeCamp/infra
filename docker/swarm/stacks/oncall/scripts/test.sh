@@ -72,6 +72,7 @@ check() {
 }
 
 api_calls() { grep -c '^API ' "$log"; }
+dispatch_calls() { grep -c '^API .*/dispatches$' "$log"; }
 chat_calls() { grep -c '^CHAT ' "$log"; }
 
 json_probe='import json, sys
@@ -89,24 +90,53 @@ chat_lines() {
   grep '^CHATDATA ' "$log" | sed 's/^CHATDATA //' | python3 -c "$lines_probe" 2>&1
 }
 
-run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100
+LAST_OK='{"workflow_runs":[{"id":1,"status":"completed","conclusion":"success","html_url":"https://github.com/freeCodeCamp/news/actions/runs/1"}]}'
+LAST_FAILED='{"workflow_runs":[{"id":2,"status":"completed","conclusion":"failure","html_url":"https://github.com/freeCodeCamp/news/actions/runs/2"}]}'
+
+run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=200 FAKE_BODY="$LAST_OK"
 check "avoid inside window exits 0" "$status" 0
-check "avoid inside window makes no API call" "$(api_calls)" 0
+check "avoid inside window starts nothing" "$(dispatch_calls)" 0
+check "avoid inside window reads the last main run" "$(grep '^API ' "$log")" \
+  "API http://api.test/repos/freeCodeCamp/news/actions/workflows/deploy-eng.yml/runs?branch=main&status=completed&per_page=1"
+check "avoid skip after a good run posts no chat" "$(chat_calls)" 0
+
+run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
+check "avoid skip after a failed run exits 0" "$status" 0
+check "avoid skip after a failed run starts nothing" "$(dispatch_calls)" 0
+check "avoid skip after a failed run is a standard warn line" \
+  "$(chat_text_has '⚠️ *dispatch* · freeCodeCamp/news deploy-eng.yml · skipped: inside the maintenance window, the last run is failure')" 1
+check "avoid skip after a failed run links that run" \
+  "$(chat_text_has '<https://github.com/freeCodeCamp/news/actions/runs/2|last run>')" 1
+check "avoid skip warn is one line" "$(chat_lines)" 1
+
+run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$((WED_0100 + 2 * 3600 + 5 * 60)) FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
+check "second window skip after a failed run posts no chat" "$(chat_calls)" 0
+
+run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 DISPATCH_REF=refs/heads/main FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
+check "full ref reads runs by branch name" "$(grep -c 'runs?branch=main&' "$log")" 1
+
+run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=200 \
+  FAKE_BODY='{"workflow_runs":[{"conclusion":"cancelled","html_url":"https://x.test/3"}]}'
+check "avoid skip after a cancelled run posts chat" "$(chat_text_has 'the last run is cancelled')" 1
+
+run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=503 FAKE_BODY=down
+check "avoid skip with an unreadable API exits 0" "$status" 0
+check "avoid skip with an unreadable API posts no chat" "$(chat_calls)" 0
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0559
-check "window includes Wed 05:59" "$(api_calls)" 0
+check "window includes Wed 05:59" "$(dispatch_calls)" 0
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$SAT_0000
-check "window includes Sat 00:00" "$(api_calls)" 0
+check "window includes Sat 00:00" "$(dispatch_calls)" 0
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0600
-check "window excludes Wed 06:00" "$(api_calls)" 1
+check "window excludes Wed 06:00" "$(dispatch_calls)" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$TUE_2359
-check "window excludes Tue 23:59" "$(api_calls)" 1
+check "window excludes Tue 23:59" "$(dispatch_calls)" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0905
-check "window excludes Wed 09:05 (leading-zero hour)" "$(api_calls)" 1
+check "window excludes Wed 09:05 (leading-zero hour)" "$(dispatch_calls)" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$THU_0605
 check "avoid outside window exits 0" "$status" 0

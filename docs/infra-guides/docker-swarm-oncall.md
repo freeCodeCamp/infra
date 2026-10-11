@@ -80,7 +80,7 @@ GitHub `schedule` triggers start late or do not start at all (observed since 202
 
 The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it once.
 
-- `avoid`: inside the window, the dispatcher does nothing.
+- `avoid`: inside the window, the dispatcher starts nothing. If the last completed run on the branch failed or was cancelled, the first skip of the window (00:00–03:00 UTC) posts a warning to Google Chat.
 - `require`: outside the window, the dispatcher refuses and posts to Google Chat.
 
 The dispatcher posts to Google Chat when the API refuses the request or when a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
