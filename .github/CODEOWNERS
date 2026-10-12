@@ -13,15 +13,8 @@
 
 * @freecodecamp/dev-team
 
-# --- Owned by none (negate rule above) ---
-
-package.json
-package-lock.json
-
-
 /* @freecodecamp/dev-team
 
-# --- Owned by none (negate rule above) ---
-
-/package.json
-/package-lock.json
+uv.lock @freecodecamp/package-approvers
+requirements.yml @freecodecamp/package-approvers
+.terraform.lock.hcl @freecodecamp/package-approvers
