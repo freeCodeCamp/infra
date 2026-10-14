@@ -4,19 +4,19 @@ The plays in `ansible/` and the commands that replace the `justfile` (removed 20
 
 ## Before You Start
 
-Run the play commands from `ansible/`. Run the former `just` recipes from the repository root. `direnv exec .` loads the Linode and DigitalOcean tokens.
+Run the play commands from `ansible/`. Run the former `just` recipes from the repository root. direnv loads the Linode and DigitalOcean tokens and puts `ansible/.venv/bin` on `PATH`, so `ansible-*` commands need no `uv run`.
 
 ```bash
 cd ansible
 uv sync --locked
-uv run ansible-galaxy install -r requirements.yml
+ansible-galaxy install -r requirements.yml
 ```
 
 Show the groups:
 
 ```bash
-direnv exec . uv run ansible-inventory -i inventory/linode.yml --graph
-direnv exec . uv run ansible-inventory -i inventory/digitalocean.yml --graph
+ansible-inventory -i inventory/linode.yml --graph
+ansible-inventory -i inventory/digitalocean.yml --graph
 ```
 
 ## Rules for Every Play
@@ -35,7 +35,7 @@ direnv exec . uv run ansible-inventory -i inventory/digitalocean.yml --graph
 The command form:
 
 ```bash
-direnv exec . uv run ansible-playbook -i inventory/linode.yml <play> -e variable_host=<group> [-e <input>=<value>]
+ansible-playbook -i inventory/linode.yml <play> -e variable_host=<group> [-e <input>=<value>]
 ```
 
 ## Linode Plays
@@ -104,8 +104,8 @@ Run these from the repository root.
 
 | Recipe                                    | Command                                                                                                                                                |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `just bootstrap <play> <group>`           | `cd ansible && direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-<play>.yml -e variable_host=<group>`                           |
-| `just bootstrap-tools`                    | `cd ansible && uv sync --locked && uv run ansible-galaxy install -r requirements.yml`                                                                  |
+| `just bootstrap <play> <group>`           | `cd ansible && ansible-playbook -i inventory/digitalocean.yml play-<play>.yml -e variable_host=<group>`                           |
+| `just bootstrap-tools`                    | `cd ansible && uv sync --locked && ansible-galaxy install -r requirements.yml`                                                                  |
 | `just provision <cmd> <ws>`               | `terraform -chdir=terraform/<ws> <cmd>`. List the workspaces with `find terraform -name .terraform.lock.hcl -exec dirname {} \;`.                      |
 | `just release ops-backoffice-tools <app>` | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern)                                                                              |
 | `just configure-kubeconfig <cluster>`     | `(umask 077 && sops decrypt --input-type yaml --output-type yaml ../infra-secrets/k3s/<cluster>/kubeconfig.yaml.enc > k3s/<cluster>/.kubeconfig.yaml && chmod 600 k3s/<cluster>/.kubeconfig.yaml)` |

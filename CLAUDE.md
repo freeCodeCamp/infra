@@ -72,6 +72,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 ## Ansible
 
 - Plays, inputs and the former `just` recipes: `docs/infra-guides/ansible.md`
+- Root `.envrc` puts `ansible/.venv/bin` on `PATH`. Write `ansible-playbook` and `ansible-*` commands with no `uv run` and no `direnv exec .` prefix.
 - Per-group config: `ansible/inventory/group_vars/<group>.yml`
 - Playbooks generic orchestrators — reference variables, not literal values
 - Add a group: create a group_vars file matching the DO inventory tag
