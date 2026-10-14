@@ -1,6 +1,6 @@
 # Usage
 
-Once the StackScript is provisioned using the terraform config in this folder, you can use it as a resource elsewhere like so:
+Once the StackScript is provisioned using the terraform config in `terraform/ops-stackscripts/`, you can use it as a resource elsewhere like so:
 
 ```hcl
   resource "linode_instance" "test" {

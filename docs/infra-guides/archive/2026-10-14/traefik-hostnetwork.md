@@ -1,5 +1,7 @@
 # Traefik on k3s with hostNetwork — pitfalls and patterns
 
+> **Historical.** This guide describes the Universe platform, which was torn down in October 2026. Its paths exist only at commit `027d913d6f38`. No live cluster uses this setup.
+
 Operator-runnable reference for the Traefik DaemonSet that every Universe galaxy uses for `:80`/`:443` ingress. Promotes operational findings from the archived field-notes (`Universe/.archive/infra/`) into canonical guidance — the WHY behind values that already live in chart code.
 
 > **Read first:** [ADR-009 §Ingress](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/009-networking-domains.md) for the Traefik-DaemonSet-over-cloud-LB rationale.
@@ -156,7 +158,7 @@ Hitting "missing managed-by" on a CRD?
 
 ## Cross-refs
 
-- [`docs/infra-guides/chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) point 5 — CF zone SSL mode gate.
+- [`docs/infra-guides/chart-pre-merge-checklist.md`](../../chart-pre-merge-checklist.md) point 5 — CF zone SSL mode gate.
 - [`docs/infra-guides/cilium-cnp.md`](./cilium-cnp.md) — when adding a CNP to a chart that uses Traefik hostNetwork, ingress must allow `fromEntities: [host]` (Cilium identifies hostNetwork pods as the `host` entity).
 - [`Architecture/docs/infra/flight-manuals/UNIVERSE.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/flight-manuals/UNIVERSE.md) §3.2 — new-galaxy pre-flight file list.
 - ADR-009 §Ingress — DaemonSet-over-LB rationale.

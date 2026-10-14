@@ -63,7 +63,7 @@ Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age,
 
 Layout contract + per-path consumer matrix: `docs/architecture/rfc-secrets-layout.md`.
 
-Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to JSON parser and silently fails — explicit `--input-type dotenv --output-type dotenv` is required.
+Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to the JSON parser and fails — explicit `--input-type dotenv --output-type dotenv` is required.
 
 ## Operations
 

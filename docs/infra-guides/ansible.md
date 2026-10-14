@@ -9,8 +9,10 @@ Run the play commands from `ansible/`. Run the former `just` recipes from the re
 ```bash
 cd ansible
 uv sync --locked
-ansible-galaxy install -r requirements.yml
+.venv/bin/ansible-galaxy install -r requirements.yml
 ```
+
+On a fresh clone, direnv adds `ansible/.venv/bin` to `PATH` only after `uv sync` and the next `cd` into the repository. The first `ansible-galaxy` call uses the full path for this reason.
 
 Show the groups:
 
@@ -105,10 +107,10 @@ Run these from the repository root.
 | Recipe                                    | Command                                                                                                                                                |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `just bootstrap <play> <group>`           | `cd ansible && ansible-playbook -i inventory/digitalocean.yml play-<play>.yml -e variable_host=<group>`                           |
-| `just bootstrap-tools`                    | `cd ansible && uv sync --locked && ansible-galaxy install -r requirements.yml`                                                                  |
-| `just provision <cmd> <ws>`               | `terraform -chdir=terraform/<ws> <cmd>`. List the workspaces with `find terraform -name .terraform.lock.hcl -exec dirname {} \;`.                      |
+| `just bootstrap-tools`                    | `cd ansible && uv sync --locked && .venv/bin/ansible-galaxy install -r requirements.yml`                                                                  |
+| `just provision <cmd> <ws>`               | `terraform -chdir=terraform/<ws> <cmd>`. For `ops-o11y`, run `cd terraform/ops-o11y && terraform <cmd>`, so direnv loads its `.envrc`. List the workspaces with `find terraform -name .terraform.lock.hcl -exec dirname {} \;`.                      |
 | `just release ops-backoffice-tools <app>` | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern)                                                                              |
-| `just configure-kubeconfig <cluster>`     | `(umask 077 && sops decrypt --input-type yaml --output-type yaml ../infra-secrets/k3s/<cluster>/kubeconfig.yaml.enc > k3s/<cluster>/.kubeconfig.yaml && chmod 600 k3s/<cluster>/.kubeconfig.yaml)` |
+| `just configure-kubeconfig <cluster>` | See [Kubeconfig From an Envelope](#kubeconfig-from-an-envelope). |
 | `just configure-secret <name>`            | `sops edit --input-type dotenv --output-type dotenv ../infra-secrets/<name>/.env.enc`                                                                                                                |
 | `just configure-policy <cluster>`         | No replacement. No cluster has a `cluster/policy` folder.                                                |
 | `just inspect-secret <name>`              | [Runbook 04](../runbooks/04-secrets-decrypt.md)                                                                                                        |
@@ -117,11 +119,27 @@ Run these from the repository root.
 | `just verify-manifests`                   | The `kubeconform` command in `.github/workflows/k8s--validate.yml`                                                                                     |
 | `just verify-secrets`                     | No replacement. Decrypt one envelope with runbook 04 to test the key.                                                                                  |
 
+## Kubeconfig From an Envelope
+
+Only `ops-backoffice-tools` has a kubeconfig envelope. The `ops-o11y` kubeconfig comes from `play-k3s--servers.yml`. Run from the repository root:
+
+```bash
+(
+  umask 077
+  f=k3s/<cluster>/.kubeconfig.yaml
+  sops decrypt --input-type yaml --output-type yaml \
+    ../infra-secrets/k3s/<cluster>/kubeconfig.yaml.enc > "$f.new" &&
+    mv "$f.new" "$f" || { rm -f "$f.new"; false; }
+)
+```
+
+If the decrypt fails, the current kubeconfig stays as it is. The new file has mode `600`.
+
 ## Housekeeping Workflow
 
-`ansible--housekeeping.yml` runs in this order: the maintenance window check, uptime, update staging, reboot staging NGINX, check staging NGINX, reboot staging, the same steps on production, then a last NGINX check on production.
+`ansible--housekeeping.yml` runs in this order: the maintenance window check, uptime, update staging, reboot staging NGINX, check staging NGINX, reboot staging, the same steps on production, then a last NGINX check on staging and production.
 
 - Outside Wednesday and Saturday 00:00-06:00 UTC, the run stops at the window check. Dispatch it with `window_check=false` to run it at another time.
 - If the staging NGINX check finds a problem, the production steps do not run that night. This is also true when the restart fixed NGINX.
-- The last NGINX check runs on production also when the production steps did not run. It can restart NGINX on `prd_oldeworld_pxy`.
+- The last NGINX check runs on `stg_oldeworld_pxy` and `prd_oldeworld_pxy`, also when the production steps did not run. It can restart NGINX on both groups.
 - The NGINX check posts its findings to Google Chat. The run summary in Google Chat shows each skipped stage.

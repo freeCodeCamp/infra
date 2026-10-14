@@ -1,23 +1,14 @@
 # Runbook — Decrypt sops-encrypted secrets
 
-**Type:** Operator-local · read-only.
-**Owners:** Infra team.
-**Last verified:** 2026-04-27.
+**Type:** Operator-local · read-only. **Owners:** Infra team. **Last verified:** 2026-10-14, sops 3.13.3.
 
-Single-purpose: decrypt one of the `*.env.enc` / `*.values.yaml.enc`
-envelopes under `../infra-secrets/` for inspection or for sourcing into
-a shell. Helm-rendering recipes and ops scripts MUST follow the dotenv
-incantation — sops auto-detect on `.enc` falls back to the JSON parser
-and silently fails on dotenv content.
+Single-purpose: decrypt one of the `*.env.enc` / `*.yaml.enc` envelopes under `../infra-secrets/` for inspection or for use in the environment of a command. sops selects the format from the last file extension. For `.enc` it uses the JSON parser, which fails on these envelopes. Always pass the type flags.
 
 ## Preconditions
 
-- `../infra-secrets/` checked out at the canonical relative path
-  (consumed by root `.envrc`).
-- Operator host has the org age key in
-  `~/Library/Application Support/sops/age/keys.txt` (macOS) or
-  `~/.config/sops/age/keys.txt` (Linux).
-- `sops` ≥ 3.8 on `PATH`.
+- `../infra-secrets/` checked out at the canonical relative path (consumed by root `.envrc`).
+- Operator host has the org age key in `$XDG_CONFIG_HOME/sops/age/keys.txt` when `XDG_CONFIG_HOME` is set, otherwise `~/Library/Application Support/sops/age/keys.txt` (macOS) or `~/.config/sops/age/keys.txt` (Linux).
+- `sops` ≥ 3.9 on `PATH`. The `decrypt` subcommand starts at 3.9.0.
 
 Check: `sops --version && age --version`.
 
@@ -25,45 +16,39 @@ Check: `sops --version && age --version`.
 
 ### 1. dotenv envelopes (`*.env.enc`)
 
-Required flags. Auto-detect on `.enc` extension routes to JSON;
-dotenv content trips
-`Error unmarshalling input json: invalid character '#'`.
-
 ```bash
 sops decrypt --input-type dotenv --output-type dotenv \
   ../infra-secrets/<scope>/<name>.env.enc
 ```
 
-### 2. Helm value overlays (`*.values.yaml.enc`)
+### 2. YAML envelopes (`*.yaml.enc`)
 
-YAML envelopes. Auto-detect does **not** work here: sops reads only the
-final `.enc` and applies the JSON parser, which fails with
-`Could not unmarshal input data: invalid character '#'`. Both flags are
-required, exactly as for a dotenv envelope:
+Examples: `docker/oldeworld/pxy-upstreams-prd.yaml.enc`, `k3s/ops-backoffice-tools/kubeconfig.yaml.enc`.
 
 ```bash
 sops decrypt --input-type yaml --output-type yaml \
-  ../infra-secrets/<scope>/<app>.values.yaml.enc
+  ../infra-secrets/<scope>/<name>.yaml.enc
 ```
 
-### 3. Source into a current shell (dotenv only)
+### 3. Run commands with the secrets in the environment (dotenv only)
 
 ```bash
-set -a
-source <(sops decrypt --input-type dotenv --output-type dotenv \
-  ../infra-secrets/<scope>/<name>.env.enc)
-set +a
+(
+  set -eu
+  secrets=$(sops decrypt --input-type dotenv --output-type dotenv \
+    ../infra-secrets/<scope>/<name>.env.enc)
+  while IFS= read -r line; do
+    case $line in '' | '#'*) continue ;; esac
+    export "$line"
+  done <<< "$secrets"
+  <command-that-reads-the-env>
+)
 ```
 
-Use sparingly — leaks secrets into the shell history if the
-operator runs `env` afterwards. Prefer `sops exec-env` for one-off
-commands:
-
-```bash
-sops exec-env --input-type dotenv --output-type dotenv \
-  ../infra-secrets/<scope>/<name>.env.enc \
-  '<command-that-reads-the-env>'
-```
+- The parentheses run a subshell. The secrets are not in your shell after the command.
+- `set -eu` stops the subshell before the command if the decrypt fails.
+- `export "$line"` keeps each value as it is. A value with `&`, `$`, a space or a quote is safe.
+- This works in zsh and bash.
 
 ## Rollback
 
@@ -72,21 +57,16 @@ Read-only operation. Nothing to roll back.
 ## Exit criteria
 
 - Plaintext content matches expectations (vars / keys present).
-- No `invalid character '#'` JSON-parser error in stderr.
+- No `Could not unmarshal input data` error in stderr.
 - Clipboard / scrollback cleared after inspection.
 
 ## Pitfalls
 
-- **No bare `sops decrypt` on `.env.enc`.** Auto-detect routes to JSON
-  → cryptic parse error. Always pass `--input-type dotenv
---output-type dotenv`.
-- **Helm chart secret-rendering commands** and the rendering scripts
-  in `scripts/` MUST pass both flags.
-- **Per-glob `input_type: dotenv` pin in `.sops.yaml`** would remove
-  the need for explicit flags but is deferred — the current
-  `.sops.yaml` rules block has no per-path type config.
+- **No `sops decrypt` without the type flags on an `.enc` file.** sops uses the JSON parser and fails with `Could not unmarshal input data`.
+- **Do not `source` the decrypted output.** The shell parses each value, so a value with `&`, `$` or a space breaks the parse. The command after it runs with missing values.
+- **Do not use `sops exec-env` on `.env.enc`.** In sops 3.13.3, `exec-env` has no `--input-type` flag, so it cannot read a dotenv envelope.
+- **`.sops.yaml` cannot set the type.** sops 3.13.3 creation rules have no `input_type` key, so the flags stay required.
 
 ## References
 
-- Field-note origin: `infra/CLAUDE.md` §infra-secrets coupling (now
-  pointer-only).
+- `infra/CLAUDE.md` §infra-secrets coupling.

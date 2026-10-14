@@ -105,7 +105,7 @@ ______________________________________________________________________
 
 Tailscale on nodes for SSH/kubectl access only (under review).
 
-See `tailscale/README.md` (repo root) for device inventory.
+See [`tailscale.md`](./tailscale.md) for device inventory.
 
 ______________________________________________________________________
 
@@ -216,7 +216,7 @@ ______________________________________________________________________
 
 ## Cross-refs
 
-- [`cilium-multi-nic.md`](./cilium-multi-nic.md) — MTU + device pinning on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
-- [`cilium-cnp.md`](./cilium-cnp.md) — CiliumNetworkPolicy patterns and the DNS L7 trap.
-- [`traefik-hostnetwork.md`](./traefik-hostnetwork.md) — Traefik DaemonSet pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
+- [`cilium-multi-nic.md`](./archive/2026-10-14/cilium-multi-nic.md) — MTU + device pinning on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
+- [`cilium-cnp.md`](./archive/2026-10-14/cilium-cnp.md) — CiliumNetworkPolicy patterns and the DNS L7 trap.
+- [`traefik-hostnetwork.md`](./archive/2026-10-14/traefik-hostnetwork.md) — Traefik DaemonSet pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
 - [`chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) — five-point gate every new chart clears before merge.

@@ -1,5 +1,7 @@
 # Cilium NetworkPolicy — patterns and traps
 
+> **Historical.** This guide describes the Universe platform, which was torn down in October 2026. Its paths exist only at commit `027d913d6f38`. No live cluster uses this setup.
+
 Operator-runnable reference for writing `CiliumNetworkPolicy` (CNP) manifests on the Universe galaxies. Promotes operational findings that previously lived only in field-notes (now consolidated under `Universe/.archive/infra/`) into canonical guidance.
 
 > **Read first:** [ADR-009 §Cilium](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/009-networking-domains.md#cni-cilium-without-cluster-mesh) for the CNI choice rationale; [ADR-011 §Within-galaxy CiliumNetworkPolicy](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/decisions/011-security-model.md#within-galaxy-cilium-ciliumnetworkpolicy) for the constellation-isolation posture.

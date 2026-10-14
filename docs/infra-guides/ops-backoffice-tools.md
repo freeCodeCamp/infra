@@ -2,12 +2,12 @@
 
 Internal tools cluster on k3s with Longhorn storage.
 
+Run every command on this page from the repository root.
+
 ## Access
 
 ```bash
-cd k3s/ops-backoffice-tools
-export KUBECONFIG=$(pwd)/.kubeconfig.yaml
-kubectl get nodes
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
 ```
 
 ## Applications
@@ -28,14 +28,20 @@ kubectl get nodes
 
 Required for cross-cluster communication.
 
+`read -rs` takes the OAuth client secret without echo, so it stays out of the shell history.
+
 ```bash
 helm repo add tailscale https://pkgs.tailscale.com/helmcharts
 helm repo update
-helm upgrade tailscale-operator tailscale/tailscale-operator \
-  -n tailscale --create-namespace --install \
-  -f cluster/tailscale/operator-values.yaml \
-  --set oauth.clientId=<CLIENT_ID> \
-  --set oauth.clientSecret=<CLIENT_SECRET>
+(
+  printf 'OAuth client secret: '
+  read -rs TS_OAUTH_CLIENT_SECRET; echo
+  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml helm upgrade tailscale-operator tailscale/tailscale-operator \
+    --namespace tailscale --create-namespace --install \
+    -f k3s/ops-backoffice-tools/cluster/tailscale/operator-values.yaml \
+    --set oauth.clientId=<CLIENT_ID> \
+    --set-file oauth.clientSecret=<(printf %s "$TS_OAUTH_CLIENT_SECRET")
+)
 ```
 
 ---
@@ -56,10 +62,10 @@ sops decrypt --input-type dotenv --output-type dotenv "$ENC/$APP.secrets.env.enc
 rm -f "$SEC/.secrets.env" "$SEC/tls.crt" "$SEC/tls.key"
 
 # Check
-kubectl get all -n <app>
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get all -n <app>
 
 # Logs
-kubectl logs -n <app> deploy/<app>
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl logs -n <app> deploy/<app>
 ```
 
 ### Secrets Structure
@@ -79,18 +85,18 @@ apps/<app>/manifests/base/secrets/
 ### Tailscale Connectivity
 
 ```bash
-kubectl logs -n tailscale deploy/operator
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl logs -n tailscale deploy/operator
 ```
 
 ### PVC Stuck Pending
 
 ```bash
-kubectl get volumes.longhorn.io -n longhorn-system
-kubectl describe pvc -n <namespace> <pvc-name>
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get volumes.longhorn.io -n longhorn-system
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl describe pvc -n <namespace> <pvc-name>
 ```
 
 ### Longhorn UI
 
 ```bash
-kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ```

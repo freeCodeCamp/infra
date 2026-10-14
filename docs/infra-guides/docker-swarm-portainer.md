@@ -36,15 +36,17 @@ Portainer uses the `--trusted-origins` flag to allow access from the Tailscale d
 
 ### 1. Deploy Stack
 
-Set the environment variable and deploy in one command:
+Run from the repository root. Set the environment variable and deploy in one command:
 
 ```shell
+cd docker/swarm/stacks/portainer
 TAILSCALE_HOSTNAME=your-device.your-tailnet.ts.net docker stack deploy -c stack-portainer.yml portainer
 ```
 
 Or export the variable first, then deploy:
 
 ```shell
+cd docker/swarm/stacks/portainer
 export TAILSCALE_HOSTNAME=your-device.your-tailnet.ts.net
 docker stack deploy -c stack-portainer.yml portainer
 ```
