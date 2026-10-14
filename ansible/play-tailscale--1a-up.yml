@@ -2,59 +2,107 @@
 # Usage:
 #   ansible-playbook -i inventory/linode.yml play-tailscale--1a-up.yml \
 #     -e variable_host=<group>
-#
-# The device is tagged at enrolment. Override the default tag list with
-#   -e variable_tags=tag:added-by-ops,tag:<extra>
-# Repeat the same -e variable_tags on every re-run of a host that carries more
-# than the default tag; tailscale up keeps no flags between runs.
 - name: Tailscale - Connect to Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   become: true
   gather_facts: false
+  vars:
+    tailscale_auth_key: "{{ lookup('ansible.builtin.env', 'TAILSCALE_AUTH_KEY') }}"
   tasks:
+    - name: Fail without an auth key
+      ansible.builtin.assert:
+        that:
+          - tailscale_auth_key | length > 0
+        fail_msg: Export TAILSCALE_AUTH_KEY before you run this play.
+        quiet: true
+
     - name: Check if Tailscale is Installed
-      shell:
-        cmd: |
-          tailscale --version
-        executable: /bin/bash
-      register: tailscale_version
+      ansible.builtin.command: tailscale --version
+      changed_when: false
+      check_mode: false
+
+    - name: Read the current Tailscale settings
+      ansible.builtin.command: tailscale debug prefs
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      register: tailscale_prefs
+
+    - name: Read the current Tailscale tags
+      ansible.builtin.command: tailscale status --json
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      register: tailscale_before
+
+    - name: Fail on an invalid SSH or tag input
+      ansible.builtin.assert:
+        that:
+          - variable_ssh is not defined or (variable_ssh | string | lower) in ['true', 'false']
+          - >-
+            variable_tags is not defined
+            or (variable_tags | string).split(',') | reject('match', '^tag:[A-Za-z0-9-]+$') | list | length == 0
+        fail_msg: "Pass -e variable_ssh=true or -e variable_ssh=false, and -e variable_tags=tag:<name>[,tag:<name>]."
+        quiet: true
+
+    - name: Fail when the current settings cannot be read
+      ansible.builtin.assert:
+        that:
+          - (tailscale_prefs.rc == 0 and tailscale_before.rc == 0) or (variable_ssh is defined and variable_tags is defined)
+        fail_msg: "Cannot read the Tailscale settings on {{ inventory_hostname }}. Pass -e variable_ssh=true|false and -e variable_tags=<tags>."
+        quiet: true
+
+    - name: Keep the current SSH setting and tags unless the run sets them
+      ansible.builtin.set_fact:
+        tailscale_ssh: >-
+          {{ (variable_ssh | bool) if variable_ssh is defined
+          else ((tailscale_prefs.stdout | from_json).RunSSH | default(false)) }}
+        tailscale_tags: >-
+          {{ variable_tags if variable_tags is defined
+          else (((tailscale_before.stdout | from_json).Self.Tags | default([], true))
+          or ((tailscale_prefs.stdout | from_json).AdvertiseTags | default([], true))
+          or ['tag:added-by-ops']) | join(',') }}
+
+    - name: Show the settings this run applies
+      ansible.builtin.debug:
+        msg: "keep_ssh={{ tailscale_ssh | bool | lower }} keep_tags={{ tailscale_tags }}"
 
     - name: Add Tailscale to Network
-      shell:
-        cmd: |
-          tailscale up \
-          --authkey "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}" \
-          --hostname {{ inventory_hostname }} \
-          --advertise-tags "{{ variable_tags | default('tag:added-by-ops') }}" \
-          --force-reauth \
-          --reset
-        executable: /bin/bash
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - up
+          - --authkey
+          - "{{ tailscale_auth_key }}"
+          - --hostname
+          - "{{ inventory_hostname }}"
+          - --advertise-tags
+          - "{{ tailscale_tags }}"
+          - --force-reauth
+          - --reset
+          - --ssh={{ tailscale_ssh | bool | lower }}
       no_log: true
       changed_when: true
-      ignore_errors: true
+      failed_when: false
       register: tailscale_up
 
-    - name: Print error message if Tailscale failed
-      debug:
-        msg: '{{ tailscale_up.stderr }}'
-      when: tailscale_up.rc != 0
+    - name: Fail with the tailscale up error
+      ansible.builtin.fail:
+        msg: "{{ tailscale_up.stderr | regex_replace('tskey-[A-Za-z0-9_-]+', 'tskey-REDACTED') }}"
+      when: tailscale_up.rc | default(0) != 0
 
-    - name: Check if Tailscale is Connected
-      shell:
-        cmd: |
-          tailscale status --json | jq -r '.Self.Online'
-        executable: /bin/bash
+    - name: Read the Tailscale status
+      ansible.builtin.command: tailscale status --json
+      changed_when: false
+      check_mode: false
       register: tailscale_status
 
-    - name: Check DNS name
-      shell:
-        cmd: |
-          tailscale status --json | jq -r '.Self.DNSName'
-        executable: /bin/bash
-      register: tailscale_dns
-
-    - name: Print Tailscale Status
-      debug:
-        msg: |
-          Tailscale Status: {{ tailscale_status.stdout }}
-          Tailscale DNS: {{ tailscale_dns.stdout }}
+    - name: Fail if the node is not online
+      ansible.builtin.assert:
+        that:
+          - (tailscale_status.stdout | from_json).Self.Online
+        fail_msg: "{{ inventory_hostname }} is not online on the tailnet."
+        success_msg: "{{ (tailscale_status.stdout | from_json).Self.DNSName }} is online, ssh={{ tailscale_ssh | bool | lower }}, tags={{ tailscale_tags }}."
+      when: not ansible_check_mode

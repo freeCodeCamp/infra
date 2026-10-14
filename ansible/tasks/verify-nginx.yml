@@ -11,7 +11,6 @@
 
 - name: Wait for the host to accept connections
   ansible.builtin.wait_for_connection:
-    delay: 5
     timeout: 300
 
 # failed_when: false because the systemd module fail_json()s on a unit with a
@@ -85,6 +84,7 @@
   register: verify_listener
   failed_when: false
   changed_when: false
+  check_mode: false
   when: verify_nginx_port | int > 0
 
 # The restart policy is the whole root-cause fix, and it ships as a manual
@@ -100,6 +100,7 @@
   register: verify_config
   changed_when: false
   failed_when: false
+  check_mode: false
 
 # Normalise the two probe results into plain booleans BEFORE the finding is
 # built, so the finding builder takes a clean contract and can be driven by

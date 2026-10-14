@@ -85,37 +85,96 @@ jobs:
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      serial: 3
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  wait-on-uptime:
-    name: Wait on Uptime
+  update-stg:
+    name: Update (staging)
     needs: uptime
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+    strategy:
+      fail-fast: false
+      matrix:
+        host_groups:
+          - stg_oldeworld_api
+          - stg_oldeworld_pxy
+          - stg_oldeworld_jms
+          - stg_oldeworld_clt
+    uses: ./.github/workflows/ansible--update.yml
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: "-v"
+      serial: 1
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Wait for 300 seconds
-        run: sleep 300
+  reboot-web-stg:
+    name: Reboot Ingress (staging)
+    needs: update-stg
+    strategy:
+      fail-fast: false
+      matrix:
+        host_groups:
+          - stg_oldeworld_pxy
+    uses: ./.github/workflows/ansible--reboot.yml
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: "-v"
+      serial: 1
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  update:
-    name: Update
-    needs: wait-on-uptime
+  gate-web-stg:
+    name: Gate NGINX (staging)
+    needs: reboot-web-stg
+    strategy:
+      fail-fast: false
+      matrix:
+        host_groups:
+          - stg_oldeworld_pxy
+    uses: ./.github/workflows/ansible--verify-nginx.yml
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: "-v"
+      stage: Gate NGINX (staging)
+      artifact_prefix: nginx-gate
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+
+  reboot-stg:
+    name: Reboot (staging)
+    needs: gate-web-stg
+    strategy:
+      fail-fast: false
+      matrix:
+        host_groups:
+          - stg_oldeworld_api
+          - stg_oldeworld_jms
+          - stg_oldeworld_clt
+    uses: ./.github/workflows/ansible--reboot.yml
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: "-v"
+      serial: 1
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+  update-prd:
+    name: Update (production)
+    needs: reboot-stg
     strategy:
       fail-fast: false
       matrix:
         host_groups:
           - ops_all
-          - stg_oldeworld_api
           - prd_oldeworld_api
-          - stg_oldeworld_pxy
           - prd_oldeworld_pxy
-          - stg_oldeworld_jms
           - prd_oldeworld_jms
-          - stg_oldeworld_clt
           - prd_oldeworld_clt_eng
           - prd_oldeworld_clt_chn
           - prd_oldeworld_clt_cnt
@@ -128,7 +187,6 @@ jobs:
           - prd_oldeworld_clt_swa
           - prd_oldeworld_clt_kor
           - prd_oldeworld_clt_ara
-
     uses: ./.github/workflows/ansible--update.yml
     with:
       hosts: ${{ matrix.host_groups }}
@@ -138,25 +196,13 @@ jobs:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  wait-on-update:
-    name: Wait on Update
-    needs: update
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Wait for 300 seconds
-        run: sleep 300
-
-  reboot-web:
-    name: Reboot Ingress
-    needs: wait-on-update
+  reboot-web-prd:
+    name: Reboot Ingress (production)
+    needs: update-prd
     strategy:
       fail-fast: false
       matrix:
         host_groups:
-          - stg_oldeworld_pxy
           - prd_oldeworld_pxy
     uses: ./.github/workflows/ansible--reboot.yml
     with:
@@ -167,30 +213,35 @@ jobs:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  wait-on-reboot-web:
-    name: Wait on Reboot (Web)
-    needs: reboot-web
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+  gate-web-prd:
+    name: Gate NGINX (production)
+    needs: reboot-web-prd
+    strategy:
+      fail-fast: false
+      matrix:
+        host_groups:
+          - prd_oldeworld_pxy
+    uses: ./.github/workflows/ansible--verify-nginx.yml
+    with:
+      hosts: ${{ matrix.host_groups }}
+      verbosity: "-v"
+      stage: Gate NGINX (production)
+      artifact_prefix: nginx-gate
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
 
-      - name: Wait for 300 seconds
-        run: sleep 300
-
-  reboot:
-    name: Reboot
-    needs: wait-on-reboot-web
+  reboot-prd:
+    name: Reboot (production)
+    needs: gate-web-prd
     strategy:
       fail-fast: false
       matrix:
         host_groups:
           - ops_all
-          - stg_oldeworld_api
           - prd_oldeworld_api
-          - stg_oldeworld_jms
           - prd_oldeworld_jms
-          - stg_oldeworld_clt
           - prd_oldeworld_clt_eng
           - prd_oldeworld_clt_chn
           - prd_oldeworld_clt_cnt
@@ -203,7 +254,6 @@ jobs:
           - prd_oldeworld_clt_swa
           - prd_oldeworld_clt_kor
           - prd_oldeworld_clt_ara
-
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
@@ -223,7 +273,7 @@ jobs:
   # finding rather than a normal absence.
   verify-nginx:
     name: Verify NGINX
-    needs: [window, reboot]
+    needs: [window, reboot-prd]
     # This condition widens rather than narrows: it makes the check run even
     # when a stage above failed or was skipped, which is exactly when a
     # service is most likely to be down.
@@ -247,7 +297,7 @@ jobs:
 
   report:
     name: Report
-    needs: [window, uptime, update, reboot-web, reboot, verify-nginx]
+    needs: [window, uptime, update-stg, reboot-web-stg, gate-web-stg, reboot-stg, update-prd, reboot-web-prd, gate-web-prd, reboot-prd, verify-nginx]
     # always(), not success(): the run that most needs a message is the one
     # that failed. Once this posts on every run, a Wednesday or Saturday with
     # NO message means the workflow never ran at all -- the one failure no
@@ -276,9 +326,14 @@ jobs:
         env:
           WINDOW: ${{ needs.window.result }}
           UPTIME: ${{ needs.uptime.result }}
-          UPDATE: ${{ needs.update.result }}
-          REBOOT_WEB: ${{ needs.reboot-web.result }}
-          REBOOT: ${{ needs.reboot.result }}
+          UPDATE_STG: ${{ needs.update-stg.result }}
+          REBOOT_WEB_STG: ${{ needs.reboot-web-stg.result }}
+          GATE_WEB_STG: ${{ needs.gate-web-stg.result }}
+          REBOOT_STG: ${{ needs.reboot-stg.result }}
+          UPDATE_PRD: ${{ needs.update-prd.result }}
+          REBOOT_WEB_PRD: ${{ needs.reboot-web-prd.result }}
+          GATE_WEB_PRD: ${{ needs.gate-web-prd.result }}
+          REBOOT_PRD: ${{ needs.reboot-prd.result }}
           VERIFY: ${{ needs.verify-nginx.result }}
         run: |
           python3 - <<'PYEOF'
@@ -288,9 +343,14 @@ jobs:
           stages = [
               ("window", os.environ["WINDOW"]),
               ("uptime", os.environ["UPTIME"]),
-              ("update", os.environ["UPDATE"]),
-              ("reboot-web", os.environ["REBOOT_WEB"]),
-              ("reboot", os.environ["REBOOT"]),
+              ("update-stg", os.environ["UPDATE_STG"]),
+              ("reboot-web-stg", os.environ["REBOOT_WEB_STG"]),
+              ("gate-web-stg", os.environ["GATE_WEB_STG"]),
+              ("reboot-stg", os.environ["REBOOT_STG"]),
+              ("update-prd", os.environ["UPDATE_PRD"]),
+              ("reboot-web-prd", os.environ["REBOOT_WEB_PRD"]),
+              ("gate-web-prd", os.environ["GATE_WEB_PRD"]),
+              ("reboot-prd", os.environ["REBOOT_PRD"]),
               ("verify", os.environ["VERIFY"]),
           ]
 
@@ -331,7 +391,7 @@ jobs:
               details.append(f["host"])
               details += [f"  {r}" for r in f["reasons"]]
           details.append("stages")
-          details += [f"  {name:<12}{result}" for name, result in stages]
+          details += [f"  {name:<16}{result}" for name, result in stages]
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"status={status}\n")

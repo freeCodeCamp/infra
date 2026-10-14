@@ -11,11 +11,9 @@
 # Example:
 #   ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
 #     -e variable_host=k3s_tools
-
-
 # Play 1: Install Longhorn prerequisites on all nodes
 - name: Longhorn - Prerequisites
-  hosts: '{{ variable_host }}'
+  hosts: "{{ variable_host | default('null') }}"
   gather_facts: true
   become: true
 
@@ -27,6 +25,7 @@
           - nfs-common
         state: present
         update_cache: true
+        cache_valid_time: 3600
 
     - name: Enable and start iscsid
       systemd:
@@ -34,10 +33,9 @@
         enabled: true
         state: started
 
-
 # Play 2: Deploy Longhorn via k3s HelmChart (runs on first server only)
 - name: Longhorn - Deploy
-  hosts: '{{ variable_host }}[0]'
+  hosts: "{{ variable_host | default('null') }}[0]"
   gather_facts: false
   become: true
 
@@ -65,7 +63,7 @@
                 defaultReplicaCount: 2
                 storageMinimalAvailablePercentage: 15
                 storageOverProvisioningPercentage: 100
-        mode: '0600'
+        mode: "0600"
 
     - name: Wait for Longhorn namespace
       command: k3s kubectl get namespace longhorn-system

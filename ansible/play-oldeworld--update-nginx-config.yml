@@ -1,61 +1,104 @@
 ---
-- name: Update Git Repository (Parallel)
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--update-nginx-config.yml -e variable_host=<group>
+- name: Pull and check the NGINX config on every host
   hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
   become: true
-  serial: "{{ ansible_play_batch | length }}"
 
   tasks:
-    - name: Update Git Repository
-      git:
-        repo: https://github.com/freeCodeCamp/nginx-config.git
-        dest: /etc/nginx
-        clone: false
-        update: true
-        force: true
-        single_branch: true
-        version: main
-        accept_hostkey: true
-      register: git_update
+    - name: Pull, render and check the config
+      block:
+        - name: Update Git Repository
+          ansible.builtin.git:
+            repo: https://github.com/freeCodeCamp/nginx-config.git
+            dest: "{{ nginx_config_dir }}"
+            clone: false
+            update: true
+            force: true
+            single_branch: true
+            version: main
+            accept_hostkey: true
+          register: git_update
 
-    - name: Write the listed upstream blocks
-      include_tasks: roles/nginx/tasks/render-upstreams.yml
+        - name: Write the listed upstream blocks
+          ansible.builtin.include_tasks: roles/nginx/tasks/render-upstreams.yml
 
-    - name: Check if Git Repository was Updated
-      debug:
-        msg: "Git Repository was updated, will run NGINX config check and reload."
-      when: git_update.changed
+        - name: Check NGINX Config
+          ansible.builtin.command:
+            chdir: "{{ nginx_config_dir }}"
+            cmd: nginx -t
+          changed_when: false
+          check_mode: false
 
-    - name: Check NGINX Config
-      shell:
-        chdir: /etc/nginx
-        cmd: nginx -t
-      register: nginx_config_check
-      ignore_errors: true
+      rescue:
+        - name: Restore the previous config
+          ansible.builtin.include_tasks: tasks/restore-nginx-config.yml
 
-    - name: Notify if NGINX Config Check Failed
-      debug:
-        msg: "NGINX configuration check failed! Please review the configuration before proceeding."
-      when: nginx_config_check.rc != 0
+        - name: Stop the run before any reload
+          ansible.builtin.fail:
+            msg: >-
+              The new NGINX config failed on {{ inventory_hostname }}: {{ ansible_failed_result.msg | default('') }}
+              {{ ansible_failed_result.stderr | default('') }}
+              No host was reloaded. {{ nginx_restore_summary }}
 
-- name: Reload NGINX (Staggered)
+- name: Restore every host when one host failed
   hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
+  become: true
+  vars:
+    nginx_failed_hosts: "{{ ansible_play_hosts_all | difference(ansible_play_hosts) }}"
+
+  tasks:
+    - name: Restore this host and stop the run
+      when: nginx_failed_hosts | length > 0
+      block:
+        - name: Restore the previous config
+          ansible.builtin.include_tasks: tasks/restore-nginx-config.yml
+
+        - name: Stop the run before any reload
+          ansible.builtin.fail:
+            msg: >-
+              {{ nginx_failed_hosts | join(', ') }} failed, so no host was reloaded.
+              {{ inventory_hostname }}: {{ nginx_restore_summary }}
+
+- name: Reload NGINX one host at a time
+  hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
   become: true
   serial: 1
+  max_fail_percentage: 0
+  vars:
+    nginx_reload_marker: /var/lib/nginx-config.reloaded
 
   tasks:
-    - name: Add a delay to stagger the reloads
-      pause:
-        seconds: "{{ range(5, 30) | random(seed=inventory_hostname) }}"
-
     - name: Start NGINX
-      service:
+      ansible.builtin.service:
         name: nginx
         state: started
         enabled: true
-      when: hostvars[inventory_hostname]['nginx_config_check'] is defined and hostvars[inventory_hostname]['nginx_config_check'].rc == 0
+
+    - name: Read the commit of the last reload
+      ansible.builtin.slurp:
+        src: "{{ nginx_reload_marker }}"
+      register: nginx_reloaded_commit
+      failed_when: false
 
     - name: Reload NGINX
-      shell:
-        chdir: /etc/nginx
-        cmd: nginx -s 'reload'
-      when: hostvars[inventory_hostname]['nginx_config_check'] is defined and hostvars[inventory_hostname]['nginx_config_check'].rc == 0
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+      when: >-
+        nginx_upstreams_written is changed
+        or (nginx_reloaded_commit.content | default('') | b64decode | trim) != git_update.after
+
+    - name: Check NGINX holds its listener
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ variable_nginx_port | default(80) }}"
+        timeout: 30
+
+    - name: Record the commit of this reload
+      ansible.builtin.copy:
+        content: "{{ git_update.after }}\n"
+        dest: "{{ nginx_reload_marker }}"
+        mode: "0644"

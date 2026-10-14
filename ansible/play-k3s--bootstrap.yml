@@ -13,9 +13,6 @@
 #     `kubectl top nodes` works only through the apiserver on the pod's own node.
 #   - Env vars loaded via direnv (cd into cluster dir first)
 #   - Group vars populated for the target inventory group
-#
-# Usage:
-#   just bootstrap k3s--bootstrap <inventory_group>
 
 # Play 1: Validate prerequisites and build dynamic groups
 - name: "K3s {{ variable_host }} - Validate"
@@ -70,7 +67,7 @@
 
 # Play 2: System prerequisites (before k3s starts)
 - name: "K3s {{ variable_host }} - Prerequisites"
-  hosts: k3s_cluster
+  hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
   vars:
@@ -122,7 +119,7 @@
 
 # Play 3: Deploy k3s server
 - name: "K3s {{ variable_host }} - Deploy"
-  hosts: server
+  hosts: "{{ variable_host }}"
   gather_facts: true
   become: true
   vars:
@@ -163,7 +160,7 @@
 
 # Play 4: Install Cilium CNI
 - name: "K3s {{ variable_host }} - Cilium"
-  hosts: server[0]
+  hosts: "{{ variable_host }}[0]"
   gather_facts: false
   become: true
   vars:
@@ -177,7 +174,7 @@
 
 # Play 5: Verify cluster and fetch kubeconfig
 - name: "K3s {{ variable_host }} - Verify"
-  hosts: server[0]
+  hosts: "{{ variable_host }}[0]"
   gather_facts: false
   become: true
   vars:

@@ -1,7 +1,7 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--clients-list-releases.yml -e variable_host=<group>
 - name: List available releases
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
   gather_facts: false
   tasks:
     - name: List client releases

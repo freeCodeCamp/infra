@@ -45,8 +45,15 @@ helm upgrade tailscale-operator tailscale/tailscale-operator \
 All apps use Kustomize:
 
 ```bash
-# Deploy (decrypts secrets + TLS, applies, cleans up)
-just release ops-backoffice-tools <app>
+# Deploy: decrypt the secrets and TLS, apply, then delete the plaintext
+APP=<app>
+ENC=../infra-secrets/k3s/ops-backoffice-tools
+SEC=k3s/ops-backoffice-tools/apps/$APP/manifests/base/secrets
+sops decrypt --input-type dotenv --output-type dotenv "$ENC/$APP.secrets.env.enc" > "$SEC/.secrets.env" &&
+  sops decrypt "$ENC/$APP.tls.crt.enc" > "$SEC/tls.crt" &&
+  sops decrypt "$ENC/$APP.tls.key.enc" > "$SEC/tls.key" &&
+  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl apply -k "k3s/ops-backoffice-tools/apps/$APP/manifests/base/"
+rm -f "$SEC/.secrets.env" "$SEC/tls.crt" "$SEC/tls.key"
 
 # Check
 kubectl get all -n <app>

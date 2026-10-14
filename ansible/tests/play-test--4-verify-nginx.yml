@@ -21,7 +21,7 @@
     verify_nginx_port: 80
   tasks:
     - name: Healthy host
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: loaded
         verify_enabled: enabled
@@ -41,7 +41,7 @@
     # The case the whole change exists for: the VM booted, the unit is
     # enabled, and NGINX is dead with nothing retrying it.
     - name: Dead after boot
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: loaded
         verify_enabled: enabled
@@ -63,7 +63,7 @@
     # explicit call: a night that fixed itself is something to see, not to
     # hide behind a green tick.
     - name: Healed by the check
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: loaded
         verify_enabled: enabled
@@ -83,7 +83,7 @@
     # Running now, but disabled: it will not come back after the next reboot.
     # Exactly the state a check that only looks at ActiveState would pass.
     - name: Running but disabled at boot
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: loaded
         verify_enabled: disabled
@@ -103,7 +103,7 @@
     # `systemctl mask nginx` reports LoadState=masked, not loaded, so a check
     # that keys on ActiveState alone would never see it.
     - name: Masked unit
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: masked
         verify_enabled: masked
@@ -124,7 +124,7 @@
     # the next restart, and then fatal. This is what the pre-reboot gate in
     # play-any--reboot.yml holds a host back for.
     - name: Running with a broken config on disk
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: loaded
         verify_enabled: enabled
@@ -145,7 +145,7 @@
     # hardened has no recovery behaviour at all -- and looks perfectly healthy
     # until the day it needs to recover.
     - name: Healthy, but never hardened
-      ansible.builtin.include_tasks: tasks/verify-nginx-finding.yml
+      ansible.builtin.include_tasks: ../tasks/verify-nginx-finding.yml
       vars:
         verify_load: loaded
         verify_enabled: enabled

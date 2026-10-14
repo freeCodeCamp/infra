@@ -43,48 +43,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Setup UV
-        run: |
-          # Install uv if not available
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          fi
-
-          # Verify uv is available
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "ERROR: uv installation failed"
-            exit 1
-          fi
-
-          echo "uv version: $(uv --version)"
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          # Use uv to install ansible and dependencies (matches local setup)
-          uv sync
-
-          # Activate venv and install ansible collections/roles
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-
-          # Verify ansible is working
-          ansible --version
-
-      - name: Configure SSH Private Key
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Play -- Cleanup Clients
+        env:
+          HOSTS: ${{ matrix.host_groups }}
+          SERIAL: ${{ inputs.serial || 0 }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+          VERBOSITY: ${{ inputs.verbosity }}
         run: |
           source .venv/bin/activate
-          SERIAL_VALUE=${{ inputs.serial || 0 }}  # Default of 0 (all hosts at once) if inputs.serial is not set
+          case "$SERIAL" in
+            '' | *[!0-9]*)
+              echo "::error::serial must be a non-negative integer"
+              exit 1
+              ;;
+          esac
+          case "$DRY_RUN" in
+            true | false) ;;
+            *)
+              echo "::error::dry_run must be true or false"
+              exit 1
+              ;;
+          esac
+          case "$VERBOSITY" in
+            '' | -v | -vv | -vvv | -vvvv) ;;
+            *)
+              echo "::error::verbosity must be empty or -v to -vvvv"
+              exit 1
+              ;;
+          esac
+          extra_args=()
+          if [ -n "$VERBOSITY" ]; then
+            extra_args+=("$VERBOSITY")
+          fi
           ansible-playbook -i inventory/linode.yml \
           play-any--cleanup-clients.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e '{"variable_host": "${{ matrix.host_groups }}", "variable_serial": '$SERIAL_VALUE', "variable_dry_run": '${{ inputs.dry_run }}'}' \
-          ${{ inputs.verbosity }}
+          -e variable_host="$HOSTS" \
+          -e variable_serial="$SERIAL" \
+          -e variable_dry_run="$DRY_RUN" \
+          "${extra_args[@]}"

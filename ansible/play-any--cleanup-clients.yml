@@ -2,35 +2,29 @@
 # Usage:
 #   ansible-playbook -i inventory/linode.yml play-any--cleanup-clients.yml \
 #     -e variable_host=prd_oldeworld_clt
-#
-# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
-# in the environment, and it selects hosts by name, not by group:
-#   ansible-playbook -i inventory/tailscale.yml play-any--cleanup-clients.yml \
-#     -e variable_host='prd-vm-oldeworld-clt-*'
 
 - name: Remove old releases
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(0) }}'
+  serial: "{{ variable_serial | default(0) }}"
   gather_facts: false
   vars:
-    dry_run: '{{ variable_dry_run | default(false) }}'
+    dry_run: "{{ variable_dry_run | default(false) | bool }}"
     client_root: "{{ variable_client_root | default('/home/freecodecamp/client') }}"
   tasks:
     - name: Get all release directories
       ansible.builtin.find:
-        paths: '{{ client_root }}/releases'
+        paths: "{{ client_root }}/releases"
         recurse: false
         file_type: directory
       register: all_releases
 
     - name: Sort releases by modification time
       ansible.builtin.set_fact:
-        sorted_releases:
-          "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
+        sorted_releases: "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
 
     - name: Read the client start scripts
       ansible.builtin.slurp:
-        src: '{{ client_root }}/client-start-{{ item }}.sh'
+        src: "{{ client_root }}/client-start-{{ item }}.sh"
       loop:
         - primary
         - secondary
@@ -38,16 +32,13 @@
 
     - name: Get the release markers from the start scripts
       ansible.builtin.set_fact:
-        release_markers: "{{ start_scripts.results | map(attribute='content')
-          | map('b64decode') | map('regex_search', 'releases/([^\\s]+)', '\\1')
-          | list }}"
+        release_markers: "{{ start_scripts.results | map(attribute='content') | map('b64decode') | map('regex_search', 'releases/([^\\s]+)', '\\1') | list }}"
 
     - name: Fail if a start script names no release
       ansible.builtin.assert:
         that:
           - release_markers | select('none') | list | length == 0
-        fail_msg: "A start script under {{ client_root }} names no release:
-          {{ release_markers }}"
+        fail_msg: "A start script under {{ client_root }} names no release: {{ release_markers }}"
 
     - name: Get the live release IDs from the release markers
       ansible.builtin.set_fact:
@@ -57,25 +48,22 @@
       ansible.builtin.assert:
         that:
           - live_release_ids | length > 0
-          - live_release_ids | difference(sorted_releases | map(attribute='path')
-            | map('basename') | list) | length == 0
-        fail_msg: "Start scripts name {{ live_release_ids }}, but
-          {{ client_root }}/releases holds
-          {{ sorted_releases | map(attribute='path') | map('basename') | list }}"
+          - live_release_ids | difference(sorted_releases | map(attribute='path') | map('basename') | list) | length == 0
+        fail_msg: "Start scripts name {{ live_release_ids }}, but {{ client_root }}/releases holds {{ sorted_releases | map(attribute='path') | map('basename') |
+          list }}"
 
     - name: Get releases to delete (excluding last 2 and the live releases)
       ansible.builtin.set_fact:
-        releases_to_delete: "{{ sorted_releases[2:] | map(attribute='path')
-          | map('basename') | difference(live_release_ids) | list }}"
+        releases_to_delete: "{{ sorted_releases[2:] | map(attribute='path') | map('basename') | difference(live_release_ids) | list }}"
 
     - name: Log releases to be deleted
       ansible.builtin.debug:
-        msg: '{{ item }}'
-      with_items: '{{ releases_to_delete }}'
+        msg: "{{ item }}"
+      with_items: "{{ releases_to_delete }}"
 
     - name: Remove old releases
       ansible.builtin.file:
-        path: '{{ client_root }}/releases/{{ item }}'
+        path: "{{ client_root }}/releases/{{ item }}"
         state: absent
-      with_items: '{{ releases_to_delete }}'
+      with_items: "{{ releases_to_delete }}"
       when: not dry_run

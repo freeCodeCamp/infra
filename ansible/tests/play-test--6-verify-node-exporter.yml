@@ -1,4 +1,5 @@
 ---
+# Usage: ansible-playbook play-test--6-verify-node-exporter.yml
 - name: Test the node_exporter finding logic
   hosts: localhost
   connection: local

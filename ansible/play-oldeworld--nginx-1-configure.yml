@@ -1,10 +1,10 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--nginx-1-configure.yml -e variable_host=<group>
 - name: Configure NGINX on the Oldeworld Cluster
   hosts: '{{ variable_host | default("null") }}'
+  serial: 1
+  max_fail_percentage: 0
   become: true
-
-  roles:
-    - dns # Configure ansible facts for networking info lookup
 
   tasks:
     - name: Configure Nginx instances

@@ -45,7 +45,7 @@ This repo owns:
 
 ## Working directory rule
 
-Run every recipe from the repo root. Recipes that need a cluster take it as an arg and export `KUBECONFIG` themselves.
+Run every command from the repo root unless the runbook line says otherwise.
 
 direnv `.envrc` hierarchy:
 
@@ -67,10 +67,11 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Operations
 
-**New work adds no `just` recipes (operator 2026-09-03).** The recipes are brittle and abstract too much. Write standard-toolchain commands instead: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. The existing recipes and the docs that reference them stay as they are.
+**No `justfile` (operator 2026-10-10).** Write standard-toolchain commands: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. A `just` line in a `gxy-*` example is historical.
 
 ## Ansible
 
+- Plays, inputs and the former `just` recipes: `docs/infra-guides/ansible.md`
 - Per-group config: `ansible/inventory/group_vars/<group>.yml`
 - Playbooks generic orchestrators — reference variables, not literal values
 - Add a group: create a group_vars file matching the DO inventory tag
@@ -81,7 +82,3 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 - `ops-backoffice-tools`: legacy.
 
 Verify reality with `doctl compute droplet list` before acting.
-
-## Non-obvious conventions
-
-- `just bootstrap` prepends `play-` + appends `.yml` to playbook arg.

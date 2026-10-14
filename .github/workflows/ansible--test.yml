@@ -22,29 +22,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Setup UV
-        run: |
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          fi
-
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "ERROR: uv installation failed"
-            exit 1
-          fi
-
-          echo "uv version: $(uv --version)"
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          uv sync
-
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-
-          ansible --version
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
 
       - name: Validate Ansible Setup
         run: |
@@ -54,29 +33,15 @@ jobs:
           ansible-inventory --help >/dev/null
           echo "SUCCESS: All ansible commands working"
 
+      - name: Lint Playbooks
+        run: |
+          source .venv/bin/activate
+          ansible-lint
+
       - name: Syntax Check Playbooks
         run: |
           source .venv/bin/activate
-
-          echo "Checking playbook syntax..."
-          FAILED=0
-          for playbook in play-*.yml; do
-            # Pass dummy variable_host to satisfy playbooks that use dynamic hosts
-            if ! ansible-playbook --syntax-check -e variable_host=localhost "$playbook" >/dev/null 2>&1; then
-              echo "FAIL: $playbook"
-              ansible-playbook --syntax-check -e variable_host=localhost "$playbook" 2>&1 | tail -10
-              FAILED=1
-            else
-              echo "OK: $playbook"
-            fi
-          done
-
-          if [ "$FAILED" -eq 1 ]; then
-            echo "ERROR: Some playbooks have syntax errors"
-            exit 1
-          fi
-
-          echo "SUCCESS: All playbooks passed syntax check"
+          ansible-playbook --syntax-check -e variable_host=localhost play-*.yml
 
       # --syntax-check does not descend into a dynamic include_tasks, so the
       # NGINX finding logic is invisible to the step above. This runs the
@@ -88,14 +53,14 @@ jobs:
           # `-i localhost,` cannot be parsed and the play runs on the implicit
           # localhost regardless. The flag was doing nothing but printing
           # three warnings.
-          ansible-playbook --check play-test--4-verify-nginx.yml
+          ansible-playbook --check tests/play-test--4-verify-nginx.yml
 
       - name: Unit Test the Disk Space Finding Logic
         run: |
           source .venv/bin/activate
-          ansible-playbook --check play-test--5-check-disk-space.yml
+          ansible-playbook --check tests/play-test--5-check-disk-space.yml
 
       - name: Unit Test the node_exporter Finding Logic
         run: |
           source .venv/bin/activate
-          ansible-playbook --check play-test--6-verify-node-exporter.yml
+          ansible-playbook --check tests/play-test--6-verify-node-exporter.yml

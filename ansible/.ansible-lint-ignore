@@ -1,0 +1,20 @@
+# This file contains ignores rule violations for ansible-lint
+inventory/group_vars/oldeworld_pxy.yml yaml[line-length]
+play-any--cleanup-clients.yml yaml[line-length]
+play-any--git-patch.yml command-instead-of-module
+play-any--reboot.yml jinja[spacing]
+play-any--reboot.yml key-order[task]
+play-any--restart-docker.yml jinja[spacing]
+play-any--restart-docker.yml key-order[task]
+play-any--update.yml command-instead-of-module
+play-any--uptime.yml jinja[spacing]
+play-any--uptime.yml partial-become[play]
+play-k3s--bootstrap.yml syntax-check[specific]
+play-oldeworld--nginx-2-startup.yml command-instead-of-shell
+play-oldeworld--update-nginx-config.yml command-instead-of-shell
+roles/cilium/defaults/main.yml var-naming[no-role-prefix]
+roles/nginx/tasks/config-nginx.yml literal-compare
+roles/node-exporter role-name
+roles/nodejs/tasks/main.yml command-instead-of-module
+tasks/restart-client-service.yml name[template]
+tasks/rollback-client-service.yml name[template]

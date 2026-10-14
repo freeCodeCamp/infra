@@ -1,11 +1,17 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--clients-restart.yml -e variable_host=<group>
 - name: Restart
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: 1
+  max_fail_percentage: 0
   gather_facts: false
   vars:
-    dry_run: '{{ variable_dry_run | default(false) }}'
+    dry_run: "{{ variable_dry_run | default(false) | bool }}"
   tasks:
+    - name: Read the client start scripts and their ports
+      ansible.builtin.include_tasks:
+        file: tasks/read-client-start-scripts.yml
+
     - name: Restart client services (rolling)
       ansible.builtin.include_tasks:
         file: tasks/restart-client-service.yml
@@ -17,23 +23,22 @@
 
     - name: Save PM2 process list
       ansible.builtin.shell: |
-        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        {{ nvm_preamble }}
         pm2 save
       args:
         executable: /bin/bash
         chdir: /home/freecodecamp/client
-      when: not dry_run | bool
+      when: not dry_run
 
     - name: Display PM2 process status
       ansible.builtin.shell: |
-        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        {{ nvm_preamble }}
         pm2 ls
       args:
         executable: /bin/bash
         chdir: /home/freecodecamp/client
       register: pm2_status
+      changed_when: false
 
     - name: Show PM2 status
       ansible.builtin.debug:

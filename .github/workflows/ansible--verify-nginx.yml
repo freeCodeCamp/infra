@@ -6,9 +6,6 @@ name: Ansible --07- Verify NGINX
 # It MUTATES -- a host where NGINX is down gets one restart attempt -- and it
 # reports the host as an anomaly either way, including when the restart
 # worked. A night that healed itself is something to see, not to hide.
-#
-# It is deliberately terminal in the housekeeping chain. Nothing runs after
-# it, so failing here can never stop the fleet being patched.
 
 on:
   workflow_call:
@@ -27,6 +24,10 @@ on:
         description: 'Port the listener probe checks; 0 skips the probe'
         type: number
         default: 80
+      artifact_prefix:
+        description: 'Name prefix of the findings artifact; the housekeeping report reads nginx-verify-*'
+        type: string
+        default: nginx-verify
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
@@ -80,26 +81,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Setup UV
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          uv sync
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-          ansible --version
-
-      - name: Configure SSH Private Key
-        shell: bash
-        env:
-          # Via env, not inline: printf keeps a key with backslashes intact,
-          # and the secret never becomes shell text.
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh/
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Play -- Verify NGINX
         id: play
@@ -228,6 +213,6 @@ jobs:
         if: always() && hashFiles('nginx-verify.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: nginx-verify-${{ inputs.hosts }}
+          name: ${{ inputs.artifact_prefix || 'nginx-verify' }}-${{ inputs.hosts }}
           path: nginx-verify.json
           retention-days: 7

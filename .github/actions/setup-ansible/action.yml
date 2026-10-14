@@ -1,0 +1,36 @@
+name: Setup Ansible
+description: Install uv, the locked Ansible environment in ansible/.venv and the Galaxy requirements. Let a host pattern that matches no hosts warn, not fail, because a staging tier can be empty. Write ~/.ssh/id_for_ansible.pem when a key is given.
+
+inputs:
+  ssh-private-key:
+    description: The SSH private key for the Ansible user. An empty value writes no key file.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup UV
+      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        enable-cache: true
+        cache-dependency-glob: ansible/uv.lock
+
+    - name: Install Ansible and the Galaxy requirements
+      shell: bash
+      working-directory: ansible
+      run: |
+        uv sync --locked
+        .venv/bin/ansible-galaxy install -r requirements.yml
+        .venv/bin/ansible --version
+        echo "ANSIBLE_HOST_PATTERN_MISMATCH=warning" >> "$GITHUB_ENV"
+
+    - name: Write the SSH private key
+      if: inputs.ssh-private-key != ''
+      shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh-private-key }}
+      run: |
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_for_ansible.pem
+        chmod 600 ~/.ssh/id_for_ansible.pem

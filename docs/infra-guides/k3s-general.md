@@ -92,16 +92,11 @@ ______________________________________________________________________
 ## Ansible Deployment
 
 ```bash
-# Deploy tools cluster
-just bootstrap k3s--cluster tools_k3s
-
 # Longhorn storage (tools)
-just bootstrap k3s--longhorn tools_k3s
+cd ansible && direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
 
-# Deploy any Universe galaxy (k3s + Cilium + Tailscale)
-just bootstrap k3s--bootstrap gxy_management_k3s
-just bootstrap k3s--bootstrap gxy_launchbase_k3s
-just bootstrap k3s--bootstrap gxy_cassiopeia_k3s
+# Deploy a new cluster (k3s + Cilium + Tailscale)
+cd ansible && direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--bootstrap.yml -e variable_host=<group>
 ```
 
 ______________________________________________________________________
@@ -150,9 +145,7 @@ kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 
 ### Update Apps
 
-```bash
-just release <cluster> <app>
-```
+On ops-backoffice-tools, use the deployment pattern in [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern). On ops-o11y, Flux deploys the apps (runbook 14).
 
 ______________________________________________________________________
 
@@ -218,7 +211,6 @@ ______________________________________________________________________
 
 | Playbook                | Purpose                                               |
 | ----------------------- | ----------------------------------------------------- |
-| play-k3s--cluster.yml   | Deploy k3s HA cluster                                 |
 | play-k3s--longhorn.yml  | Install Longhorn storage                              |
 | play-k3s--bootstrap.yml | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |
 

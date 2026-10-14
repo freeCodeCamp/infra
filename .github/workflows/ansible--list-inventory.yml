@@ -18,41 +18,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Setup UV
-        run: |
-          # Install uv if not available
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          fi
-
-          # Verify uv is available
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "ERROR: uv installation failed"
-            exit 1
-          fi
-
-          echo "uv version: $(uv --version)"
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          # Use uv to install ansible and dependencies (matches local setup)
-          uv sync
-
-          # Activate venv and install ansible collections/roles
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-
-          # Verify ansible is working
-          ansible --version
-
-      - name: Configure SSH Private Key
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: List Inventory
         run: |

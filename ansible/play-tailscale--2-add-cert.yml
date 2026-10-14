@@ -1,14 +1,23 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-tailscale--2-add-cert.yml -e variable_host=<group> -e variable_tailnet_dns_name=<tailnet>.ts.net
 - name: Tailscale - Add Cert for Tailscale Network (https access)
   hosts: '{{ variable_host | default("null") }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   become: true
   gather_facts: false
   tasks:
+    - name: Fail without the tailnet DNS name
+      ansible.builtin.assert:
+        that:
+          - variable_tailnet_dns_name | default('') | length > 0
+        fail_msg: Pass -e variable_tailnet_dns_name=<tailnet>.ts.net.
+        quiet: true
+
     - name: Run Tailscale Cert
-      shell:
-        cmd: |
-          tailscale cert {{ inventory_hostname }}.{{ variable_tailnet_dns_name }}
-        executable: /bin/bash
-      no_log: true
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - cert
+          - "{{ inventory_hostname }}.{{ variable_tailnet_dns_name }}"
       changed_when: true
-      ignore_errors: true

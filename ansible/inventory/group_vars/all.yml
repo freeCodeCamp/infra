@@ -4,3 +4,4 @@ pm2_user: freecodecamp
 pm2_home: /home/freecodecamp/.pm2
 pm2_required_bins: [pm2]
 pm2_app_ports: []
+nvm_preamble: 'export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"'

@@ -1,6 +1,6 @@
 ---
 - name: Install NGINX and its dependecies via apt
-  apt:
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   with_items:

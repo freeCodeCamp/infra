@@ -2,25 +2,25 @@
 # Usage:
 #   ansible-playbook -i inventory/linode.yml play-any--reboot.yml \
 #     -e variable_host=stg_oldeworld_clt
-#
-# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
-# in the environment, and it selects hosts by name, not by group:
-#   ansible-playbook -i inventory/tailscale.yml play-any--reboot.yml \
-#     -e variable_host='stg-vm-oldeworld-clt-*'
 
 - name: Reboot a machine and wait for it to come back
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   gather_facts: true
+  gather_subset:
+    - '!all'
+    - '!min'
+    - hardware
   become: true
   become_user: root
   vars:
     # Set force_reboot to True to force a reboot — mind the quotes!
-    force_reboot: '{{ variable_force_reboot | default(False) }}'
+    force_reboot: "{{ variable_force_reboot | default(False) }}"
   tasks:
     - name: Check if /var/run/reboot-required exists
       register: reboot_required
-      stat:
+      ansible.builtin.stat:
         path: /var/run/reboot-required
         get_checksum: false
 
@@ -29,15 +29,15 @@
     # 2. Uptime is greater than 7 days
     # 3. force_reboot is set to True
     - name: Display Status
-      debug:
+      ansible.builtin.debug:
         msg:
-          - 'Debug info:'
-          - '  Force Reboot Flag: {{ force_reboot }}'
-          - '  Reboot Required File Exists: {{ reboot_required.stat.exists }}'
-          - '  Uptime: {{ ansible_facts.uptime_seconds/86400 }} days'
+          - "Debug info:"
+          - "  Force Reboot Flag: {{ force_reboot }}"
+          - "  Reboot Required File Exists: {{ reboot_required.stat.exists }}"
+          - "  Uptime: {{ ansible_facts.uptime_seconds/86400 }} days"
 
     - name: Set Should Reboot
-      set_fact:
+      ansible.builtin.set_fact:
         should_reboot: >-
           {{ (force_reboot | bool) or
              (reboot_required.stat.exists) or
@@ -57,10 +57,8 @@
           {%- endif -%}
 
     - name: Print Reboot Reason
-      debug:
-        msg:
-          'Rebooting the machine: {{ inventory_hostname }} - Reason: {{
-          reboot_reason }}'
+      ansible.builtin.debug:
+        msg: "Rebooting the machine: {{ inventory_hostname }} - Reason: {{ reboot_reason }}"
       when: should_reboot
 
     # Pre-reboot config gate, for NGINX hosts only.
@@ -92,8 +90,7 @@
       failed_when: false
       when:
         - should_reboot
-        - (reboot_nginx_unit.status | default({})).UnitFileState | default('') in
-          ['enabled', 'enabled-runtime', 'static']
+        - (reboot_nginx_unit.status | default({})).UnitFileState | default('') in ['enabled', 'enabled-runtime', 'static']
 
     - name: Hold the reboot back when the NGINX config is broken
       ansible.builtin.set_fact:
@@ -125,17 +122,13 @@
             pre_reboot_delay: 5
             post_reboot_delay: 30
             test_command: uptime
-            msg: 'Reboot initiated by Ansible'
+            msg: "Reboot initiated by Ansible"
           register: reboot_result
           ignore_unreachable: true
 
         - name: Wait for machine to become reachable again
-          wait_for_connection:
-            delay: 10
+          ansible.builtin.wait_for_connection:
             timeout: 300
 
-        - name: Gather facts after reboot
-          setup:
-
       when: should_reboot
-      ignore_errors: '{{ ansible_check_mode }}'
+      ignore_errors: "{{ ansible_check_mode }}"

@@ -2,18 +2,16 @@
 # Usage:
 #   ansible-playbook -i inventory/linode.yml play-any--uptime.yml \
 #     -e variable_host=prd_oldeworld_api
-#
-# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
-# in the environment, and it selects hosts by name, not by group:
-#   ansible-playbook -i inventory/tailscale.yml play-any--uptime.yml \
-#     -e variable_host='prd-vm-oldeworld-api-*'
 
 - name: Check uptime on virtual machines
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
+  gather_subset:
+    - '!all'
+    - '!min'
+    - hardware
   become_user: root
-  serial: '{{ variable_serial | default(1) }}'
   tasks:
     - name: Print uptime
-      debug:
-        msg: 'Host machine {{ inventory_hostname }} has been up for {{ ansible_facts.uptime_seconds/86400 }} days'
+      ansible.builtin.debug:
+        msg: "Host machine {{ inventory_hostname }} has been up for {{ ansible_facts.uptime_seconds/86400 }} days"

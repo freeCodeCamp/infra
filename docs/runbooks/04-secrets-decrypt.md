@@ -34,12 +34,6 @@ sops decrypt --input-type dotenv --output-type dotenv \
   ../infra-secrets/<scope>/<name>.env.enc
 ```
 
-Justfile recipe equivalent (read-only, prints to stdout):
-
-```bash
-just inspect-secret <name>
-```
-
 ### 2. Helm value overlays (`*.values.yaml.enc`)
 
 YAML envelopes. Auto-detect does **not** work here: sops reads only the
@@ -86,8 +80,8 @@ Read-only operation. Nothing to roll back.
 - **No bare `sops decrypt` on `.env.enc`.** Auto-detect routes to JSON
   → cryptic parse error. Always pass `--input-type dotenv
 --output-type dotenv`.
-- **Helm chart secret-rendering recipes** in the justfile MUST pass
-  both flags. Rendering scripts in `scripts/` likewise.
+- **Helm chart secret-rendering commands** and the rendering scripts
+  in `scripts/` MUST pass both flags.
 - **Per-glob `input_type: dotenv` pin in `.sops.yaml`** would remove
   the need for explicit flags but is deferred — the current
   `.sops.yaml` rules block has no per-path type config.

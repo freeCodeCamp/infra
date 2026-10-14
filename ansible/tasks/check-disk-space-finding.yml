@@ -65,4 +65,4 @@
 
 - name: Flag whether this host is an anomaly
   ansible.builtin.set_fact:
-    disk_anomaly: '{{ disk_reasons | length > 0 }}'
+    disk_anomaly: "{{ disk_reasons | length > 0 }}"

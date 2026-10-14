@@ -1,18 +1,17 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-any--cleanup-jms.yml -e variable_host=<group>
 - name: Cleanup JMS Clients
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   gather_facts: false
   tasks:
-    - name: Cleanup JMS Client
-      shell: |
-        docker system prune --force
-      args:
-        chdir: '/home/freecodecamp'
-      register: result
+    - name: Prune stopped containers, unused networks, dangling images and build cache
+      ansible.builtin.command:
+        cmd: docker system prune --force
+      register: prune_result
+      changed_when: "'Total reclaimed space: 0B' not in prune_result.stdout"
 
-    - name: Show the status of running containers
-      debug:
-        msg: '{{ result.stdout }}'
-      when: result.stdout.find('error') == -1
-      failed_when: result.stdout.find('error') != -1
+    - name: Show the reclaimed space
+      ansible.builtin.debug:
+        msg: "{{ prune_result.stdout_lines | default([]) | last | default('not run') }}"

@@ -57,47 +57,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Setup UV
-        run: |
-          # Install uv if not available
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          fi
-
-          # Verify uv is available
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "ERROR: uv installation failed"
-            exit 1
-          fi
-
-          echo "uv version: $(uv --version)"
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          # Use uv to install ansible and dependencies (matches local setup)
-          uv sync
-
-          # Activate venv and install ansible collections/roles
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-
-          # Verify ansible is working
-          ansible --version
-
-      - name: Configure SSH Private Key
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Play -- Reboot
+        env:
+          HOSTS: ${{ inputs.hosts }}
+          VERBOSITY: ${{ inputs.verbosity }}
+          SERIAL: ${{ inputs.serial }}
         run: |
           source .venv/bin/activate
+          case "$HOSTS" in
+            '' | *[!A-Za-z0-9_,.:*!\&-]*)
+              echo "::error::invalid host pattern -- letters, digits and _ , . : * ! & - only"
+              exit 1
+              ;;
+          esac
+          case "$VERBOSITY" in
+            '' | -v | -vv | -vvv | -vvvv) ;;
+            *)
+              echo "::error::verbosity must be empty or -v to -vvvv"
+              exit 1
+              ;;
+          esac
+          extra_args=()
+          if [ -n "$VERBOSITY" ]; then
+            extra_args+=("$VERBOSITY")
+          fi
+          case "$SERIAL" in
+            '') ;;
+            *[!0-9]*)
+              echo "::error::serial must be a non-negative integer"
+              exit 1
+              ;;
+            *) extra_args+=(-e "variable_serial=$SERIAL") ;;
+          esac
           ansible-playbook -i inventory/linode.yml \
           play-any--reboot.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
-          -e '{"variable_host": "${{ inputs.hosts }}", "variable_serial": ${{ inputs.serial }}}' \
-          ${{ inputs.verbosity }}
+          -e variable_host="$HOSTS" \
+          "${extra_args[@]}"

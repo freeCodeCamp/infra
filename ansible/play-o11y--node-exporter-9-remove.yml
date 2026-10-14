@@ -1,6 +1,9 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-o11y--node-exporter-9-remove.yml -e variable_host=<group>
 - name: Remove node_exporter from the fleet
   hosts: "{{ variable_host | default('null') }}"
+  serial: "{{ variable_serial | default('25%') }}"
+  max_fail_percentage: 0
   gather_facts: false
   become: true
   become_user: root

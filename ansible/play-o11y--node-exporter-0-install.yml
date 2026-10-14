@@ -1,4 +1,5 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-o11y--node-exporter-0-install.yml -e variable_host=<group>
 - name: Prove every target host answers before the fleet is touched
   hosts: "{{ variable_host | default('null') }}"
   gather_facts: false

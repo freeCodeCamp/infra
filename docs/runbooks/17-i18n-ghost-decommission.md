@@ -57,7 +57,7 @@ Staging upstreams already point at `0.0.0.0:32323`. No upstream change is necess
 
 ```sh
 cd ansible
-direnv exec . ansible-playbook -i inventory/ play-oldeworld--update-nginx-config.yml -e variable_host=stg_oldeworld_pxy
+direnv exec . uv run ansible-playbook -i inventory/linode.yml play-oldeworld--update-nginx-config.yml -e variable_host=stg_oldeworld_pxy
 ```
 
 **Verify staging:**
@@ -71,7 +71,7 @@ for u in /espanol/news/ /espanol/news/ghost/ /news/ghost/; do printf '%s ' $u; c
 Then production. The command also points the 7 `news-<code>` upstreams at `0.0.0.0:32323`, so that no upstream depends on a Ghost DNS record:
 
 ```sh
-direnv exec . ansible-playbook -i inventory/ play-oldeworld--update-nginx-config.yml -e variable_host=prd_oldeworld_pxy \
+direnv exec . uv run ansible-playbook -i inventory/linode.yml play-oldeworld--update-nginx-config.yml -e variable_host=prd_oldeworld_pxy \
   -e '{"nginx_upstreams":[{"name":"news-chn","servers":["0.0.0.0:32323"]},{"name":"news-esp","servers":["0.0.0.0:32323"]},{"name":"news-ita","servers":["0.0.0.0:32323"]},{"name":"news-jpn","servers":["0.0.0.0:32323"]},{"name":"news-kor","servers":["0.0.0.0:32323"]},{"name":"news-por","servers":["0.0.0.0:32323"]},{"name":"news-ukr","servers":["0.0.0.0:32323"]}]}'
 cd ..
 ```

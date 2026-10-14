@@ -1,13 +1,11 @@
 # IMPORTANT: This file has to be be named linode.yml or linode.yaml
 # See: https://github.com/ansible-collections/community.general/blob/011b2f8bdc2a042f0eb44739ff51ce425f391afa/plugins/inventory/linode.py#L274
+# Warning "Found variable using reserved name: tags" on every run: https://github.com/ansible/ansible/issues/84897
 
 plugin: community.general.linode # can be replaced with linode.cloud.instance, when they support Jinja2 template strings
 access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
 
 groups:
-  # Test Instances
-  test_all: "'test' in (tags|list)"
-
   # Staging Instances
   stg_all: "'stg' in (tags|list)"
 
@@ -17,11 +15,6 @@ groups:
   # Operations Instances
   ops_all: "'ops' in (tags|list)"
   ops_backoffice: "'ops_backoffice' in (tags|list)"
-
-  # Swarm Cluster (docker-swarm role targets the `managers`/`workers` groups)
-  swarm_all: "'swarm' in (tags|list)"
-  managers: "'swarm_leader' in (tags|list)"
-  workers: "'swarm_worker' in (tags|list)"
 
   # Oldeworld Cluster -- ALL
   oldeworld_all: "'oldeworld' in (tags|list)"
@@ -133,4 +126,4 @@ groups:
     (tags|list) and 'clt' in (tags|list)"
 
 compose:
-  ansible_ssh_host: ipv4[0]
+  ansible_host: ipv4[0]

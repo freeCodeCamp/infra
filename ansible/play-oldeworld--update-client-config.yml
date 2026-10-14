@@ -1,14 +1,16 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--update-client-config.yml -e variable_host=<group>
 - name: Update Git Repository for Client Configs
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   gather_facts: false
   tasks:
     - name: Update Git Repository
-      git:
+      ansible.builtin.git:
         repo: https://github.com/freeCodeCamp/client-config.git
         dest: /home/freecodecamp/client
-        clone: '{{ variable_clone | default(false) }}'
+        clone: "{{ variable_clone | default(false) }}"
         update: true
         force: true
         single_branch: true
@@ -17,8 +19,6 @@
       register: git_update
 
     - name: Check if Git Repository was Updated
-      debug:
-        msg:
-          'Git Repository was updated. Run play-oldeworld--clients-restart.yml
-          or the deploy pipeline to load the new config.'
+      ansible.builtin.debug:
+        msg: "Git Repository was updated. Run play-oldeworld--clients-restart.yml or the deploy pipeline to load the new config."
       when: git_update.changed

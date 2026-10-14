@@ -8,8 +8,7 @@
 
 - name: Sort releases by modification time
   ansible.builtin.set_fact:
-    sorted_releases:
-      "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
+    sorted_releases: "{{ all_releases.files | sort(attribute='mtime', reverse=true) }}"
 
 - name: Display available releases (newest first)
   ansible.builtin.debug:

@@ -1,0 +1,6 @@
+---
+profile: moderate
+offline: true
+exclude_paths:
+  - .venv/
+  - .ansible/
