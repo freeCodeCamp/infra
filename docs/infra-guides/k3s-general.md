@@ -93,10 +93,10 @@ ______________________________________________________________________
 
 ```bash
 # Longhorn storage (tools)
-cd ansible && direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
+cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
 
 # Deploy a new cluster (k3s + Cilium + Tailscale)
-cd ansible && direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--bootstrap.yml -e variable_host=<group>
+cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--bootstrap.yml -e variable_host=<group>
 ```
 
 ______________________________________________________________________
