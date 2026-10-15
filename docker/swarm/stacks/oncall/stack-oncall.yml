@@ -7,8 +7,8 @@ x-logging-config: &logging-config
       compress: "true"
 
 x-dispatch-env: &dispatch-env
-  GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN}
-  GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+  GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN:?}
+  GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
 
 x-dispatch: &dispatch
   <<: *logging-config
@@ -67,7 +67,7 @@ services:
     image: curlimages/curl:8.22.0
     entrypoint: ["/scripts/watchdog.sh"]
     environment:
-      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
     configs:
       - source: scripts_lib
         target: /scripts/lib.sh
@@ -165,7 +165,7 @@ services:
       - "-verbose"
       - "-hooks=/hooks.json"
     environment:
-      - "GOOGLE_CHAT_WEBHOOK=${GOOGLE_CHAT_WEBHOOK}"
+      - "GOOGLE_CHAT_WEBHOOK=${GOOGLE_CHAT_WEBHOOK:?}"
     configs:
       - source: hooks_relay
         target: /hooks.json
@@ -206,7 +206,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
     environment:
-      - "WEBHOOK_SECRET=${WEBHOOK_SECRET}"
+      - "WEBHOOK_SECRET=${WEBHOOK_SECRET:?}"
     <<: *logging-config
     deploy:
       replicas: 1
