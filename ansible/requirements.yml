@@ -2,8 +2,6 @@
 collections:
   - name: community.general
     version: "12.6.6"
-  - name: community.docker
-    version: "4.8.9"
   - name: community.sops
     version: "2.5.0"
   - name: community.digitalocean
@@ -12,8 +10,6 @@ collections:
     version: "2.2.2"
   - name: kubernetes.core
     version: "6.6.0"
-  - name: freeformz.ansible
-    version: "0.4.0"
   - name: https://github.com/k3s-io/k3s-ansible.git
     type: git
     version: 1.1.1

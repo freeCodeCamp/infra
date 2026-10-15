@@ -10,7 +10,7 @@
 #
 # Example:
 #   ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml \
-#     -e variable_host=k3s_tools
+#     -e variable_host=tools_k3s
 # Play 1: Install Longhorn prerequisites on all nodes
 - name: Longhorn - Prerequisites
   hosts: "{{ variable_host | default('null') }}"
