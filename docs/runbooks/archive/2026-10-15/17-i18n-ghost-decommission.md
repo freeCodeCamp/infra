@@ -120,7 +120,7 @@ In the Tailscale admin console, remove the 7 devices `prd-vm-oldeworld-nws-<code
 The instances ran Ghost 3.42.9 on MySQL 8.0.
 
 1. Revert `b75950e0` in `infra` and `0b22d84` (#124) in `nginx-config`. This puts back the firewall rule, the Ansible group and the NGINX locations.
-1. Create the VM: remove the `#` from its line in `nws_instances` in `terraform/prd-cluster-oldeworld/main.tf`, then apply.
+1. Create the VM: restore `terraform/prd-cluster-oldeworld/next-05-nws.tf` and the `nws_instances` local in `main.tf` from commit `0dcbd104`, remove the `#` from its line in `nws_instances`, then apply.
 1. Restore the database from `Linode-Backups/<code>/2026-10-06/database/` into a MySQL 8.0 server.
 1. Copy `Linode-Backups/<code>/2026-10-06/content/` to `/datadrive/content` and `config/config.production.json` to `/var/www/ghost/`.
 1. Set the database host in `config.production.json`, then start Ghost.

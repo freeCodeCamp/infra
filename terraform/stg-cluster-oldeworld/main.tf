@@ -52,11 +52,6 @@ locals {
 
 // When removing an item, DO NOT change the IPAM number.
 locals {
-  nws_instances = {
-    # eng = { name = "eng", ipam_id = 0 }, # 10.0.0.100
-    # i18n = { name = "i18n", ipam_id = 10 } # 10.0.0.110
-  }
-
   clt_config_meta = {
     eng = { name = "eng", ipam_id = 0, node_count = local.clt_node_count },  # 10.0.0.40, 10.0.0.41, ...
     chn = { name = "chn", ipam_id = 5, node_count = local.clt_node_count },  # 10.0.0.45, 10.0.0.46, ...
