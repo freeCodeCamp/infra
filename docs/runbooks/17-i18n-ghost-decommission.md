@@ -42,14 +42,7 @@ The state must be `disabled_manually`. The count must be `0`. `docker/swarm/stac
 
 ### 2. Merge the NGINX change
 
-`freeCodeCamp/nginx-config` branch `fix/drop-i18n-ghost` removes the Ghost proxy locations. The R2 image locations stay.
-
-```sh
-git -C ../nginx-config push -u origin fix/drop-i18n-ghost
-gh pr create -R freeCodeCamp/nginx-config --head fix/drop-i18n-ghost --fill
-```
-
-Merge the PR.
+Done. `freeCodeCamp/nginx-config` commit `0b22d84` (#124) on `main` removes the Ghost proxy locations. The R2 image locations stay. Check: `git -C ../nginx-config fetch origin && git -C ../nginx-config log --oneline origin/main | grep 0b22d84`.
 
 ### 3. Deploy NGINX — staging first
 
@@ -124,7 +117,7 @@ In the Tailscale admin console, remove the 7 devices `prd-vm-oldeworld-nws-<code
 
 The instances ran Ghost 3.42.9 on MySQL 8.0.
 
-1. Revert `b75950e0` in `infra` and `fix/drop-i18n-ghost` in `nginx-config`. This puts back the firewall rule, the Ansible group and the NGINX locations.
+1. Revert `b75950e0` in `infra` and `0b22d84` (#124) in `nginx-config`. This puts back the firewall rule, the Ansible group and the NGINX locations.
 1. Create the VM: remove the `#` from its line in `nws_instances` in `terraform/prd-cluster-oldeworld/main.tf`, then apply.
 1. Restore the database from `Linode-Backups/<code>/2026-10-06/database/` into a MySQL 8.0 server.
 1. Copy `Linode-Backups/<code>/2026-10-06/content/` to `/datadrive/content` and `config/config.production.json` to `/var/www/ghost/`.

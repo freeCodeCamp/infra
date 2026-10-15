@@ -10,25 +10,21 @@ The News stack provides static site hosting for the freeCodeCamp news and curric
 
 | Service | Purpose |
 | --- | --- |
-| **news** | JAMStack news applications and static content |
+| **svc-chn**, **svc-esp**, **svc-ita**, **svc-jpn**, **svc-kor**, **svc-por**, **svc-ukr** | News sites, one service per language |
+| **svc-eng** | English news. Commented out in `stack-news.yml`. |
 
 ## Deployment
 
-Name stacks per environment (e.g., `prd-news`, `stg-news`):
+Name stacks per environment (`prd-news`, `stg-news`). Deploy from Portainer, or from the CLI as below. After a CLI deploy, the copy that Portainer stores is old. Do not press Update for the stack in Portainer after a CLI deploy. Run the CLI block from the repository root.
+
+`docker stack deploy` reads variables only from your shell. It does not read a `.env` file. Before a CLI deploy, export every variable that `docker/swarm/stacks/news/.env.sample` lists. An unset variable becomes an empty string, for example in the image name.
+
+For `prd-news`, uncomment `svc-eng` in `stack-news.yml` first (`stack-news.yml:52-54`). The live `prd-news` stack runs `svc-eng`. A deploy without it does not remove the live service, but the file does not describe it.
 
 ```bash
-# Set context and deploy
-docker context use <context_name>
-docker stack deploy -c stack-news.yml prd-news
+cd docker/swarm/stacks/news
+docker --context <context_name> stack deploy -c stack-news.yml <stack-name>
 ```
-
-Then configure environment variables in Portainer UI for the deployed stack.
-
-## Configuration
-
-1. Copy `.env.sample` to `.env`
-2. Set required environment variables in Portainer UI
-3. Redeploy stack to apply changes
 
 ## Notes
 

@@ -49,7 +49,7 @@ Run every command from the repo root unless the runbook line says otherwise.
 
 direnv `.envrc` hierarchy:
 
-- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. The session hooks keep an agent out of the plaintext.
+- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. When `CLAUDECODE` is set (an agent shell), every `.envrc` here decrypts no envelope and loads no `.env`. `KUBECONFIG` still points at the cluster file on disk. The gate is not a security boundary. An agent shell also gets the environment of the shell that started `claude`, so start it with `direnv exec / claude`. An agent asks the operator to run a command that needs a token.
 - `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (DO token for the ansible DO inventory).
 - `terraform/ops-o11y/.envrc` → sources root + adds `do-universe/.env.enc` and `tfstate/.env.enc` (state in R2 `infra-tfstate`).
 - `k3s/ops-o11y/.envrc` → sources root + exports `KUBECONFIG`.
@@ -63,7 +63,7 @@ Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age,
 
 Layout contract + per-path consumer matrix: `docs/architecture/rfc-secrets-layout.md`.
 
-Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to JSON parser and silently fails — explicit `--input-type dotenv --output-type dotenv` is required.
+Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to the JSON parser and fails — explicit `--input-type dotenv --output-type dotenv` is required.
 
 ## Operations
 

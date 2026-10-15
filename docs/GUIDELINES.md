@@ -2,6 +2,8 @@
 
 Conventions for docs maintained by this repo.
 
+> **Historical sections.** Field notes (archived 2026-05-10), the per-galaxy flight manuals and TODO-park belong to the Universe platform, which was torn down in October 2026. These sections are historical: Field-note format, Flight-manual format, Field-note discipline, Parking decisions.
+
 ## Field-note format
 
 Field notes live upstream in `~/DEV/fCC-U/Architecture/spike/field-notes/<team>.md`,

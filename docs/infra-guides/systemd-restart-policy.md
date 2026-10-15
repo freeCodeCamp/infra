@@ -1,6 +1,8 @@
 # systemd restart policy
 
-Every unit that Ansible manages bounds its restarts. A real fault must end in a
+Ansible bounds the restarts of the nginx and node_exporter units. It adds no
+bound to other units, for example `fail2ban`
+(`ansible/roles/fail2ban/tasks/configure.yml`). A real fault must end in a
 visible `failed` state, not in an endless restart loop. `Restart=on-failure`
 covers a transient fault. `StartLimitIntervalSec` and `StartLimitBurst` stop
 the loop when the fault does not clear.

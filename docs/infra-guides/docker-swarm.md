@@ -24,7 +24,7 @@
 
    Get the token if needed, by running `docker swarm join-token worker`
 
-3. On all nodes - Add labels to the nodes in the cluster.
+3. From the manager node - Add labels to the nodes in the cluster. `docker node update` works only on a manager node.
 
    > [!IMPORTANT]
    > Labels are used for placement constraints in the docker stack templates.
@@ -32,13 +32,13 @@
    Here are some example lables for the nodes. Adjust as needed
    - Get the node ids using `docker node ls` on the manager node.
 
-   - On the manager node
+   - Label for the manager node
 
      ```shell
      docker node update --label-add "portainer=true" <node id>
      ```
 
-   - On the worker nodes
+   - Labels for the worker nodes
 
      JAMStack news
 
@@ -73,10 +73,10 @@
      docker node update --label-add "socrates.variant=org" <node id>
      ```
 
-4. Deploy [Portainer](stacks/portainer/README.md).
+4. Deploy [Portainer](docker-swarm-portainer.md).
 
 5. Complete the Portainer setup wizard & add the cluster to Portainer.
 
 6. Add the container registry details to Portainer.
 
-7. Deploy all the remaining stacks via Portainer, including [Socrates](stacks/socrates/README.md). Note that you should not manage the portainer stack from within Portainer UI.
+7. Deploy the remaining stacks: [API](docker-swarm-api.md) and [Socrates](docker-swarm-socrates.md) only from Portainer, [News](docker-swarm-news.md) from Portainer or the CLI, and [oncall](docker-swarm-oncall.md#deployment) only from the CLI. Do not manage the portainer stack from within the Portainer UI.

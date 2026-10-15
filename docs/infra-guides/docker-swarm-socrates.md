@@ -10,31 +10,18 @@ The Socrates stack provides the AI-powered hints API for freeCodeCamp coding cha
 
 | Service      | Purpose                                    |
 | ------------ | ------------------------------------------ |
-| **socrates** | AI-powered hints API for coding challenges |
-| **redis**    | Rate limiting (sidecar)                    |
+| **svc-socrates-alpha**, **svc-socrates-bravo** | AI-powered hints API for coding challenges |
+| **svc-redis**    | Rate limiting (sidecar)                    |
 
 ## Deployment
 
-Name stacks per environment (e.g., `prd-socrates`, `stg-socrates`):
+Name stacks per environment (`prd-socrates`, `stg-socrates`). Deploy and update them from Portainer, which stores their variables.
 
-```bash
-# Set context and deploy
-docker context use <context_name>
-docker stack deploy -c stack-socrates.yml stg-socrates
-docker stack deploy -c stack-socrates.yml prd-socrates
-```
-
-Then configure environment variables in Portainer UI for the deployed stack.
-
-## Configuration
-
-1. Copy `.env.sample` to `.env`
-2. Set required environment variables in Portainer UI
-3. Redeploy stack to apply changes
+Do not deploy these stacks from the CLI. `docker stack deploy` reads variables only from your shell, and `docker/swarm/stacks/socrates/.env.sample` lists secrets. `infra-secrets` has no envelope for this stack, so a CLI deploy means typing secrets into the shell. An unset variable becomes an empty string in the live stack.
 
 ## Node Labels
 
-Nodes running Socrates services require specific labels:
+Nodes running Socrates services require specific labels. Run these commands against the manager:
 
 ```shell
 docker node update --label-add "socrates.enabled=true" <node id>
@@ -48,7 +35,7 @@ docker node update --label-add "socrates.variant=org" <node id>
 `svc-redis` is deployed `mode: global` behind the `socrates.enabled` and `socrates.variant`
 placement constraints, so every node that carries both labels runs its own instance and the
 rate-limit bucket is per node rather than shared. nginx spreads a caller across all six containers
-with `least_conn` and no session affinity (`upstream socrates` in the `nginx-config` repository),
+with `least_conn` and no session affinity (`upstream socrates` in `/etc/nginx/configs/upstreams.conf` on the proxies, rendered from `pxy-upstreams-<tier>.yaml.enc` by `ansible/inventory/group_vars/oldeworld_pxy.yml:7`),
 so the effective per-user ceiling is `PER_USER_LIMIT` multiplied by the node count.
 
 With three nodes, `PER_USER_LIMIT=10` allows about 30 requests per minute per user, and
