@@ -51,7 +51,7 @@ export TAILSCALE_HOSTNAME=your-device.your-tailnet.ts.net
 docker stack deploy -c stack-portainer.yml portainer
 ```
 
-### 3. Configure Tailscale Access
+### 2. Configure Tailscale Access
 
 ```shell
 sudo tailscale serve --bg --tls-terminated-tcp 443 tcp://127.0.0.1:9000

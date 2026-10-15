@@ -134,7 +134,7 @@ All services log to the local Docker `json-file` driver, rotated per node:
 
 - **Rotation**: `max-size=10m`, `max-file=3`, `compress=true`
 - **Scope**: logs stay on the node running the task; inspect with `docker service logs oncall_<svc>`
-- **History**: previously shipped to Loki on the o11y cluster (tenant `fCC-o11y-oncall-v20250113-0001`); o11y decommissioned 2026-07-14
+- **History**: previously shipped to Loki on the old DOKS o11y cluster (tenant `fCC-o11y-oncall-v20250113-0001`), decommissioned 2026-07-14
 
 ## Deployment
 

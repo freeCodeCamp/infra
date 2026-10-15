@@ -22,11 +22,11 @@ KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
 - **Longhorn**: Replicas=2, daily backups to DO Spaces
 - **Backup Target**: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
 
----
+______________________________________________________________________
 
 ## Tailscale Operator
 
-Required for cross-cluster communication.
+Gives tailnet access to the cluster services. It is the only Tailscale device the repository defines ([`tailscale.md`](./tailscale.md)).
 
 `read -rs` takes the OAuth client secret without echo, so it stays out of the shell history.
 
@@ -44,7 +44,7 @@ helm repo update
 )
 ```
 
----
+______________________________________________________________________
 
 ## Deployment Pattern
 
@@ -78,7 +78,7 @@ apps/<app>/manifests/base/secrets/
 └── tls.key              # Private key (gitignored)
 ```
 
----
+______________________________________________________________________
 
 ## Troubleshooting
 

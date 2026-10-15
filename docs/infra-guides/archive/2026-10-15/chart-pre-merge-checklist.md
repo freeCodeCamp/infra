@@ -1,5 +1,7 @@
 # Chart pre-merge checklist
 
+> **Historical.** Archived 2026-10-15. This checklist describes the Universe charts, which were torn down in October 2026. Its paths exist only at commit `027d913d6f38`. No chart on `main` has templates.
+
 Operator-runnable five-point checklist for every new Helm chart landing under `k3s/<cluster>/apps/<app>/charts/<chart>/`. Promotes operational findings from the 2026-04-27 T34 chart-side pattern study (archived in `Universe/.archive/artemis/2026-04-27-chart-side-pattern.md`) into canonical guidance.
 
 > **Read first:** the chart you are about to merge end-to-end, plus the closest existing chart in the same cluster. Prior art catches most of this list before review.
@@ -46,7 +48,7 @@ grep -A 5 'fromEntities' <chart-path>/templates/*.yaml
 
 **Reviewer rule.** On a Cilium cluster, vanilla NP under `k3s/<cluster>/apps/` is a reject. The single non-CNP exception on Universe was `valkey` (vanilla NP, ingress plus DNS-only egress, no L7).
 
-Read [`cilium-cnp.md`](./archive/2026-10-14/cilium-cnp.md) before adding **any** CNP — the DNS L7 trap is a separate gate.
+Read [`cilium-cnp.md`](../2026-10-14/cilium-cnp.md) before adding **any** CNP — the DNS L7 trap is a separate gate.
 
 ### 3. Service env contract = read source + sample
 
@@ -122,8 +124,8 @@ Use these verbatim in PR review when rejecting:
 
 ## Cross-refs
 
-- [`docs/GUIDELINES.md`](../GUIDELINES.md) — broader doc/format conventions; this checklist is the §Chart pre-merge specialisation.
-- [`docs/infra-guides/archive/2026-10-14/cilium-cnp.md`](./archive/2026-10-14/cilium-cnp.md) — CNP patterns and the DNS L7 trap (point 2 dovetails with this).
+- [`docs/GUIDELINES.md`](../../../GUIDELINES.md) — broader doc/format conventions; this checklist is the §Chart pre-merge specialisation.
+- [`docs/infra-guides/archive/2026-10-14/cilium-cnp.md`](../2026-10-14/cilium-cnp.md) — CNP patterns and the DNS L7 trap (point 2 dovetails with this).
 - `Universe/.archive/artemis/2026-04-27-chart-side-pattern.md` — source incident (T34 chart-side pattern study, 2026-04-27).
 - Reference charts (historical, commit `027d913d6f38`):
   - `k3s/gxy-cassiopeia/apps/caddy/charts/caddy` — CNP Pattern A + Flexible-SSL Gateway shape.

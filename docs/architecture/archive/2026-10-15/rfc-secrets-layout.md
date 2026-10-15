@@ -1,6 +1,6 @@
 # RFC: Secrets Layout — Two-Scope Convention + Shared Wildcard Cert
 
-> **Status 2026-10-15.** The two scopes and the envelope names in "infra-secrets tree" and "Two explicit scopes" still hold. Every `just` recipe here (`release`, `verify-secrets`, `backup-windmill`) is historical: the `justfile` is gone (operator 2026-10-10, removed on `main` in `2a304148`). The `gxy-*` clusters were torn down in October 2026; their paths exist only at commit `027d913d6f38`. No live service uses the `global/tls/` wildcard. For the live envelope list, run `find ../infra-secrets -name '*.enc'`.
+> **Historical.** Archived 2026-10-15. The `just` recipes, the `gxy-*` clusters and the `global/tls/` wildcard flow are gone. The `gxy-*` paths exist only at commit `027d913d6f38`. The live envelope layout is in [`04-secrets-decrypt.md`](../../../runbooks/04-secrets-decrypt.md#envelope-layout).
 
 **Date:** 2026-04-22 **Status:** Accepted (implemented 2026-04-22) **Target Release:** Pre-#22 (rename exec gate) **Author:** Infra team **Related:** ADR-003 (Universe topology), ADR-011 (admin plane + secrets), ADR-012 (DR — parked) **Gates:** sprint task #22 (gxy-mgmt → gxy-management reprovision)
 

@@ -1,5 +1,7 @@
 # Runbook — Decommission the i18n Ghost instances
 
+> **Historical.** Archived 2026-10-15. The decommission is complete.
+
 **Type:** Ansible + Terraform + `linode-cli`. **Scope:** the 7 production Ghost VMs `prd-vm-oldeworld-nws-{chn,esp,ita,jpn,kor,por,ukr}`, their data volumes, and the managed MySQL `237699`. **Last verified:** 2026-10-06.
 
 The i18n news sites stay live. The JMS stack `prd-news` serves the static pages. R2 serves the images. Ghost is stopped and disabled on all 7 VMs.

@@ -4,10 +4,10 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose                                              | Apps                              |
-| -------------------- | ---------------------------------------------------- | --------------------------------- |
-| ops-backoffice-tools | Internal tools (legacy)                              | Appsmith, Outline                 |
-| ops-o11y             | Observability, seed of the bare-metal `mgmt` cluster | Grafana, VictoriaMetrics, Argo CD |
+| Cluster              | Purpose                 | Apps                              | Guide                                                  |
+| -------------------- | ----------------------- | --------------------------------- | ------------------------------------------------------ |
+| ops-backoffice-tools | Internal tools (legacy) | Appsmith, Outline                 | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md) |
+| ops-o11y             | Observability           | Grafana, VictoriaMetrics, Argo CD | [runbook 14](../runbooks/14-o11y-node-bringup.md)      |
 
 ## Quick Access
 
@@ -29,17 +29,17 @@ k3s/
 │       ├── longhorn/
 │       └── tailscale/
 ├── ops-o11y/
-│   ├── apps/
-│   ├── argocd/
+│   ├── apps/                         # Argo CD reads apps/*/application.yaml
+│   ├── argocd/                       # root app-of-apps
 │   ├── cluster/
-│   ├── flux-system/
-│   ├── ops/
-│   └── platform/
+│   ├── flux-system/                  # target state, not deployed (runbook 14)
+│   ├── ops/                          # target state, not deployed
+│   └── platform/                     # target state, not deployed
 └── shared/
     └── traefik-config.yaml
 ```
 
-Retired chart trees (argocd, zot, woodpecker) tracked in [`../architecture/retired-stacks.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/architecture/retired-stacks.md).
+Retired Universe chart trees (zot, woodpecker, the Universe Argo CD) are tracked in [`retired-stacks.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/architecture/retired-stacks.md).
 
 ______________________________________________________________________
 
@@ -47,9 +47,10 @@ ______________________________________________________________________
 
 ### Droplets
 
-| Cluster | Name Pattern             | Count | Specs              | Tags      |
-| ------- | ------------------------ | ----- | ------------------ | --------- |
-| tools   | ops-vm-tools-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | tools_k3s |
+| Cluster              | Name Pattern             | Count | Specs              | Tags      |
+| -------------------- | ------------------------ | ----- | ------------------ | --------- |
+| ops-backoffice-tools | ops-vm-tools-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | tools_k3s |
+| ops-o11y             | ops-vm-o11y-k3s-fra1-0X  | 1     | 4 vCPU, 8GB, 160GB | ops-o11y  |
 
 ### Load Balancer
 
@@ -62,34 +63,29 @@ ______________________________________________________________________
 ## Ansible Deployment
 
 ```bash
-# Longhorn storage (tools)
+# Longhorn storage (ops-backoffice-tools)
 cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
 
-# Deploy a new cluster (k3s + Cilium + Tailscale)
-cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--bootstrap.yml -e variable_host=<group>
+# k3s servers (ops-o11y)
+cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
 ```
 
 ______________________________________________________________________
 
 ## Tailscale Network
 
-Tailscale on nodes for SSH/kubectl access only (under review).
-
-See [`tailscale.md`](./tailscale.md) for device inventory.
+Tailscale on nodes for SSH/kubectl access. See [`tailscale.md`](./tailscale.md) for device inventory.
 
 ______________________________________________________________________
 
 ## Storage
 
-| Class    | Provisioner        | Replicas | Use For                       |
-| -------- | ------------------ | -------- | ----------------------------- |
-| longhorn | driver.longhorn.io | 2        | Stateful apps (tools cluster) |
+| Class      | Provisioner           | Use For                                 |
+| ---------- | --------------------- | --------------------------------------- |
+| longhorn   | driver.longhorn.io    | Stateful apps on ops-backoffice-tools   |
+| local-path | rancher.io/local-path | Grafana and VictoriaMetrics on ops-o11y |
 
-### Longhorn Backups
-
-- Target: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
-- Schedule: Daily 2 AM UTC
-- Retention: 7 days
+Longhorn replicas and backups: [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#storage).
 
 ______________________________________________________________________
 
@@ -102,17 +98,9 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Maintenance
+## Update Apps
 
-### Longhorn UI
-
-```bash
-kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
-```
-
-### Update Apps
-
-On ops-backoffice-tools, use the deployment pattern in [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern). On ops-o11y, Flux deploys the apps (runbook 14).
+On ops-backoffice-tools, use the deployment pattern in [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern). On ops-o11y, Argo CD syncs the apps from `main`.
 
 ______________________________________________________________________
 
@@ -142,14 +130,4 @@ ______________________________________________________________________
 
 ## Playbooks Reference
 
-| Playbook                | Purpose                                         |
-| ----------------------- | ----------------------------------------------- |
-| play-k3s--longhorn.yml  | Install Longhorn storage                        |
-| play-k3s--bootstrap.yml | Deploy a k3s cluster (K3s + Cilium + Tailscale) |
-
-## Cross-refs
-
-- [`cilium-multi-nic.md`](./archive/2026-10-14/cilium-multi-nic.md) — MTU + device pinning on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
-- [`cilium-cnp.md`](./archive/2026-10-14/cilium-cnp.md) — CiliumNetworkPolicy patterns and the DNS L7 trap.
-- [`traefik-hostnetwork.md`](./archive/2026-10-14/traefik-hostnetwork.md) — Traefik DaemonSet pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
-- [`chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) — five-point gate every new chart clears before merge.
+See [`ansible.md`](./ansible.md#digitalocean-k3s-plays).

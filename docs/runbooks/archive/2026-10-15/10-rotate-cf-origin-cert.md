@@ -2,7 +2,7 @@
 
 > **Historical.** Archived 2026-10-15. No live service uses the `freecodecamp.net` wildcard origin certificate, and steps 4 and 5 call the deleted `justfile` and the torn-down `gxy-management` cluster. The Cloudflare steps (1–3) stay valid if a service uses the certificate again.
 
-**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Zone:** `freecodecamp.net` (Full Strict — see `Architecture/docs/infra/flight-manuals/UNIVERSE.md` §1.1). **Spec:** `docs/architecture/rfc-secrets-layout.md` D1–D3 (canonical zone-wildcard + per-app override + zone-fallback probe). **Last verified:** 2026-07-05.
+**Type:** ClickOps (Cloudflare dashboard) + sops envelope edit. **Zone:** `freecodecamp.net` (Full Strict — see `Architecture/docs/infra/flight-manuals/UNIVERSE.md` §1.1). **Spec:** `docs/architecture/archive/2026-10-15/rfc-secrets-layout.md` D1–D3 (canonical zone-wildcard + per-app override + zone-fallback probe). **Last verified:** 2026-07-05.
 
 The wildcard `*.freecodecamp.net` origin cert lives once, canonically, at `infra-secrets/global/tls/freecodecamp-net.{crt,key}.enc` (RFC D1) — this replaced three galaxy-local duplicate copies (`argocd`/`windmill`/`zot` `.tls.*.enc`) that existed pre-RFC. Rotating the canonical pair rotates it for every consumer resolving the wildcard via zone-fallback in one pass. `freecode.camp` has no origin: since the Universe sunset (October 2026), a Cloudflare redirect rule sends every host in that zone to `https://www.freecodecamp.org/`. This runbook is scoped to `freecodecamp.net`.
 
@@ -111,6 +111,6 @@ Prior cert content is recoverable from `infra-secrets` git history (`git show HE
 
 - [`04-secrets-decrypt.md`](../../04-secrets-decrypt.md) — canonical sops decrypt/edit incantations
 - [`05-r2-keys-rotation.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/05-r2-keys-rotation.md) — sibling rotation runbook (R2 keys), same house shape
-- `docs/architecture/rfc-secrets-layout.md` — D1 (single canonical wildcard), D2 (`cluster.tls.zone` marker), D3 (per-app override escape hatch)
+- `docs/architecture/archive/2026-10-15/rfc-secrets-layout.md` — D1 (single canonical wildcard), D2 (`cluster.tls.zone` marker), D3 (per-app override escape hatch)
 - `Architecture/docs/infra/flight-manuals/UNIVERSE.md` §1 — DNS + Cloudflare baseline, zone SSL matrix
 - `Architecture/docs/infra/flight-manuals/gxy-management.md` §B.2 — existing Gateway/HTTPRoute verify pattern this runbook reuses
