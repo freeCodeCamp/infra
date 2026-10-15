@@ -21,32 +21,6 @@ x-port-config: &port-config
   mode: host
 
 services:
-
-  # This is a test service to dial in the deploment
-  # of the news services. Do not deploy this service in production.
-  
-  # svc-tst:
-  #   image: ${DOCKER_REGISTRY}/ops/test:latest
-  #   ports:
-  #     - published: 3000
-  #       target: 3000
-  #       protocol: tcp
-  #       mode: host
-  #   deploy:
-  #     replicas: 3
-  #     placement:
-  #       constraints:
-  #         - node.labels.jms.enabled == true
-  #         - node.labels.jms.variant == ${DEPLOYMENT_ENV}
-  #       preferences:
-  #         - spread: node.labels.jms.variant == ${DEPLOYMENT_ENV}
-  #     update_config:
-  #       parallelism: 1
-  #       delay: 10s
-  #       failure_action: rollback
-  #     labels:
-  #       - org.freecodecamp.autoupdate=true
-
   # The following services are the news services for various languages.
   # The PORTS are important, as they are defined in the downstream NGINX configuration.
   # Uncomment the English service on production deployment.
