@@ -4,82 +4,53 @@ Self-hosted k3s clusters on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose                 | Apps                                               |
-| -------------------- | ----------------------- | -------------------------------------------------- |
-| ops-backoffice-tools | Internal tools (legacy) | Appsmith, Outline                                  |
-| gxy-management       | Universe control plane  | artemis (uploads.freecode.camp), valkey            |
-| gxy-launchbase       | Standby (post-cutover)  | CNPG operator only (woodpecker retired 2026-05-03) |
-| gxy-cassiopeia       | Static-serve plane      | Caddy-S3 fronting `*.freecode.camp` from R2        |
+| Cluster              | Purpose                 | Apps                              | Guide                                                  |
+| -------------------- | ----------------------- | --------------------------------- | ------------------------------------------------------ |
+| ops-backoffice-tools | Internal tools (legacy) | Appsmith, Outline                 | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md) |
+| ops-o11y             | Observability           | Grafana, VictoriaMetrics, Argo CD | [runbook 14](../runbooks/14-o11y-node-bringup.md)      |
 
 ## Quick Access
 
 ```bash
-# Tools cluster
-cd k3s/ops-backoffice-tools && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
-
-# Galaxy management cluster
-cd k3s/gxy-management && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
-
-# Galaxy cassiopeia cluster
-cd k3s/gxy-cassiopeia && export KUBECONFIG=$(pwd)/.kubeconfig.yaml
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
+KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl get nodes
 ```
 
 ## Structure
 
 ```
 k3s/
-├── gxy-management/
-│   ├── apps/
-│   │   ├── artemis/
-│   │   └── valkey/
-│   └── cluster/
-│       ├── cilium/
-│       └── security/
-├── gxy-launchbase/
-│   ├── apps/
-│   │   └── cnpg-system/
-│   └── cluster/
-│       ├── cilium/
-│       └── security/
-├── gxy-cassiopeia/
-│   ├── apps/
-│   │   └── caddy/
-│   └── cluster/
-│       ├── cilium/
-│       └── security/
 ├── ops-backoffice-tools/             # legacy
 │   ├── apps/
 │   │   ├── appsmith/
 │   │   └── outline/
 │   └── cluster/
+│       ├── charts/
 │       ├── longhorn/
 │       └── tailscale/
+├── ops-o11y/
+│   ├── apps/                         # Argo CD reads apps/*/application.yaml
+│   ├── argocd/                       # root app-of-apps
+│   ├── cluster/
+│   ├── flux-system/                  # target state, not deployed (runbook 14)
+│   ├── ops/                          # target state, not deployed
+│   └── platform/                     # target state, not deployed
 └── shared/
     └── traefik-config.yaml
 ```
 
-Retired chart trees (argocd, zot, woodpecker) tracked in [`../architecture/retired-stacks.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/architecture/retired-stacks.md).
+Retired Universe chart trees (zot, woodpecker, the Universe Argo CD) are tracked in [`retired-stacks.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/architecture/retired-stacks.md).
 
 ______________________________________________________________________
 
 ## DigitalOcean Resources
 
-### VPC
-
-| Property | Value             |
-| -------- | ----------------- |
-| Name     | universe-vpc-fra1 |
-| Region   | fra1              |
-| IP Range | 10.110.0.0/20     |
-
 ### Droplets
 
-| Cluster        | Name Pattern                  | Count | Specs               | Tags               |
-| -------------- | ----------------------------- | ----- | ------------------- | ------------------ |
-| tools          | ops-vm-tools-k3s-nyc3-0X      | 3     | 4 vCPU, 8GB, 160GB  | tools_k3s          |
-| gxy-management | gxy-vm-management-k3s-{1,2,3} | 3     | 8 vCPU, 16GB, 320GB | gxy-management-k3s |
-| gxy-launchbase | gxy-vm-launchbase-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-launchbase-k3s |
-| gxy-cassiopeia | gxy-vm-cassiopeia-k3s-{1,2,3} | 3     | 4 vCPU, 8GB, 160GB  | gxy-cassiopeia-k3s |
+| Cluster              | Name Pattern             | Count | Specs              | Tags      |
+| -------------------- | ------------------------ | ----- | ------------------ | --------- |
+| ops-backoffice-tools | ops-vm-tools-k3s-nyc3-0X | 3     | 4 vCPU, 8GB, 160GB | tools_k3s |
+| ops-o11y             | ops-vm-o11y-k3s-fra1-0X  | 1     | 4 vCPU, 8GB, 160GB | ops-o11y  |
 
 ### Load Balancer
 
@@ -92,60 +63,44 @@ ______________________________________________________________________
 ## Ansible Deployment
 
 ```bash
-# Longhorn storage (tools)
+# Longhorn storage (ops-backoffice-tools)
 cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
 
-# Deploy a new cluster (k3s + Cilium + Tailscale)
-cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--bootstrap.yml -e variable_host=<group>
+# k3s servers (ops-o11y)
+cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--servers.yml -e variable_host=ops_o11y
 ```
 
 ______________________________________________________________________
 
 ## Tailscale Network
 
-Tailscale on nodes for SSH/kubectl access only (under review).
-
-See [`tailscale.md`](./tailscale.md) for device inventory.
+Tailscale on nodes for SSH/kubectl access. See [`tailscale.md`](./tailscale.md) for device inventory.
 
 ______________________________________________________________________
 
 ## Storage
 
-| Class    | Provisioner        | Replicas | Use For                       |
-| -------- | ------------------ | -------- | ----------------------------- |
-| longhorn | driver.longhorn.io | 2        | Stateful apps (tools cluster) |
+| Class      | Provisioner           | Use For                                 |
+| ---------- | --------------------- | --------------------------------------- |
+| longhorn   | driver.longhorn.io    | Stateful apps on ops-backoffice-tools   |
+| local-path | rancher.io/local-path | Grafana and VictoriaMetrics on ops-o11y |
 
-### Longhorn Backups
-
-- Target: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
-- Schedule: Daily 2 AM UTC
-- Retention: 7 days
+Longhorn replicas and backups: [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#storage).
 
 ______________________________________________________________________
 
 ## DNS (Cloudflare)
 
-| Record                    | Type | Value                   | SSL Mode      |
-| ------------------------- | ---- | ----------------------- | ------------- |
-| appsmith.freecodecamp.net | A    | tools LB (legacy)       | Full (Strict) |
-| outline.freecodecamp.net  | A    | tools LB (legacy)       | Full (Strict) |
-| freecode.camp             | A    | gxy-cassiopeia node IPs | Flexible      |
-| \*.freecode.camp          | A    | gxy-cassiopeia node IPs | Flexible      |
-| uploads.freecode.camp     | A    | gxy-management node IPs | Flexible      |
+| Record                    | Type | Value             | SSL Mode      |
+| ------------------------- | ---- | ----------------- | ------------- |
+| appsmith.freecodecamp.net | A    | tools LB (legacy) | Full (Strict) |
+| outline.freecodecamp.net  | A    | tools LB (legacy) | Full (Strict) |
 
 ______________________________________________________________________
 
-## Maintenance
+## Update Apps
 
-### Longhorn UI
-
-```bash
-kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
-```
-
-### Update Apps
-
-On ops-backoffice-tools, use the deployment pattern in [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern). On ops-o11y, Flux deploys the apps (runbook 14).
+On ops-backoffice-tools, use the deployment pattern in [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern). On ops-o11y, Argo CD syncs the apps from `main`.
 
 ______________________________________________________________________
 
@@ -171,52 +126,8 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 | Appsmith | 1        | 10Gi        | Embedded           |
 | Outline  | 1        | 10Gi + 10Gi | PostgreSQL sidecar |
 
-### gxy-management
-
-```
-Internet → Cloudflare (Flexible) → Node Public IPs → Traefik (hostNetwork) → Gateway API → artemis
-                                                                                              │
-                                                                                           Valkey (in-cluster registry)
-                                                                                              │
-                                                                                           R2 (universe-static-apps-01)
-
-CNI: Cilium    Storage: local-path
-```
-
-| App     | Access                                      | Notes                                          |
-| ------- | ------------------------------------------- | ---------------------------------------------- |
-| artemis | `uploads.freecode.camp` (staff via GH team) | Deploy-proxy; Valkey-backed sites registry     |
-| Valkey  | in-cluster only (`valkey.valkey.svc`)       | Single-replica; AOF; backs artemis sites + JWT |
-
-Windmill (platform-ops tooling) was retired 2026-07-07 — see [`Architecture/docs/infra/runbooks/archive/2026-07-07/12-windmill-decommission.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/runbooks/archive/2026-07-07/12-windmill-decommission.md).
-
-### gxy-cassiopeia
-
-```
-Internet → Cloudflare (Flexible) → Node Public IPs → Traefik (hostNetwork) → Gateway API → Caddy
-                                                                                              │
-                                                                                              ↓
-                                                                                R2 (caddy-s3 in-tree)
-
-CNI: Cilium    Storage: emptyDir    SSH/kubectl: Tailscale
-```
-
-| App   | Replicas | Domain        | Notes                                                  |
-| ----- | -------- | ------------- | ------------------------------------------------------ |
-| Caddy | 3        | freecode.camp | R2 bucket `universe-static-apps-01`, alias-pinned read |
-
 ______________________________________________________________________
 
 ## Playbooks Reference
 
-| Playbook                | Purpose                                               |
-| ----------------------- | ----------------------------------------------------- |
-| play-k3s--longhorn.yml  | Install Longhorn storage                              |
-| play-k3s--bootstrap.yml | Deploy any Universe galaxy (K3s + Cilium + Tailscale) |
-
-## Cross-refs
-
-- [`cilium-multi-nic.md`](./archive/2026-10-14/cilium-multi-nic.md) — MTU + device pinning on multi-NIC nodes (every Universe galaxy ships eth0/eth1/tailscale0).
-- [`cilium-cnp.md`](./archive/2026-10-14/cilium-cnp.md) — CiliumNetworkPolicy patterns and the DNS L7 trap.
-- [`traefik-hostnetwork.md`](./archive/2026-10-14/traefik-hostnetwork.md) — Traefik DaemonSet pitfalls (updateStrategy, runAsUser:0, Gateway port match, CRDs bundled).
-- [`chart-pre-merge-checklist.md`](./chart-pre-merge-checklist.md) — five-point gate every new chart clears before merge.
+See [`ansible.md`](./ansible.md#digitalocean-k3s-plays).

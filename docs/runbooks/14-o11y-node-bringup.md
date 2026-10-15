@@ -1,5 +1,7 @@
 # 14 — mgmt cluster bringup (ops-o11y)
 
+> **Target state.** This runbook describes the planned cluster. The live `ops-o11y` cluster is one node, and Argo CD deploys its apps: `argocd`, `cluster-dns`, `grafana` and `victoria-metrics` from `k3s/ops-o11y/apps/*/application.yaml`. Flux, External Secrets, cert-manager, Rancher and the DO CSI driver are not installed.
+
 **Audience:** operator. **Trigger:** growth of the single `ops-vm-o11y-k3s-fra1-01` node into the three-server `mgmt` cluster (T58), a later rebuild of one node, or a rebuild of the whole cluster after a total loss.
 
 The cluster is freeCodeCamp's management plane: Rancher, Flux, External Secrets, VictoriaMetrics and Grafana. It pulls node_exporter metrics from ~80 Linode VMs over Tailscale, keeps 12 months of history, and later scrapes the Hetzner estate under the same `job="node"`. The cluster name and every path stay `ops-o11y` until the rename is decided (RFC Q21).

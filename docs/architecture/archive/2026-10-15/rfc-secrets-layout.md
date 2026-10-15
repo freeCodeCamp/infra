@@ -1,5 +1,7 @@
 # RFC: Secrets Layout — Two-Scope Convention + Shared Wildcard Cert
 
+> **Historical.** Archived 2026-10-15. The `just` recipes, the `gxy-*` clusters and the `global/tls/` wildcard flow are gone. The `gxy-*` paths exist only at commit `027d913d6f38`. The live envelope layout is in [`04-secrets-decrypt.md`](../../../runbooks/04-secrets-decrypt.md#envelope-layout).
+
 **Date:** 2026-04-22 **Status:** Accepted (implemented 2026-04-22) **Target Release:** Pre-#22 (rename exec gate) **Author:** Infra team **Related:** ADR-003 (Universe topology), ADR-011 (admin plane + secrets), ADR-012 (DR — parked) **Gates:** sprint task #22 (gxy-mgmt → gxy-management reprovision)
 
 ## Summary

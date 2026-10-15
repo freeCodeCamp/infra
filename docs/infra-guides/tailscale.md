@@ -43,14 +43,4 @@ Tailscale devices that the repository defines in a file. Hosts also join the tai
 
 **Admin Console:** https://login.tailscale.com/admin/machines
 
-**Upgrade Operators:** run from the repository root. `read -rs` takes the OAuth client secret without echo, so it stays out of the shell history.
-
-```bash
-(
-  printf 'OAuth client secret: '
-  read -rs TS_OAUTH_CLIENT_SECRET; echo
-  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml helm upgrade tailscale-operator tailscale/tailscale-operator \
-    -n tailscale -f k3s/ops-backoffice-tools/cluster/tailscale/operator-values.yaml \
-    --set oauth.clientId=<ID> --set-file oauth.clientSecret=<(printf %s "$TS_OAUTH_CLIENT_SECRET")
-)
-```
+**Install or upgrade the operator:** [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#tailscale-operator).

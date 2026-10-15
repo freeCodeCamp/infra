@@ -19,7 +19,7 @@ Name stacks per environment (`prd-news`, `stg-news`). Deploy from Portainer, or 
 
 `docker stack deploy` reads variables only from your shell. It does not read a `.env` file. Before a CLI deploy, export every variable that `docker/swarm/stacks/news/.env.sample` lists. An unset variable becomes an empty string, for example in the image name.
 
-For `prd-news`, uncomment `svc-eng` in `stack-news.yml` first (`stack-news.yml:52-54`). The live `prd-news` stack runs `svc-eng`. A deploy without it does not remove the live service, but the file does not describe it.
+For `prd-news`, uncomment `svc-eng` in `stack-news.yml` first (`stack-news.yml:28-33`). The live `prd-news` stack runs `svc-eng`. A deploy without it does not remove the live service, but the file does not describe it.
 
 ```bash
 cd docker/swarm/stacks/news

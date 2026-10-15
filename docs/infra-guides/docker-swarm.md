@@ -1,4 +1,4 @@
-# docker-swarm-config
+# Docker Swarm
 
 > Docker stack configs for our Docker swarm clusters
 

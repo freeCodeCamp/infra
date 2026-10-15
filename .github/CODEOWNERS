@@ -13,8 +13,6 @@
 
 * @freecodecamp/dev-team
 
-/* @freecodecamp/dev-team
-
 uv.lock @freecodecamp/package-approvers
 requirements.yml @freecodecamp/package-approvers
 .terraform.lock.hcl @freecodecamp/package-approvers

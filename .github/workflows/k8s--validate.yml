@@ -39,11 +39,5 @@ jobs:
             -ignore-filename-pattern 'kustomization\.yaml' \
             -ignore-filename-pattern '\.kubeconfig\.yaml' \
             -ignore-filename-pattern 'values(\.[^/]+)?\.yaml' \
-            -ignore-filename-pattern 'operator-values\.yaml' \
-            -ignore-filename-pattern 'pnpm-lock\.yaml' \
             -ignore-filename-pattern '\.sample' \
-            -ignore-filename-pattern 'node_modules' \
-            -ignore-filename-pattern '\.json' \
-            -ignore-filename-pattern 'dashboards/' \
-            -ignore-filename-pattern 'charts/.*/(Chart\.yaml|templates/)' \
             k3s/

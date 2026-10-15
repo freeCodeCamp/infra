@@ -39,9 +39,9 @@ This repo owns:
 | Path                 | Purpose                                                          |
 | -------------------- | ---------------------------------------------------------------- |
 | `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
-| `docs/architecture/` | RFCs for non-trivial work                                        |
+| `docs/architecture/` | RFCs for non-trivial work (archived RFCs under `archive/`)       |
 | `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)               |
-| `docs/GUIDELINES.md` | Field-note format spec (legacy; field-notes archived 2026-05-10) |
+| `docs/GUIDELINES.md` | Runbook and RFC format rules                                     |
 
 ## Working directory rule
 
@@ -61,7 +61,7 @@ direnv `.envrc` hierarchy:
 
 Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age, single org key, `.sops.yaml` regex `.*`). Root `.envrc` resolves `SECRETS_DIR=../infra-secrets`; any other layout breaks direnv loading. No secrets this repo — not even encrypted.
 
-Layout contract + per-path consumer matrix: `docs/architecture/rfc-secrets-layout.md`.
+Envelope layout and consumers: `docs/runbooks/04-secrets-decrypt.md` §Envelope layout.
 
 Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to the JSON parser and fails — explicit `--input-type dotenv --output-type dotenv` is required.
 
@@ -79,7 +79,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Clusters
 
-- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplets `ops-vm-o11y-k3s-fra1-NN` (Terraform `node_count`, default 3; runbook 14), the observability cluster and the seed of the bare-metal `mgmt` cluster. `doctl` shows it in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
+- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplet `ops-vm-o11y-k3s-fra1-01`, the observability cluster. Argo CD deploys its apps. Runbook 14 describes the planned three-node cluster (Terraform `node_count`, default 3). `doctl` shows it in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
 - `ops-backoffice-tools`: legacy.
 
 Verify reality with `doctl compute droplet list` before acting.
