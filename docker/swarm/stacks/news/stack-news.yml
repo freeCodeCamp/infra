@@ -23,14 +23,6 @@ x-port-config: &port-config
 services:
   # The following services are the news services for various languages.
   # The PORTS are important, as they are defined in the downstream NGINX configuration.
-  # Uncomment the English service on production deployment.
-
-  # svc-eng:
-  #   image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
-  #   ports:
-  #     - published: 4001
-  #       <<: *port-config
-  #   <<: *deploy-config
   svc-chn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
     ports:
