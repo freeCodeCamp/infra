@@ -18,3 +18,5 @@
 uv.lock @freecodecamp/package-approvers
 requirements.yml @freecodecamp/package-approvers
 .terraform.lock.hcl @freecodecamp/package-approvers
+/renovate.json @freecodecamp/package-approvers
+/.github/CODEOWNERS @freecodecamp/package-approvers
