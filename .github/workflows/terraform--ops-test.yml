@@ -36,12 +36,44 @@ jobs:
         run: terraform fmt -check
         working-directory: terraform/ops-test
 
+  changes:
+    runs-on: ubuntu-latest
+    name: Terraform Changes
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      terraform: ${{ steps.filter.outputs.terraform }}
+
+    steps:
+      - name: Check for terraform changes
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != 'pull_request' ]; then
+            echo 'terraform=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pr="repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
+          count=$(gh api "$pr" --jq '.changed_files')
+          files=$(gh api --paginate "$pr/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          if [ "$count" -ge 3000 ] || grep -q '^terraform/' <<< "$files"; then
+            echo 'terraform=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'terraform=false' >> "$GITHUB_OUTPUT"
+          fi
+
   terraform-upgrade-test:
+    needs: changes
     if:
-      github.event_name == 'pull_request' || github.event_name ==
-      'workflow_dispatch'
+      ${{ !cancelled() && (needs.changes.result != 'success' ||
+      needs.changes.outputs.terraform == 'true') }}
     runs-on: ubuntu-latest
     name: Terraform Upgrade Test
+    environment: terraform
     permissions:
       contents: read
       pull-requests: write
@@ -61,11 +93,13 @@ jobs:
         working-directory: terraform/ops-test
 
   terraform-cloud-speculative-run:
+    needs: changes
     if:
-      github.event_name == 'pull_request' || github.event_name ==
-      'workflow_dispatch'
+      ${{ !cancelled() && (needs.changes.result != 'success' ||
+      needs.changes.outputs.terraform == 'true') }}
     runs-on: ubuntu-latest
     name: Terraform Cloud Speculative Run
+    environment: terraform
     permissions:
       contents: read
       pull-requests: write
