@@ -19,12 +19,13 @@
 
 - name: Check that the Linode API set every node to {{ nb_mode }}
   ansible.builtin.assert:
-    that: item.skipped | default(false) or item.status == 200
-    fail_msg: "{{ item.item.nb }}/{{ item.item.config }} {{ item.item.address }}: HTTP {{ item.status }} {{ item.json.errors | default([]) }}"
+    that: item.status | default(0) == 200
+    fail_msg: "{{ item.item.nb }}/{{ item.item.config }} {{ item.item.address }}: HTTP {{ item.status | default('none') }} {{ item.json.errors | default([]) }}"
     quiet: true
   loop: "{{ nb_set_mode.results }}"
   loop_control:
     label: "{{ item.item.nb }}/{{ item.item.config }} {{ item.item.address }}"
+  when: not ansible_check_mode
 
 - name: Wait for the NodeBalancers to report this host UP
   ansible.builtin.uri:

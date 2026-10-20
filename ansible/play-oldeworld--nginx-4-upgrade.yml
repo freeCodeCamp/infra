@@ -7,10 +7,11 @@
   become: true
   vars:
     nb_tier: "{{ inventory_hostname.split('-')[0] }}"
-    upgrade_no_keepalive_upstreams: [api, socrates]
     upgrade_upstream_head_re: '(?m)^(upstream NAME[ \t]+\{[ \t]*\n(?:[ \t]*least_conn;[ \t]*\n)?)'
     upgrade_drain_seconds: "{{ variable_drain_seconds | default(120) }}"
-    upgrade_smoke_host: "www.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}"
+    upgrade_smoke_urls:
+      - "www.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}/"
+      - "api.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}/status/ping"
 
   pre_tasks:
     - name: Check that the Linode API token is set
@@ -45,6 +46,12 @@
           delay: 5
           changed_when: false
           failed_when: false
+
+        - name: Move the clients still pinned to this host to its peers
+          ansible.builtin.include_tasks: tasks/nodebalancer-set-mode.yml
+          vars:
+            nb_mode: reject
+          tags: [nodebalancer]
 
         - name: Add the nginx.org repository
           ansible.builtin.include_role:
@@ -131,24 +138,24 @@
             fail_msg: "{{ nginx_config_dir }} is not clean: {{ upgrade_git_status.stdout_lines }}"
             quiet: true
 
-        - name: Turn off upstream keepalive for {{ upgrade_no_keepalive_upstreams | join(' and ') }}
+        - name: Turn off upstream keepalive for {{ nginx_no_keepalive_upstreams | join(' and ') }}
           ansible.builtin.replace:
             path: "{{ nginx_upstreams_path }}"
             regexp: '{{ upgrade_upstream_head_re | replace("NAME", item) }}(?![ \t]*(?:least_conn;[ \t]*\n[ \t]*)?keepalive 0;)'
             replace: '\1  keepalive 0;\n'
-          loop: "{{ upgrade_no_keepalive_upstreams }}"
+          loop: "{{ nginx_no_keepalive_upstreams }}"
 
         - name: Read the upstreams file
           ansible.builtin.slurp:
             src: "{{ nginx_upstreams_path }}"
           register: upgrade_upstreams
 
-        - name: Check that keepalive is off for {{ upgrade_no_keepalive_upstreams | join(' and ') }}
+        - name: Check that keepalive is off for {{ nginx_no_keepalive_upstreams | join(' and ') }}
           ansible.builtin.assert:
             that: upgrade_upstreams.content | b64decode is search(upgrade_upstream_head_re | replace("NAME", item) ~ '[ \t]*keepalive 0;')
             fail_msg: "upstream {{ item }} has no 'keepalive 0;' in {{ nginx_upstreams_path }}"
             quiet: true
-          loop: "{{ upgrade_no_keepalive_upstreams }}"
+          loop: "{{ nginx_no_keepalive_upstreams }}"
 
         - name: Install the NGINX restart policy
           ansible.builtin.include_role:
@@ -182,13 +189,14 @@
             fail_msg: "expected nginx {{ nginx_org_version }}, got: {{ upgrade_nginx_v.stderr }}"
             quiet: true
 
-        - name: Request the home page through this host  # noqa: command-instead-of-module
+        - name: Request www and api through this host  # noqa: command-instead-of-module
           ansible.builtin.command: >-
             curl -ksS -o /dev/null -w '%{http_code}' --max-time 10
-            --resolve {{ upgrade_smoke_host }}:443:127.0.0.1 https://{{ upgrade_smoke_host }}/
+            --resolve {{ item.split('/')[0] }}:443:127.0.0.1 https://{{ item }}
+          loop: "{{ upgrade_smoke_urls }}"
           register: upgrade_smoke
           changed_when: false
-          failed_when: upgrade_smoke.stdout not in ['200', '301', '302']
+          failed_when: upgrade_smoke.stdout != '200'
 
         - name: Return this host to service
           ansible.builtin.include_tasks: tasks/nodebalancer-set-mode.yml
@@ -202,6 +210,6 @@
             msg: >-
               The upgrade failed on {{ inventory_hostname }}:
               {{ ansible_failed_result.msg | default('') }} {{ ansible_failed_result.stderr | default('') }}
-              Some or all of its NodeBalancer nodes can still be in drain mode, so it serves little or no traffic.
+              Some or all of its NodeBalancer nodes can still be in drain or reject mode, so it serves little or no traffic.
               No later host was touched. Fix the cause and run the play again on this host;
               each run drains, converges and returns the host to service.

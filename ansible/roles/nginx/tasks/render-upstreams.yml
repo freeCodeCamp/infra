@@ -4,6 +4,12 @@
     nginx_upstreams_to_render: "{{ nginx_upstreams }}"
   no_log: true
 
+- name: Read the NGINX version on the host
+  ansible.builtin.command: nginx -v
+  register: nginx_version_on_host
+  changed_when: false
+  check_mode: false
+
 - name: Read the upstreams on the host
   ansible.builtin.slurp:
     path: "{{ nginx_upstreams_path }}"
@@ -24,11 +30,13 @@
     replace: |-
       upstream {{ item.name }} {
       {% if item.least_conn | default(false) %}  least_conn;
-      {% endif %}{% if nginx_upstream_keepalive | int > 0 %}  keepalive {{ nginx_upstream_keepalive }};
+      {% endif %}{% if item.name in (nginx_no_keepalive_upstreams | default([])) and nginx_version is version('1.29.7', '>=') %}  keepalive 0;
+      {% elif nginx_upstream_keepalive | int > 0 %}  keepalive {{ nginx_upstream_keepalive }};
         keepalive_timeout 4s;
       {% endif %}{% for server in item.servers %}  server {{ server }} max_fails=3 fail_timeout=10s;
       {% endfor %}}
   vars:
+    nginx_version: "{{ nginx_version_on_host.stderr | regex_search('nginx/([0-9.]+)', '\\1') | first }}"
     nginx_upstream_keepalive: "{{ 32 if item.name is match('client-') else (16 if item.name is match('(news|jms)-') else 0) }}"
   loop: "{{ nginx_upstreams_to_render }}"
   loop_control:

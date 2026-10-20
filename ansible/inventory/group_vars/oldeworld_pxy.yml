@@ -7,3 +7,4 @@ secrets_dir: "{{ lookup('ansible.builtin.env', 'SECRETS_DIR') | default(playbook
 nginx_upstreams: "{{ (lookup('community.sops.sops', secrets_dir ~ '/docker/oldeworld/pxy-upstreams-' ~ pxy_tier ~ '.yaml.enc', input_type='yaml', output_type='yaml') | from_yaml).nginx_upstreams }}"
 nginx_org_series: "1.30"
 nginx_org_version: "1.30.6-1~jammy"
+nginx_no_keepalive_upstreams: [api, socrates]
