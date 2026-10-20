@@ -1,10 +1,16 @@
 ---
-- name: Install NGINX and its dependecies via apt
+- name: Add the nginx.org repository
+  ansible.builtin.include_tasks: nginx-org-repo.yml
+
+- name: Install NGINX from nginx.org
   ansible.builtin.apt:
-    name: "{{ item }}"
+    name: "nginx={{ nginx_org_version }}"
     state: present
-  with_items:
-    - nginx
+    update_cache: true
+    dpkg_options: force-confold,force-confdef
+
+- name: Tidy the nginx.org package defaults
+  ansible.builtin.include_tasks: nginx-org-tidy.yml
 
 - name: Stop the stock NGINX until the config and the upstreams are in place
   ansible.builtin.systemd:

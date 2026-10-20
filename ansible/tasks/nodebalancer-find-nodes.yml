@@ -1,0 +1,101 @@
+---
+- name: Read the private address of {{ inventory_hostname }}
+  ansible.builtin.set_fact:
+    nb_private_ip: >-
+      {{ ansible_facts.all_ipv4_addresses
+         | select('match', '^192\.168\.(1(2[89]|[3-9][0-9])|2[0-5][0-9])\.')
+         | first | default('') }}
+
+- name: Check that the host has a private address
+  ansible.builtin.assert:
+    that: nb_private_ip | length > 0
+    fail_msg: "{{ inventory_hostname }} has no address in 192.168.128.0/17"
+    quiet: true
+
+- name: List the NodeBalancers
+  ansible.builtin.uri:
+    url: "{{ linode_api_url | default('https://api.linode.com/v4') }}/nodebalancers?page_size=500"
+    headers:
+      Authorization: "Bearer {{ lookup('ansible.builtin.env', 'LINODE_API_TOKEN') }}"
+  register: nb_list
+  delegate_to: localhost
+  become: false
+  check_mode: false
+  no_log: true
+
+- name: Keep the NodeBalancers in front of the proxies of tier {{ nb_tier }}
+  ansible.builtin.set_fact:
+    nb_ids: "{{ nb_list.json.data | selectattr('label', 'match', nb_tier ~ '-nb-oldeworld-pxy') | map(attribute='id') | list }}"
+
+- name: List the NodeBalancer configs
+  ansible.builtin.uri:
+    url: "{{ linode_api_url | default('https://api.linode.com/v4') }}/nodebalancers/{{ item }}/configs"
+    headers:
+      Authorization: "Bearer {{ lookup('ansible.builtin.env', 'LINODE_API_TOKEN') }}"
+  loop: "{{ nb_ids }}"
+  register: nb_configs
+  delegate_to: localhost
+  become: false
+  check_mode: false
+  no_log: true
+
+- name: Pair each config with its NodeBalancer
+  ansible.builtin.set_fact:
+    nb_config_pairs: >-
+      {%- set pairs = [] -%}
+      {%- for result in nb_configs.results -%}
+      {%- for config in result.json.data -%}
+      {%- set _ = pairs.append({'nb': result.item, 'config': config.id, 'port': config.port}) -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ pairs }}
+
+- name: List the nodes of each config
+  ansible.builtin.uri:
+    url: "{{ linode_api_url | default('https://api.linode.com/v4') }}/nodebalancers/{{ item.nb }}/configs/{{ item.config }}/nodes"
+    headers:
+      Authorization: "Bearer {{ lookup('ansible.builtin.env', 'LINODE_API_TOKEN') }}"
+  loop: "{{ nb_config_pairs }}"
+  register: nb_node_lists
+  delegate_to: localhost
+  become: false
+  check_mode: false
+  no_log: true
+
+- name: Split the nodes into this host and its peers
+  ansible.builtin.set_fact:
+    nb_own_nodes: >-
+      {%- set own = [] -%}
+      {%- for result in nb_node_lists.results -%}
+      {%- for node in result.json.data if node.address.split(':')[0] == nb_private_ip -%}
+      {%- set _ = own.append({'nb': result.item.nb, 'config': result.item.config, 'id': node.id,
+                              'address': node.address, 'mode': node.mode}) -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ own }}
+    nb_configs_without_peer: >-
+      {%- set bare = [] -%}
+      {%- for result in nb_node_lists.results -%}
+      {%- set ns = namespace(peers=0) -%}
+      {%- for node in result.json.data
+          if node.address.split(':')[0] != nb_private_ip and node.mode == 'accept' and node.status == 'UP' -%}
+      {%- set ns.peers = ns.peers + 1 -%}
+      {%- endfor -%}
+      {%- if ns.peers == 0 -%}
+      {%- set _ = bare.append(result.item.nb ~ '/' ~ result.item.config ~ ':' ~ result.item.port) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ bare }}
+
+- name: Check that every config holds this host and a healthy peer
+  ansible.builtin.assert:
+    that:
+      - nb_ids | length > 0
+      - nb_own_nodes | length == nb_config_pairs | length
+      - nb_configs_without_peer | length == 0
+    fail_msg: >-
+      {{ inventory_hostname }} ({{ nb_private_ip }}): {{ nb_ids | length }} NodeBalancers,
+      {{ nb_config_pairs | length }} configs, {{ nb_own_nodes | length }} own nodes.
+      Configs with no other node in accept mode and UP: {{ nb_configs_without_peer }}.
+      Draining now could leave a NodeBalancer with no backend.
+    quiet: true

@@ -1,0 +1,159 @@
+---
+- name: Upgrade NGINX to the nginx.org stable series
+  hosts: '{{ variable_host | default("null") }}'
+  serial: 1
+  max_fail_percentage: 0
+  gather_facts: true
+  become: true
+  vars:
+    nb_tier: "{{ inventory_hostname.split('-')[0] }}"
+    upgrade_no_keepalive_upstreams: [api, socrates]
+    upgrade_drain_seconds: "{{ variable_drain_seconds | default(120) }}"
+    upgrade_smoke_host: "www.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}"
+
+  pre_tasks:
+    - name: Check that the Linode API token is set
+      ansible.builtin.assert:
+        that: lookup('ansible.builtin.env', 'LINODE_API_TOKEN') | length > 0
+        fail_msg: LINODE_API_TOKEN is not set; run the play from infra/ansible with direnv loaded
+        quiet: true
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+  tasks:
+    - name: Find the NodeBalancer nodes of this host
+      ansible.builtin.include_tasks: tasks/nodebalancer-find-nodes.yml
+      tags: [nodebalancer]
+
+    - name: Drain this host
+      ansible.builtin.include_tasks: tasks/nodebalancer-set-mode.yml
+      vars:
+        nb_mode: drain
+      tags: [nodebalancer]
+
+    - name: Upgrade, then return the host to service
+      block:
+        - name: Wait for the open client connections to finish
+          ansible.builtin.shell:
+            cmd: ss -Htn state established '( sport = :80 or sport = :443 )' | wc -l
+          register: upgrade_open_connections
+          until: upgrade_open_connections.stdout | int <= 5
+          retries: "{{ (upgrade_drain_seconds | int / 5) | int }}"
+          delay: 5
+          changed_when: false
+          failed_when: false
+
+        - name: Add the nginx.org repository
+          ansible.builtin.include_role:
+            name: nginx
+            tasks_from: nginx-org-repo.yml
+
+        - name: Read the installed NGINX version
+          ansible.builtin.command: dpkg-query -W -f=${Version} nginx
+          register: upgrade_installed_version
+          changed_when: false
+
+        - name: Stop NGINX gracefully before the package swap
+          when: upgrade_installed_version.stdout != nginx_org_version
+          block:
+            - name: Ask NGINX to finish its requests and exit
+              ansible.builtin.command:
+                cmd: nginx -s quit
+                removes: /run/nginx.pid
+
+            - name: Wait for the NGINX master to exit
+              ansible.builtin.wait_for:
+                path: /run/nginx.pid
+                state: absent
+                timeout: 60
+
+        - name: Install NGINX from nginx.org
+          ansible.builtin.apt:
+            name: "nginx={{ nginx_org_version }}"
+            state: present
+            update_cache: true
+            dpkg_options: force-confold,force-confdef
+
+        - name: Tidy the nginx.org package defaults
+          ansible.builtin.include_role:
+            name: nginx
+            tasks_from: nginx-org-tidy.yml
+
+        - name: Restore the tracked config files  # noqa: command-instead-of-module
+          ansible.builtin.command: git -C {{ nginx_config_dir }} checkout -- .
+          changed_when: false
+
+        - name: Read the config checkout status  # noqa: command-instead-of-module
+          ansible.builtin.command: git -C {{ nginx_config_dir }} status --porcelain --untracked-files=no
+          register: upgrade_git_status
+          changed_when: false
+
+        - name: Check that the config checkout is clean
+          ansible.builtin.assert:
+            that: upgrade_git_status.stdout | length == 0
+            fail_msg: "{{ nginx_config_dir }} is not clean: {{ upgrade_git_status.stdout_lines }}"
+            quiet: true
+
+        - name: Turn off upstream keepalive for {{ upgrade_no_keepalive_upstreams | join(' and ') }}
+          ansible.builtin.replace:
+            path: "{{ nginx_upstreams_path }}"
+            regexp: '(?m)^(upstream {{ item }} \{\n(?:[ \t]*least_conn;\n)?)(?![ \t]*keepalive 0;)'
+            replace: '\1  keepalive 0;\n'
+          loop: "{{ upgrade_no_keepalive_upstreams }}"
+
+        - name: Install the NGINX restart policy
+          ansible.builtin.include_role:
+            name: nginx
+            tasks_from: harden-unit.yml
+
+        - name: Check the NGINX config
+          ansible.builtin.command: nginx -t
+          changed_when: false
+
+        - name: Restart NGINX
+          ansible.builtin.systemd:
+            name: nginx
+            state: restarted
+
+        - name: Wait for NGINX to listen
+          ansible.builtin.wait_for:
+            host: 127.0.0.1
+            port: "{{ item }}"
+            timeout: 30
+          loop: [80, 443]
+
+        - name: Read the running NGINX version
+          ansible.builtin.command: nginx -v
+          register: upgrade_nginx_v
+          changed_when: false
+
+        - name: Check the NGINX version
+          ansible.builtin.assert:
+            that: ("nginx/" ~ nginx_org_version.split('-')[0]) in upgrade_nginx_v.stderr
+            fail_msg: "expected nginx {{ nginx_org_version }}, got: {{ upgrade_nginx_v.stderr }}"
+            quiet: true
+
+        - name: Request the home page through this host  # noqa: command-instead-of-module
+          ansible.builtin.command: >-
+            curl -ksS -o /dev/null -w '%{http_code}' --max-time 10
+            --resolve {{ upgrade_smoke_host }}:443:127.0.0.1 https://{{ upgrade_smoke_host }}/
+          register: upgrade_smoke
+          changed_when: false
+          failed_when: upgrade_smoke.stdout not in ['200', '301', '302']
+
+        - name: Return this host to service
+          ansible.builtin.include_tasks: tasks/nodebalancer-set-mode.yml
+          vars:
+            nb_mode: accept
+          tags: [nodebalancer]
+
+      rescue:
+        - name: Stop the run and leave the host to the operator
+          ansible.builtin.fail:
+            msg: >-
+              The upgrade failed on {{ inventory_hostname }}:
+              {{ ansible_failed_result.msg | default('') }} {{ ansible_failed_result.stderr | default('') }}
+              Some or all of its NodeBalancer nodes can still be in drain mode, so it serves little or no traffic.
+              No later host was touched. Fix the cause and run the play again on this host;
+              each run drains, converges and returns the host to service.

@@ -1,0 +1,16 @@
+---
+- name: Set the NodeBalancer nodes of this host to {{ nb_mode }}
+  ansible.builtin.uri:
+    url: "{{ linode_api_url | default('https://api.linode.com/v4') }}/nodebalancers/{{ item.nb }}/configs/{{ item.config }}/nodes/{{ item.id }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ lookup('ansible.builtin.env', 'LINODE_API_TOKEN') }}"
+    body_format: json
+    body:
+      mode: "{{ nb_mode }}"
+  loop: "{{ nb_own_nodes }}"
+  loop_control:
+    label: "{{ item.nb }}/{{ item.config }} {{ item.address }}"
+  delegate_to: localhost
+  become: false
+  no_log: true

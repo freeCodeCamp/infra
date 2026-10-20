@@ -1,0 +1,28 @@
+---
+- name: Read the distribution facts
+  ansible.builtin.setup:
+    gather_subset:
+      - "!all"
+      - distribution
+  when: ansible_distribution_release is not defined
+
+- name: Add the nginx.org APT repository
+  ansible.builtin.deb822_repository:
+    name: nginx
+    types: deb
+    uris: "https://nginx.org/packages/{{ ansible_distribution | lower }}"
+    suites: "{{ ansible_distribution_release | lower }}"
+    components: nginx
+    signed_by: https://nginx.org/keys/nginx_signing.key
+    state: present
+
+- name: Pin NGINX to its stable series {{ nginx_org_series }}
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/99nginx
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Package: nginx
+      Pin: version {{ nginx_org_series }}.*
+      Pin-Priority: 900
