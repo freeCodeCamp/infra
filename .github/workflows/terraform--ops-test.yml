@@ -4,14 +4,17 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform--ops-test.yml'
   workflow_dispatch:
 
 defaults:
   run:
     shell: bash
-
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   terraform-format:
@@ -22,7 +25,6 @@ jobs:
     name: Terraform Format
     permissions:
       contents: read
-      pull-requests: write
 
     steps:
       - name: Checkout
@@ -36,47 +38,30 @@ jobs:
         run: terraform fmt -check
         working-directory: terraform/ops-test
 
-  changes:
+  terraform-validate:
     runs-on: ubuntu-latest
-    name: Terraform Changes
+    name: Terraform Validate
     permissions:
       contents: read
-      pull-requests: read
-    outputs:
-      terraform: ${{ steps.filter.outputs.terraform }}
 
     steps:
-      - name: Check for terraform changes
-        id: filter
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          if [ "$GITHUB_EVENT_NAME" != 'pull_request' ]; then
-            echo 'terraform=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          pr="repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"
-          count=$(gh api "$pr" --jq '.changed_files')
-          files=$(gh api --paginate "$pr/files" \
-            --jq '.[] | .filename, (.previous_filename // empty)')
-          if [ "$count" -ge 3000 ] || grep -q '^terraform/' <<< "$files"; then
-            echo 'terraform=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'terraform=false' >> "$GITHUB_OUTPUT"
-          fi
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+
+      - name: Terraform Validate
+        run: terraform init -backend=false -input=false && terraform validate
+        working-directory: terraform/ops-test
 
   terraform-upgrade-test:
-    needs: changes
-    if:
-      ${{ !cancelled() && (needs.changes.result != 'success' ||
-      needs.changes.outputs.terraform == 'true') }}
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     name: Terraform Upgrade Test
     environment: terraform
     permissions:
       contents: read
-      pull-requests: write
 
     steps:
       - name: Checkout
@@ -93,16 +78,12 @@ jobs:
         working-directory: terraform/ops-test
 
   terraform-cloud-speculative-run:
-    needs: changes
-    if:
-      ${{ !cancelled() && (needs.changes.result != 'success' ||
-      needs.changes.outputs.terraform == 'true') }}
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     name: Terraform Cloud Speculative Run
     environment: terraform
     permissions:
       contents: read
-      pull-requests: write
     env:
       TF_CLOUD_ORGANIZATION: freecodecamp
       TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
@@ -137,46 +118,3 @@ jobs:
         id: plan-output
         with:
           plan: ${{ steps.run.outputs.plan_id }}
-
-      - name: Find Comment
-        if: github.event_name == 'pull_request'
-        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
-        id: fc
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
-          body-includes: Run Details - ${{ env.TF_WORKSPACE }}
-
-      - name: Create or update comment
-        if: github.event_name == 'pull_request'
-        uses: peter-evans/create-or-update-comment@cf1a4a2020fa08820c81f4127c6aad2fa212beb8
-        with:
-          comment-id: ${{ steps.fc.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          edit-mode: replace
-          body: |
-            Run Details - ${{ env.TF_WORKSPACE }}
-
-            **Terraform Cloud Plan Output**
-
-            ```
-            Plan: ${{ steps.plan-output.outputs.add }} to add, ${{ steps.plan-output.outputs.change }} to change, ${{ steps.plan-output.outputs.destroy }} to destroy.
-            ```
-
-            **Details : <${{ steps.run.outputs.run_link }}>**
-
-            <table>
-              <tr>
-                <td>
-                  Warning
-                </td>
-                <td>
-                  <p>
-                    Please note that the plan output provided may not accurately reflect the impact on the Terraform project you are currently working on in this Pull Request. The CI checks are merely a sanity test to verify that the versions in the lock file are valid and functional.
-                  </p>
-                  <p>
-                    Confirm the actual Terraform plan by running the corresponding project on your machine or on TFC.
-                  </p>
-                </td>
-              </tr>
-            </table>
