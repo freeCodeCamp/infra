@@ -8,9 +8,38 @@
     body_format: json
     body:
       mode: "{{ nb_mode }}"
+    status_code: [200, 400, 401, 403, 404, 429, 500, 502, 503]
   loop: "{{ nb_own_nodes }}"
   loop_control:
     label: "{{ item.nb }}/{{ item.config }} {{ item.address }}"
+  register: nb_set_mode
   delegate_to: localhost
   become: false
   no_log: true
+
+- name: Check that the Linode API set every node to {{ nb_mode }}
+  ansible.builtin.assert:
+    that: item.skipped | default(false) or item.status == 200
+    fail_msg: "{{ item.item.nb }}/{{ item.item.config }} {{ item.item.address }}: HTTP {{ item.status }} {{ item.json.errors | default([]) }}"
+    quiet: true
+  loop: "{{ nb_set_mode.results }}"
+  loop_control:
+    label: "{{ item.item.nb }}/{{ item.item.config }} {{ item.item.address }}"
+
+- name: Wait for the NodeBalancers to report this host UP
+  ansible.builtin.uri:
+    url: "{{ linode_api_url | default('https://api.linode.com/v4') }}/nodebalancers/{{ item.nb }}/configs/{{ item.config }}/nodes/{{ item.id }}"
+    headers:
+      Authorization: "Bearer {{ lookup('ansible.builtin.env', 'LINODE_API_TOKEN') }}"
+  loop: "{{ nb_own_nodes }}"
+  loop_control:
+    label: "{{ item.nb }}/{{ item.config }} {{ item.address }}"
+  register: nb_node_state
+  until: nb_node_state.json.status | default('') == 'UP'
+  retries: 18
+  delay: 5
+  delegate_to: localhost
+  become: false
+  check_mode: false
+  no_log: true
+  when: nb_mode == 'accept'

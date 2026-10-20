@@ -17,11 +17,18 @@
     url: "{{ linode_api_url | default('https://api.linode.com/v4') }}/nodebalancers?page_size=500"
     headers:
       Authorization: "Bearer {{ lookup('ansible.builtin.env', 'LINODE_API_TOKEN') }}"
+    status_code: [200, 400, 401, 403, 404, 429, 500, 502, 503]
   register: nb_list
   delegate_to: localhost
   become: false
   check_mode: false
   no_log: true
+
+- name: Check that the Linode API listed the NodeBalancers
+  ansible.builtin.assert:
+    that: nb_list.status == 200
+    fail_msg: "Linode API: HTTP {{ nb_list.status }} {{ nb_list.json.errors | default([]) }}"
+    quiet: true
 
 - name: Keep the NodeBalancers in front of the proxies of tier {{ nb_tier }}
   ansible.builtin.set_fact:

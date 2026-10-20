@@ -70,6 +70,14 @@
                 path: /run/nginx.pid
                 state: absent
                 timeout: 60
+              register: upgrade_quit_wait
+              failed_when: false
+
+            - name: Stop NGINX when long-lived connections hold it open
+              ansible.builtin.systemd:
+                name: nginx
+                state: stopped
+              when: upgrade_quit_wait.state | default('') != 'absent'
 
         - name: Install NGINX from nginx.org
           ansible.builtin.apt:
@@ -82,6 +90,31 @@
           ansible.builtin.include_role:
             name: nginx
             tasks_from: nginx-org-tidy.yml
+
+        - name: List the removed Ubuntu NGINX packages that keep their config
+          ansible.builtin.shell:
+            cmd: dpkg -l 'nginx-common' 'libnginx-mod-*' 2>/dev/null | awk '/^rc/ {print $2}'
+          register: upgrade_rc_packages
+          changed_when: false
+          check_mode: false
+
+        - name: Keep the nginx-common purge from deleting /etc/nginx
+          ansible.builtin.copy:
+            dest: /var/lib/dpkg/info/nginx-common.postrm
+            owner: root
+            group: root
+            mode: "0755"
+            content: |
+              #!/bin/sh
+              exit 0
+          when: "'nginx-common' in upgrade_rc_packages.stdout_lines"
+
+        - name: Purge the removed Ubuntu NGINX packages
+          ansible.builtin.apt:
+            name: "{{ upgrade_rc_packages.stdout_lines }}"
+            state: absent
+            purge: true
+          when: upgrade_rc_packages.stdout_lines | length > 0
 
         - name: Restore the tracked config files  # noqa: command-instead-of-module
           ansible.builtin.command: git -C {{ nginx_config_dir }} checkout -- .
