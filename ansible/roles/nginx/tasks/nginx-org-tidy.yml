@@ -26,3 +26,22 @@
               fi
           endscript
       }
+
+- name: Find the files that the package swap leaves behind
+  ansible.builtin.find:
+    paths:
+      - /etc/nginx
+      - /etc/nginx/modules-enabled
+    patterns:
+      - "*.dpkg-dist"
+      - "*.removed"
+    file_type: any
+  register: nginx_org_leftovers
+
+- name: Remove the files that the package swap leaves behind
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ nginx_org_leftovers.files }}"
+  loop_control:
+    label: "{{ item.path }}"

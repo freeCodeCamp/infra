@@ -8,6 +8,7 @@
   vars:
     nb_tier: "{{ inventory_hostname.split('-')[0] }}"
     upgrade_no_keepalive_upstreams: [api, socrates]
+    upgrade_upstream_head_re: '(?m)^(upstream NAME[ \t]+\{[ \t]*\n(?:[ \t]*least_conn;[ \t]*\n)?)'
     upgrade_drain_seconds: "{{ variable_drain_seconds | default(120) }}"
     upgrade_smoke_host: "www.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}"
 
@@ -20,6 +21,7 @@
       delegate_to: localhost
       become: false
       run_once: true
+      tags: [nodebalancer]
 
   tasks:
     - name: Find the NodeBalancer nodes of this host
@@ -53,6 +55,7 @@
           ansible.builtin.command: dpkg-query -W -f=${Version} nginx
           register: upgrade_installed_version
           changed_when: false
+          check_mode: false
 
         - name: Stop NGINX gracefully before the package swap
           when: upgrade_installed_version.stdout != nginx_org_version
@@ -98,8 +101,20 @@
         - name: Turn off upstream keepalive for {{ upgrade_no_keepalive_upstreams | join(' and ') }}
           ansible.builtin.replace:
             path: "{{ nginx_upstreams_path }}"
-            regexp: '(?m)^(upstream {{ item }} \{\n(?:[ \t]*least_conn;\n)?)(?![ \t]*keepalive 0;)'
+            regexp: '{{ upgrade_upstream_head_re | replace("NAME", item) }}(?![ \t]*(?:least_conn;[ \t]*\n[ \t]*)?keepalive 0;)'
             replace: '\1  keepalive 0;\n'
+          loop: "{{ upgrade_no_keepalive_upstreams }}"
+
+        - name: Read the upstreams file
+          ansible.builtin.slurp:
+            src: "{{ nginx_upstreams_path }}"
+          register: upgrade_upstreams
+
+        - name: Check that keepalive is off for {{ upgrade_no_keepalive_upstreams | join(' and ') }}
+          ansible.builtin.assert:
+            that: upgrade_upstreams.content | b64decode is search(upgrade_upstream_head_re | replace("NAME", item) ~ '[ \t]*keepalive 0;')
+            fail_msg: "upstream {{ item }} has no 'keepalive 0;' in {{ nginx_upstreams_path }}"
+            quiet: true
           loop: "{{ upgrade_no_keepalive_upstreams }}"
 
         - name: Install the NGINX restart policy

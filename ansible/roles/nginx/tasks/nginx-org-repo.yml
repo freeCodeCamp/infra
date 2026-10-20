@@ -14,6 +14,7 @@
     suites: "{{ ansible_distribution_release | lower }}"
     components: nginx
     signed_by: https://nginx.org/keys/nginx_signing.key
+    install_python_debian: true
     state: present
 
 - name: Pin NGINX to its stable series {{ nginx_org_series }}
