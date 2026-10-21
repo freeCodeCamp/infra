@@ -24,8 +24,12 @@
     replace: |-
       upstream {{ item.name }} {
       {% if item.least_conn | default(false) %}  least_conn;
-      {% endif %}{% for server in item.servers %}  server {{ server }};
+      {% endif %}{% if nginx_upstream_keepalive | int > 0 %}  keepalive {{ nginx_upstream_keepalive }};
+        keepalive_timeout 4s;
+      {% endif %}{% for server in item.servers %}  server {{ server }} max_fails=3 fail_timeout=10s;
       {% endfor %}}
+  vars:
+    nginx_upstream_keepalive: "{{ 32 if item.name is match('client-') else (16 if item.name is match('(news|jms)-') else 0) }}"
   loop: "{{ nginx_upstreams_to_render }}"
   loop_control:
     label: "{{ item.name }}"
