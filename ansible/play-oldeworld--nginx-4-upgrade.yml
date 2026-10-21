@@ -6,12 +6,11 @@
   gather_facts: true
   become: true
   vars:
-    nb_tier: "{{ inventory_hostname.split('-')[0] }}"
     upgrade_upstream_head_re: '(?m)^(upstream NAME[ \t]+\{[ \t]*\n(?:[ \t]*least_conn;[ \t]*\n)?)'
     upgrade_drain_seconds: "{{ variable_drain_seconds | default(120) }}"
     upgrade_smoke_urls:
-      - "www.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}/"
-      - "api.freecodecamp.{{ 'org' if nb_tier == 'prd' else 'dev' }}/status/ping"
+      - "www.freecodecamp.{{ 'org' if pxy_tier == 'prd' else 'dev' }}/"
+      - "api.freecodecamp.{{ 'org' if pxy_tier == 'prd' else 'dev' }}/status/ping"
 
   pre_tasks:
     - name: Check that the Linode API token is set
@@ -65,7 +64,7 @@
           check_mode: false
 
         - name: Stop NGINX gracefully before the package swap
-          when: upgrade_installed_version.stdout != nginx_org_version
+          when: not upgrade_installed_version.stdout.startswith(nginx_org_series ~ '.')
           block:
             - name: Ask NGINX to finish its requests and exit
               ansible.builtin.command:
@@ -88,7 +87,7 @@
 
         - name: Install NGINX from nginx.org
           ansible.builtin.apt:
-            name: "nginx={{ nginx_org_version }}"
+            name: "nginx={{ nginx_org_series }}.*"
             state: present
             update_cache: true
             dpkg_options: force-confold,force-confdef
@@ -185,8 +184,8 @@
 
         - name: Check the NGINX version
           ansible.builtin.assert:
-            that: ("nginx/" ~ nginx_org_version.split('-')[0]) in upgrade_nginx_v.stderr
-            fail_msg: "expected nginx {{ nginx_org_version }}, got: {{ upgrade_nginx_v.stderr }}"
+            that: ("nginx/" ~ nginx_org_series ~ ".") in upgrade_nginx_v.stderr
+            fail_msg: "expected nginx {{ nginx_org_series }}.x, got: {{ upgrade_nginx_v.stderr }}"
             quiet: true
 
         - name: Request www and api through this host  # noqa: command-instead-of-module

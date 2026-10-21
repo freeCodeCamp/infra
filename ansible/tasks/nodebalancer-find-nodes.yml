@@ -30,9 +30,9 @@
     fail_msg: "Linode API: HTTP {{ nb_list.status }} {{ nb_list.json.errors | default([]) }}"
     quiet: true
 
-- name: Keep the NodeBalancers in front of the proxies of tier {{ nb_tier }}
+- name: Keep the NodeBalancers in front of the proxies of tier {{ pxy_tier }}
   ansible.builtin.set_fact:
-    nb_ids: "{{ nb_list.json.data | selectattr('label', 'match', nb_tier ~ '-nb-oldeworld-pxy') | map(attribute='id') | list }}"
+    nb_ids: "{{ nb_list.json.data | selectattr('label', 'match', pxy_tier ~ '-nb-oldeworld-pxy') | map(attribute='id') | list }}"
 
 - name: List the NodeBalancer configs
   ansible.builtin.uri:

@@ -4,7 +4,7 @@
 
 - name: Install NGINX from nginx.org
   ansible.builtin.apt:
-    name: "nginx={{ nginx_org_version }}"
+    name: "nginx={{ nginx_org_series }}.*"
     state: present
     update_cache: true
     dpkg_options: force-confold,force-confdef
