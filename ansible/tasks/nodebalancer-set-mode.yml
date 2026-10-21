@@ -37,7 +37,7 @@
     label: "{{ item.nb }}/{{ item.config }} {{ item.address }}"
   register: nb_node_state
   until: nb_node_state.json.status | default('') == 'UP'
-  retries: 18
+  retries: 60
   delay: 5
   delegate_to: localhost
   become: false
