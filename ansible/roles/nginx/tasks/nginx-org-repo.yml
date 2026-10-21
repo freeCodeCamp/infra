@@ -4,14 +4,14 @@
     gather_subset:
       - "!all"
       - distribution
-  when: ansible_distribution_release is not defined
+  when: ansible_facts.distribution_release is not defined
 
 - name: Add the nginx.org APT repository
   ansible.builtin.deb822_repository:
     name: nginx
     types: deb
-    uris: "https://nginx.org/packages/{{ ansible_distribution | lower }}"
-    suites: "{{ ansible_distribution_release | lower }}"
+    uris: "https://nginx.org/packages/{{ ansible_facts.distribution | lower }}"
+    suites: "{{ ansible_facts.distribution_release | lower }}"
     components: nginx
     signed_by: https://nginx.org/keys/nginx_signing.key
     install_python_debian: true
