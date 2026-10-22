@@ -8,7 +8,7 @@ x-logging-config: &logging-config
 
 x-dispatch-env: &dispatch-env
   GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN}
-  GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+  CHAT_PROXY_URL: http://svc-chat-proxy:8080/hooks/chat
 
 x-dispatch: &dispatch
   <<: *logging-config
@@ -67,7 +67,7 @@ services:
     image: curlimages/curl:8.22.0
     entrypoint: ["/scripts/watchdog.sh"]
     environment:
-      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+      CHAT_PROXY_URL: http://svc-chat-proxy:8080/hooks/chat
     configs:
       - source: scripts_lib
         target: /scripts/lib.sh
@@ -114,7 +114,7 @@ services:
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
       - "GANTRY_UPDATE_OPTIONS=--with-registry-auth"
       - "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-chat-relay:9000/hooks/gantry?trigger=hourly"
-      - "GANTRY_NOTIFICATION_CONDITION=on-change"
+      - "GANTRY_NOTIFICATION_CONDITION=all"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
@@ -159,13 +159,46 @@ services:
       restart_policy:
         condition: none
 
+  svc-chat-proxy:
+    image: python:3.12.15-alpine3.24@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4
+    command: ["python3", "/app/chat_proxy.py"]
+    environment:
+      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK}
+      CHAT_PROXY_EXPECTATIONS: /app/cron-expectations.json
+      CHAT_PROXY_DATA_DIR: /data
+      CHAT_PROXY_GRACE_MINUTES: "15"
+      CHAT_PROXY_RETENTION_DAYS: "7"
+      PORT: "8080"
+    configs:
+      - source: chat_proxy_script
+        target: /app/chat_proxy.py
+        mode: 0555
+      - source: chat_proxy_expectations
+        target: /app/cron-expectations.json
+        mode: 0444
+    volumes:
+      - chat_proxy_data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    <<: *logging-config
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - "node.role == manager"
+
   svc-chat-relay:
     image: lwlook/webhook@sha256:93f708c6c0d6469b4a0f7f654d5f25054e54dccba1cf316a1d7e48e2be736c9a
     command:
       - "-verbose"
       - "-hooks=/hooks.json"
     environment:
-      - "GOOGLE_CHAT_WEBHOOK=${GOOGLE_CHAT_WEBHOOK}"
+      - "CHAT_PROXY_URL=http://svc-chat-proxy:8080/hooks/chat"
     configs:
       - source: hooks_relay
         target: /hooks.json
@@ -223,13 +256,13 @@ configs:
     name: oncall_run_gantry_v2
     file: ./run_gantry.sh
   scripts_lib:
-    name: oncall_scripts_lib_v1
+    name: oncall_scripts_lib_v2
     file: ./scripts/lib.sh
   scripts_dispatch:
-    name: oncall_scripts_dispatch_v2
+    name: oncall_scripts_dispatch_v3
     file: ./scripts/dispatch.sh
   scripts_watchdog:
-    name: oncall_scripts_watchdog_v1
+    name: oncall_scripts_watchdog_v2
     file: ./scripts/watchdog.sh
   hooks_relay:
     name: oncall_hooks_relay_v1
@@ -237,3 +270,12 @@ configs:
   scripts_relay:
     name: oncall_scripts_relay_v1
     file: ./scripts/relay.sh
+  chat_proxy_script:
+    name: oncall_chat_proxy_script_v1
+    file: ./proxy/chat_proxy.py
+  chat_proxy_expectations:
+    name: oncall_chat_proxy_expectations_v1
+    file: ./proxy/cron-expectations.json
+
+volumes:
+  chat_proxy_data:
