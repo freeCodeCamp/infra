@@ -99,7 +99,7 @@ services:
         - "swarm.cronjob.skip-running=true"
 
   svc-cronjob:
-    image: crazymax/swarm-cronjob:1.16.0
+    image: crazymax/swarm-cronjob:1.16.1
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
