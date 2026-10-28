@@ -37,7 +37,11 @@ cd docker/swarm/stacks/socrates
 cd -
 ```
 
-The deploy does not use `--with-registry-auth`. The services keep the registry credentials of their current spec. Without those credentials on the manager, the deploy cannot pin the image digest and prints a warning. The services then run `socrates:latest`, the same as the news stacks, and Gantry updates them when `latest` moves. `SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
+The deploy does not use `--with-registry-auth`, so the services keep the registry credentials in their spec. The daemon uses those credentials to pin the image digest. If they do not work, the deploy prints a warning and the services run `socrates:latest` with no pin. Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS=--with-registry-auth` in `stack-oncall.yml`).
+
+A new stack, or a stack after `docker stack rm`, has no stored credentials. For that deploy, run `doctl --context primary registry login --read-only` first, and add `--with-registry-auth` to `docker stack deploy`.
+
+`SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
 
 ## Node Labels
 
@@ -81,4 +85,4 @@ The ceiling is soft even when Redis is healthy. `svc-redis` runs `--maxmemory 20
 ## Notes
 
 - Environment-specific naming allows managing multiple Socrates deployments
-- All configuration is managed through Portainer
+- The configuration is in the stack file and the `socrates-{prd,stg}.env.enc` envelopes

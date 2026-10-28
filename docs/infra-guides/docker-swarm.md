@@ -79,4 +79,4 @@
 
 6. Add the container registry details to Portainer.
 
-7. Deploy the remaining stacks: [API](docker-swarm-api.md) and [Socrates](docker-swarm-socrates.md) only from Portainer, [News](docker-swarm-news.md) from Portainer or the CLI, and [oncall](docker-swarm-oncall.md#deployment) only from the CLI. Do not manage the portainer stack from within the Portainer UI.
+7. Deploy the remaining stacks: [API](docker-swarm-api.md) only from Portainer, [News](docker-swarm-news.md) from Portainer or the CLI, and [Socrates](docker-swarm-socrates.md#deployment) and [oncall](docker-swarm-oncall.md#deployment) only from the CLI. Do not manage the portainer stack from within the Portainer UI.
