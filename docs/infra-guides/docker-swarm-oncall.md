@@ -8,16 +8,17 @@ The Oncall stack provides automated maintenance and monitoring services includin
 
 ## Components
 
-| Service                       | Purpose                                                       |
-| ----------------------------- | ------------------------------------------------------------- |
-| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)             |
-| **svc-update**                | Gantry service updater (auto-updates tagged services)         |
-| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)   |
-| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)   |
-| **svc-chat-relay**            | Posts Gantry notices to Google Chat as one standard line      |
-| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
-| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
-| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale      |
+| Service                       | Purpose                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)                |
+| **svc-update**                | Gantry service updater (auto-updates tagged services)            |
+| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)      |
+| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)      |
+| **svc-chat-relay**            | Posts Gantry notices to Google Chat as one standard line         |
+| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours          |
+| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat    |
+| **svc-dispatch-docr-gc**      | Starts the infra `docr--garbage-collection.yml` workflow Wed/Sat |
+| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale         |
 
 ## Architecture
 
@@ -26,7 +27,7 @@ Cronjob Scheduler → Scheduled Tasks
 Service Updater → Auto-update tagged services
 Cleanup Job → Weekly prune on all nodes
 Webhook Receiver → On-demand Gantry updates (via GHA)
-Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping)
+Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping, DOCR garbage collection)
 Watchdog → news RSS lastBuildDate → Google Chat when stale
 Gantry (cron and webhook) → Chat relay → Google Chat
     ↓
@@ -77,6 +78,7 @@ GitHub `schedule` triggers start late or do not start at all (observed since 202
 | --------------------------- | ---------------- | ------------- |
 | `svc-dispatch-news-eng`     | `0 5 */3 * * *`  | `avoid`       |
 | `svc-dispatch-housekeeping` | `0 30 1 * * 3,6` | `require`     |
+| `svc-dispatch-docr-gc`      | `0 30 3 * * 3,6` | `require`     |
 
 The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it once.
 
@@ -84,6 +86,8 @@ The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it
 - `require`: outside the window, the dispatcher refuses and posts to Google Chat.
 
 The dispatcher posts to Google Chat when the API refuses the request or when a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
+
+The DOCR garbage collection workflow makes the registry read-only while it runs. It starts only on Wed/Sat 00:00–05:10 UTC, so it ends before the 06:05 news deploy. It waits up to 60 minutes for DOCR push and cleanup runs in other repos to finish, then skips. It posts each result to Google Chat. To start it outside the window, use `window_check=false`.
 
 ### Freshness Watchdog
 
@@ -246,6 +250,7 @@ docker service logs --since 2h oncall_svc-webhook
 docker service logs --since 2h oncall_svc-chat-relay
 docker service logs --since 3h oncall_svc-dispatch-news-eng
 docker service logs --since 96h oncall_svc-dispatch-housekeeping
+docker service logs --since 96h oncall_svc-dispatch-docr-gc
 docker service logs --since 2h oncall_svc-watchdog-news
 docker service logs --since 168h oncall_svc-cleanup
 ```
