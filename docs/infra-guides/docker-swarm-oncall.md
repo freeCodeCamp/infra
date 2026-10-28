@@ -87,7 +87,7 @@ The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it
 
 The dispatcher posts to Google Chat when the API refuses the request or when a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
 
-The DOCR garbage collection workflow makes the registry read-only while it runs. It starts only on Wed/Sat 00:00–05:10 UTC, so it ends before the 06:05 news deploy. It waits up to 60 minutes for DOCR push and cleanup runs in other repos to finish, then skips. It posts each result to Google Chat. To start it outside the window, use `window_check=false`.
+The DOCR garbage collection workflow makes the registry read-only while it runs. It starts only on Wed/Sat 00:00–05:10 UTC. This leaves at least 55 minutes before the 06:05 news deploy. Past runs took 5–26 minutes. It waits up to 60 minutes for DOCR push and cleanup runs in other repos to finish, then skips. It posts each result to Google Chat. To start it outside the window, use `window_check=false`.
 
 ### Freshness Watchdog
 
