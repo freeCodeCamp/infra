@@ -73,7 +73,7 @@ x-deploy-config: &deploy-config
     - GLOBAL_LIMIT=${GLOBAL_LIMIT:-1000}
     # Observability
     - SENTRY_DSN=${SENTRY_DSN:-}
-    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-${DEPLOYMENT_ENV}}
+    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:?SENTRY_ENVIRONMENT must be set}
     - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-}
 
 x-port-config: &port-config
