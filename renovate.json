@@ -8,6 +8,12 @@
       "matchDatasources": ["docker"],
       "groupName": "portainer",
       "matchPackageNames": ["/^portainer//"]
+    },
+    {
+      "description": "ansible-galaxy gives github-tags the full git URL, but github-tags needs owner/repo. Remove the host and the .git suffix.",
+      "matchManagers": ["ansible-galaxy"],
+      "matchDatasources": ["github-tags"],
+      "overridePackageName": "{{{replace '^(?:git\\+)?https://github\\.com/|\\.git$' '' packageName}}}"
     }
   ]
 }
