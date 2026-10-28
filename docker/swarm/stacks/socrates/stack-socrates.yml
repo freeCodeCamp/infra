@@ -1,5 +1,5 @@
 x-deploy-config: &deploy-config
-  stop_grace_period: 90s
+  stop_grace_period: 100s
   deploy:
     replicas: 3
     placement:
@@ -42,7 +42,6 @@ x-deploy-config: &deploy-config
     # Runtime
     - NODE_ENV=${NODE_ENV:-production}
     - PORT=3001
-    - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     - LOG_LEVEL=${LOG_LEVEL:-info}
     - DEBUG_SOCRATES=${DEBUG_SOCRATES:-false}
     - SERVER_URL=${SERVER_URL:-}
