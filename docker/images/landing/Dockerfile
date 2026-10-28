@@ -1,4 +1,4 @@
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2
+FROM node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
 
 LABEL org.opencontainers.image.source=https://github.com/freecodecamp/infra
 LABEL org.opencontainers.image.description="A quick landing page for the freeCodeCamp.org Docker containers."
