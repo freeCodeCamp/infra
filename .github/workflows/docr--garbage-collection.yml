@@ -43,6 +43,7 @@ jobs:
             exam-services:release.yml
             exam-services:deploy.yaml
             exam-services:docr-cleanup.yml
+            exam-platform:release.yml
             hashnode-preview:deploy.yml
             mobile:deploy-api.yml
         run: |
