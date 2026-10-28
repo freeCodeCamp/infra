@@ -1,0 +1,122 @@
+name: DOCR -- Garbage Collection
+
+on:
+  workflow_dispatch:
+    inputs:
+      window_check:
+        description: Refuse to start outside Wed/Sat 00:00-05:10 UTC
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  gc:
+    name: Garbage Collection
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Wait for DOCR pushes and cleanups to finish
+        id: preflight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WINDOW_CHECK: ${{ inputs.window_check }}
+          WORKFLOWS: |
+            freeCodeCamp:deploy-api.yml
+            freeCodeCamp:docker-docr.yml
+            freeCodeCamp:docker-docr-cleanup.yml
+            news:deploy-eng.yml
+            news:deploy-i18n.yml
+            news:docr-cleanup.yml
+            socrates:deploy-api.yml
+            socrates:docker-docr-cleanup.yml
+            curriculum-db:docker-docr.yml
+            exam-creator:deploy.yaml
+            exam-creator:docr-clean-up.yml
+            exam-services:release.yml
+            exam-services:deploy.yaml
+            exam-services:docr-cleanup.yml
+            hashnode-preview:deploy.yml
+            mobile:deploy-api.yml
+        run: |
+          count_active() {
+            local total=0 entry status count
+            for entry in $WORKFLOWS; do
+              for status in in_progress queued; do
+                count=$(gh api \
+                  "repos/freeCodeCamp/${entry%%:*}/actions/workflows/${entry#*:}/runs?status=$status" \
+                  --jq '.total_count') || exit 1
+                if [ "$count" -gt 0 ]; then
+                  echo "Active: $entry ($status)" >&2
+                fi
+                total=$((total + count))
+              done
+            done
+            echo "$total"
+          }
+
+          in_window() {
+            local day hour minute
+            if [ "$WINDOW_CHECK" = "false" ]; then
+              return 0
+            fi
+            read -r day hour minute < <(date -u '+%u %H %M')
+            { [ "$day" -eq 3 ] || [ "$day" -eq 6 ]; } &&
+              [ $((10#$hour * 60 + 10#$minute)) -lt 310 ]
+          }
+
+          skip() {
+            echo "::notice::$1"
+            echo "clear=false" >> "$GITHUB_OUTPUT"
+            echo "reason=SKIPPED: $1" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          for attempt in $(seq 1 13); do
+            active=$(count_active)
+            if ! in_window; then
+              skip "outside Wed/Sat 00:00-05:10 UTC"
+            fi
+            if [ "$active" -eq 0 ]; then
+              echo "clear=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 13 ]; then
+              sleep 300
+            fi
+          done
+
+          skip "DOCR still busy after 60 minutes"
+
+      - name: Install doctl
+        if: steps.preflight.outputs.clear == 'true'
+        uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Start garbage collection
+        if: steps.preflight.outputs.clear == 'true'
+        run: doctl registry garbage-collection start --include-untagged-manifests --force
+
+      - name: Checkout
+        if: always()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Post the result
+        if: always()
+        uses: ./.github/actions/notify-chat
+        with:
+          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          status: ${{ job.status != 'success' && 'fail' || steps.preflight.outputs.clear == 'true' && 'ok' || 'warn' }}
+          source: docr
+          subject: garbage collection
+          summary: "${{ job.status != 'success' && 'FAILED: read the run log' || steps.preflight.outputs.clear == 'true' && 'STARTED: untagged manifests and unreferenced blobs' || steps.preflight.outputs.reason }}"
