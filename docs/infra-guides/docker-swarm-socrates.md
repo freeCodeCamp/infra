@@ -39,7 +39,7 @@ cd -
 
 The deploy does not use `--with-registry-auth`, so the services keep the registry credentials in their spec. The daemon uses those credentials to pin the image digest. If they do not work, the deploy prints a warning and the services run `socrates:latest` with no pin. Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS=--with-registry-auth` in `stack-oncall.yml`).
 
-A new stack, or a stack after `docker stack rm`, has no stored credentials. For that deploy, run `doctl --context primary registry login --read-only` first, and add `--with-registry-auth` to `docker stack deploy`.
+A new stack, or a stack after `docker stack rm`, has no stored credentials. For that deploy, run `doctl --context primary registry login --read-only --never-expire` first, and add `--with-registry-auth` to `docker stack deploy`. Without `--never-expire`, the stored token expires after 30 days.
 
 `SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
 
