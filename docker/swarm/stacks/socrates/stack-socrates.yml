@@ -97,7 +97,7 @@ services:
     <<: *deploy-config
 
   svc-redis:
-    image: redis:7.4-alpine
+    image: redis:8.0-alpine
     ports:
       - published: 6379
         target: 6379
