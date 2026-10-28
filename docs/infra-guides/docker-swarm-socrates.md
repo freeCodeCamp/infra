@@ -19,10 +19,9 @@ Name stacks per environment (`prd-socrates`, `stg-socrates`). Deploy from the CL
 
 Do not press Update for these stacks in Portainer. Its stored copy is old, and an update replaces the live stack with that copy.
 
-Start Tailscale. Log in to the registry, so that the deploy can pin the image digest. Then run the block from the repository root. Use `stg` or `prd` in `env`. Deploy `stg` first.
+Start Tailscale. Then run the block from the repository root. Use `stg` or `prd` in `env`. Deploy `stg` first.
 
 ```bash
-doctl --context primary registry login --read-only --expiry-seconds 1800
 env=stg
 cd docker/swarm/stacks/socrates
 (
@@ -38,7 +37,7 @@ cd docker/swarm/stacks/socrates
 cd -
 ```
 
-The deploy does not use `--with-registry-auth`. The services keep the registry credentials of their current spec. `SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
+The deploy does not use `--with-registry-auth`. The services keep the registry credentials of their current spec. Without those credentials on the manager, the deploy cannot pin the image digest and prints a warning. The services then run `socrates:latest`, the same as the news stacks, and Gantry updates them when `latest` moves. `SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
 
 ## Node Labels
 
