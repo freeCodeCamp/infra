@@ -12,7 +12,7 @@ x-dispatch-env: &dispatch-env
 
 x-dispatch: &dispatch
   <<: *logging-config
-  image: curlimages/curl:8.22.0
+  image: curlimages/curl:8.23.0
   entrypoint: ["/scripts/dispatch.sh"]
   configs:
     - source: scripts_lib
@@ -64,7 +64,7 @@ services:
 
   svc-watchdog-news:
     <<: *logging-config
-    image: curlimages/curl:8.22.0
+    image: curlimages/curl:8.23.0
     entrypoint: ["/scripts/watchdog.sh"]
     environment:
       GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
