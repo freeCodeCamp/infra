@@ -55,6 +55,7 @@ jobs:
                   --jq '.total_count') || exit 1
                 if [ "$count" -gt 0 ]; then
                   echo "Active: $entry ($status)" >&2
+                  echo "$entry ($status)" >> "$RUNNER_TEMP/active"
                 fi
                 total=$((total + count))
               done
@@ -74,15 +75,22 @@ jobs:
 
           skip() {
             echo "::notice::$1"
-            echo "clear=false" >> "$GITHUB_OUTPUT"
-            echo "reason=SKIPPED: $1" >> "$GITHUB_OUTPUT"
+            {
+              echo "clear=false"
+              echo "reason=SKIPPED: $1"
+              echo "details<<DETAILS_EOF"
+              echo "$2"
+              echo "DETAILS_EOF"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           }
 
           for attempt in $(seq 1 13); do
+            : > "$RUNNER_TEMP/active"
             active=$(count_active)
             if ! in_window; then
-              skip "outside Wed/Sat 00:00-05:10 UTC"
+              skip "outside Wed/Sat 00:00-05:10 UTC" \
+                "dispatch with window_check=false to override"
             fi
             if [ "$active" -eq 0 ]; then
               echo "clear=true" >> "$GITHUB_OUTPUT"
@@ -93,7 +101,7 @@ jobs:
             fi
           done
 
-          skip "DOCR still busy after 60 minutes"
+          skip "DOCR still busy after 60 minutes" "$(cat "$RUNNER_TEMP/active")"
 
       - name: Install doctl
         if: steps.preflight.outputs.clear == 'true'
@@ -116,7 +124,8 @@ jobs:
         uses: ./.github/actions/notify-chat
         with:
           webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
-          status: ${{ job.status != 'success' && 'fail' || steps.preflight.outputs.clear == 'true' && 'ok' || 'warn' }}
+          status: ${{ job.status == 'cancelled' && 'warn' || job.status != 'success' && 'fail' || steps.preflight.outputs.clear == 'true' && 'ok' || 'warn' }}
           source: docr
           subject: garbage collection
-          summary: "${{ job.status != 'success' && 'FAILED: read the run log' || steps.preflight.outputs.clear == 'true' && 'STARTED: untagged manifests and unreferenced blobs' || steps.preflight.outputs.reason }}"
+          summary: "${{ job.status == 'cancelled' && 'CANCELLED: nothing more ran' || job.status != 'success' && 'FAILED: read the run log' || steps.preflight.outputs.clear == 'true' && 'STARTED: untagged manifests and unreferenced blobs' || steps.preflight.outputs.reason }}"
+          details: ${{ steps.preflight.outputs.details }}
