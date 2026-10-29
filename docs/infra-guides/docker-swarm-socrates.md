@@ -19,7 +19,13 @@ Name stacks per environment (`prd-socrates`, `stg-socrates`). Deploy from the CL
 
 Do not press Update for these stacks in Portainer. Its stored copy is old, and an update replaces the live stack with that copy.
 
-Start Tailscale. Then run the block from the repository root. Use `stg` or `prd` in `env`. Deploy `stg` first.
+Start Tailscale. Log Docker in to the registry once with a read-only token that does not expire:
+
+```bash
+doctl --context primary registry login --read-only --never-expire
+```
+
+Then run the block from the repository root. Use `stg` or `prd` in `env`. Deploy `stg` first.
 
 ```bash
 env=stg
@@ -32,14 +38,15 @@ cd docker/swarm/stacks/socrates
     case $line in '' | '#'*) continue ;; esac
     export "$line"
   done <<< "$secrets"
-  docker --context backoffice stack deploy -c stack-socrates.yml "$env-socrates"
+  docker --context backoffice stack deploy --with-registry-auth \
+    -c stack-socrates.yml "$env-socrates"
 )
 cd -
 ```
 
-The deploy does not use `--with-registry-auth`, so the services keep the registry credentials in their spec. The daemon uses those credentials to pin the image digest. If they do not work, the deploy prints a warning and the services run `socrates:latest` with no pin. Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS=--with-registry-auth` in `stack-oncall.yml`).
+`--with-registry-auth` sends your registry credentials. The CLI uses them to pin the image digest, and the nodes use them to pull. Without the flag, the deploy prints "could not be accessed on a registry to record its digest" and the services run `socrates:latest` with no pin. Gantry then restarts them at its next run to pin the digest.
 
-A new stack, or a stack after `docker stack rm`, has no stored credentials. For that deploy, run `doctl --context primary registry login --read-only --never-expire` first, and add `--with-registry-auth` to `docker stack deploy`. Without `--never-expire`, the stored token expires after 30 days.
+Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS=--with-registry-auth` in `stack-oncall.yml`). Without `--never-expire`, the token from `doctl registry login` expires after 30 days.
 
 `SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
 
