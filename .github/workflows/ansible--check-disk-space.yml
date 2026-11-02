@@ -19,6 +19,11 @@ on:
         description: "Percent of inodes used that counts as a finding"
         type: number
         default: 80
+      provider:
+        description: "The inventory to use: linode or vultr"
+        type: string
+        required: false
+        default: "linode"
     secrets:
       SSH_PRIVATE_KEY:
         description: "The SSH private key for the Ansible user"
@@ -26,6 +31,9 @@ on:
       LINODE_TOKEN:
         description: "The Linode API token"
         required: true
+      VULTR_API_KEY:
+        description: "The Vultr API key"
+        required: false
   workflow_dispatch:
     inputs:
       hosts:
@@ -52,6 +60,14 @@ on:
         type: number
         required: true
         default: 80
+      provider:
+        description: "The inventory to use: linode or vultr"
+        type: choice
+        required: true
+        default: "linode"
+        options:
+          - "linode"
+          - "vultr"
 
 defaults:
   run:
@@ -64,6 +80,7 @@ jobs:
     permissions: {}
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
 
     steps:
       - name: Checkout
@@ -80,6 +97,7 @@ jobs:
           THRESHOLD: ${{ inputs.threshold }}
           INODE_THRESHOLD: ${{ inputs.inode_threshold }}
           VERBOSITY: ${{ inputs.verbosity }}
+          PROVIDER: ${{ inputs.provider }}
         run: |
           source .venv/bin/activate
           case "$HOSTS" in
@@ -88,7 +106,15 @@ jobs:
               exit 1
               ;;
           esac
-          ansible-playbook -i inventory/linode.yml \
+          case "$PROVIDER" in
+            linode) inventory=(-i inventory/linode.yml) ;;
+            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            *)
+              echo "::error::provider must be linode or vultr"
+              exit 1
+              ;;
+          esac
+          ansible-playbook "${inventory[@]}" \
           play-any--check-disk-space.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e variable_host="$HOSTS" \

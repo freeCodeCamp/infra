@@ -28,6 +28,11 @@ on:
         description: 'Name prefix of the findings artifact; the housekeeping report reads nginx-verify-*'
         type: string
         default: nginx-verify
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: string
+        required: false
+        default: 'linode'
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
@@ -35,6 +40,9 @@ on:
       LINODE_TOKEN:
         description: 'The Linode API token'
         required: true
+      VULTR_API_KEY:
+        description: 'The Vultr API key'
+        required: false
       GOOGLE_CHAT_WEBHOOK:
         description: 'Google Chat webhook URL; alerts are skipped when unset'
         required: false
@@ -59,6 +67,14 @@ on:
         type: number
         required: false
         default: 80
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: choice
+        required: true
+        default: 'linode'
+        options:
+          - 'linode'
+          - 'vultr'
 
 # The job only needs to read the repo. It holds the SSH key and the Linode
 # token, so GITHUB_TOKEN gets no write scope it cannot use.
@@ -75,6 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       REPORT: ${{ github.workspace }}/nginx-verify.json
 
     steps:
@@ -98,6 +115,7 @@ jobs:
           HOSTS: ${{ inputs.hosts }}
           VERBOSITY: ${{ inputs.verbosity }}
           NGINX_PORT: ${{ inputs.nginx_port }}
+          PROVIDER: ${{ inputs.provider }}
         run: |
           source .venv/bin/activate
 
@@ -126,9 +144,18 @@ jobs:
             extra_args+=("$VERBOSITY")
           fi
 
+          case "$PROVIDER" in
+            linode) inventory=(-i inventory/linode.yml) ;;
+            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            *)
+              echo "::error::provider must be linode or vultr"
+              exit 1
+              ;;
+          esac
+
           # tee, so the annotate step below can tell "no hosts matched" (normal)
           # from "the play died before reaching them" (not normal).
-          ansible-playbook -i inventory/linode.yml \
+          ansible-playbook "${inventory[@]}" \
           play-any--verify-nginx.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e variable_host="$HOSTS" \

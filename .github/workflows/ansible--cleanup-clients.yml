@@ -22,6 +22,14 @@ on:
         type: boolean
         required: true
         default: false
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: choice
+        required: true
+        default: 'linode'
+        options:
+          - 'linode'
+          - 'vultr'
 
 defaults:
   run:
@@ -33,6 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
     strategy:
       matrix:
         host_groups:
@@ -54,6 +63,7 @@ jobs:
           SERIAL: ${{ inputs.serial || 0 }}
           DRY_RUN: ${{ inputs.dry_run || false }}
           VERBOSITY: ${{ inputs.verbosity }}
+          PROVIDER: ${{ inputs.provider || 'linode' }}
         run: |
           source .venv/bin/activate
           case "$SERIAL" in
@@ -80,7 +90,15 @@ jobs:
           if [ -n "$VERBOSITY" ]; then
             extra_args+=("$VERBOSITY")
           fi
-          ansible-playbook -i inventory/linode.yml \
+          case "$PROVIDER" in
+            linode) inventory=(-i inventory/linode.yml) ;;
+            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            *)
+              echo "::error::provider must be linode or vultr"
+              exit 1
+              ;;
+          esac
+          ansible-playbook "${inventory[@]}" \
           play-any--cleanup-clients.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e variable_host="$HOSTS" \

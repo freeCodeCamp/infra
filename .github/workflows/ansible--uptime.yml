@@ -10,6 +10,11 @@ on:
       verbosity:
         description: 'The verbosity level for logs'
         type: string
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: string
+        required: false
+        default: 'linode'
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
@@ -17,6 +22,9 @@ on:
       LINODE_TOKEN:
         description: 'The Linode API token'
         required: true
+      VULTR_API_KEY:
+        description: 'The Vultr API key'
+        required: false
   workflow_dispatch:
     inputs:
       hosts:
@@ -33,6 +41,14 @@ on:
           - '-v'
           - '-vv'
           - '-vvv'
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: choice
+        required: true
+        default: 'linode'
+        options:
+          - 'linode'
+          - 'vultr'
 
 defaults:
   run:
@@ -44,6 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
 
     steps:
       - name: Checkout
@@ -58,6 +75,7 @@ jobs:
         env:
           HOSTS: ${{ inputs.hosts }}
           VERBOSITY: ${{ inputs.verbosity }}
+          PROVIDER: ${{ inputs.provider }}
         run: |
           source .venv/bin/activate
           case "$HOSTS" in
@@ -77,7 +95,15 @@ jobs:
           if [ -n "$VERBOSITY" ]; then
             extra_args+=("$VERBOSITY")
           fi
-          ansible-playbook -i inventory/linode.yml \
+          case "$PROVIDER" in
+            linode) inventory=(-i inventory/linode.yml) ;;
+            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            *)
+              echo "::error::provider must be linode or vultr"
+              exit 1
+              ;;
+          esac
+          ansible-playbook "${inventory[@]}" \
           play-any--uptime.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e variable_host="$HOSTS" \
