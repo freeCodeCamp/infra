@@ -1,0 +1,12 @@
+---
+swarm_legacy_role: {api: api, soc: socrates, nws: jms}
+swarm_legacy_variant: {stg: dev, prd: org}
+
+swarm_hostname: "{{ inventory_hostname }}"
+swarm_node_env: "{{ swarm_hostname.split('-') | first }}"
+swarm_node_role: "{{ swarm_hostname | regex_replace('^[a-z0-9]+-vm-', '') | regex_replace('-[0-9]+$', '') }}"
+swarm_legacy_labels: "{{ {
+  swarm_legacy_role[swarm_node_role] ~ '.enabled': 'true',
+  swarm_legacy_role[swarm_node_role] ~ '.variant': swarm_legacy_variant[swarm_node_env],
+  } if swarm_node_role in swarm_legacy_role and swarm_node_env in swarm_legacy_variant else {} }}"
+swarm_node_labels: "{{ {'env': swarm_node_env, 'role': swarm_node_role} | combine(swarm_legacy_labels) }}"

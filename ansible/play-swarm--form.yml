@@ -1,0 +1,146 @@
+---
+- name: Prepare the Swarm hosts
+  hosts: "{{ swarm_manager_group | default('null') }}:{{ swarm_worker_group | default('null') }}:&provider_vultr"
+  become: true
+  become_user: root
+  gather_facts: false
+  any_errors_fatal: true
+  vars_files:
+    - vars/swarm.yml
+  tasks:
+    - name: Install the Docker SDK for Python
+      ansible.builtin.apt:
+        name: python3-docker
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Read the VPC address of this host
+      ansible.builtin.command: ip -o -4 addr show to {{ vultr_vpc_cidr }}
+      register: swarm_vpc_addr
+      changed_when: false
+      check_mode: false
+
+    - name: Refuse a host without exactly one VPC address
+      ansible.builtin.assert:
+        that:
+          - swarm_vpc_addr.stdout_lines | length == 1
+        fail_msg: "{{ inventory_hostname }}: {{ swarm_vpc_addr.stdout_lines }}"
+
+    - name: Keep the VPC address and the labels for the Swarm
+      ansible.builtin.set_fact:
+        swarm_vpc_ip: "{{ (swarm_vpc_addr.stdout.split()[3]).split('/') | first }}"
+        swarm_labels: "{{ swarm_node_labels }}"
+
+    - name: Group the prepared hosts
+      ansible.builtin.group_by:
+        key: swarm_prepared
+      changed_when: false
+
+- name: Initialise the Swarm on the manager
+  hosts: "{{ swarm_manager_group | default('null') }}:&swarm_prepared"
+  become: true
+  become_user: root
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Refuse more than one manager
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts_all | length == 1
+        fail_msg: "swarm_manager_group must hold one host: {{ ansible_play_hosts_all }}"
+      run_once: true
+
+    - name: Initialise the Swarm on the VPC address
+      community.docker.docker_swarm:
+        state: present
+        advertise_addr: "{{ swarm_vpc_ip }}"
+        listen_addr: "{{ swarm_vpc_ip }}:2377"
+        default_addr_pool: [10.60.0.0/16]
+        subnet_size: 24
+      register: swarm_init
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: Read the Swarm state of the manager
+      community.docker.docker_host_info:
+      register: swarm_manager_info
+      when: not ansible_check_mode
+
+    - name: Read the Swarm address pool
+      community.docker.docker_swarm_info:
+      register: swarm_cluster_info
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: Refuse a Swarm on another address or address pool
+      ansible.builtin.assert:
+        that:
+          - swarm_manager_info.host_info.Swarm.NodeAddr == swarm_vpc_ip
+          - swarm_cluster_info.swarm_facts.DefaultAddrPool == ['10.60.0.0/16']
+          - swarm_cluster_info.swarm_facts.SubnetSize == 24
+        fail_msg: "{{ inventory_hostname }}: the Swarm is not on {{ swarm_vpc_ip }} with pool 10.60.0.0/16 and /24 subnets"
+      when: not ansible_check_mode
+
+    - name: Keep the manager node ID and the worker join token
+      ansible.builtin.set_fact:
+        swarm_manager_node_id: "{{ swarm_manager_info.host_info.Swarm.NodeID }}"
+        swarm_worker_token: "{{ swarm_init.swarm_facts.JoinTokens.Worker }}"
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: Mark the manager
+      ansible.builtin.group_by:
+        key: swarm_manager
+      changed_when: false
+
+- name: Join the workers
+  hosts: "{{ swarm_worker_group | default('null') }}:&swarm_prepared:!{{ swarm_manager_group | default('null') }}"
+  become: true
+  become_user: root
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    swarm_manager: "{{ groups['swarm_manager'] | first }}"
+  tasks:
+    - name: Join the Swarm as a worker
+      community.docker.docker_swarm:
+        state: join
+        advertise_addr: "{{ swarm_vpc_ip }}"
+        listen_addr: "{{ swarm_vpc_ip }}:2377"
+        remote_addrs: ["{{ hostvars[swarm_manager].swarm_vpc_ip }}:2377"]
+        join_token: "{{ hostvars[swarm_manager].swarm_worker_token }}"
+      when: not ansible_check_mode
+
+    - name: Read the Swarm state of the worker
+      community.docker.docker_host_info:
+      register: swarm_worker_info
+      when: not ansible_check_mode
+
+    - name: Refuse a worker that is not active in this Swarm
+      ansible.builtin.assert:
+        that:
+          - swarm_worker_info.host_info.Swarm.LocalNodeState == 'active'
+          - "hostvars[swarm_manager].swarm_manager_node_id in
+            (swarm_worker_info.host_info.Swarm.RemoteManagers | default([], true) | map(attribute='NodeID'))"
+          - swarm_worker_info.host_info.Swarm.NodeAddr == swarm_vpc_ip
+        fail_msg: "{{ inventory_hostname }}: not an active member of the Swarm on {{ swarm_manager }}"
+      when: not ansible_check_mode
+
+- name: Label the Swarm nodes
+  hosts: "{{ swarm_manager_group | default('null') }}:&swarm_manager"
+  become: true
+  become_user: root
+  gather_facts: false
+  tasks:
+    - name: Apply the old and new labels to each node
+      community.docker.docker_node:
+        hostname: "{{ item }}"
+        labels: "{{ hostvars[item].swarm_labels }}"
+        labels_state: merge
+      loop: "{{ groups['swarm_prepared'] }}"
+      register: swarm_label
+      until: swarm_label is succeeded
+      retries: 6
+      delay: 5
+      when: not ansible_check_mode
