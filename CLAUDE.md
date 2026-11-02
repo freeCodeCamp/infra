@@ -36,12 +36,12 @@ Optional siblings: `PLAN.md` (wave list, multi-wave sprints only), `dispatches/W
 
 This repo owns:
 
-| Path                 | Purpose                                                          |
-| -------------------- | ---------------------------------------------------------------- |
-| `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
-| `docs/architecture/` | RFCs for non-trivial work (archived RFCs under `archive/`)       |
-| `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)               |
-| `docs/GUIDELINES.md` | Runbook and RFC format rules                                     |
+| Path                 | Purpose                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`) |
+| `docs/architecture/` | RFCs for non-trivial work (archived RFCs under `archive/`)  |
+| `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)          |
+| `docs/GUIDELINES.md` | Runbook and RFC format rules                                |
 
 ## Working directory rule
 
@@ -52,6 +52,8 @@ direnv `.envrc` hierarchy:
 - root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. When `CLAUDECODE` is set (an agent shell), every `.envrc` here decrypts no envelope and loads no `.env`. `KUBECONFIG` still points at the cluster file on disk. The gate is not a security boundary. An agent shell also gets the environment of the shell that started `claude`, so start it with `direnv exec / claude`. An agent asks the operator to run a command that needs a token.
 - `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (DO token for the ansible DO inventory).
 - `terraform/ops-o11y/.envrc` → sources root + adds `do-universe/.env.enc` and `tfstate/.env.enc` (state in R2 `infra-tfstate`).
+- `terraform/vultr-base/.envrc` → sources root + adds `tfstate/.env.enc` and `vultr/.env.enc` (`VULTR_API_KEY`, `TF_VAR_state_passphrase`; state encrypted in R2 `infra-tfstate`).
+- `terraform/tst-vultr/.envrc` → same envelopes as `terraform/vultr-base/.envrc`.
 - `k3s/ops-o11y/.envrc` → sources root + exports `KUBECONFIG`.
 - `k3s/ops-backoffice-tools/.envrc` → sources root + adds `do-primary/.env.enc`.
 
@@ -67,7 +69,7 @@ Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops aut
 
 ## Operations
 
-**No `justfile` (operator 2026-10-10).** Write standard-toolchain commands: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. A `just` line in a `gxy-*` example is historical.
+**No `justfile` (operator 2026-10-10).** Write standard-toolchain commands: `terraform -chdir=<dir>` (`tofu -chdir=<dir>` for the Vultr dirs), `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. A `just` line in a `gxy-*` example is historical.
 
 ## Ansible
 
