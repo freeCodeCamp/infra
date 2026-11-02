@@ -1,0 +1,16 @@
+---
+galaxy_name: ops-o11y-vultr
+k3s_init_host: ops-vm-o11y-1
+k3s_version: v1.36.4+k3s1
+
+server_config_yaml: |
+  write-kubeconfig-mode: "0600"
+  disable:
+    - servicelb
+  etcd-snapshot-schedule-cron: "0 */6 * * *"
+  etcd-snapshot-retention: 20
+  kubelet-arg:
+    - system-reserved=cpu=500m,memory=1536Mi
+    - eviction-hard=memory.available<500Mi,nodefs.available<10%
+  kube-proxy-arg:
+    - nodeport-addresses={{ tailnet_cidr }}
