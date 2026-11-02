@@ -103,6 +103,35 @@
   vars:
     swarm_manager: "{{ groups['swarm_manager'] | first }}"
   tasks:
+    - name: Read the Swarm state of the worker before the join
+      community.docker.docker_host_info:
+      register: swarm_before
+      when: not ansible_check_mode
+
+    - name: Find a worker that another Swarm or a failed join holds
+      ansible.builtin.set_fact:
+        swarm_foreign: >-
+          {{ swarm_before.host_info.Swarm.LocalNodeState != 'inactive'
+          and not (swarm_before.host_info.Swarm.LocalNodeState == 'active'
+          and hostvars[swarm_manager].swarm_manager_node_id in
+          (swarm_before.host_info.Swarm.RemoteManagers | default([], true) | map(attribute='NodeID'))) }}
+      when: not ansible_check_mode
+
+    - name: Refuse to move a worker out of another Swarm without swarm_rejoin
+      ansible.builtin.assert:
+        that:
+          - not swarm_foreign or swarm_rejoin | default(false) | bool
+        fail_msg: >-
+          {{ inventory_hostname }} is {{ swarm_before.host_info.Swarm.LocalNodeState }}
+          outside the Swarm on {{ swarm_manager }}. Re-run with -e swarm_rejoin=true
+          to make it leave and join again.
+      when: not ansible_check_mode
+
+    - name: Leave the other Swarm, or clear a failed join
+      ansible.builtin.command: docker swarm leave --force
+      changed_when: true
+      when: not ansible_check_mode and swarm_foreign
+
     - name: Join the Swarm as a worker
       community.docker.docker_swarm:
         state: join
