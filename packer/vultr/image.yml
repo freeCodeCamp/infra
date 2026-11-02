@@ -1,0 +1,80 @@
+---
+- name: Wait for the first boot
+  hosts: "{{ variable_host | default('null') }}:&provider_vultr"
+  become: true
+  become_user: root
+  gather_facts: false
+  tasks:
+    - name: Wait for cloud-init to finish
+      ansible.builtin.command: cloud-init status --wait
+      register: image_cloud_init
+      changed_when: false
+      failed_when: image_cloud_init.rc not in [0, 2]
+
+- name: Configure the base of a Vultr host
+  ansible.builtin.import_playbook: ../../ansible/play-vultr--base.yml
+  vars:
+    sshd_reload: false
+    node_exporter_start: false
+
+- name: Clear the image identity
+  hosts: "{{ variable_host | default('null') }}:&provider_vultr"
+  become: true
+  become_user: root
+  gather_facts: false
+  tasks:
+    - name: Stop the services that keep build state
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop: [docker.socket, docker, fail2ban]
+
+    - name: Delete the build state
+      ansible.builtin.shell: |
+        rm -rf /var/lib/docker/engine-id /var/lib/fail2ban/fail2ban.sqlite3
+        rm -rf /var/log/journal/*
+      changed_when: true
+
+    - name: Check the root password input
+      ansible.builtin.assert:
+        that: lookup('ansible.builtin.env', 'VULTR_ROOT_PASSWORD') is regex('[A-Za-z0-9._-]{32,}', match_type='fullmatch')
+        fail_msg: Export VULTR_ROOT_PASSWORD (32 or more letters, digits, '.', '_' or '-') for the web console login.
+        quiet: true
+
+    - name: Set the root password for the web console
+      ansible.builtin.command:
+        cmd: chpasswd
+        stdin: "root:{{ lookup('ansible.builtin.env', 'VULTR_ROOT_PASSWORD') }}"
+      no_log: true
+      changed_when: true
+
+    - name: Empty the machine ID
+      ansible.builtin.command: truncate --size=0 /etc/machine-id
+      changed_when: true
+
+    - name: Find the SSH host keys
+      ansible.builtin.find:
+        paths: /etc/ssh
+        patterns: ssh_host_*
+      register: image_host_keys
+
+    - name: Delete the SSH host keys
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ image_host_keys.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Clean the cloud-init state
+      ansible.builtin.command: cloud-init clean --logs --seed
+      changed_when: true
+
+    - name: Flush the disk before the snapshot
+      ansible.builtin.command: sync
+      changed_when: false
+
+    - name: Delete the build key
+      ansible.builtin.file:
+        path: /root/.ssh/authorized_keys
+        state: absent
