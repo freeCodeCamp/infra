@@ -1,0 +1,4 @@
+---
+sshd_allow_users: [freecodecamp]
+sshd_reload: true
+sshd_dropin: /etc/ssh/sshd_config.d/10-hardening.conf

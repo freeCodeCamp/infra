@@ -1,4 +1,10 @@
 ---
+- name: Refuse to verify a host that binds the VPC address
+  ansible.builtin.assert:
+    that:
+      - node_exporter_bind | default('tailnet') == 'tailnet'
+    fail_msg: "{{ inventory_hostname }}: verify.yml checks the tailnet bind only."
+
 - name: Read the Tailscale address of this host
   ansible.builtin.command: "{{ node_exporter_tailscale_binary }} ip -4"
   register: verify_ne_tailscale

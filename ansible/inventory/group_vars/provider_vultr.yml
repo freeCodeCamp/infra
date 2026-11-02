@@ -1,0 +1,8 @@
+---
+vultr_vpc_cidr: 10.50.0.0/20
+
+node_exporter_bind: vpc
+node_exporter_vpc_cidr: "{{ vultr_vpc_cidr }}"
+node_exporter_systemd_unit_include: "^(cron|docker|fail2ban|fluent-bit|node_exporter|ssh|tailscaled)[.]service"
+
+fluent_bit_ip_allow: [localhost, "{{ vultr_vpc_cidr }}"]

@@ -1,0 +1,9 @@
+---
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+docker_log_max_size: 50m
+docker_log_max_file: "5"

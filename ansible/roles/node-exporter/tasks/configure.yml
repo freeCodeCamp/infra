@@ -4,16 +4,25 @@
     that:
       - node_exporter_extra_args | select('search', 'web[.]listen-address') | list | length == 0
       - node_exporter_extra_args | select('search', 'web[.]systemd-socket') | list | length == 0
-      - node_exporter_tailnet_cidr == '100.64.0.0/10'
+      - node_exporter_bind != 'tailnet' or node_exporter_tailnet_cidr == '100.64.0.0/10'
     fail_msg: >-
       node_exporter_extra_args must not carry web.listen-address or
       web.systemd-socket -- the flag is a repeatable accumulator and a second
       value adds a listener. node_exporter_tailnet_cidr must stay
       100.64.0.0/10 to match the launcher guard.
 
-- name: Install the node_exporter tailnet launcher
+- name: Refuse a bind mode without a private address range
+  ansible.builtin.assert:
+    that:
+      - node_exporter_bind in ['tailnet', 'vpc']
+      - node_exporter_bind != 'vpc' or node_exporter_vpc_cidr is match(node_exporter_private_cidr_re)
+    fail_msg: "node_exporter_bind is tailnet or vpc; vpc mode needs a private node_exporter_vpc_cidr."
+  vars:
+    node_exporter_private_cidr_re: '^(10[.][0-9]+|172[.](1[6-9]|2[0-9]|3[01])|192[.]168)[.][0-9]+[.][0-9]+/(1[6-9]|2[0-9]|30)$'
+
+- name: Install the node_exporter launcher
   ansible.builtin.template:
-    src: node-exporter-launch.j2
+    src: "{{ 'node-exporter-launch.j2' if node_exporter_bind == 'tailnet' else 'node-exporter-launch-vpc.j2' }}"
     dest: "{{ node_exporter_launcher }}"
     owner: root
     group: root
@@ -33,5 +42,5 @@
   ansible.builtin.systemd:
     name: node_exporter
     enabled: true
-    state: started
+    state: "{{ 'started' if node_exporter_start | bool else omit }}"
     daemon_reload: true

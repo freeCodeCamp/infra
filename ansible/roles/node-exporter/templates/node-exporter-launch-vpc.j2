@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+# SECURITY INVARIANT: every fleet host has a public IPv4. Bind the one
+# address inside the VPC range ({{ node_exporter_vpc_cidr }}) or exit non-zero.
+{% set vpc = node_exporter_vpc_cidr.split('/') %}
+to_int() {
+  IFS=. read -r a b c d <<END
+$1
+END
+  echo $(( (a << 24) + (b << 16) + (c << 8) + d ))
+}
+
+mask=$(( (0xFFFFFFFF << (32 - {{ vpc[1] }})) & 0xFFFFFFFF ))
+net=$(( $(to_int {{ vpc[0] }}) & mask ))
+deadline=$(( $(date +%s) + {{ node_exporter_vpc_wait_seconds }} ))
+
+while :; do
+  match=""
+  count=0
+  for ip in $(ip -4 -o addr show scope global | awk '{ split($4, a, "/"); print a[1] }'); do
+    case "$ip" in
+    *[!0-9.]*) continue ;;
+    esac
+    if [ $(( $(to_int "$ip") & mask )) -eq "$net" ]; then
+      match=$ip
+      count=$((count + 1))
+    fi
+  done
+  [ "$count" -eq 1 ] && break
+  [ "$count" -gt 1 ] && exit 1
+  [ "$(date +%s)" -ge "$deadline" ] && exit 1
+  sleep 2
+done
+
+exec "$@" --web.listen-address="$match:{{ node_exporter_port }}"

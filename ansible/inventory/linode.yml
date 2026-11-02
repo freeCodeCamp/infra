@@ -6,6 +6,8 @@ plugin: community.general.linode # can be replaced with linode.cloud.instance, w
 access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
 
 groups:
+  provider_linode: true
+
   # Staging Instances
   stg_all: "'stg' in (tags|list)"
 

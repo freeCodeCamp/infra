@@ -1,0 +1,93 @@
+service:
+  flush: 1
+  log_level: info
+  parsers_file: /etc/fluent-bit/parsers.conf
+  http_server: on
+  http_listen: 0.0.0.0
+  http_port: {{ fluent_bit_http_port }}
+  hot_reload: on
+  storage.path: {{ fluent_bit_state_dir }}/storage
+  storage.sync: normal
+  storage.metrics: on
+  storage.max_chunks_up: 128
+  storage.backlog.mem_limit: 5M
+  storage.keep.rejected: on
+  storage.rejected.limit: 256M
+  scheduler.cap: 300
+
+parsers:
+  - name: nginx_error
+    format: regex
+    regex: '^(?<time>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?<level>\w+)\] (?<pid>\d+)#(?<tid>\d+): (?<log>.*)$'
+    time_key: time
+    time_format: '%Y/%m/%d %H:%M:%S'
+
+pipeline:
+  inputs:
+    - name: systemd
+      tag: journal
+      db: {{ fluent_bit_state_dir }}/systemd.db
+      read_from_tail: on
+      storage.type: filesystem
+
+    - name: tail
+      tag: nginx.access
+      path: /var/log/nginx/json_access.log
+      parser: json
+      db: {{ fluent_bit_state_dir }}/tail-nginx-access.db
+      db.sync: normal
+      rotate_wait: 300
+      skip_long_lines: on
+      storage.type: filesystem
+
+    - name: tail
+      tag: nginx.error
+      path: /var/log/nginx/error.log
+      parser: nginx_error
+      db: {{ fluent_bit_state_dir }}/tail-nginx-error.db
+      db.sync: normal
+      rotate_wait: 300
+      skip_long_lines: on
+      storage.type: filesystem
+
+    - name: tail
+      tag: docker
+      path: /var/lib/docker/containers/*/*-json.log
+      path_key: file
+      multiline.parser: docker, cri
+      db: {{ fluent_bit_state_dir }}/tail-docker.db
+      db.sync: normal
+      rotate_wait: 300
+      skip_long_lines: on
+      storage.type: filesystem
+
+  filters:
+    - name: modify
+      match: "*"
+      add:
+        - host {{ inventory_hostname }}
+        - env {{ fluent_bit_env }}
+        - role {{ fluent_bit_role }}
+
+  outputs:
+{% for out in [
+     {'match': 'journal', 'fields': '_SYSTEMD_UNIT', 'msg': 'MESSAGE', 'time': 'date', 'limit': fluent_bit_limit_journal},
+     {'match': 'nginx.access', 'fields': 'server_name', 'msg': 'request', 'time': 'time_iso8601', 'limit': fluent_bit_limit_nginx_access},
+     {'match': 'nginx.error', 'fields': 'level', 'msg': 'log', 'time': 'date', 'limit': fluent_bit_limit_nginx_error},
+     {'match': 'docker', 'fields': 'file', 'msg': 'log', 'time': 'date', 'limit': fluent_bit_limit_docker},
+   ] %}
+    - name: http
+      match: {{ out.match }}
+      host: {{ fluent_bit_vlagent_host }}
+      port: {{ fluent_bit_vlagent_port }}
+      uri: /insert/jsonline?_stream_fields=env,role,host,{{ out.fields }}&_msg_field={{ out.msg }}&_time_field={{ out.time }}
+      format: json_lines
+      json_date_key: date
+      json_date_format: iso8601
+      compress: gzip
+      retry_limit: no_limits
+      storage.total_limit_size: {{ out.limit }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}

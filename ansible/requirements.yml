@@ -8,6 +8,10 @@ collections:
     version: "1.27.0"
   - name: ansible.posix
     version: "2.2.2"
+  - name: vultr.cloud
+    version: "1.14.1"
+  - name: community.docker
+    version: "5.4.0"
   - name: kubernetes.core
     version: "6.6.0"
   - name: https://github.com/k3s-io/k3s-ansible.git
