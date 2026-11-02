@@ -1,0 +1,94 @@
+name: Vultr -- Snapshot Cleanup
+
+on:
+  schedule:
+    - cron: "5 0 * * 3,6"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Snapshot Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Delete all but the newest image snapshots
+        id: prune
+        shell: bash
+        env:
+          VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+          KEEP: 3
+        run: |
+          api() {
+            curl -fsS --connect-timeout 10 --max-time 60 \
+              -H "Authorization: Bearer $VULTR_API_KEY" "$@"
+          }
+
+          list="$RUNNER_TEMP/snapshots.jsonl"
+          : > "$list"
+          cursor=""
+          while :; do
+            args=(--retry 3 -G https://api.vultr.com/v2/snapshots --data-urlencode per_page=500)
+            if [ -n "$cursor" ]; then
+              args+=(--data-urlencode "cursor=$cursor")
+            fi
+            page=$(api "${args[@]}")
+            printf '%s\n' "$page" | jq -c '.snapshots[]' >> "$list"
+            cursor=$(printf '%s\n' "$page" | jq -r '.meta.links.next // ""')
+            [ -n "$cursor" ] || break
+          done
+
+          images=$(jq -s '
+            unique_by(.id)
+            | map(select(((.description // "") | startswith("img-")) and .status == "complete"))
+            | sort_by(.date_created | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601)
+            | reverse' "$list")
+          printf '%s\n' "$images" | jq -r --argjson keep "$KEEP" \
+            '.[:$keep][] | "Keep \(.id) \(.description | @json)"'
+          old=$(printf '%s\n' "$images" | jq -r --argjson keep "$KEEP" '.[$keep:][].id')
+
+          uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          deleted=0
+          for id in $old; do
+            if [[ ! $id =~ $uuid ]]; then
+              echo "::error::Not a snapshot ID: $id"
+              exit 1
+            fi
+            api -X DELETE "https://api.vultr.com/v2/snapshots/$id"
+            echo "Deleted $id"
+            deleted=$((deleted + 1))
+          done
+
+          kept=$(printf '%s\n' "$images" | jq --argjson keep "$KEEP" '.[:$keep] | length')
+          status=ok
+          if [ "$kept" -lt "$KEEP" ]; then
+            status=warn
+          fi
+          {
+            echo "deleted=$deleted"
+            echo "kept=$kept"
+            echo "status=$status"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: always()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Post the result
+        if: always()
+        uses: ./.github/actions/notify-chat
+        with:
+          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          status: ${{ job.status == 'cancelled' && 'warn' || job.status != 'success' && 'fail' || steps.prune.outputs.status }}
+          source: vultr
+          subject: snapshot cleanup
+          summary: "${{ job.status == 'cancelled' && 'CANCELLED: nothing more ran' || job.status != 'success' && 'FAILED: read the run log' || format('DELETED {0} image snapshots, kept {1}', steps.prune.outputs.deleted, steps.prune.outputs.kept) }}"
