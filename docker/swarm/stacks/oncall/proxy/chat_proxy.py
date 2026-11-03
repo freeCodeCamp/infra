@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import random
 import re
@@ -41,6 +42,9 @@ GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 GITHUB_NOTIFICATION_KEY = re.compile(r"^[a-z0-9_.:/-]{1,200}$")
 GITHUB_TIMESTAMP = re.compile(r"^[1-9][0-9]{9,}$")
 GITHUB_SIGNATURE = re.compile(r"^sha256=[0-9a-f]{64}$")
+GRAFANA_SIGNATURE = re.compile(r"^[0-9a-f]{64}$")
+GRAFANA_FINGERPRINT = re.compile(r"^[0-9a-f]{16,64}$")
+MAX_GRAFANA_ALERTS = 20
 MAX_INGRESS_FAILURES = 10000
 URL_IN_TEXT = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 
@@ -121,11 +125,18 @@ def strict_json_loads(raw_body):
     def reject_constant(_value):
         raise ValueError("non-finite JSON number")
 
+    def finite_float(value):
+        result = float(value)
+        if not math.isfinite(result):
+            raise ValueError("non-finite JSON number")
+        return result
+
     text = raw_body.decode("utf-8")
     return json.loads(
         text,
         object_pairs_hook=object_from_pairs,
         parse_constant=reject_constant,
+        parse_float=finite_float,
     )
 
 
@@ -354,6 +365,9 @@ class ChatProxy:
         github_secrets=(),
         github_signature_ttl_seconds=300,
         github_required=False,
+        grafana_secrets=(),
+        grafana_signature_ttl_seconds=300,
+        grafana_required=False,
     ):
         self.webhook = webhook
         self.data_dir = Path(data_dir)
@@ -372,6 +386,16 @@ class ChatProxy:
             raise ValueError("GitHub HMAC configuration requires distinct current/previous secrets")
         self.github_signature_ttl = timedelta(seconds=github_signature_ttl_seconds)
         self.github_required = github_required
+        self.grafana_secrets = tuple(secret for secret in grafana_secrets if secret)
+        if (
+            len(self.grafana_secrets) > 2
+            or len(set(self.grafana_secrets)) != len(self.grafana_secrets)
+        ):
+            raise ValueError(
+                "Grafana HMAC configuration requires distinct current/previous secrets"
+            )
+        self.grafana_signature_ttl = timedelta(seconds=grafana_signature_ttl_seconds)
+        self.grafana_required = grafana_required
         self.lock = threading.RLock()
         self.ingress_failure_lock = threading.Lock()
         self.ingress_failure_last_recorded = {}
@@ -856,6 +880,315 @@ class ChatProxy:
         ).hexdigest()
         return event, f"github:{dedupe_key}", payload_fingerprint
 
+    def _canonicalize_grafana(self, payload, received_at):
+        allowed_fields = {
+            "receiver",
+            "status",
+            "alerts",
+            "groupLabels",
+            "commonLabels",
+            "commonAnnotations",
+            "externalURL",
+            "appVersion",
+            "version",
+            "groupKey",
+            "truncatedAlerts",
+            "orgId",
+            "title",
+            "state",
+            "message",
+        }
+        required_fields = allowed_fields - {"appVersion"}
+        if (
+            not isinstance(payload, dict)
+            or set(payload) - allowed_fields
+            or not required_fields.issubset(payload)
+            or payload.get("version") != "1"
+        ):
+            raise ValueError("unsupported Grafana webhook contract")
+
+        def bounded_string(value, maximum, *, allow_empty=False):
+            if (
+                not isinstance(value, str)
+                or (not allow_empty and not value)
+                or len(value) > maximum
+            ):
+                raise ValueError("invalid Grafana string field")
+            return value
+
+        def string_map(value):
+            if not isinstance(value, dict) or len(value) > 100:
+                raise ValueError("invalid Grafana label map")
+            result = {}
+            for key, item in value.items():
+                if (
+                    not isinstance(key, str)
+                    or not key
+                    or len(key) > 200
+                    or not isinstance(item, str)
+                    or len(item) > 2000
+                ):
+                    raise ValueError("invalid Grafana label map")
+                result[key] = item
+            return result
+
+        receiver = bounded_string(payload["receiver"], 200)
+        status = bounded_string(payload["status"], 16)
+        state_value = bounded_string(payload["state"], 16)
+        if status not in {"firing", "resolved"}:
+            raise ValueError("invalid Grafana status")
+        if (status, state_value) not in {("firing", "alerting"), ("resolved", "ok")}:
+            raise ValueError("inconsistent Grafana state")
+        if not isinstance(payload["orgId"], int) or isinstance(payload["orgId"], bool) or payload["orgId"] < 1:
+            raise ValueError("invalid Grafana organization")
+        truncated = payload["truncatedAlerts"]
+        if not isinstance(truncated, int) or isinstance(truncated, bool) or truncated < 0:
+            raise ValueError("invalid Grafana truncation count")
+        group_key = bounded_string(payload["groupKey"], 4096)
+        bounded_string(payload["title"], 8192, allow_empty=True)
+        bounded_string(payload["message"], 32768, allow_empty=True)
+        bounded_string(payload["externalURL"], 2048, allow_empty=True)
+        if "appVersion" in payload:
+            bounded_string(payload["appVersion"], 100, allow_empty=True)
+        common_labels = string_map(payload["commonLabels"])
+        string_map(payload["groupLabels"])
+        string_map(payload["commonAnnotations"])
+
+        alerts = payload["alerts"]
+        if not isinstance(alerts, list) or not 1 <= len(alerts) <= MAX_GRAFANA_ALERTS:
+            raise ValueError("invalid Grafana alerts")
+        alert_allowed = {
+            "status",
+            "labels",
+            "annotations",
+            "startsAt",
+            "endsAt",
+            "generatorURL",
+            "fingerprint",
+            "silenceURL",
+            "dashboardURL",
+            "panelURL",
+            "ruleUID",
+            "values",
+            "valueString",
+            "imageURL",
+            "embeddedImage",
+            "orgId",
+            "enrichments",
+        }
+        alert_required = {
+            "status",
+            "labels",
+            "annotations",
+            "startsAt",
+            "endsAt",
+            "generatorURL",
+            "fingerprint",
+            "silenceURL",
+            "dashboardURL",
+            "panelURL",
+            "values",
+            "valueString",
+        }
+        normalized_alerts = []
+        for alert in alerts:
+            if (
+                not isinstance(alert, dict)
+                or set(alert) - alert_allowed
+                or not alert_required.issubset(alert)
+                or alert["status"] not in {"firing", "resolved"}
+            ):
+                raise ValueError("invalid Grafana alert")
+            labels = string_map(alert["labels"])
+            annotations = string_map(alert["annotations"])
+            fingerprint = bounded_string(alert["fingerprint"], 64)
+            if not GRAFANA_FINGERPRINT.fullmatch(fingerprint):
+                raise ValueError("invalid Grafana fingerprint")
+            try:
+                starts_at = parse_timestamp(bounded_string(alert["startsAt"], 64))
+                ends_at = parse_timestamp(bounded_string(alert["endsAt"], 64))
+            except (TypeError, ValueError):
+                raise ValueError("invalid Grafana alert timestamp") from None
+            for field in (
+                "generatorURL",
+                "silenceURL",
+                "dashboardURL",
+                "panelURL",
+                "valueString",
+                "ruleUID",
+                "imageURL",
+                "embeddedImage",
+            ):
+                if field in alert:
+                    bounded_string(alert[field], 16384, allow_empty=True)
+            values = alert["values"]
+            if values is not None:
+                if not isinstance(values, dict) or len(values) > 100:
+                    raise ValueError("invalid Grafana values")
+                for key, value in values.items():
+                    if (
+                        not isinstance(key, str)
+                        or not key
+                        or len(key) > 100
+                        or isinstance(value, bool)
+                        or not isinstance(value, (int, float))
+                        or not math.isfinite(value)
+                    ):
+                        raise ValueError("invalid Grafana values")
+            if "orgId" in alert and (
+                not isinstance(alert["orgId"], int)
+                or isinstance(alert["orgId"], bool)
+                or alert["orgId"] < 1
+            ):
+                raise ValueError("invalid Grafana alert organization")
+            normalized_alerts.append(
+                {
+                    "status": alert["status"],
+                    "labels": labels,
+                    "annotations": annotations,
+                    "starts_at": starts_at,
+                    "ends_at": ends_at,
+                    "fingerprint": fingerprint,
+                    "dashboard_url": alert["dashboardURL"],
+                    "panel_url": alert["panelURL"],
+                    "generator_url": alert["generatorURL"],
+                }
+            )
+
+        is_test = all(
+            alert["labels"].get("alertname") == "TestAlert"
+            and alert["labels"].get("instance") == "Grafana"
+            and alert["annotations"].get("summary") == "Notification test"
+            for alert in normalized_alerts
+        )
+        alert_names = {
+            alert["labels"].get("alertname", "") for alert in normalized_alerts
+        }
+        if status == "resolved":
+            event_state = "resolved"
+        elif is_test:
+            event_state = "test"
+        elif "DatasourceError" in alert_names:
+            event_state = "error"
+        elif "DatasourceNoData" in alert_names:
+            event_state = "no_data"
+        else:
+            event_state = "firing"
+
+        display_names = []
+        detail_lines = []
+        for alert in normalized_alerts:
+            labels = alert["labels"]
+            annotations = alert["annotations"]
+            name = labels.get("rulename") or labels.get("alertname") or "Grafana alert"
+            name = sanitize_one_line(name) or "Grafana alert"
+            if len(name) > 200:
+                name = name[:199] + "…"
+            if name not in display_names:
+                display_names.append(name)
+            detail_parts = []
+            for key in ("summary", "description", "grafana_state_reason"):
+                value = annotations.get(key)
+                if value:
+                    sanitized = sanitize_one_line(value)
+                    if sanitized and sanitized not in detail_parts:
+                        detail_parts.append(sanitized)
+            if detail_parts:
+                detail_lines.append(f"{name}: {'; '.join(detail_parts)}")
+        names_text = ", ".join(display_names[:5])
+        if len(display_names) > 5:
+            names_text += f", +{len(display_names) - 5} more"
+        if is_test:
+            subject_label = "Grafana contact point test"
+            summary = "Grafana contact point test notification"
+        else:
+            subject_label = common_labels.get("alertname") or names_text or "Grafana alert group"
+            subject_label = sanitize_one_line(subject_label) or "Grafana alert group"
+            if len(subject_label) > EVENT_LIMITS["subject_label"]:
+                subject_label = subject_label[: EVENT_LIMITS["subject_label"] - 1] + "…"
+            summary = f"{len(normalized_alerts)} alert(s) {event_state.replace('_', ' ')}"
+            if names_text:
+                summary += f": {names_text}"
+        if len(summary) > EVENT_LIMITS["summary"]:
+            summary = summary[: EVENT_LIMITS["summary"] - 1] + "…"
+        if truncated:
+            detail_lines.append(f"Grafana omitted {truncated} additional alert(s)")
+        details = sanitize_details("\n".join(detail_lines)) or None
+        if details and len(details) > EVENT_LIMITS["details"]:
+            details = details[: EVENT_LIMITS["details"] - 1] + "…"
+
+        link = None
+        for alert in normalized_alerts:
+            for candidate in (
+                alert["dashboard_url"],
+                alert["panel_url"],
+                alert["generator_url"],
+            ):
+                link = sanitize_link(candidate)
+                if link:
+                    break
+            if link:
+                break
+        observed_candidates = [
+            alert["ends_at"] if status == "resolved" else alert["starts_at"]
+            for alert in normalized_alerts
+        ]
+        observed_at = max(observed_candidates)
+        if status == "resolved" and observed_at.year == 1:
+            raise ValueError("resolved Grafana alert has no end time")
+
+        occurrence_members = sorted(
+            (alert["fingerprint"], isoformat(alert["starts_at"]))
+            for alert in normalized_alerts
+        )
+        incident_identity = {
+            "group": hashlib.sha256(group_key.encode()).hexdigest(),
+            "members": occurrence_members,
+        }
+        delivery_identity = {
+            **incident_identity,
+            "alert_statuses": sorted(
+                (alert["fingerprint"], alert["status"])
+                for alert in normalized_alerts
+            ),
+            "state": event_state,
+        }
+        provider_event_id = hashlib.sha256(
+            json.dumps(delivery_identity, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        incident_key = hashlib.sha256(
+            json.dumps(incident_identity, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        subject_key = f"grafana:{hashlib.sha256(group_key.encode()).hexdigest()[:32]}"
+        event = {
+            "schema": "fcc.alert-event/v1",
+            "event_id": str(uuid.uuid4()),
+            "source": {"id": "grafana", "instance": "ops-o11y", "adapter": "grafana/v1"},
+            "provider": {
+                "event_id": provider_event_id,
+                "delivery_id": None,
+                "incident_key": incident_key,
+            },
+            "kind": "test" if is_test else "alert",
+            "state": event_state,
+            "severity": SEVERITY_BY_STATE[event_state],
+            "subject": {"key": subject_key, "label": subject_label},
+            "summary": summary,
+            "details": details,
+            "link": link,
+            "link_label": "dashboard",
+            "observed_at": isoformat(observed_at),
+            "received_at": isoformat(received_at),
+            "heartbeat": {"expectation_id": None, "scheduled_for": None},
+            "routing": {
+                "action": "immediate",
+                "policy_version": 1,
+                "reason": "grafana-test" if is_test else f"grafana-{event_state}",
+            },
+        }
+        self._validate_event(event)
+        return event, f"grafana:{provider_event_id}"
+
     def verify_github_signature(self, raw_body, timestamp, signature, received_at=None):
         if not self.github_secrets:
             return False, 503, "not_configured"
@@ -877,6 +1210,30 @@ class ChatProxy:
         matched = False
         for secret in self.github_secrets:
             expected = "sha256=" + hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+            matched = hmac.compare_digest(signature, expected) or matched
+        return (True, 202, "ok") if matched else (False, 401, "invalid_signature")
+
+    def verify_grafana_signature(self, raw_body, timestamp, signature, received_at=None):
+        if not self.grafana_secrets:
+            return False, 503, "not_configured"
+        if (
+            not isinstance(timestamp, str)
+            or not isinstance(signature, str)
+            or not GITHUB_TIMESTAMP.fullmatch(timestamp)
+            or not GRAFANA_SIGNATURE.fullmatch(signature)
+        ):
+            return False, 401, "missing_or_malformed"
+        try:
+            signed_at = datetime.fromtimestamp(int(timestamp), UTC)
+        except (ValueError, OSError, OverflowError):
+            return False, 401, "invalid_timestamp"
+        current = (received_at or self.now()).astimezone(UTC)
+        if abs(current - signed_at) > self.grafana_signature_ttl:
+            return False, 401, "stale_timestamp"
+        signed = timestamp.encode() + b":" + raw_body
+        matched = False
+        for secret in self.grafana_secrets:
+            expected = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
             matched = hmac.compare_digest(signature, expected) or matched
         return (True, 202, "ok") if matched else (False, 401, "invalid_signature")
 
@@ -1104,6 +1461,25 @@ class ChatProxy:
             timedelta(days=90),
             received_at,
             payload_fingerprint=payload_fingerprint,
+        )
+
+    def accept_grafana(self, payload, received_at=None):
+        received_at = (received_at or self.now()).astimezone(UTC)
+        try:
+            event, dedupe_key = self._canonicalize_grafana(payload, received_at)
+        except (TypeError, ValueError):
+            return False, 422
+        retention = (
+            timedelta(days=90)
+            if event["state"] == "resolved"
+            else timedelta(hours=4)
+        )
+        return self._accept_event(
+            event,
+            "grafana",
+            dedupe_key,
+            retention,
+            received_at,
         )
 
     def _send_to_chat(self, payload):
@@ -1730,7 +2106,11 @@ class ChatProxy:
 
     def readiness(self):
         try:
-            if not self.webhook or (self.github_required and not self.github_secrets):
+            if (
+                not self.webhook
+                or (self.github_required and not self.github_secrets)
+                or (self.grafana_required and not self.grafana_secrets)
+            ):
                 return False
             if shutil.disk_usage(self.data_dir).free < self.min_free_bytes:
                 return False
@@ -1913,37 +2293,52 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         received_at = self.server.proxy.now().astimezone(UTC)
-        timestamps = self.headers.get_all("X-FCC-Timestamp", [])
-        signatures = self.headers.get_all("X-FCC-Signature", [])
-        timestamp = timestamps[0] if len(timestamps) == 1 else None
-        signature = signatures[0] if len(signatures) == 1 else None
-        authenticated, status, reason = self.server.proxy.verify_github_signature(
-            raw_body,
-            timestamp,
-            signature,
-            received_at,
-        )
-        if not authenticated:
-            self.server.proxy.record_ingress_failure(
-                "github-actions", "auth", reason, received_at
+        if self.path == "/v1/events/github-actions":
+            source_id = "github-actions"
+            timestamp_headers = self.headers.get_all("X-FCC-Timestamp", [])
+            signature_headers = self.headers.get_all("X-FCC-Signature", [])
+            timestamp = timestamp_headers[0] if len(timestamp_headers) == 1 else None
+            signature = signature_headers[0] if len(signature_headers) == 1 else None
+            authenticated, status, reason = self.server.proxy.verify_github_signature(
+                raw_body,
+                timestamp,
+                signature,
+                received_at,
             )
+        else:
+            source_id = "grafana"
+            timestamp_headers = self.headers.get_all("X-Grafana-Alerting-Timestamp", [])
+            signature_headers = self.headers.get_all("X-Grafana-Alerting-Signature", [])
+            timestamp = timestamp_headers[0] if len(timestamp_headers) == 1 else None
+            signature = signature_headers[0] if len(signature_headers) == 1 else None
+            authenticated, status, reason = self.server.proxy.verify_grafana_signature(
+                raw_body,
+                timestamp,
+                signature,
+                received_at,
+            )
+        if not authenticated:
+            self.server.proxy.record_ingress_failure(source_id, "auth", reason, received_at)
             self._json_response(status, {"accepted": False})
             return
         try:
             payload = strict_json_loads(raw_body)
         except (UnicodeDecodeError, ValueError, RecursionError):
             self.server.proxy.record_ingress_failure(
-                "github-actions", "adapter", "invalid_json", received_at
+                source_id, "adapter", "invalid_json", received_at
             )
             self._json_response(400, {"accepted": False})
             return
-        observed_at = datetime.fromtimestamp(int(timestamp), UTC)
-        accepted, status = self.server.proxy.accept_github(
-            payload, received_at, observed_at
-        )
+        if source_id == "github-actions":
+            observed_at = datetime.fromtimestamp(int(timestamp), UTC)
+            accepted, status = self.server.proxy.accept_github(
+                payload, received_at, observed_at
+            )
+        else:
+            accepted, status = self.server.proxy.accept_grafana(payload, received_at)
         if status == 422:
             self.server.proxy.record_ingress_failure(
-                "github-actions", "adapter", "invalid_payload", received_at
+                source_id, "adapter", "invalid_payload", received_at
             )
         self._json_response(status, {"accepted": accepted})
 
@@ -1952,6 +2347,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         known_routes = {
             "/hooks/chat",
             "/v1/events/github-actions",
+            "/v1/events/grafana",
             "/livez",
             "/healthz",
             "/readyz",
@@ -1979,7 +2375,8 @@ class ProxyServer(ThreadingHTTPServer):
         self.max_request_bytes = max_request_bytes
         self.request_timeout = request_timeout
         self.allowed_post_paths = frozenset(
-            allowed_post_paths or ("/hooks/chat", "/v1/events/github-actions")
+            allowed_post_paths
+            or ("/hooks/chat", "/v1/events/github-actions", "/v1/events/grafana")
         )
         self.expose_health = expose_health
         self.request_slots = threading.BoundedSemaphore(64)
@@ -2021,6 +2418,14 @@ def main():
             os.environ.get("GITHUB_ACTIONS_SIGNATURE_TTL_SECONDS", "300")
         ),
         github_required=os.environ.get("GITHUB_ACTIONS_REQUIRED", "false").lower() == "true",
+        grafana_secrets=(
+            read_secret("GRAFANA_HMAC_SECRET"),
+            read_secret("GRAFANA_HMAC_SECRET_PREVIOUS"),
+        ),
+        grafana_signature_ttl_seconds=int(
+            os.environ.get("GRAFANA_SIGNATURE_TTL_SECONDS", "300")
+        ),
+        grafana_required=os.environ.get("GRAFANA_REQUIRED", "false").lower() == "true",
     )
     max_request_bytes = int(os.environ.get("CHAT_PROXY_MAX_REQUEST_BYTES", "65536"))
     request_timeout = int(os.environ.get("CHAT_PROXY_REQUEST_TIMEOUT_SECONDS", "10"))
@@ -2036,7 +2441,7 @@ def main():
         proxy,
         max_request_bytes,
         request_timeout,
-        allowed_post_paths=("/v1/events/github-actions",),
+        allowed_post_paths=("/v1/events/github-actions", "/v1/events/grafana"),
         expose_health=False,
     )
 

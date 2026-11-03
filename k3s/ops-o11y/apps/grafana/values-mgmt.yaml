@@ -19,10 +19,17 @@ alerting:
       - orgId: 1
         name: ops-chat
         receivers:
-          - uid: ops-chat-googlechat
-            type: googlechat
+          - uid: ops-chat-webhook
+            type: webhook
+            disableResolveMessage: false
             settings:
-              url: $GOOGLE_CHAT_WEBHOOK_URL
+              url: $DEVOPS_ALERTS_GRAFANA_URL
+              httpMethod: POST
+              maxAlerts: 20
+              hmacConfig:
+                secret: $DEVOPS_ALERTS_GRAFANA_HMAC
+                header: X-Grafana-Alerting-Signature
+                timestampHeader: X-Grafana-Alerting-Timestamp
       - orgId: 1
         name: ops-email
         receivers:

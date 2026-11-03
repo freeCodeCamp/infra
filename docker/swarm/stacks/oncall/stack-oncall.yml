@@ -168,6 +168,10 @@ services:
       GITHUB_ACTIONS_HMAC_SECRET_PREVIOUS_FILE: /run/secrets/github_actions_hmac_previous
       GITHUB_ACTIONS_REQUIRED: "true"
       GITHUB_ACTIONS_SIGNATURE_TTL_SECONDS: "300"
+      GRAFANA_HMAC_SECRET_FILE: /run/secrets/grafana_hmac
+      GRAFANA_HMAC_SECRET_PREVIOUS_FILE: /run/secrets/grafana_hmac_previous
+      GRAFANA_REQUIRED: "true"
+      GRAFANA_SIGNATURE_TTL_SECONDS: "300"
       CHAT_PROXY_EXPECTATIONS: /app/cron-expectations.json
       CHAT_PROXY_DATA_DIR: /data
       CHAT_PROXY_GRACE_MINUTES: "15"
@@ -192,6 +196,12 @@ services:
         mode: 0400
       - source: chat_proxy_github_actions_hmac_previous
         target: github_actions_hmac_previous
+        mode: 0400
+      - source: chat_proxy_grafana_hmac
+        target: grafana_hmac
+        mode: 0400
+      - source: chat_proxy_grafana_hmac_previous
+        target: grafana_hmac_previous
         mode: 0400
     volumes:
       - chat_proxy_data:/data
@@ -290,7 +300,7 @@ configs:
     name: oncall_scripts_relay_v1
     file: ./scripts/relay.sh
   chat_proxy_script:
-    name: oncall_chat_proxy_script_v3
+    name: oncall_chat_proxy_script_v4
     file: ./proxy/chat_proxy.py
   chat_proxy_expectations:
     name: oncall_chat_proxy_expectations_v1
@@ -306,6 +316,12 @@ secrets:
   chat_proxy_github_actions_hmac_previous:
     external: true
     name: oncall_github_actions_hmac_previous_v1
+  chat_proxy_grafana_hmac:
+    external: true
+    name: oncall_grafana_hmac_v1
+  chat_proxy_grafana_hmac_previous:
+    external: true
+    name: oncall_grafana_hmac_previous_v1
 
 volumes:
   chat_proxy_data:

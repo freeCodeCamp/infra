@@ -30,8 +30,11 @@ UTC = timezone.utc
 HERE = Path(__file__).resolve().parent
 EXPECTATIONS = HERE / "cron-expectations.json"
 STACK = HERE.parent / "stack-oncall.yml"
+GRAFANA_VALUES = HERE.parents[4] / "k3s/ops-o11y/apps/grafana/values-mgmt.yaml"
 GITHUB_SECRET = "github-current-secret"
 GITHUB_PREVIOUS_SECRET = "github-previous-secret"
+GRAFANA_SECRET = "grafana-current-secret"
+GRAFANA_PREVIOUS_SECRET = "grafana-previous-secret"
 
 
 def github_payload(**overrides):
@@ -62,6 +65,71 @@ def github_signature(body, timestamp, secret=GITHUB_SECRET):
     return "sha256=" + digest
 
 
+def grafana_payload(
+    *,
+    status="firing",
+    alertname="HighLoad",
+    fingerprint="0123456789abcdef",
+    starts_at="2026-10-02T00:00:00Z",
+    ends_at="0001-01-01T00:00:00Z",
+    annotations=None,
+    labels=None,
+    **overrides,
+):
+    labels = {
+        "alertname": alertname,
+        "instance": "mgmt-01",
+        **(labels or {}),
+    }
+    annotations = {
+        "summary": "Load is above the threshold",
+        **(annotations or {}),
+    }
+    alert = {
+        "status": status,
+        "labels": labels,
+        "annotations": annotations,
+        "startsAt": starts_at,
+        "endsAt": ends_at,
+        "generatorURL": "https://grafana.example.test/alerting/rules/abc?token=secret",
+        "fingerprint": fingerprint,
+        "silenceURL": "https://grafana.example.test/silence?matcher=secret",
+        "dashboardURL": "https://grafana.example.test/d/ops?orgId=1",
+        "panelURL": "https://grafana.example.test/d/ops?viewPanel=2",
+        "ruleUID": "rule-abc",
+        "values": {"A": 2.0},
+        "valueString": "[ var='A' value=2 ]",
+        "orgId": 1,
+    }
+    payload = {
+        "receiver": "ops-chat",
+        "status": status,
+        "alerts": [alert],
+        "groupLabels": {"alertname": alertname},
+        "commonLabels": {"alertname": alertname},
+        "commonAnnotations": annotations,
+        "externalURL": "https://grafana.example.test/",
+        "appVersion": "13.2.1",
+        "version": "1",
+        "groupKey": f'{{}}:{{alertname="{alertname}"}}',
+        "truncatedAlerts": 0,
+        "orgId": 1,
+        "title": f"[{status.upper()}:1] {alertname}",
+        "state": "alerting" if status == "firing" else "ok",
+        "message": "provider-formatted message is not retained",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def grafana_signature(body, timestamp, secret=GRAFANA_SECRET):
+    return hmac.new(
+        secret.encode(),
+        timestamp.encode() + b":" + body,
+        hashlib.sha256,
+    ).hexdigest()
+
+
 class ChatProxyTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -81,6 +149,7 @@ class ChatProxyTests(unittest.TestCase):
             sender=sender,
             jitter=lambda: 1,
             github_secrets=(GITHUB_SECRET, GITHUB_PREVIOUS_SECRET),
+            grafana_secrets=(GRAFANA_SECRET, GRAFANA_PREVIOUS_SECRET),
         )
 
     def scalar(self, sql, parameters=()):
@@ -947,6 +1016,182 @@ class ChatProxyTests(unittest.TestCase):
         self.assertNotIn("key=secret", serialized)
         self.assertNotIn("<host>", serialized)
 
+    def test_grafana_firing_maps_to_sanitized_immediate_event(self):
+        payload = grafana_payload(
+            annotations={
+                "summary": "Load high https://status.test/detail?token=secret",
+                "description": "Investigate <host>",
+            }
+        )
+        self.assertEqual(self.proxy.accept_grafana(payload, self.current), (True, 202))
+        event = self.proxy.events()[0]
+        self.assertEqual(event["source"], {
+            "id": "grafana",
+            "instance": "ops-o11y",
+            "adapter": "grafana/v1",
+        })
+        self.assertEqual(event["kind"], "alert")
+        self.assertEqual(event["state"], "firing")
+        self.assertEqual(event["severity"], "critical")
+        self.assertEqual(event["routing"]["action"], "immediate")
+        self.assertEqual(event["observed_at"], "2026-10-02T00:00:00Z")
+        self.assertEqual(event["link"], "https://grafana.example.test/d/ops")
+        serialized = json.dumps(event)
+        self.assertNotIn("token=secret", serialized)
+        self.assertNotIn("provider-formatted", serialized)
+        self.assertNotIn("<host>", serialized)
+        self.assertEqual(len(self.proxy.deliveries()), 1)
+
+    def test_grafana_state_mapping_includes_nodata_error_test_and_resolution(self):
+        cases = (
+            (
+                grafana_payload(
+                    alertname="DatasourceNoData",
+                    labels={"rulename": "Fleet health"},
+                ),
+                "no_data",
+                "alert",
+            ),
+            (
+                grafana_payload(
+                    alertname="DatasourceError",
+                    fingerprint="1123456789abcdef",
+                    labels={"rulename": "Metrics query"},
+                ),
+                "error",
+                "alert",
+            ),
+            (
+                grafana_payload(
+                    alertname="TestAlert",
+                    fingerprint="2123456789abcdef",
+                    labels={"instance": "Grafana"},
+                    annotations={"summary": "Notification test"},
+                ),
+                "test",
+                "test",
+            ),
+            (
+                grafana_payload(
+                    status="resolved",
+                    fingerprint="3123456789abcdef",
+                    ends_at="2026-10-02T00:00:30Z",
+                ),
+                "resolved",
+                "alert",
+            ),
+        )
+        for index, (payload, state, kind) in enumerate(cases):
+            with self.subTest(state=state):
+                accepted = self.proxy.accept_grafana(
+                    payload, self.current + timedelta(seconds=index)
+                )
+                self.assertEqual(accepted, (True, 202))
+                event = self.proxy.events()[-1]
+                self.assertEqual(event["state"], state)
+                self.assertEqual(event["kind"], kind)
+                self.assertEqual(event["routing"]["action"], "immediate")
+
+    def test_grafana_group_membership_and_four_hour_coalescing(self):
+        payload = grafana_payload()
+        self.assertEqual(self.proxy.accept_grafana(payload, self.current), (True, 202))
+        self.assertEqual(
+            self.proxy.accept_grafana(payload, self.current + timedelta(hours=3)),
+            (True, 202),
+        )
+        self.assertEqual(len(self.proxy.events()), 1)
+        self.assertEqual(
+            self.proxy.accept_grafana(payload, self.current + timedelta(hours=4)),
+            (True, 202),
+        )
+        self.assertEqual(len(self.proxy.events()), 2)
+
+        changed_group = json.loads(json.dumps(payload))
+        second = json.loads(json.dumps(changed_group["alerts"][0]))
+        second["fingerprint"] = "4123456789abcdef"
+        second["labels"]["instance"] = "mgmt-02"
+        changed_group["alerts"].append(second)
+        self.assertEqual(
+            self.proxy.accept_grafana(changed_group, self.current + timedelta(hours=4, seconds=1)),
+            (True, 202),
+        )
+        self.assertEqual(len(self.proxy.events()), 3)
+        self.assertIn("2 alert(s) firing", self.proxy.events()[-1]["summary"])
+
+    def test_grafana_resolution_is_distinct_from_active_occurrence(self):
+        firing = grafana_payload()
+        resolved = grafana_payload(
+            status="resolved",
+            ends_at="2026-10-02T00:02:00Z",
+        )
+        self.proxy.accept_grafana(firing, self.current)
+        self.proxy.accept_grafana(resolved, self.current + timedelta(minutes=1))
+        self.proxy.accept_grafana(resolved, self.current + timedelta(days=30))
+        self.assertEqual([event["state"] for event in self.proxy.events()], ["firing", "resolved"])
+
+    def test_grafana_adapter_rejects_invalid_contracts(self):
+        cases = []
+        for mutation in (
+            lambda value: value.update({"version": "2"}),
+            lambda value: value.update({"unknown": "field"}),
+            lambda value: value.update({"status": "pending"}),
+            lambda value: value.update({"state": "ok"}),
+            lambda value: value.update({"alerts": []}),
+            lambda value: value["alerts"][0].update({"fingerprint": "invalid"}),
+            lambda value: value["alerts"][0].update({"startsAt": "not-a-time"}),
+            lambda value: value["alerts"][0].update({"values": {"A": True}}),
+            lambda value: value["alerts"][0].update({"values": {"A": float("inf")}}),
+            lambda value: value["commonLabels"].update({"bad": 1}),
+        ):
+            payload = grafana_payload()
+            mutation(payload)
+            cases.append(payload)
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertEqual(
+                    self.proxy.accept_grafana(payload, self.current),
+                    (False, 422),
+                )
+        self.assertEqual(self.proxy.events(), [])
+
+    def test_grafana_signature_supports_rotation_timestamp_and_exact_body(self):
+        self.assertEqual(
+            grafana_signature(b'{"status":"firing"}', "1790899260"),
+            "f9c37504920d48a1c6d7e1441dcc178319aca1641d8c545ef00d3f619abee006",
+        )
+        body = json.dumps(grafana_payload(), separators=(",", ":")).encode()
+        timestamp = str(int(self.current.timestamp()))
+        for secret in (GRAFANA_SECRET, GRAFANA_PREVIOUS_SECRET):
+            with self.subTest(secret=secret):
+                self.assertEqual(
+                    self.proxy.verify_grafana_signature(
+                        body,
+                        timestamp,
+                        grafana_signature(body, timestamp, secret),
+                        self.current,
+                    ),
+                    (True, 202, "ok"),
+                )
+        self.assertEqual(
+            self.proxy.verify_grafana_signature(
+                body + b" ",
+                timestamp,
+                grafana_signature(body, timestamp),
+                self.current,
+            ),
+            (False, 401, "invalid_signature"),
+        )
+        stale = str(int((self.current - timedelta(seconds=301)).timestamp()))
+        self.assertEqual(
+            self.proxy.verify_grafana_signature(
+                body,
+                stale,
+                grafana_signature(body, stale),
+                self.current,
+            ),
+            (False, 401, "stale_timestamp"),
+        )
+
     def test_github_signature_supports_rotation_and_exact_body(self):
         body = json.dumps(github_payload(), separators=(",", ":")).encode()
         timestamp = str(int(self.current.timestamp()))
@@ -1014,6 +1259,20 @@ class ChatProxyTests(unittest.TestCase):
                 EXPECTATIONS,
                 github_secrets=("one", "two", "three"),
             )
+
+    def test_grafana_rotation_and_readiness_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "distinct current/previous"):
+            ChatProxy(
+                "https://chat.invalid/secret",
+                self.temporary.name,
+                EXPECTATIONS,
+                grafana_secrets=(GRAFANA_SECRET, GRAFANA_SECRET),
+            )
+        self.proxy.grafana_required = True
+        self.proxy.grafana_secrets = ()
+        self.assertFalse(self.proxy.readiness())
+        self.proxy.grafana_secrets = (GRAFANA_SECRET,)
+        self.assertTrue(self.proxy.readiness())
 
     def test_github_requirement_affects_readiness(self):
         self.proxy.github_required = True
@@ -1084,6 +1343,7 @@ class HttpTests(unittest.TestCase):
             sender=lambda payload: self.sent.append(payload) or True,
             jitter=lambda: 1,
             github_secrets=(GITHUB_SECRET, GITHUB_PREVIOUS_SECRET),
+            grafana_secrets=(GRAFANA_SECRET, GRAFANA_PREVIOUS_SECRET),
         )
         self.server = ProxyServer(("127.0.0.1", 0), self.proxy, 1024)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -1118,6 +1378,31 @@ class HttpTests(unittest.TestCase):
                 "Content-Type": content_type,
                 "X-FCC-Timestamp": timestamp,
                 "X-FCC-Signature": github_signature(body, timestamp, secret),
+            },
+            method="POST",
+        )
+        return urlopen(request, timeout=2)
+
+    def post_grafana(
+        self,
+        payload=None,
+        *,
+        body=None,
+        secret=GRAFANA_SECRET,
+        timestamp=None,
+        content_type="application/json",
+    ):
+        body = body if body is not None else json.dumps(payload, separators=(",", ":")).encode()
+        timestamp = timestamp or str(int(self.current.timestamp()))
+        request = Request(
+            self.base_url + "/v1/events/grafana",
+            data=body,
+            headers={
+                "Content-Type": content_type,
+                "X-Grafana-Alerting-Timestamp": timestamp,
+                "X-Grafana-Alerting-Signature": grafana_signature(
+                    body, timestamp, secret
+                ),
             },
             method="POST",
         )
@@ -1180,6 +1465,90 @@ class HttpTests(unittest.TestCase):
         self.proxy.process_deliveries(self.current)
         self.assertEqual(len(self.sent), 1)
 
+    def test_grafana_http_route_authenticates_accepts_and_deduplicates(self):
+        self.server.max_request_bytes = 65536
+        payload = grafana_payload()
+        for secret in (GRAFANA_SECRET, GRAFANA_PREVIOUS_SECRET):
+            with self.subTest(secret=secret):
+                with self.post_grafana(payload, secret=secret) as response:
+                    self.assertEqual(response.status, 202)
+                    self.assertEqual(json.load(response), {"accepted": True})
+        self.assertEqual(len(self.proxy.events()), 1)
+        self.assertEqual(len(self.proxy.deliveries()), 1)
+
+    def test_grafana_http_route_rejects_bad_auth_and_malformed_payload(self):
+        self.server.max_request_bytes = 65536
+        body = b"not-json-with-sensitive-content"
+        timestamp = str(int(self.current.timestamp()))
+        request = Request(
+            self.base_url + "/v1/events/grafana",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Grafana-Alerting-Timestamp": timestamp,
+                "X-Grafana-Alerting-Signature": grafana_signature(
+                    body, timestamp, "wrong-source-secret"
+                ),
+            },
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as auth_error:
+            urlopen(request, timeout=2)
+        self.assertEqual(auth_error.exception.code, 401)
+        with self.assertRaises(HTTPError) as payload_error:
+            self.post_grafana({**grafana_payload(), "version": "2"})
+        self.assertEqual(payload_error.exception.code, 422)
+        with self.proxy._connect() as connection:
+            rows = connection.execute(
+                "SELECT source_id,category,reason FROM ingress_failures ORDER BY failure_id"
+            ).fetchall()
+        self.assertEqual(
+            [tuple(row) for row in rows],
+            [
+                ("grafana", "auth", "invalid_signature"),
+                ("grafana", "adapter", "invalid_payload"),
+            ],
+        )
+
+    def test_external_credentials_cannot_impersonate_another_source(self):
+        self.server.max_request_bytes = 65536
+        github_body = json.dumps(github_payload(), separators=(",", ":")).encode()
+        grafana_body = json.dumps(grafana_payload(), separators=(",", ":")).encode()
+        timestamp = str(int(self.current.timestamp()))
+        requests = (
+            Request(
+                self.base_url + "/v1/events/github-actions",
+                data=github_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-FCC-Timestamp": timestamp,
+                    "X-FCC-Signature": "sha256=" + grafana_signature(
+                        github_body, timestamp
+                    ),
+                },
+                method="POST",
+            ),
+            Request(
+                self.base_url + "/v1/events/grafana",
+                data=grafana_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Grafana-Alerting-Timestamp": timestamp,
+                    "X-Grafana-Alerting-Signature": hmac.new(
+                        GITHUB_SECRET.encode(),
+                        timestamp.encode() + b":" + grafana_body,
+                        hashlib.sha256,
+                    ).hexdigest(),
+                },
+                method="POST",
+            ),
+        )
+        for request in requests:
+            with self.assertRaises(HTTPError) as error:
+                urlopen(request, timeout=2)
+            self.assertEqual(error.exception.code, 401)
+        self.assertEqual(self.proxy.events(), [])
+
     def test_github_http_route_rejects_bad_auth_before_json_parsing(self):
         body = b"not-json-with-sensitive-content"
         timestamp = str(int(self.current.timestamp()))
@@ -1233,6 +1602,7 @@ class HttpTests(unittest.TestCase):
         for body in (
             b'{"schema":"fcc.github-actions-event/v1","schema":"duplicate"}',
             b'{"value":NaN}',
+            b'{"value":1e999}',
             b'\xff',
         ):
             with self.subTest(body=body):
@@ -1343,7 +1713,7 @@ class HttpTests(unittest.TestCase):
             ("127.0.0.1", 0),
             self.proxy,
             1024,
-            allowed_post_paths=("/v1/events/github-actions",),
+            allowed_post_paths=("/v1/events/github-actions", "/v1/events/grafana"),
             expose_health=False,
         )
         threads = [
@@ -1361,13 +1731,24 @@ class HttpTests(unittest.TestCase):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
+            internal_grafana = Request(
+                internal_url + "/v1/events/grafana",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
             external_legacy = Request(
                 external_url + "/hooks/chat",
                 data=b"{}",
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            for request in (internal_github, external_legacy, external_url + "/readyz"):
+            for request in (
+                internal_github,
+                internal_grafana,
+                external_legacy,
+                external_url + "/readyz",
+            ):
                 with self.assertRaises(HTTPError) as error:
                     urlopen(request, timeout=2)
                 self.assertEqual(error.exception.code, 404)
@@ -1410,6 +1791,20 @@ class HttpTests(unittest.TestCase):
                     self.post({"text": "🔴 *watchdog* · news English · failed"})
         self.assertEqual(error.exception.code, 503)
         self.assertEqual(json.load(error.exception), {"accepted": False})
+
+
+class GrafanaConfigTests(unittest.TestCase):
+    def test_grafana_uses_native_hmac_webhook_and_preserves_page_email(self):
+        values = GRAFANA_VALUES.read_text(encoding="utf-8")
+        self.assertIn("type: webhook", values)
+        self.assertIn("url: $DEVOPS_ALERTS_GRAFANA_URL", values)
+        self.assertIn("secret: $DEVOPS_ALERTS_GRAFANA_HMAC", values)
+        self.assertIn("header: X-Grafana-Alerting-Signature", values)
+        self.assertIn("timestampHeader: X-Grafana-Alerting-Timestamp", values)
+        self.assertNotIn("type: googlechat", values)
+        self.assertIn("receiver: ops-email", values)
+        self.assertIn('[severity, "=", page]', values)
+        self.assertIn("continue: true", values)
 
 
 class ScheduleTests(unittest.TestCase):
