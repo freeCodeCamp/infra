@@ -60,6 +60,12 @@ spec:
         - /select/logsql/.*
         - /select/vmui.*
       load_balancing_policy: first_available
+    - static:
+        urls:
+          - http://vmselect-vm.o11y.svc:8481
+      paths:
+        - /select/0/vmui.*
+        - /select/0/prometheus/.*
 ---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
