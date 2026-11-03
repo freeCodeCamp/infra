@@ -1,0 +1,54 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: public-hostnames-prd
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: blackbox-http
+  module: http_2xx
+  interval: 60s
+  scrapeTimeout: 15s
+  vmProberSpec:
+    url: blackbox-exporter-prometheus-blackbox-exporter.o11y.svc:9115
+  targets:
+    staticConfig:
+      labels:
+        env: prd
+      targets:
+        - https://freecodecamp.org/
+        - https://www.freecodecamp.org/
+        - https://api.freecodecamp.org/status/ping
+        - https://chinese.freecodecamp.org/
+        - https://socrates.freecodecamp.org/
+        - https://blog.freecodecamp.org/
+        - https://chapter.freecodecamp.org/
+        - https://guide.freecodecamp.org/
+        - https://medium.freecodecamp.org/
+        - https://meeting.freecodecamp.org/
+        - https://news.freecodecamp.org/
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: public-hostnames-stg
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: blackbox-http
+  module: http_2xx
+  interval: 60s
+  scrapeTimeout: 15s
+  vmProberSpec:
+    url: blackbox-exporter-prometheus-blackbox-exporter.o11y.svc:9115
+  targets:
+    staticConfig:
+      labels:
+        env: stg
+      targets:
+        - https://freecodecamp.dev/
+        - https://www.freecodecamp.dev/
+        - https://api.freecodecamp.dev/status/ping
+        - https://chinese.freecodecamp.dev/
+        - https://socrates.freecodecamp.dev/
+        - https://new-api.freecodecamp.dev/
