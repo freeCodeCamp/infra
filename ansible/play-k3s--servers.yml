@@ -91,6 +91,41 @@
     server_group: "{{ variable_host }}"
     user_kubectl: false
     kubeconfig: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+  pre_tasks:
+    - name: Read the etcd S3 settings from 1Password once
+      ansible.builtin.set_fact:
+        k3s_etcd_s3_resolved: "{{ k3s_etcd_s3_config }}"
+      run_once: true
+      no_log: true
+      when: k3s_etcd_s3_config is defined
+
+    - name: Validate the etcd S3 settings are not empty
+      ansible.builtin.assert:
+        that:
+          - k3s_etcd_s3_resolved['etcd-s3-endpoint'] | length > 0
+          - k3s_etcd_s3_resolved['etcd-s3-access-key'] | length > 0
+          - k3s_etcd_s3_resolved['etcd-s3-secret-key'] | length > 0
+        fail_msg: "An etcd S3 field read from 1Password is empty; check the item field labels."
+      no_log: true
+      when: k3s_etcd_s3_config is defined
+
+    - name: Create the K3s config drop-in directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s/config.yaml.d
+        state: directory
+        mode: "0755"
+      when: k3s_etcd_s3_config is defined
+
+    # security: the role writes config.yaml as 0644; the R2 key stays in this 0600 file.
+    - name: Write the etcd S3 snapshot drop-in
+      ansible.builtin.copy:
+        content: "{{ k3s_etcd_s3_resolved | to_nice_yaml }}"
+        dest: /etc/rancher/k3s/config.yaml.d/etcd-s3.yaml
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: k3s_etcd_s3_config is defined
   roles:
     - role: k3s.orchestration.prereq
     - role: k3s.orchestration.k3s_server
@@ -132,6 +167,15 @@
       ansible.builtin.command: k3s etcd-snapshot save --name "play-{{ ansible_play_hosts | length }}-servers"
       changed_when: true
       when: inventory_hostname == first_host
+
+    - name: Validate the snapshot reached the S3 bucket
+      ansible.builtin.command: k3s etcd-snapshot ls
+      register: snapshot_ls
+      changed_when: false
+      failed_when: >-
+        snapshot_ls.rc != 0 or
+        ('s3://' ~ k3s_etcd_s3_resolved['etcd-s3-bucket'] ~ '/') not in snapshot_ls.stdout
+      when: inventory_hostname == first_host and k3s_etcd_s3_resolved is defined
 
     - name: Fetch the kubeconfig
       ansible.builtin.include_tasks: tasks/fetch-kubeconfig.yml
