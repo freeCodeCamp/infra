@@ -104,6 +104,7 @@ vmagent:
       - vm-linode-sd
     inlineScrapeConfig: |
       - job_name: node
+        scrape_interval: 60s
         scheme: http
         metrics_path: /metrics
         linode_sd_configs:
