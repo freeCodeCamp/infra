@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: watchdog-checkin
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 60
+      template:
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: checkin
+              image: curlimages/curl:8.22.0
+              env:
+                - name: CHECKIN_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: sentry-watchdog-checkin
+                      key: url
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  memory: 64Mi
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  am='http://vmalertmanager-vm.o11y.svc:9093/api/v2/alerts'
+                  q='filter=alertname%3D%22Watchdog%22&active=true&silenced=false&inhibited=false'
+                  body=$(curl -fsS --max-time 10 "$am?$q")
+                  case "$body" in
+                    *'"alertname":"Watchdog"'*) ;;
+                    *) echo "Watchdog is not active; no check-in"; exit 1 ;;
+                  esac
+                  printf 'url = "%s?status=ok"\n' "$CHECKIN_URL" |
+                    curl -fsS --max-time 10 --retry 2 --retry-all-errors -o /dev/null -K -
+                  echo "check-in sent"
