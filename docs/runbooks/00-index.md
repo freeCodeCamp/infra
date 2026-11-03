@@ -9,6 +9,7 @@ Single-purpose ops runbooks. Each file owns one operational concern.
 | 04  | [04-secrets-decrypt.md](04-secrets-decrypt.md)             | Operator | Inspect / source a sops envelope; envelope layout   |
 | 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)         | Operator | Bring up / grow the ops-o11y cluster (target state) |
 | 18  | [18-swarm-manager-rebuild.md](18-swarm-manager-rebuild.md) | Operator | Rebuild the Vultr Swarm after a manager loss        |
+| 19  | [19-o11y-alerts.md](19-o11y-alerts.md)                     | Operator | An ops-o11y-vultr alert fires                       |
 
 Archived in [`archive/2026-10-15/`](archive/2026-10-15/):
 

@@ -169,12 +169,18 @@ vmalert:
   enabled: true
   spec:
     replicaCount: 2
+    ruleSelector:
+      matchExpressions:
+        - key: o11y.freecodecamp.org/datasource
+          operator: NotIn
+          values: [vlogs]
     affinity:
       podAntiAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchLabels:
                 app.kubernetes.io/name: vmalert
+                app.kubernetes.io/instance: vm
             topologyKey: kubernetes.io/hostname
     resources:
       requests:

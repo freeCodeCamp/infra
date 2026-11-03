@@ -1,0 +1,42 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: logs
+  labels:
+    o11y.freecodecamp.org/datasource: vlogs
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  groups:
+    - name: nginx-logs
+      type: vlogs
+      interval: 1m
+      rules:
+        - alert: NginxHigh5xxRate
+          expr: |
+            _time:5m server_name:*
+            | stats by (env, server_name) count() as total, count() if (status:~"^5") as errors
+            | math errors / total as ratio
+            | filter total:>=100 ratio:>0.05
+            | fields env, server_name, ratio
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.env }} {{ $labels.server_name }} returns over 5% 5xx responses."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#nginxhigh5xxrate"
+        - alert: NginxUpstreamErrors
+          expr: |
+            _time:5m _stream:{level=~"error|crit|alert|emerg"} upstream
+            | stats by (env, host) count() as errors
+            | filter errors:>10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.env }} NGINX on {{ $labels.host }} logs upstream errors."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#nginxupstreamerrors"

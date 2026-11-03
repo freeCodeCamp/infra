@@ -15,3 +15,6 @@ spec:
           annotations:
             summary: >-
               Always fires. The watchdog-checkin CronJob sends a Sentry check-in while it is active.
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#watchdog"
