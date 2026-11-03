@@ -34,8 +34,11 @@ on:
       LINODE_TOKEN:
         description: 'The Linode API token'
         required: true
-      GOOGLE_CHAT_WEBHOOK:
-        description: 'Google Chat webhook URL; alerts are skipped when unset'
+      DEVOPS_ALERTS_PROXY_URL:
+        description: 'Versioned DevOps Alerts proxy endpoint; notifications are skipped when unset'
+        required: false
+      DEVOPS_ALERTS_GITHUB_HMAC:
+        description: 'GitHub-only HMAC credential for the DevOps Alerts proxy'
         required: false
   workflow_dispatch:
     inputs:
@@ -177,7 +180,7 @@ jobs:
           fi
 
           python3 - "$REPORT" <<'PYEOF'
-          import json, os, sys
+          import hashlib, json, os, sys
 
           report = json.load(open(sys.argv[1]))
           findings = report.get("findings") or []
@@ -197,6 +200,8 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"anomalies={len(bad)}\n")
               out.write(f"checked={len(findings)}\n")
+              group_key = hashlib.sha256(group.encode()).hexdigest()[:16]
+              out.write(f"notification_key=nginx-anomaly-{group_key}\n")
               out.write("subject=" + " ".join(f"{stage} · {group}".split()) + "\n")
               out.write(f"summary=nginx anomaly on {len(bad)}/{len(findings)} hosts\n")
               out.write("details<<VERIFY_EOF\n")
@@ -211,11 +216,13 @@ jobs:
       # stages -- the housekeeping chain runs this job after them -- but a
       # standalone dispatch of this workflow alerts the moment it finds
       # something, and each group alerts without waiting for the other.
-      - name: Alert Google Chat on an anomaly
+      - name: Alert DevOps on an anomaly
         if: always() && steps.findings.outputs.anomalies != '0' && steps.findings.outputs.summary != ''
         uses: ./.github/actions/notify-chat
         with:
-          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          endpoint: ${{ secrets.DEVOPS_ALERTS_PROXY_URL }}
+          hmac_secret: ${{ secrets.DEVOPS_ALERTS_GITHUB_HMAC }}
+          notification_key: ${{ steps.findings.outputs.notification_key }}
           status: fail
           source: housekeeping
           subject: ${{ steps.findings.outputs.subject }}

@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import http.client
 import json
 import shutil
 import socket
@@ -27,6 +30,36 @@ UTC = timezone.utc
 HERE = Path(__file__).resolve().parent
 EXPECTATIONS = HERE / "cron-expectations.json"
 STACK = HERE.parent / "stack-oncall.yml"
+GITHUB_SECRET = "github-current-secret"
+GITHUB_PREVIOUS_SECRET = "github-previous-secret"
+
+
+def github_payload(**overrides):
+    payload = {
+        "schema": "fcc.github-actions-event/v1",
+        "status": "fail",
+        "source": "housekeeping",
+        "subject": "Wed 21 Oct",
+        "summary": "ANOMALY: nginx unavailable",
+        "details": "pxy-1\n  inactive",
+        "link": "https://github.com/freeCodeCamp/infra/actions/runs/123?token=redacted",
+        "link_label": "run",
+        "repository": "freeCodeCamp/infra",
+        "run_id": "123",
+        "run_attempt": "1",
+        "notification_key": "housekeeping-summary",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def github_signature(body, timestamp, secret=GITHUB_SECRET):
+    digest = hmac.new(
+        secret.encode(),
+        timestamp.encode() + b"." + body,
+        hashlib.sha256,
+    ).hexdigest()
+    return "sha256=" + digest
 
 
 class ChatProxyTests(unittest.TestCase):
@@ -47,6 +80,7 @@ class ChatProxyTests(unittest.TestCase):
             now=lambda: self.current,
             sender=sender,
             jitter=lambda: 1,
+            github_secrets=(GITHUB_SECRET, GITHUB_PREVIOUS_SECRET),
         )
 
     def scalar(self, sql, parameters=()):
@@ -189,8 +223,8 @@ class ChatProxyTests(unittest.TestCase):
     def test_database_schema_pragmas_and_restart_durability(self):
         self.proxy.accept({"text": "✅ *watchdog* · news English · feed healthy"}, self.current)
         with self.proxy._connect() as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 1)
-            self.assertEqual(connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 1)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 2)
             self.assertEqual(connection.execute("PRAGMA journal_mode").fetchone()[0], "wal")
             self.assertEqual(connection.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(connection.execute("PRAGMA busy_timeout").fetchone()[0], 5000)
@@ -198,6 +232,22 @@ class ChatProxyTests(unittest.TestCase):
         self.assertEqual(self.proxy.database_path.stat().st_mode & 0o777, 0o600)
         restarted = ChatProxy("", self.temporary.name, EXPECTATIONS, sender=lambda _payload: True)
         self.assertEqual(len(restarted.events()), 1)
+
+    def test_schema_one_database_migrates_to_schema_two(self):
+        with self.proxy._connect() as connection:
+            connection.execute("DROP TABLE ingress_failures")
+            connection.execute("DELETE FROM schema_migrations WHERE version=2")
+            connection.execute("PRAGMA user_version=1")
+        migrated = ChatProxy(
+            "https://chat.invalid/secret",
+            self.temporary.name,
+            EXPECTATIONS,
+            github_secrets=(GITHUB_SECRET,),
+        )
+        with migrated._connect() as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 2)
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM ingress_failures").fetchone()[0], 0)
 
     def test_corrupt_database_fails_closed_at_startup(self):
         other = tempfile.TemporaryDirectory()
@@ -759,11 +809,265 @@ class ChatProxyTests(unittest.TestCase):
         self.assertEqual(status["status"], "degraded")
         self.assertEqual(status["oldest_overdue_digest_age_seconds"], 7200)
 
+    def test_github_failure_maps_to_sanitized_immediate_event(self):
+        accepted, status = self.proxy.accept_github(github_payload(), self.current)
+        self.assertEqual((accepted, status), (True, 202))
+        event = self.proxy.events()[0]
+        self.assertEqual(event["source"], {
+            "id": "github-actions",
+            "instance": "housekeeping",
+            "adapter": "github-actions/v1",
+        })
+        self.assertEqual(event["state"], "failed")
+        self.assertEqual(event["kind"], "job")
+        self.assertEqual(event["observed_at"], "2026-10-02T00:01:00Z")
+        self.assertEqual(event["routing"]["action"], "immediate")
+        self.assertEqual(
+            event["provider"]["event_id"],
+            '["freecodecamp/infra","123","1","housekeeping-summary"]',
+        )
+        self.assertEqual(event["link"], "https://github.com/freeCodeCamp/infra/actions/runs/123")
+        self.assertNotIn("token=redacted", json.dumps(event))
+        self.proxy.process_deliveries(self.current)
+        self.assertIn("🔴 *housekeeping* · Wed 21 Oct · ANOMALY", self.sent[0]["text"])
+
+    def test_github_success_enters_digest_without_immediate_delivery(self):
+        payload = github_payload(
+            status="ok",
+            summary="OK: all stages passed",
+            details="",
+            notification_key="housekeeping-success",
+        )
+        self.assertEqual(self.proxy.accept_github(payload, self.current), (True, 202))
+        self.assertEqual(self.proxy.events()[0]["routing"]["action"], "digest")
+        self.assertEqual(self.proxy.deliveries(), [])
+        self.assertEqual(self.sent, [])
+
+    def test_github_run_identity_deduplicates_retries_but_not_attempts_or_keys(self):
+        payload = github_payload()
+        self.assertEqual(self.proxy.accept_github(payload, self.current), (True, 202))
+        self.assertEqual(
+            self.proxy.accept_github(payload, self.current + timedelta(seconds=2)),
+            (True, 202),
+        )
+        self.assertEqual(
+            self.proxy.accept_github(
+                {**payload, "summary": "changed retry body"},
+                self.current + timedelta(seconds=5),
+            ),
+            (False, 409),
+        )
+        self.proxy.accept_github({**payload, "run_attempt": "2"}, self.current + timedelta(seconds=10))
+        self.proxy.accept_github(
+            {**payload, "notification_key": "nginx-anomaly"},
+            self.current + timedelta(seconds=15),
+        )
+        self.assertEqual(len(self.proxy.events()), 3)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM dedupe_claims WHERE scope='github-actions'"), 3)
+
+    def test_github_dedupe_claim_survives_thirty_day_digest_retention(self):
+        old = self.current - timedelta(days=40)
+        payload = github_payload(status="ok", details=None)
+        self.proxy.accept_github(payload, old, old)
+        self.proxy.send_digest(old.date())
+        self.proxy.cleanup(self.current)
+        self.assertEqual(self.proxy.events(), [])
+        self.assertEqual(
+            self.scalar("SELECT COUNT(*) FROM dedupe_claims WHERE scope='github-actions'"),
+            1,
+        )
+        self.assertEqual(self.proxy.accept_github(payload, self.current, old), (True, 202))
+        self.assertEqual(self.proxy.events(), [])
+        after_expiry = old + timedelta(days=91)
+        self.assertEqual(
+            self.proxy.accept_github(payload, after_expiry, after_expiry),
+            (True, 202),
+        )
+        self.assertEqual(len(self.proxy.events()), 1)
+
+    def test_concurrent_github_retries_create_one_event(self):
+        barrier = threading.Barrier(9)
+        results = []
+
+        def accept_retry():
+            barrier.wait()
+            results.append(self.proxy.accept_github(github_payload(), self.current))
+
+        threads = [threading.Thread(target=accept_retry) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        barrier.wait()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(results, [(True, 202)] * 8)
+        self.assertEqual(len(self.proxy.events()), 1)
+        self.assertEqual(len(self.proxy.deliveries()), 1)
+
+    def test_github_adapter_rejects_invalid_contracts(self):
+        cases = (
+            {"schema": "fcc.github-actions-event/v2"},
+            {"status": "unknown"},
+            {"repository": "not-a-repository"},
+            {"run_id": "0"},
+            {"run_attempt": "nope"},
+            {"notification_key": "spaces are invalid"},
+            {"extra_field": "not allowed"},
+            {"link": "http://example.test/run"},
+            {"link": "https://:443/run"},
+            {"link": "https://example.test:bad/run"},
+            {"link": "https://example.test/run with-space"},
+            {"summary": "x" * 501},
+            {"details": "x" * 8193},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                self.assertEqual(
+                    self.proxy.accept_github(github_payload(**override), self.current),
+                    (False, 422),
+                )
+        self.assertEqual(self.proxy.events(), [])
+
+    def test_github_adapter_sanitizes_text_urls_and_chat_markup(self):
+        payload = github_payload(
+            source="<housekeeping>",
+            subject="summary\nsubject",
+            summary=(
+                "failed http://insecure.test/path?password=secret "
+                "https://example.test/path?token=secret"
+            ),
+            details="<host> HTTPS://example.test/detail?key=secret",
+        )
+        self.proxy.accept_github(payload, self.current)
+        event = self.proxy.events()[0]
+        serialized = json.dumps(event)
+        self.assertEqual(event["source"]["instance"], "housekeeping")
+        self.assertEqual(event["subject"]["label"], "summary subject")
+        self.assertNotIn("token=secret", serialized)
+        self.assertNotIn("password=secret", serialized)
+        self.assertNotIn("key=secret", serialized)
+        self.assertNotIn("<host>", serialized)
+
+    def test_github_signature_supports_rotation_and_exact_body(self):
+        body = json.dumps(github_payload(), separators=(",", ":")).encode()
+        timestamp = str(int(self.current.timestamp()))
+        for secret in (GITHUB_SECRET, GITHUB_PREVIOUS_SECRET):
+            with self.subTest(secret=secret):
+                self.assertEqual(
+                    self.proxy.verify_github_signature(
+                        body,
+                        timestamp,
+                        github_signature(body, timestamp, secret),
+                        self.current,
+                    ),
+                    (True, 202, "ok"),
+                )
+        changed = body + b" "
+        self.assertEqual(
+            self.proxy.verify_github_signature(
+                changed,
+                timestamp,
+                github_signature(body, timestamp),
+                self.current,
+            ),
+            (False, 401, "invalid_signature"),
+        )
+        for seconds in (-300, 300):
+            boundary = str(int((self.current + timedelta(seconds=seconds)).timestamp()))
+            self.assertEqual(
+                self.proxy.verify_github_signature(
+                    body,
+                    boundary,
+                    github_signature(body, boundary),
+                    self.current,
+                ),
+                (True, 202, "ok"),
+            )
+        for seconds in (-301, 301):
+            stale = str(int((self.current + timedelta(seconds=seconds)).timestamp()))
+            self.assertEqual(
+                self.proxy.verify_github_signature(
+                    body,
+                    stale,
+                    github_signature(body, stale),
+                    self.current,
+                ),
+                (False, 401, "stale_timestamp"),
+            )
+        uppercase = github_signature(body, timestamp).upper()
+        self.assertEqual(
+            self.proxy.verify_github_signature(body, timestamp, uppercase, self.current),
+            (False, 401, "missing_or_malformed"),
+        )
+
+    def test_github_rotation_rejects_duplicate_or_excess_secrets(self):
+        with self.assertRaisesRegex(ValueError, "distinct current/previous"):
+            ChatProxy(
+                "https://chat.invalid/secret",
+                self.temporary.name,
+                EXPECTATIONS,
+                github_secrets=(GITHUB_SECRET, GITHUB_SECRET),
+            )
+        with self.assertRaisesRegex(ValueError, "distinct current/previous"):
+            ChatProxy(
+                "https://chat.invalid/secret",
+                self.temporary.name,
+                EXPECTATIONS,
+                github_secrets=("one", "two", "three"),
+            )
+
+    def test_github_requirement_affects_readiness(self):
+        self.proxy.github_required = True
+        self.proxy.github_secrets = ()
+        self.assertFalse(self.proxy.readiness())
+        self.proxy.github_secrets = (GITHUB_SECRET,)
+        self.assertTrue(self.proxy.readiness())
+
+    def test_ingress_failure_metadata_expires_without_raw_payloads(self):
+        self.proxy.record_ingress_failure(
+            "github-actions",
+            "auth",
+            "invalid_signature",
+            self.current - timedelta(days=31),
+        )
+        self.proxy.record_ingress_failure(
+            "github-actions",
+            "adapter",
+            "invalid_payload",
+            self.current - timedelta(days=15),
+        )
+        with self.proxy._connect() as connection:
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(ingress_failures)")
+            }
+        self.assertNotIn("payload", columns)
+        self.proxy.cleanup(self.current)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM ingress_failures"), 0)
+
+    def test_ingress_failure_metadata_is_capacity_bounded(self):
+        with patch("chat_proxy.MAX_INGRESS_FAILURES", 3):
+            for index in range(5):
+                self.proxy.record_ingress_failure(
+                    "github-actions",
+                    "auth",
+                    f"failure-{index}",
+                    self.current + timedelta(seconds=index),
+                )
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM ingress_failures"), 3)
+        with self.proxy._connect() as connection:
+            reasons = [row[0] for row in connection.execute(
+                "SELECT reason FROM ingress_failures ORDER BY failure_id"
+            )]
+        self.assertEqual(reasons, ["failure-2", "failure-3", "failure-4"])
+
     def test_secret_file_takes_precedence(self):
         secret = Path(self.temporary.name) / "secret"
         secret.write_text("from-file\n", encoding="utf-8")
         with patch.dict("os.environ", {"TOKEN": "from-env", "TOKEN_FILE": str(secret)}):
             self.assertEqual(read_secret("TOKEN"), "from-file")
+        secret.write_text(" surrounding-space \n", encoding="utf-8")
+        with patch.dict("os.environ", {"TOKEN_FILE": str(secret)}):
+            with self.assertRaisesRegex(ValueError, "surrounding whitespace"):
+                read_secret("TOKEN")
 
 
 class HttpTests(unittest.TestCase):
@@ -771,12 +1075,15 @@ class HttpTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.sent = []
+        self.current = datetime(2026, 10, 2, 0, 1, tzinfo=UTC)
         self.proxy = ChatProxy(
             "https://chat.invalid/secret",
             self.temporary.name,
             EXPECTATIONS,
+            now=lambda: self.current,
             sender=lambda payload: self.sent.append(payload) or True,
             jitter=lambda: 1,
+            github_secrets=(GITHUB_SECRET, GITHUB_PREVIOUS_SECRET),
         )
         self.server = ProxyServer(("127.0.0.1", 0), self.proxy, 1024)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -784,6 +1091,10 @@ class HttpTests(unittest.TestCase):
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
         self.base_url = f"http://127.0.0.1:{self.server.server_port}"
+
+    def scalar(self, sql, parameters=()):
+        with self.proxy._connect() as connection:
+            return connection.execute(sql, parameters).fetchone()[0]
 
     def post_raw(self, body, content_type="application/json"):
         request = Request(
@@ -796,6 +1107,21 @@ class HttpTests(unittest.TestCase):
 
     def post(self, payload):
         return self.post_raw(json.dumps(payload).encode())
+
+    def post_github(self, payload=None, *, body=None, secret=GITHUB_SECRET, timestamp=None, content_type="application/json"):
+        body = body if body is not None else json.dumps(payload, separators=(",", ":")).encode()
+        timestamp = timestamp or str(int(self.current.timestamp()))
+        request = Request(
+            self.base_url + "/v1/events/github-actions",
+            data=body,
+            headers={
+                "Content-Type": content_type,
+                "X-FCC-Timestamp": timestamp,
+                "X-FCC-Signature": github_signature(body, timestamp, secret),
+            },
+            method="POST",
+        )
+        return urlopen(request, timeout=2)
 
     def test_liveness_readiness_and_health_alias(self):
         for path, expected in (("/livez", {"status": "ok"}), ("/healthz", {"status": "ok"}), ("/readyz", {"status": "ready"})):
@@ -841,6 +1167,216 @@ class HttpTests(unittest.TestCase):
         self.proxy.process_deliveries()
         self.assertEqual(self.sent, [payload])
         self.assertEqual(len(self.proxy.events()), 1)
+
+    def test_github_http_route_authenticates_accepts_and_deduplicates(self):
+        payload = github_payload()
+        for secret in (GITHUB_SECRET, GITHUB_PREVIOUS_SECRET):
+            with self.subTest(secret=secret):
+                with self.post_github(payload, secret=secret) as response:
+                    self.assertEqual(response.status, 202)
+                    self.assertEqual(json.load(response), {"accepted": True})
+        self.assertEqual(len(self.proxy.events()), 1)
+        self.assertEqual(len(self.proxy.deliveries()), 1)
+        self.proxy.process_deliveries(self.current)
+        self.assertEqual(len(self.sent), 1)
+
+    def test_github_http_route_rejects_bad_auth_before_json_parsing(self):
+        body = b"not-json-with-sensitive-content"
+        timestamp = str(int(self.current.timestamp()))
+        request = Request(
+            self.base_url + "/v1/events/github-actions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-FCC-Timestamp": timestamp,
+                "X-FCC-Signature": github_signature(body, timestamp, "wrong-source-secret"),
+            },
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as error:
+            urlopen(request, timeout=2)
+        self.assertEqual(error.exception.code, 401)
+        self.assertEqual(json.load(error.exception), {"accepted": False})
+        self.assertEqual(self.proxy.events(), [])
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM ingress_failures WHERE category='auth'"), 1)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM ingress_failures WHERE category='adapter'"), 0)
+
+    def test_github_http_route_rejects_stale_and_missing_signatures(self):
+        body = json.dumps(github_payload(), separators=(",", ":")).encode()
+        stale = str(int((self.current - timedelta(minutes=6)).timestamp()))
+        with self.assertRaises(HTTPError) as stale_error:
+            self.post_github(body=body, timestamp=stale)
+        self.assertEqual(stale_error.exception.code, 401)
+        request = Request(
+            self.base_url + "/v1/events/github-actions",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as missing_error:
+            urlopen(request, timeout=2)
+        self.assertEqual(missing_error.exception.code, 401)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM ingress_failures WHERE category='auth'"), 2)
+
+    def test_github_http_route_records_only_sanitized_adapter_failure(self):
+        body = b"not-json"
+        with self.assertRaises(HTTPError) as error:
+            self.post_github(body=body)
+        self.assertEqual(error.exception.code, 400)
+        with self.proxy._connect() as connection:
+            row = connection.execute(
+                "SELECT source_id,category,reason FROM ingress_failures"
+            ).fetchone()
+        self.assertEqual(tuple(row), ("github-actions", "adapter", "invalid_json"))
+
+    def test_github_http_route_rejects_duplicate_keys_and_nonfinite_numbers(self):
+        for body in (
+            b'{"schema":"fcc.github-actions-event/v1","schema":"duplicate"}',
+            b'{"value":NaN}',
+            b'\xff',
+        ):
+            with self.subTest(body=body):
+                with self.assertRaises(HTTPError) as error:
+                    self.post_github(body=body)
+                self.assertEqual(error.exception.code, 400)
+        self.assertEqual(
+            self.scalar("SELECT COUNT(*) FROM ingress_failures WHERE category='adapter'"),
+            1,
+        )
+
+    def test_github_http_route_rejects_excessive_json_nesting(self):
+        self.server.max_request_bytes = 32768
+        body = b"[" * 10000 + b"]" * 10000
+        with self.assertRaises(HTTPError) as error:
+            self.post_github(body=body)
+        self.assertEqual(error.exception.code, 400)
+
+    def test_github_http_route_returns_conflict_for_changed_duplicate(self):
+        payload = github_payload()
+        with self.post_github(payload) as response:
+            self.assertEqual(response.status, 202)
+        with self.assertRaises(HTTPError) as error:
+            self.post_github({**payload, "summary": "different semantic event"})
+        self.assertEqual(error.exception.code, 409)
+        self.assertEqual(json.load(error.exception), {"accepted": False})
+        self.assertEqual(len(self.proxy.events()), 1)
+
+    def test_github_http_route_rejects_ambiguous_framing_and_duplicate_auth_headers(self):
+        body = json.dumps(github_payload(), separators=(",", ":")).encode()
+        timestamp = str(int(self.current.timestamp()))
+        signature = github_signature(body, timestamp)
+
+        def raw_request(extra_headers):
+            connection = http.client.HTTPConnection(
+                "127.0.0.1", self.server.server_port, timeout=2
+            )
+            connection.putrequest("POST", "/v1/events/github-actions")
+            connection.putheader("Content-Type", "application/json")
+            for name, value in extra_headers:
+                connection.putheader(name, value)
+            connection.endheaders(body)
+            response = connection.getresponse()
+            status = response.status
+            response.read()
+            connection.close()
+            return status
+
+        common = [
+            ("Content-Length", str(len(body))),
+            ("X-FCC-Timestamp", timestamp),
+            ("X-FCC-Signature", signature),
+        ]
+        self.assertEqual(
+            raw_request(common + [("Content-Length", str(len(body)))]),
+            400,
+        )
+        self.assertEqual(raw_request(common + [("Transfer-Encoding", "chunked")]), 400)
+        self.assertEqual(
+            raw_request(common + [("X-FCC-Signature", signature)]),
+            401,
+        )
+        request = Request(
+            self.base_url + "/v1/events/github-actions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Content-Encoding": "gzip",
+                "X-FCC-Timestamp": timestamp,
+                "X-FCC-Signature": signature,
+            },
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as encoding_error:
+            urlopen(request, timeout=2)
+        self.assertEqual(encoding_error.exception.code, 415)
+
+    def test_github_http_route_is_unavailable_without_source_secret(self):
+        self.proxy.github_secrets = ()
+        body = json.dumps(github_payload(), separators=(",", ":")).encode()
+        with self.assertRaises(HTTPError) as error:
+            self.post_github(body=body)
+        self.assertEqual(error.exception.code, 503)
+        self.assertEqual(json.load(error.exception), {"accepted": False})
+
+    def test_http_logs_redact_query_and_unknown_path_content(self):
+        secret = "credential-must-not-appear"
+        with self.assertLogs("chat-proxy", level="INFO") as captured:
+            for path in (
+                f"/v1/events/github-actions?token={secret}",
+                f"/{secret}",
+            ):
+                with self.assertRaises(HTTPError) as error:
+                    urlopen(self.base_url + path, timeout=2)
+                self.assertEqual(error.exception.code, 404)
+        rendered = "\n".join(captured.output)
+        self.assertNotIn(secret, rendered)
+        self.assertNotIn("token=", rendered)
+
+    def test_internal_and_external_listeners_isolate_routes_and_health(self):
+        internal = ProxyServer(
+            ("127.0.0.1", 0),
+            self.proxy,
+            1024,
+            allowed_post_paths=("/hooks/chat",),
+        )
+        external = ProxyServer(
+            ("127.0.0.1", 0),
+            self.proxy,
+            1024,
+            allowed_post_paths=("/v1/events/github-actions",),
+            expose_health=False,
+        )
+        threads = [
+            threading.Thread(target=server.serve_forever, daemon=True)
+            for server in (internal, external)
+        ]
+        for thread in threads:
+            thread.start()
+        try:
+            internal_url = f"http://127.0.0.1:{internal.server_port}"
+            external_url = f"http://127.0.0.1:{external.server_port}"
+            internal_github = Request(
+                internal_url + "/v1/events/github-actions",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            external_legacy = Request(
+                external_url + "/hooks/chat",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            for request in (internal_github, external_legacy, external_url + "/readyz"):
+                with self.assertRaises(HTTPError) as error:
+                    urlopen(request, timeout=2)
+                self.assertEqual(error.exception.code, 404)
+        finally:
+            for server in (internal, external):
+                server.shutdown()
+                server.server_close()
+            for thread in threads:
+                thread.join(2)
 
     def test_stalled_request_body_times_out(self):
         self.server.request_timeout = 0.1

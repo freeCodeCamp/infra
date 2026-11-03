@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -26,7 +27,7 @@ from urllib.request import Request, urlopen
 
 LOG = logging.getLogger("chat-proxy")
 UTC = timezone.utc
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 STATUS_BY_ICON = {"✅": "ok", "⚠️": "warning", "🔴": "failed"}
 ICON_BY_STATE = {"ok": "✅", "warning": "⚠️", "failed": "🔴", "firing": "🔴", "resolved": "✅", "no_data": "⚠️", "error": "🔴", "unknown": "⚠️", "test": "⚠️"}
 SEVERITY_BY_STATE = {"ok": "info", "warning": "warning", "failed": "critical", "firing": "critical", "resolved": "info", "no_data": "warning", "error": "critical", "unknown": "unknown", "test": "warning"}
@@ -35,6 +36,13 @@ LINK_SUFFIX = re.compile(r"\s*·\s*<([^>|]+)\|([^>]+)>\s*$")
 RETRY_OFFSETS = (0, 30, 120, 600, 1800, 7200, 21600, 43200, 86400)
 REMINDER_OFFSETS = (("1h", 3600), ("6h", 21600), ("24h", 86400))
 EVENT_LIMITS = {"subject_key": 200, "subject_label": 300, "summary": 500, "details": 8192, "link": 2048}
+GITHUB_EVENT_SCHEMA = "fcc.github-actions-event/v1"
+GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
+GITHUB_NOTIFICATION_KEY = re.compile(r"^[a-z0-9_.:/-]{1,200}$")
+GITHUB_TIMESTAMP = re.compile(r"^[1-9][0-9]{9,}$")
+GITHUB_SIGNATURE = re.compile(r"^sha256=[0-9a-f]{64}$")
+MAX_INGRESS_FAILURES = 10000
+URL_IN_TEXT = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
 
 
 class QueueCapacityError(RuntimeError):
@@ -54,7 +62,10 @@ def isoformat(value):
 
 
 def parse_timestamp(value):
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp requires an offset")
+    return parsed.astimezone(UTC)
 
 
 def to_milliseconds(value):
@@ -66,12 +77,28 @@ def from_milliseconds(value):
 
 
 def sanitize_link(value):
-    if not value:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > EVENT_LIMITS["link"]
+        or any(ord(character) < 33 or ord(character) == 127 for character in value)
+    ):
         return None
-    parts = urlsplit(value)
-    if parts.scheme != "https" or not parts.netloc or parts.username or parts.password:
+    try:
+        parts = urlsplit(value)
+        hostname = parts.hostname
+        port = parts.port
+    except ValueError:
         return None
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+    if (
+        parts.scheme.lower() != "https"
+        or not hostname
+        or parts.username
+        or parts.password
+        or (port is not None and not 1 <= port <= 65535)
+    ):
+        return None
+    return urlunsplit(("https", parts.netloc, parts.path, "", ""))
 
 
 def sanitize_chat_links(text):
@@ -80,6 +107,49 @@ def sanitize_chat_links(text):
         return f"<{link}|{match.group(2)}>" if link else match.group(2)
 
     return CHAT_LINK.sub(replace, text)
+
+
+def strict_json_loads(raw_body):
+    def object_from_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON key")
+            result[key] = value
+        return result
+
+    def reject_constant(_value):
+        raise ValueError("non-finite JSON number")
+
+    text = raw_body.decode("utf-8")
+    return json.loads(
+        text,
+        object_pairs_hook=object_from_pairs,
+        parse_constant=reject_constant,
+    )
+
+
+def sanitize_text_urls(text):
+    def replace(match):
+        value = match.group(0)
+        trailing = ""
+        while value and value[-1] in ".,;:!?)]:`'\"":
+            trailing = value[-1] + trailing
+            value = value[:-1]
+        return (sanitize_link(value) or "[invalid-link]") + trailing
+
+    return URL_IN_TEXT.sub(replace, text)
+
+
+def sanitize_one_line(value):
+    value = " ".join(value.replace("<", "").replace(">", "").split())
+    return sanitize_text_urls(value)
+
+
+def sanitize_details(value):
+    value = value.replace("\r\n", "\n").replace("\r", "\n").replace("<", "").replace(">", "")
+    value = "\n".join(line.rstrip() for line in value.splitlines()).strip()
+    return sanitize_text_urls(value)
 
 
 def parse_message(text):
@@ -182,9 +252,16 @@ def occurrences_between(schedule, start, end):
 
 def read_secret(name, default=""):
     file_value = os.environ.get(f"{name}_FILE")
-    if file_value:
-        return Path(file_value).read_text(encoding="utf-8").strip()
-    return os.environ.get(name, default)
+    if not file_value:
+        return os.environ.get(name, default)
+    value = Path(file_value).read_text(encoding="utf-8")
+    if value.endswith("\r\n"):
+        value = value[:-2]
+    elif value.endswith("\n"):
+        value = value[:-1]
+    if value != value.strip():
+        raise ValueError(f"{name}_FILE contains surrounding whitespace")
+    return value
 
 
 def _fsync_directory(path):
@@ -274,6 +351,9 @@ class ChatProxy:
         jitter=None,
         max_queue_depth=10000,
         min_free_bytes=64 * 1024 * 1024,
+        github_secrets=(),
+        github_signature_ttl_seconds=300,
+        github_required=False,
     ):
         self.webhook = webhook
         self.data_dir = Path(data_dir)
@@ -287,7 +367,14 @@ class ChatProxy:
         self.jitter = jitter or (lambda: random.uniform(0.8, 1.2))
         self.max_queue_depth = max_queue_depth
         self.min_free_bytes = min_free_bytes
+        self.github_secrets = tuple(secret for secret in github_secrets if secret)
+        if len(self.github_secrets) > 2 or len(set(self.github_secrets)) != len(self.github_secrets):
+            raise ValueError("GitHub HMAC configuration requires distinct current/previous secrets")
+        self.github_signature_ttl = timedelta(seconds=github_signature_ttl_seconds)
+        self.github_required = github_required
         self.lock = threading.RLock()
+        self.ingress_failure_lock = threading.Lock()
+        self.ingress_failure_last_recorded = {}
         self.stopping = threading.Event()
         self.delivery_wake = threading.Event()
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -520,6 +607,45 @@ class ChatProxy:
                     COMMIT;
                     """
                 )
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version < 2:
+                connection.executescript(
+                    """
+                    BEGIN EXCLUSIVE;
+                    DROP INDEX dedupe_claims_expiry;
+                    ALTER TABLE dedupe_claims RENAME TO dedupe_claims_v1;
+                    CREATE TABLE dedupe_claims (
+                      scope TEXT NOT NULL,
+                      dedupe_key TEXT NOT NULL,
+                      event_id TEXT NOT NULL,
+                      payload_fingerprint TEXT,
+                      claimed_at_ms INTEGER NOT NULL,
+                      expires_at_ms INTEGER NOT NULL,
+                      PRIMARY KEY(scope, dedupe_key)
+                    );
+                    INSERT INTO dedupe_claims
+                      (scope,dedupe_key,event_id,payload_fingerprint,claimed_at_ms,expires_at_ms)
+                      SELECT scope,dedupe_key,event_id,NULL,claimed_at_ms,expires_at_ms
+                      FROM dedupe_claims_v1;
+                    DROP TABLE dedupe_claims_v1;
+                    CREATE INDEX dedupe_claims_expiry ON dedupe_claims(expires_at_ms);
+                    CREATE TABLE ingress_failures (
+                      failure_id INTEGER PRIMARY KEY,
+                      source_id TEXT NOT NULL,
+                      category TEXT NOT NULL CHECK (category IN ('auth','adapter')),
+                      reason TEXT NOT NULL,
+                      occurred_at_ms INTEGER NOT NULL,
+                      expires_at_ms INTEGER NOT NULL
+                    );
+                    CREATE INDEX ingress_failures_expiry ON ingress_failures(expires_at_ms);
+                    CREATE INDEX ingress_failures_source_category
+                      ON ingress_failures(source_id,category,occurred_at_ms);
+                    INSERT INTO schema_migrations
+                      VALUES (2, CAST(strftime('%s','now') AS INTEGER) * 1000);
+                    PRAGMA user_version = 2;
+                    COMMIT;
+                    """
+                )
             _validate_sqlite(connection)
         finally:
             connection.close()
@@ -607,6 +733,189 @@ class ChatProxy:
         ).hexdigest()
         return event, f"legacy:{fingerprint}"
 
+    def _canonicalize_github(self, payload, received_at, observed_at):
+        allowed_fields = {
+            "schema",
+            "status",
+            "source",
+            "subject",
+            "summary",
+            "details",
+            "link",
+            "link_label",
+            "repository",
+            "run_id",
+            "run_attempt",
+            "notification_key",
+        }
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != allowed_fields
+            or payload.get("schema") != GITHUB_EVENT_SCHEMA
+        ):
+            raise ValueError("unsupported GitHub event contract")
+
+        def required_string(name, maximum):
+            value = payload.get(name)
+            if not isinstance(value, str) or not value or len(value) > maximum:
+                raise ValueError(f"invalid {name}")
+            return value
+
+        status = required_string("status", 16)
+        states = {"ok": "ok", "warn": "warning", "fail": "failed"}
+        if status not in states:
+            raise ValueError("invalid status")
+        repository = required_string("repository", 201)
+        if not GITHUB_REPOSITORY.fullmatch(repository):
+            raise ValueError("invalid repository")
+        repository_key = repository.lower()
+        run_id = required_string("run_id", 32)
+        run_attempt = required_string("run_attempt", 10)
+        if not run_id.isdigit() or int(run_id) < 1 or not run_attempt.isdigit() or int(run_attempt) < 1:
+            raise ValueError("invalid run identity")
+        run_id = str(int(run_id))
+        run_attempt = str(int(run_attempt))
+        notification_key = required_string("notification_key", 200)
+        if not GITHUB_NOTIFICATION_KEY.fullmatch(notification_key):
+            raise ValueError("invalid notification_key")
+        source = sanitize_one_line(required_string("source", 200))
+        subject = sanitize_one_line(required_string("subject", 300))
+        summary = sanitize_one_line(required_string("summary", 1000))
+        if not source or not subject or not summary:
+            raise ValueError("sanitized text field is empty")
+        details_value = payload.get("details")
+        if details_value is None:
+            details = None
+        elif isinstance(details_value, str):
+            details = sanitize_details(details_value) or None
+        else:
+            raise ValueError("invalid details")
+        link_value = payload.get("link")
+        if link_value in (None, ""):
+            link = None
+        elif isinstance(link_value, str):
+            link = sanitize_link(link_value)
+            if not link:
+                raise ValueError("invalid link")
+        else:
+            raise ValueError("invalid link")
+        link_label_value = payload.get("link_label", "run")
+        if not isinstance(link_label_value, str) or not link_label_value:
+            raise ValueError("invalid link_label")
+        link_label = sanitize_one_line(link_label_value)
+        if len(link_label) > 100:
+            raise ValueError("invalid link_label")
+        identity_tuple = (repository_key, run_id, run_attempt, notification_key)
+        identity = json.dumps(identity_tuple, separators=(",", ":"))
+        state = states[status]
+        if state == "ok":
+            details = None
+        routing_action = "digest" if state == "ok" else "immediate"
+        event = {
+            "schema": "fcc.alert-event/v1",
+            "event_id": str(uuid.uuid4()),
+            "source": {"id": "github-actions", "instance": source, "adapter": "github-actions/v1"},
+            "provider": {
+                "event_id": identity,
+                "delivery_id": identity,
+                "incident_key": json.dumps(
+                    (repository_key, run_id, notification_key), separators=(",", ":")
+                ),
+            },
+            "kind": "job",
+            "state": state,
+            "severity": SEVERITY_BY_STATE[state],
+            "subject": {"key": notification_key, "label": subject},
+            "summary": summary,
+            "details": details,
+            "link": link,
+            "link_label": link_label,
+            "observed_at": isoformat(observed_at),
+            "received_at": isoformat(received_at),
+            "heartbeat": {"expectation_id": None, "scheduled_for": None},
+            "routing": {
+                "action": routing_action,
+                "policy_version": 1,
+                "reason": "github-success" if routing_action == "digest" else "github-actionable",
+            },
+        }
+        self._validate_event(event)
+        dedupe_key = hashlib.sha256(identity.encode()).hexdigest()
+        semantic = {
+            "status": status,
+            "source": source,
+            "subject": subject,
+            "summary": summary,
+            "details": details,
+            "link": link,
+            "link_label": link_label,
+            "identity": identity_tuple,
+        }
+        payload_fingerprint = hashlib.sha256(
+            json.dumps(semantic, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        return event, f"github:{dedupe_key}", payload_fingerprint
+
+    def verify_github_signature(self, raw_body, timestamp, signature, received_at=None):
+        if not self.github_secrets:
+            return False, 503, "not_configured"
+        if (
+            not isinstance(timestamp, str)
+            or not isinstance(signature, str)
+            or not GITHUB_TIMESTAMP.fullmatch(timestamp)
+            or not GITHUB_SIGNATURE.fullmatch(signature)
+        ):
+            return False, 401, "missing_or_malformed"
+        try:
+            signed_at = datetime.fromtimestamp(int(timestamp), UTC)
+        except (ValueError, OSError, OverflowError):
+            return False, 401, "invalid_timestamp"
+        current = (received_at or self.now()).astimezone(UTC)
+        if abs(current - signed_at) > self.github_signature_ttl:
+            return False, 401, "stale_timestamp"
+        signed = timestamp.encode() + b"." + raw_body
+        matched = False
+        for secret in self.github_secrets:
+            expected = "sha256=" + hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+            matched = hmac.compare_digest(signature, expected) or matched
+        return (True, 202, "ok") if matched else (False, 401, "invalid_signature")
+
+    def record_ingress_failure(self, source_id, category, reason, occurred_at=None):
+        occurred_at = (occurred_at or self.now()).astimezone(UTC)
+        throttle_key = (source_id, category, reason)
+        monotonic_now = time.monotonic()
+        with self.ingress_failure_lock:
+            last_recorded = self.ingress_failure_last_recorded.get(throttle_key)
+            if last_recorded is not None and monotonic_now - last_recorded < 10:
+                return
+            self.ingress_failure_last_recorded[throttle_key] = monotonic_now
+            if len(self.ingress_failure_last_recorded) > 100:
+                self.ingress_failure_last_recorded = {throttle_key: monotonic_now}
+        retention = 30 if category == "auth" else 14
+        try:
+            with self._transaction() as connection:
+                connection.execute(
+                    """INSERT INTO ingress_failures
+                    (source_id,category,reason,occurred_at_ms,expires_at_ms)
+                    VALUES (?,?,?,?,?)""",
+                    (
+                        source_id,
+                        category,
+                        reason,
+                        to_milliseconds(occurred_at),
+                        to_milliseconds(occurred_at + timedelta(days=retention)),
+                    ),
+                )
+                connection.execute(
+                    """DELETE FROM ingress_failures WHERE failure_id NOT IN (
+                      SELECT failure_id FROM ingress_failures
+                      ORDER BY failure_id DESC LIMIT ?
+                    )""",
+                    (MAX_INGRESS_FAILURES,),
+                )
+        except (OSError, sqlite3.Error):
+            LOG.error("sanitized ingress failure metadata could not be persisted")
+
     def _validate_event(self, event):
         fields = {
             "subject_key": event["subject"]["key"],
@@ -677,35 +986,49 @@ class ChatProxy:
                 (expectation["id"], event["event_id"], to_milliseconds(received_at), event["state"]),
             )
 
-    def accept(self, payload, received_at=None):
-        received_at = (received_at or self.now()).astimezone(UTC)
-        try:
-            event, dedupe_key = self._canonicalize_legacy(payload, received_at)
-        except ValueError:
-            return False, 400
+    def _accept_event(
+        self,
+        event,
+        dedupe_scope,
+        dedupe_key,
+        dedupe_retention,
+        received_at,
+        *,
+        record_heartbeat=False,
+        payload_fingerprint=None,
+    ):
         delivery_id = None
         try:
             if shutil.disk_usage(self.data_dir).free < self.min_free_bytes:
                 raise StorageCapacityError("storage free-space floor reached")
             with self.lock, self._transaction() as connection:
                 existing = connection.execute(
-                    """SELECT event_id,expires_at_ms FROM dedupe_claims
-                    WHERE scope='oncall-legacy' AND dedupe_key=?""",
-                    (dedupe_key,),
+                    """SELECT event_id,payload_fingerprint,expires_at_ms FROM dedupe_claims
+                    WHERE scope=? AND dedupe_key=?""",
+                    (dedupe_scope, dedupe_key),
                 ).fetchone()
                 if existing and existing["expires_at_ms"] > to_milliseconds(received_at):
+                    if (
+                        payload_fingerprint
+                        and existing["payload_fingerprint"] != payload_fingerprint
+                    ):
+                        return False, 409
                     return True, 202
                 if existing:
                     connection.execute(
-                        "DELETE FROM dedupe_claims WHERE scope='oncall-legacy' AND dedupe_key=?",
-                        (dedupe_key,),
+                        "DELETE FROM dedupe_claims WHERE scope=? AND dedupe_key=?",
+                        (dedupe_scope, dedupe_key),
                     )
                 if event["routing"]["action"] == "digest":
                     frozen = connection.execute(
                         "SELECT 1 FROM digests WHERE digest_day=?", (received_at.date().isoformat(),)
                     ).fetchone()
                     if frozen:
-                        event["routing"] = {"action": "immediate", "policy_version": 1, "reason": "late-after-digest"}
+                        event["routing"] = {
+                            "action": "immediate",
+                            "policy_version": 1,
+                            "reason": "late-after-digest",
+                        }
                 if event["routing"]["action"] == "immediate":
                     queue_depth = connection.execute(
                         """SELECT COUNT(*) FROM deliveries
@@ -715,17 +1038,27 @@ class ChatProxy:
                         raise QueueCapacityError("delivery queue capacity reached")
                 self._insert_event(connection, event, received_at)
                 connection.execute(
-                    "INSERT INTO dedupe_claims VALUES (?,?,?,?,?)",
+                    """INSERT INTO dedupe_claims
+                    (scope,dedupe_key,event_id,payload_fingerprint,claimed_at_ms,expires_at_ms)
+                    VALUES (?,?,?,?,?,?)""",
                     (
-                        "oncall-legacy", dedupe_key, event["event_id"], to_milliseconds(received_at),
-                        to_milliseconds(received_at + timedelta(minutes=5)),
+                        dedupe_scope,
+                        dedupe_key,
+                        event["event_id"],
+                        payload_fingerprint,
+                        to_milliseconds(received_at),
+                        to_milliseconds(received_at + dedupe_retention),
                     ),
                 )
-                self._record_observations(connection, event, received_at)
+                if record_heartbeat:
+                    self._record_observations(connection, event, received_at)
                 if event["routing"]["action"] == "immediate":
                     delivery_id = self._enqueue_delivery(
-                        connection, event_id=event["event_id"], purpose="immediate",
-                        payload={"text": render_event(event)}, due_at=received_at,
+                        connection,
+                        event_id=event["event_id"],
+                        purpose="immediate",
+                        payload={"text": render_event(event)},
+                        due_at=received_at,
                     )
         except QueueCapacityError:
             LOG.error("event rejected because delivery queue capacity was reached")
@@ -739,6 +1072,39 @@ class ChatProxy:
         if delivery_id:
             self.delivery_wake.set()
         return True, 202
+
+    def accept(self, payload, received_at=None):
+        received_at = (received_at or self.now()).astimezone(UTC)
+        try:
+            event, dedupe_key = self._canonicalize_legacy(payload, received_at)
+        except ValueError:
+            return False, 400
+        return self._accept_event(
+            event,
+            "oncall-legacy",
+            dedupe_key,
+            timedelta(minutes=5),
+            received_at,
+            record_heartbeat=True,
+        )
+
+    def accept_github(self, payload, received_at=None, observed_at=None):
+        received_at = (received_at or self.now()).astimezone(UTC)
+        observed_at = (observed_at or received_at).astimezone(UTC)
+        try:
+            event, dedupe_key, payload_fingerprint = self._canonicalize_github(
+                payload, received_at, observed_at
+            )
+        except ValueError:
+            return False, 422
+        return self._accept_event(
+            event,
+            "github-actions",
+            dedupe_key,
+            timedelta(days=90),
+            received_at,
+            payload_fingerprint=payload_fingerprint,
+        )
 
     def _send_to_chat(self, payload):
         if not self.webhook:
@@ -1269,6 +1635,7 @@ class ChatProxy:
         audit_cutoff = to_milliseconds(current - timedelta(days=365))
         with self._transaction() as connection:
             connection.execute("DELETE FROM dedupe_claims WHERE expires_at_ms<?", (to_milliseconds(current),))
+            connection.execute("DELETE FROM ingress_failures WHERE expires_at_ms<?", (to_milliseconds(current),))
             connection.execute(
                 """DELETE FROM events WHERE received_at_ms<? AND routing_action='digest'
                 AND EXISTS (
@@ -1363,7 +1730,7 @@ class ChatProxy:
 
     def readiness(self):
         try:
-            if not self.webhook:
+            if not self.webhook or (self.github_required and not self.github_secrets):
                 return False
             if shutil.disk_usage(self.data_dir).free < self.min_free_bytes:
                 return False
@@ -1395,6 +1762,12 @@ class ChatProxy:
                 WHERE disposition='unresolved'"""
             ).fetchone()[0]
             retries = connection.execute("SELECT COUNT(*) FROM deliveries WHERE state='retry_wait'").fetchone()[0]
+            auth_failures = connection.execute(
+                "SELECT COUNT(*) FROM ingress_failures WHERE category='auth'"
+            ).fetchone()[0]
+            adapter_failures = connection.execute(
+                "SELECT COUNT(*) FROM ingress_failures WHERE category='adapter'"
+            ).fetchone()[0]
             overdue_digest = connection.execute(
                 """SELECT MIN(e.received_at_ms) FROM events e
                 WHERE e.routing_action='digest' AND e.received_day<?
@@ -1420,6 +1793,8 @@ class ChatProxy:
             "queued": queue["count"],
             "retries": retries,
             "dead_letters": dead,
+            "auth_failures": auth_failures,
+            "adapter_failures": adapter_failures,
             "oldest_queue_age_seconds": oldest_age,
             "oldest_overdue_digest_age_seconds": digest_age,
             "scheduler_age_seconds": scheduler_age,
@@ -1453,6 +1828,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if not self.server.expose_health:
+            self.send_error(404)
+            return
         if self.path in ("/livez", "/healthz"):
             self._json_response(200, {"status": "ok"})
             return
@@ -1471,48 +1849,155 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
         self.send_error(404)
 
-    def do_POST(self):
-        if self.path != "/hooks/chat":
-            self.send_error(404)
-            return
-        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+    def _read_body(self):
+        content_types = self.headers.get_all("Content-Type", [])
+        if len(content_types) != 1:
+            self.send_error(415)
+            return None
+        content_type = content_types[0].split(";", 1)[0].strip().lower()
         if content_type != "application/json":
             self.send_error(415)
-            return
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
+            return None
+        if self.headers.get_all("Transfer-Encoding", []):
             self.send_error(400)
-            return
-        if length < 1 or length > self.server.max_request_bytes:
-            self.send_error(413 if length > self.server.max_request_bytes else 400)
-            return
+            return None
+        content_encodings = self.headers.get_all("Content-Encoding", [])
+        if len(content_encodings) > 1 or (
+            content_encodings and content_encodings[0].strip().lower() != "identity"
+        ):
+            self.send_error(415)
+            return None
+        lengths = self.headers.get_all("Content-Length", [])
+        if not lengths:
+            self.send_error(411)
+            return None
+        if (
+            len(lengths) != 1
+            or len(lengths[0]) > 10
+            or not re.fullmatch(r"[1-9][0-9]*", lengths[0])
+        ):
+            self.send_error(400)
+            return None
+        length = int(lengths[0])
+        if length > self.server.max_request_bytes:
+            self.send_error(413)
+            return None
         try:
-            payload = json.loads(self.rfile.read(length))
+            body = self.rfile.read(length)
         except TimeoutError:
             self.send_error(408)
-            return
+            return None
         except OSError:
             LOG.warning("request body read failed")
-            return
-        except (UnicodeDecodeError, ValueError):
+            return None
+        if len(body) != length:
             self.send_error(400)
+            return None
+        return body
+
+    def do_POST(self):
+        if self.path not in self.server.allowed_post_paths:
+            self.send_error(404)
             return
-        accepted, status = self.server.proxy.accept(payload)
+        raw_body = self._read_body()
+        if raw_body is None:
+            return
+        if self.path == "/hooks/chat":
+            try:
+                payload = strict_json_loads(raw_body)
+            except (UnicodeDecodeError, ValueError, RecursionError):
+                self.send_error(400)
+                return
+            accepted, status = self.server.proxy.accept(payload)
+            self._json_response(status, {"accepted": accepted})
+            return
+
+        received_at = self.server.proxy.now().astimezone(UTC)
+        timestamps = self.headers.get_all("X-FCC-Timestamp", [])
+        signatures = self.headers.get_all("X-FCC-Signature", [])
+        timestamp = timestamps[0] if len(timestamps) == 1 else None
+        signature = signatures[0] if len(signatures) == 1 else None
+        authenticated, status, reason = self.server.proxy.verify_github_signature(
+            raw_body,
+            timestamp,
+            signature,
+            received_at,
+        )
+        if not authenticated:
+            self.server.proxy.record_ingress_failure(
+                "github-actions", "auth", reason, received_at
+            )
+            self._json_response(status, {"accepted": False})
+            return
+        try:
+            payload = strict_json_loads(raw_body)
+        except (UnicodeDecodeError, ValueError, RecursionError):
+            self.server.proxy.record_ingress_failure(
+                "github-actions", "adapter", "invalid_json", received_at
+            )
+            self._json_response(400, {"accepted": False})
+            return
+        observed_at = datetime.fromtimestamp(int(timestamp), UTC)
+        accepted, status = self.server.proxy.accept_github(
+            payload, received_at, observed_at
+        )
+        if status == 422:
+            self.server.proxy.record_ingress_failure(
+                "github-actions", "adapter", "invalid_payload", received_at
+            )
         self._json_response(status, {"accepted": accepted})
 
-    def log_message(self, message, *args):
-        LOG.info("%s - %s", self.address_string(), message % args)
+    def log_message(self, _message, *_args):
+        route = self.path.split("?", 1)[0]
+        known_routes = {
+            "/hooks/chat",
+            "/v1/events/github-actions",
+            "/livez",
+            "/healthz",
+            "/readyz",
+            "/statusz",
+        }
+        if route not in known_routes:
+            route = "unmatched"
+        LOG.info("http request method=%s route=%s", self.command, route)
 
 
 class ProxyServer(ThreadingHTTPServer):
     daemon_threads = False
 
-    def __init__(self, address, proxy, max_request_bytes, request_timeout=10):
+    def __init__(
+        self,
+        address,
+        proxy,
+        max_request_bytes,
+        request_timeout=10,
+        *,
+        allowed_post_paths=None,
+        expose_health=True,
+    ):
         self.proxy = proxy
         self.max_request_bytes = max_request_bytes
         self.request_timeout = request_timeout
+        self.allowed_post_paths = frozenset(
+            allowed_post_paths or ("/hooks/chat", "/v1/events/github-actions")
+        )
+        self.expose_health = expose_health
+        self.request_slots = threading.BoundedSemaphore(64)
         super().__init__(address, ProxyHandler)
+
+    def process_request(self, request, client_address):
+        self.request_slots.acquire()
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.request_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.request_slots.release()
 
 
 def main():
@@ -1528,12 +2013,31 @@ def main():
         retention_days=int(os.environ.get("CHAT_PROXY_RETENTION_DAYS", "30")),
         max_queue_depth=int(os.environ.get("CHAT_PROXY_MAX_QUEUE_DEPTH", "10000")),
         min_free_bytes=int(os.environ.get("CHAT_PROXY_MIN_FREE_BYTES", str(64 * 1024 * 1024))),
+        github_secrets=(
+            read_secret("GITHUB_ACTIONS_HMAC_SECRET"),
+            read_secret("GITHUB_ACTIONS_HMAC_SECRET_PREVIOUS"),
+        ),
+        github_signature_ttl_seconds=int(
+            os.environ.get("GITHUB_ACTIONS_SIGNATURE_TTL_SECONDS", "300")
+        ),
+        github_required=os.environ.get("GITHUB_ACTIONS_REQUIRED", "false").lower() == "true",
     )
-    server = ProxyServer(
+    max_request_bytes = int(os.environ.get("CHAT_PROXY_MAX_REQUEST_BYTES", "65536"))
+    request_timeout = int(os.environ.get("CHAT_PROXY_REQUEST_TIMEOUT_SECONDS", "10"))
+    internal_server = ProxyServer(
         ("0.0.0.0", int(os.environ.get("PORT", "8080"))),
         proxy,
-        int(os.environ.get("CHAT_PROXY_MAX_REQUEST_BYTES", "65536")),
-        int(os.environ.get("CHAT_PROXY_REQUEST_TIMEOUT_SECONDS", "10")),
+        max_request_bytes,
+        request_timeout,
+        allowed_post_paths=("/hooks/chat",),
+    )
+    external_server = ProxyServer(
+        ("0.0.0.0", int(os.environ.get("EXTERNAL_PORT", "8081"))),
+        proxy,
+        max_request_bytes,
+        request_timeout,
+        allowed_post_paths=("/v1/events/github-actions",),
+        expose_health=False,
     )
 
     def scheduler():
@@ -1553,28 +2057,42 @@ def main():
 
     scheduler_thread = threading.Thread(target=scheduler, name="scheduler", daemon=True)
     delivery_thread = threading.Thread(target=delivery_worker, name="delivery", daemon=True)
+    external_thread = threading.Thread(
+        target=external_server.serve_forever,
+        name="external-listener",
+        daemon=True,
+    )
     scheduler_thread.start()
     delivery_thread.start()
+    external_thread.start()
     proxy.delivery_wake.set()
 
     def stop(_signum, _frame):
         proxy.stopping.set()
         proxy.delivery_wake.set()
-        threading.Thread(target=server.shutdown, daemon=True).start()
+        threading.Thread(target=internal_server.shutdown, daemon=True).start()
+        threading.Thread(target=external_server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    LOG.info("chat proxy listening on port %s", server.server_port)
+    LOG.info(
+        "chat proxy listening on internal port %s and external port %s",
+        internal_server.server_port,
+        external_server.server_port,
+    )
     try:
-        server.serve_forever()
+        internal_server.serve_forever()
     finally:
         proxy.stopping.set()
         proxy.delivery_wake.set()
-        server.server_close()
+        external_server.shutdown()
+        internal_server.server_close()
+        external_server.server_close()
         deadline = time.monotonic() + 20
-        for worker in (scheduler_thread, delivery_thread):
+        workers = (scheduler_thread, delivery_thread, external_thread)
+        for worker in workers:
             worker.join(timeout=max(0, deadline - time.monotonic()))
-        if scheduler_thread.is_alive() or delivery_thread.is_alive():
+        if any(worker.is_alive() for worker in workers):
             LOG.error("workers did not stop before the shutdown deadline; leases will expire normally")
         else:
             try:
