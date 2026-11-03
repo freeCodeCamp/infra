@@ -6,7 +6,7 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   retentionPeriod: 14d
-  retentionMaxDiskSpaceUsageBytes: 60GiB
+  retentionMaxDiskSpaceUsageBytes: 50GiB
   podMetadata:
     labels:
       o11y.freecodecamp.org/component: vlogs
@@ -37,7 +37,7 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   retentionPeriod: 14d
-  retentionMaxDiskSpaceUsageBytes: 60GiB
+  retentionMaxDiskSpaceUsageBytes: 50GiB
   podMetadata:
     labels:
       o11y.freecodecamp.org/component: vlogs

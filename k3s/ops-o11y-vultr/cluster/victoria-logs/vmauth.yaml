@@ -7,20 +7,9 @@ metadata:
 spec:
   replicaCount: 2
   selectAllByDefault: false
-  unauthorizedUserAccessSpec:
-    url_map:
-      - src_paths:
-          - /select/logsql/.*
-        url_prefix:
-          - http://vlsingle-vlogs-a.o11y.svc:9428
-          - http://vlsingle-vlogs-b.o11y.svc:9428
-        load_balancing_policy: first_available
-      - src_paths:
-          - /select/vmui.*
-        url_prefix:
-          - http://vlsingle-vlogs-a.o11y.svc:9428
-          - http://vlsingle-vlogs-b.o11y.svc:9428
-        load_balancing_policy: first_available
+  userSelector:
+    matchLabels:
+      o11y.freecodecamp.org/vmauth: o11y
   podMetadata:
     labels:
       o11y.freecodecamp.org/component: vmauth
@@ -47,3 +36,44 @@ spec:
       memory: 64Mi
     limits:
       memory: 256Mi
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMUser
+metadata:
+  name: logs-reader
+  labels:
+    o11y.freecodecamp.org/vmauth: o11y
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  username: ops
+  passwordRef:
+    name: vmauth-logs-reader
+    key: password
+  max_concurrent_requests: 8
+  targetRefs:
+    - static:
+        urls:
+          - http://vlsingle-vlogs-a.o11y.svc:9428
+          - http://vlsingle-vlogs-b.o11y.svc:9428
+      paths:
+        - /select/logsql/.*
+        - /select/vmui.*
+      load_balancing_policy: first_available
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: vmauth-logs-reader
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: vmauth-logs-reader
+    creationPolicy: Owner
+  data:
+    - secretKey: password
+      remoteRef:
+        key: o11y-vmauth-logs-reader/password
