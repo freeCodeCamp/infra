@@ -1,38 +1,46 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-tailscale--0-install.yml -e variable_host=<group>
 - name: Tailscale - Install
   hosts: '{{ variable_host | default("null") }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   become: true
   gather_facts: true
   vars:
-    apt_keyring_path: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    tailscale_repo_uri: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}"
   tasks:
     - name: Install Tailscale Dependencies
-      apt:
+      ansible.builtin.apt:
         name:
           - gnupg2
           - gnupg-agent
           - apt-transport-https
           - python3-apt
+          - python3-debian
           - jq
         state: present
         cache_valid_time: 3600
 
-    - name: Add Tailscale GPG Key
-      apt_key:
-        url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower
-          }}/{{ ansible_distribution_release | lower }}.noarmor.gpg"
-        keyring: "{{ apt_keyring_path }}"
-        state: present
+    - name: Remove the legacy Tailscale APT source files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/pkgs_tailscale_com_stable_{{ ansible_distribution | lower }}.list
+        - /etc/apt/sources.list.d/tailscale.list
 
     - name: Add Tailscale APT Repository
-      apt_repository:
-        repo: "deb [signed-by={{ apt_keyring_path }}]
-          https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}
-          {{ ansible_distribution_release | lower }} main"
+      ansible.builtin.deb822_repository:
+        name: tailscale
+        types: deb
+        uris: "{{ tailscale_repo_uri }}"
+        suites: "{{ ansible_distribution_release | lower }}"
+        components: main
+        signed_by: "{{ tailscale_repo_uri }}/{{ ansible_distribution_release | lower }}.noarmor.gpg"
         state: present
 
     - name: Install Tailscale
-      apt:
+      ansible.builtin.apt:
         name: tailscale
-        state: latest
+        state: present
         update_cache: true

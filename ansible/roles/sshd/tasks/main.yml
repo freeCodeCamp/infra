@@ -1,0 +1,16 @@
+---
+- name: Refuse an empty AllowUsers list
+  ansible.builtin.assert:
+    that:
+      - sshd_allow_users | length > 0
+    fail_msg: sshd_allow_users must name at least one user, or nobody can log in.
+
+- name: Install the sshd hardening drop-in
+  ansible.builtin.template:
+    src: hardening.conf.j2
+    dest: "{{ sshd_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload ssh

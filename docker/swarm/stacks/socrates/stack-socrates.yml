@@ -1,4 +1,5 @@
 x-deploy-config: &deploy-config
+  stop_grace_period: 100s
   deploy:
     replicas: 3
     placement:
@@ -41,7 +42,6 @@ x-deploy-config: &deploy-config
     # Runtime
     - NODE_ENV=${NODE_ENV:-production}
     - PORT=3001
-    - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     - LOG_LEVEL=${LOG_LEVEL:-info}
     - DEBUG_SOCRATES=${DEBUG_SOCRATES:-false}
     - SERVER_URL=${SERVER_URL:-}
@@ -72,7 +72,7 @@ x-deploy-config: &deploy-config
     - GLOBAL_LIMIT=${GLOBAL_LIMIT:-1000}
     # Observability
     - SENTRY_DSN=${SENTRY_DSN:-}
-    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-${DEPLOYMENT_ENV}}
+    - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:?SENTRY_ENVIRONMENT must be set}
     - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-}
 
 x-port-config: &port-config
@@ -96,7 +96,7 @@ services:
     <<: *deploy-config
 
   svc-redis:
-    image: redis:7.4-alpine
+    image: redis:8.0-alpine
     ports:
       - published: 6379
         target: 6379

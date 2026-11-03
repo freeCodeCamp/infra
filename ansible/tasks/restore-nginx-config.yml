@@ -1,0 +1,36 @@
+---
+- name: Restore the previous config commit
+  ansible.builtin.git:
+    repo: https://github.com/freeCodeCamp/nginx-config.git
+    dest: "{{ nginx_config_dir }}"
+    clone: false
+    update: true
+    force: true
+    version: "{{ git_update.before }}"
+    accept_hostkey: true
+  when: git_update is defined and git_update is changed
+
+- name: Restore the previous upstream blocks
+  ansible.builtin.copy:
+    content: "{{ nginx_upstreams_on_host.content | b64decode }}"
+    dest: "{{ nginx_upstreams_path }}"
+  when: nginx_upstreams_written is defined and nginx_upstreams_written is changed
+
+- name: Check the restored NGINX config
+  ansible.builtin.command:
+    chdir: "{{ nginx_config_dir }}"
+    cmd: nginx -t
+  register: nginx_restored_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Describe the restore
+  ansible.builtin.set_fact:
+    nginx_restore_summary: >-
+      {{ ('The commit on disk is back at ' ~ git_update.before ~ '.')
+         if (git_update is defined and git_update is changed) else 'The pull did not change the commit on disk.' }}
+      {{ 'The upstream blocks are back to their previous content.'
+         if (nginx_upstreams_written is defined and nginx_upstreams_written is changed) else 'The upstream blocks did not change.' }}
+      {{ 'nginx -t passes on the config on disk.'
+         if nginx_restored_check.rc == 0 else 'nginx -t still fails on the config on disk. Fix it before the next reboot.' }}

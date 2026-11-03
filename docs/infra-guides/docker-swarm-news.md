@@ -10,27 +10,26 @@ The News stack provides static site hosting for the freeCodeCamp news and curric
 
 | Service | Purpose |
 | --- | --- |
-| **news** | JAMStack news applications and static content |
+| **svc-chn**, **svc-esp**, **svc-ita**, **svc-jpn**, **svc-kor**, **svc-por**, **svc-ukr** | News sites, one service per language |
+| **svc-eng** | English news. Production only, in `stack-news.prd.yml`. |
 
 ## Deployment
 
-Name stacks per environment (e.g., `prd-news`, `stg-news`):
+Name stacks per environment (`prd-news`, `stg-news`). Deploy from the CLI. Run each block from the repository root. Do not press Update for the stack in Portainer. After a CLI deploy, the copy that Portainer stores is old.
+
+`docker stack deploy` reads variables only from your shell. It does not read a `.env` file. Before a CLI deploy, export every variable that `docker/swarm/stacks/news/.env.sample` lists. An unset variable becomes an empty string, for example in the image name.
+
+Deploy `prd-news` in two batches. The first batch deploys the services in `stack-news.yml`. The second batch deploys `svc-eng` from `stack-news.prd.yml`. A batch changes only the services in its file.
 
 ```bash
-# Set context and deploy
-docker context use <context_name>
-docker stack deploy -c stack-news.yml prd-news
+docker --context <context_name> stack deploy -c docker/swarm/stacks/news/stack-news.yml prd-news
+docker --context <context_name> stack deploy -c docker/swarm/stacks/news/stack-news.prd.yml prd-news
 ```
 
-Then configure environment variables in Portainer UI for the deployed stack.
+Deploy `stg-news` with the first batch only:
 
-## Configuration
+```bash
+docker --context <context_name> stack deploy -c docker/swarm/stacks/news/stack-news.yml stg-news
+```
 
-1. Copy `.env.sample` to `.env`
-2. Set required environment variables in Portainer UI
-3. Redeploy stack to apply changes
-
-## Notes
-
-- Environment-specific naming allows managing multiple news deployments
-- All configuration is managed through Portainer
+Do not add `--prune` to a batch. It removes the services of the other batch.

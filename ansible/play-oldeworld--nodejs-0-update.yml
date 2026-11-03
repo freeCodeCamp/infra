@@ -1,52 +1,84 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--nodejs-0-update.yml -e variable_host=<group>
 - name: Initialize Oldeworld Cluster - Node.js
   hosts: '{{ variable_host | default("null") }}'
   serial: 1
+  max_fail_percentage: 0
   become: true
   become_user: freecodecamp
   gather_facts: false
   vars:
-    nodejs_global_packages: [npm, pnpm, pm2@7]
+    nodejs_global_packages: [pm2@7]
   tasks:
+    - name: Fail on a global package version other than a major or an exact version
+      ansible.builtin.assert:
+        that: item.rsplit('@', 1)[1] is match('^([0-9]+|[0-9]+[.][0-9]+[.][0-9]+)$') if '@' in item[1:] else true
+        fail_msg: "{{ item }}: give no version, a major version or an exact version"
+        quiet: true
+      loop: "{{ nodejs_global_packages + nodejs_extra_global_packages | default([]) }}"
+
+    - name: Check that the app ports listen before any change
+      ansible.builtin.wait_for:
+        port: "{{ item }}"
+        timeout: 5
+      loop: "{{ pm2_app_ports }}"
+
     - name: Install or Update Node.js
-      include_role:
+      ansible.builtin.include_role:
         name: nodejs
       vars:
         nodejs_version: '{{ variable_nodejs_version | default("v24") }}'
 
-    - name: Get the Node.js version
-      shell:
-        cmd: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-          node -v
+    - name: Read the global npm packages
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && npm ls -g --depth=0 --json"
         chdir: /home/freecodecamp
         executable: /bin/bash
-      register: node_version_output
+      register: npm_global_ls
+      changed_when: false
+      failed_when: npm_global_ls.stdout | length == 0
+      check_mode: false
 
-    - name: Set the Node.js version fact
-      set_fact:
-        node_version: '{{ node_version_output.stdout }}'
+    - name: Pick the global packages that are missing or at another version
+      ansible.builtin.set_fact:
+        npm_global_missing: "{{ npm_global_missing | default([]) + [item] }}"
+      loop: "{{ nodejs_global_packages + nodejs_extra_global_packages | default([]) }}"
+      vars:
+        pkg_name: "{{ item.rsplit('@', 1)[0] if '@' in item[1:] else item }}"
+        pkg_want: "{{ item.rsplit('@', 1)[1] if '@' in item[1:] else '' }}"
+        pkg_have: "{{ (((npm_global_ls.stdout | from_json).dependencies | default({})).get(pkg_name) or {}).get('version', '') }}"
+      when: not (pkg_have | length > 0 and (pkg_want == '' or pkg_have == pkg_want or pkg_have.split('.')[0] == pkg_want))
 
     - name: Install Global Dependencies
-      shell:
-        cmd: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-          npm i -g {{ (nodejs_global_packages + nodejs_extra_global_packages | default([])) | join(' ') }}
-          pm2 jlist | grep -q '"name":"pm2-logrotate"' || pm2 install pm2-logrotate
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && npm i -g {{ npm_global_missing | map('quote') | join(' ') }}"
         chdir: /home/freecodecamp
         executable: /bin/bash
+      when: npm_global_missing | default([]) | length > 0
+
+    - name: Read the PM2 modules
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && pm2 jlist"
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      register: pm2_jlist
+      changed_when: false
+
+    - name: Install pm2-logrotate
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && pm2 install pm2-logrotate"
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      when: "'\"name\":\"pm2-logrotate\"' not in pm2_jlist.stdout | default('')"
 
     - name: Refresh PM2
-      include_tasks:
+      ansible.builtin.include_tasks:
         file: tasks/pm2-refresh.yml
 
     - name: Remove Node.js versions other than the default
-      shell:
+      ansible.builtin.shell:
         cmd: |
-          export NVM_DIR="$HOME/.nvm"
-          . "$NVM_DIR/nvm.sh"
+          {{ nvm_preamble }}
           default=$(nvm version default)
           [[ "$default" == v* ]] || exit 1
           for version in $(ls "$NVM_DIR/versions/node"); do

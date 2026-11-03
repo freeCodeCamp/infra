@@ -7,6 +7,8 @@ node_exporter_archive_url:
   }}.linux-amd64.tar.gz"
 
 node_exporter_port: 9100
+node_exporter_bind: tailnet
+node_exporter_start: true
 node_exporter_user: node_exporter
 node_exporter_group: node_exporter
 
@@ -19,6 +21,8 @@ node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
 node_exporter_tailscale_binary: /usr/bin/tailscale
 node_exporter_tailscale_wait_timeout: 60s
 node_exporter_tailnet_cidr: "{{ tailnet_cidr | default('100.64.0.0/10') }}"
+node_exporter_vpc_cidr: ""
+node_exporter_vpc_wait_seconds: 120
 
 node_exporter_enabled_collectors:
   - processes

@@ -19,6 +19,17 @@ The Oncall stack provides automated maintenance and monitoring services includin
 | **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
 | **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
 | **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale      |
+| Service                       | Purpose                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)                |
+| **svc-update**                | Gantry service updater (auto-updates tagged services)            |
+| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)      |
+| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)      |
+| **svc-chat-relay**            | Posts Gantry notices to Google Chat as one standard line         |
+| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours          |
+| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat    |
+| **svc-dispatch-docr-gc**      | Starts the infra `docr--garbage-collection.yml` workflow Wed/Sat |
+| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale         |
 
 ## Architecture
 
@@ -33,6 +44,10 @@ Gantry (cron and webhook) → Chat relay                              ┘
                               │
                               ├→ ✅ JSONL → daily digest at 00:00 UTC
                               └→ ⚠️ / 🔴 / unknown → immediate forward
+Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping, DOCR garbage collection)
+Watchdog → news RSS lastBuildDate → Google Chat when stale
+Gantry (cron and webhook) → Chat relay → Google Chat
+    ↓
 All services → json-file logging (local, rotated)
 ```
 
@@ -72,6 +87,7 @@ Anyone with Docker access on the manager can read these values with `docker serv
 ### Swarm Config Names
 
 Swarm configs are immutable. When you change `run_gantry.sh`, `hooks-relay.json`, a file in `scripts/`, or either file in `proxy/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails.
+Swarm configs are immutable. When you change `run_gantry.sh`, `hooks-relay.json` or a file in `scripts/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails. `hooks_json` has no versioned `name:`, so before you change `hooks.json`, add one to `hooks_json` in `stack-oncall.yml`.
 
 ### Dispatchers
 
@@ -81,6 +97,7 @@ GitHub `schedule` triggers start late or do not start at all (observed since 202
 | --------------------------- | ---------------- | ------------- |
 | `svc-dispatch-news-eng`     | `0 5 */3 * * *`  | `avoid`       |
 | `svc-dispatch-housekeeping` | `0 30 1 * * 3,6` | `require`     |
+| `svc-dispatch-docr-gc`      | `0 30 3 * * 3,6` | `require`     |
 
 The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it once.
 
@@ -88,6 +105,8 @@ The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it
 - `require`: outside the window, the dispatcher refuses and posts to Google Chat.
 
 Every accepted dispatch or intentional maintenance-window skip emits an ok heartbeat. The proxy holds that heartbeat for the daily digest. The dispatcher posts actionable warnings/failures immediately when the API refuses the request, a prior run is bad, or a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
+
+The DOCR garbage collection workflow makes the registry read-only while it runs. It starts only on Wed/Sat 00:00–05:10 UTC. This leaves at least 55 minutes before the 06:05 news deploy. Past runs took 5–26 minutes. It waits up to 60 minutes for DOCR push and cleanup runs in other repos to finish, then skips. It posts each result to Google Chat. To start it outside the window, use `window_check=false`.
 
 ### Freshness Watchdog
 
@@ -162,32 +181,40 @@ All services log to the local Docker `json-file` driver, rotated per node:
 
 - **Rotation**: `max-size=10m`, `max-file=3`, `compress=true`
 - **Scope**: logs stay on the node running the task; inspect with `docker service logs oncall_<svc>`
-- **History**: previously shipped to Loki on the o11y cluster (tenant `fCC-o11y-oncall-v20250113-0001`); o11y decommissioned 2026-07-14
+- **History**: previously shipped to Loki on the old DOKS o11y cluster (tenant `fCC-o11y-oncall-v20250113-0001`), decommissioned 2026-07-14
 
 ## Deployment
 
-```bash
-# Ensure correct ownership and permissions
-sudo chown -R freecodecamp:freecodecamp /home/freecodecamp/.docker
-sudo chmod -R u+w /home/freecodecamp/.docker
+Start Tailscale first. The `backoffice` context is `ssh://freecodecamp@ops-vm-backoffice`, and that name resolves only on the tailnet. On a new machine, create the context once: `docker context create backoffice --docker host=ssh://freecodecamp@ops-vm-backoffice`.
 
-# Set Docker context
-docker context use <context_name>
-
-# Set the stack secrets (logging is local json-file — no logging env needed)
-export WEBHOOK_SECRET="<strong-random-string>"
-export GITHUB_DISPATCH_TOKEN="<bot fine-grained PAT>"
-export GOOGLE_CHAT_WEBHOOK="<google chat webhook url>"
+Run from the repository root. The block decrypts the 3 variables into a subshell and deploys. The secrets are not in your shell after the command. See runbook 04, section 3.
 
 # Deploy stack from the repository root
 docker stack deploy -c docker/swarm/stacks/oncall/stack-oncall.yml oncall
+```bash
+cd docker/swarm/stacks/oncall
+(
+  set -eu
+  secrets=$(sops decrypt --input-type dotenv --output-type dotenv \
+    ../../../../../infra-secrets/docker/oldeworld/oncall.env.enc)
+  while IFS= read -r line; do
+    case $line in '' | '#'*) continue ;; esac
+    export "$line"
+  done <<< "$secrets"
+  docker --context backoffice stack deploy -c stack-oncall.yml oncall
+)
+```
+
+If the manager reports a permission error on `/home/freecodecamp/.docker`, run this on the manager (`ssh freecodecamp@ops-vm-backoffice`):
+
+```bash
+sudo chown -R freecodecamp:freecodecamp /home/freecodecamp/.docker
+sudo chmod -R u+w /home/freecodecamp/.docker
 ```
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
 
 **Portainer:** Portainer lists this stack, but its stored copy is old and has no config files. Deploy only with `docker stack deploy` from this directory. Do not press Update for this stack in Portainer, because that replaces the live stack with the old copy.
-
-**Cutover order:** Merge the infra changes first, then deploy this stack from `main`. Then, on the same day, merge the news changes that remove the news `schedule` triggers. Do not do the cutover on Wed/Sat before 06:00 UTC. The infra merge removes the housekeeping `schedule`, so deploy this stack before the next Wed/Sat 01:30 UTC. Until the news merge, a news deploy can run twice. This is harmless.
 
 ## GHA Integration
 
@@ -195,7 +222,7 @@ Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephem
 
 ```yaml
 - name: Setup and connect to Tailscale network
-  uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4
+  uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
   with:
     oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
     oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -233,14 +260,18 @@ Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephem
 
 ## Testing Webhook
 
-Run from the manager node (`ssh freecodecamp@ops-vm-backoffice`):
+Run from the manager node (`ssh freecodecamp@ops-vm-backoffice`). `read -rs` takes the secret without echo, so it stays out of the shell history. The secret goes to `curl` as a header file, not as an argument, and it is not in the shell after the block:
 
 ```bash
 # Trigger update for a specific service
-curl -X POST http://localhost:9889/hooks/run-gantry \
-  -H "Content-Type: application/json" \
-  -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
-  -d '{"GANTRY_SERVICES_FILTERS":"name=<stack>_<service>"}'
+(
+  printf 'Webhook secret: '
+  read -rs WEBHOOK_SECRET; echo
+  curl -X POST http://localhost:9889/hooks/run-gantry \
+    -H "Content-Type: application/json" \
+    -H @<(printf 'X-Webhook-Secret: %s\n' "$WEBHOOK_SECRET") \
+    -d '{"GANTRY_SERVICES_FILTERS":"name=<stack>_<service>"}'
+)
 
 # Invalid request (no secret — should return "Hook rules were not satisfied")
 curl -X POST http://localhost:9889/hooks/run-gantry \
@@ -265,6 +296,7 @@ docker service logs --since 2h oncall_svc-chat-relay
 docker service logs --since 2h oncall_svc-chat-proxy
 docker service logs --since 3h oncall_svc-dispatch-news-eng
 docker service logs --since 96h oncall_svc-dispatch-housekeeping
+docker service logs --since 96h oncall_svc-dispatch-docr-gc
 docker service logs --since 2h oncall_svc-watchdog-news
 docker service logs --since 168h oncall_svc-cleanup
 ```

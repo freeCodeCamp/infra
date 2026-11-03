@@ -108,9 +108,6 @@ resource "linode_firewall" "stg_oldeworld_firewall" {
     # All Client nodes.
     [for i in linode_instance.stg_oldeworld_clt : i.id],
 
-    # All News Nodes.
-    [for i in linode_instance.stg_oldeworld_nws : i.id],
-
     # All JMS Nodes.
     [for i in linode_instance.stg_oldeworld_jms : i.id],
   ])

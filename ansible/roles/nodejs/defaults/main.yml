@@ -1,1 +1,3 @@
-nodejs_version: 'latest'
+---
+nodejs_version: "latest"
+nodejs_nvm_version: v0.40.8

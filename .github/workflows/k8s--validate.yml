@@ -19,12 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Install just
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-          just --version
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install kubeconform
         run: |
@@ -32,4 +27,18 @@ jobs:
           kubeconform -v
 
       - name: Validate K8s manifests
-        run: just verify-manifests 1.32.0
+        run: |
+          kubeconform \
+            -summary \
+            -output text \
+            -strict \
+            -ignore-missing-schemas \
+            -kubernetes-version 1.32.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-filename-pattern 'kustomization\.yaml' \
+            -ignore-filename-pattern 'kustomizeconfig\.yaml' \
+            -ignore-filename-pattern '\.kubeconfig\.yaml' \
+            -ignore-filename-pattern 'values([.-][^/]+)?\.yaml' \
+            -ignore-filename-pattern '\.sample' \
+            k3s/

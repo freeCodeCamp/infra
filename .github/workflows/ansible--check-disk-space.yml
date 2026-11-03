@@ -19,6 +19,11 @@ on:
         description: "Percent of inodes used that counts as a finding"
         type: number
         default: 80
+      provider:
+        description: "The inventory to use: linode or vultr"
+        type: string
+        required: false
+        default: "linode"
     secrets:
       SSH_PRIVATE_KEY:
         description: "The SSH private key for the Ansible user"
@@ -26,6 +31,9 @@ on:
       LINODE_TOKEN:
         description: "The Linode API token"
         required: true
+      VULTR_API_KEY:
+        description: "The Vultr API key"
+        required: false
   workflow_dispatch:
     inputs:
       hosts:
@@ -52,6 +60,14 @@ on:
         type: number
         required: true
         default: 80
+      provider:
+        description: "The inventory to use: linode or vultr"
+        type: choice
+        required: true
+        default: "linode"
+        options:
+          - "linode"
+          - "vultr"
 
 defaults:
   run:
@@ -64,41 +80,16 @@ jobs:
     permissions: {}
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Setup UV
-        run: |
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          fi
-
-          if ! command -v uv >/dev/null 2>&1; then
-            echo "ERROR: uv installation failed"
-            exit 1
-          fi
-
-          echo "uv version: $(uv --version)"
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          uv sync
-
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-
-          ansible --version
-
-      - name: Configure SSH Private Key
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Play -- Check Disk Space
         env:
@@ -106,9 +97,24 @@ jobs:
           THRESHOLD: ${{ inputs.threshold }}
           INODE_THRESHOLD: ${{ inputs.inode_threshold }}
           VERBOSITY: ${{ inputs.verbosity }}
+          PROVIDER: ${{ inputs.provider }}
         run: |
           source .venv/bin/activate
-          ansible-playbook -i inventory/linode.yml \
+          case "$HOSTS" in
+            '' | *[!A-Za-z0-9_,.:*!\&-]*)
+              echo "::error::invalid host pattern -- letters, digits and _ , . : * ! & - only"
+              exit 1
+              ;;
+          esac
+          case "$PROVIDER" in
+            linode) inventory=(-i inventory/linode.yml) ;;
+            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            *)
+              echo "::error::provider must be linode or vultr"
+              exit 1
+              ;;
+          esac
+          ansible-playbook "${inventory[@]}" \
           play-any--check-disk-space.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e variable_host="$HOSTS" \

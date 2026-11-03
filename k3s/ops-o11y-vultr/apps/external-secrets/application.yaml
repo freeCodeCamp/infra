@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.external-secrets.io
+      chart: external-secrets
+      targetRevision: "2.13.0"
+      helm:
+        releaseName: external-secrets
+        valueFiles:
+          - $values/k3s/ops-o11y-vultr/apps/external-secrets/charts/external-secrets/values.yaml
+    - repoURL: https://github.com/freeCodeCamp/infra.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/freeCodeCamp/infra.git
+      targetRevision: main
+      path: k3s/ops-o11y-vultr/cluster/external-secrets
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

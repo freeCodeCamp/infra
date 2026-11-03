@@ -20,6 +20,8 @@
 # is serving traffic right now.
 - name: Harden the NGINX systemd unit
   hosts: "{{ variable_host | default('null') }}"
+  serial: 1
+  max_fail_percentage: 0
   become: true
   become_user: root
   gather_facts: false

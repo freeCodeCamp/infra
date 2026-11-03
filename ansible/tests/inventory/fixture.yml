@@ -1,0 +1,53 @@
+---
+provider_vultr:
+  hosts:
+    tst-vm-pxy-1:
+      vultr_label: tst-vm-pxy-1
+      vultr_tags: [tst, pxy]
+    tst-vm-mgr-1:
+      vultr_label: tst-vm-mgr-1
+      vultr_tags: [tst, mgr]
+    tst-vm-wkr-1:
+      vultr_label: tst-vm-wkr-1
+      vultr_tags: [tst, wkr]
+    stg-vm-api-1:
+      vultr_label: stg-vm-api-1
+    prd-vm-pxy-2:
+      vultr_label: prd-vm-pxy-2
+    prd-vm-soc-1:
+      vultr_label: prd-vm-soc-1
+    prd-vm-nws-1:
+      vultr_label: prd-vm-nws-1
+    prd-vm-clt-eng-0:
+      vultr_label: prd-vm-clt-eng-0
+    ops-vm-swarm-mgr-1:
+      vultr_label: ops-vm-swarm-mgr-1
+    ops-vm-o11y-1:
+      vultr_label: ops-vm-o11y-1
+
+provider_linode:
+  hosts:
+    prd-vm-oldeworld-pxy-1:
+      tags: [prd, oldeworld, prd_oldeworld_pxy]
+    stg-vm-oldeworld-api-1:
+      tags: [stg, oldeworld, stg_oldeworld_api, new_api]
+    prd-vm-oldeworld-clt-eng-0:
+      tags: [prd, oldeworld, prd_oldeworld_clt, clt, eng]
+    ops-vm-backoffice:
+      tags: [ops, ops_backoffice]
+
+prd_oldeworld_pxy:
+  hosts:
+    prd-vm-oldeworld-pxy-1:
+stg_oldeworld_api:
+  hosts:
+    stg-vm-oldeworld-api-1:
+prd_oldeworld_clt:
+  hosts:
+    prd-vm-oldeworld-clt-eng-0:
+prd_oldeworld_clt_eng:
+  hosts:
+    prd-vm-oldeworld-clt-eng-0:
+ops_backoffice:
+  hosts:
+    ops-vm-backoffice:

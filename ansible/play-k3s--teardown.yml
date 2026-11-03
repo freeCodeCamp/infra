@@ -3,36 +3,64 @@
 # Preserves: Tailscale, cloud-init hardening, DO infrastructure, CIS sysctls.
 #
 # Usage:
-#   just bootstrap k3s--teardown <inventory_group>
+#   ansible-playbook -i inventory/digitalocean.yml play-k3s--teardown.yml \
+#     -e variable_host=<group> -e confirm_teardown=<group>
 
-- name: "K3s {{ variable_host }} - Build groups"
-  hosts: "{{ variable_host }}"
+- name: "K3s teardown Confirm"
+  hosts: "{{ variable_host | default('null') }}"
   gather_facts: false
+  any_errors_fatal: true
   tasks:
-    - name: Build dynamic groups
-      group_by:
-        key: "{{ item }}"
-      loop: [k3s_cluster, server]
+    - name: Require typed confirmation of the target group
+      ansible.builtin.assert:
+        that:
+          - confirm_teardown | default('') == variable_host
+        fail_msg: "This resets every host in {{ variable_host }}. Pass -e confirm_teardown={{ variable_host }} to continue."
 
-- name: "K3s {{ variable_host }} - Reset"
-  hosts: k3s_cluster
+- name: "K3s teardown Snapshot"
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Check for an embedded etcd datastore
+      ansible.builtin.stat:
+        path: /var/lib/rancher/k3s/server/db/etcd
+      register: k3s_etcd
+      run_once: true
+
+    - name: Fail without an etcd datastore to snapshot
+      ansible.builtin.assert:
+        that:
+          - k3s_etcd.stat.exists or skip_snapshot | default(false) | bool
+        fail_msg: "{{ inventory_hostname }} has no embedded etcd. Pass -e skip_snapshot=true to reset without a snapshot."
+        quiet: true
+      run_once: true
+
+    - name: Save an etcd snapshot outside the k3s data directory
+      ansible.builtin.command:
+        cmd: k3s etcd-snapshot save --name pre-teardown --etcd-snapshot-dir /var/backups/k3s
+      changed_when: true
+      run_once: true
+      when: not skip_snapshot | default(false) | bool
+
+- name: "K3s teardown Reset"
+  hosts: "{{ variable_host | default('null') }}"
   gather_facts: true
   become: true
   tasks:
     - name: Run k3s uninstall (server)
-      when: "'server' in group_names"
-      command:
+      ansible.builtin.command:
         cmd: k3s-uninstall.sh
-        removes: /var/lib/rancher/k3s/*
+        removes: /usr/local/bin/k3s-uninstall.sh
 
     - name: Run k3s uninstall (agent)
-      when: "'agent' in group_names"
-      command:
+      ansible.builtin.command:
         cmd: k3s-agent-uninstall.sh
-        removes: /var/lib/rancher/k3s/*
+        removes: /usr/local/bin/k3s-agent-uninstall.sh
 
     - name: Clean up remaining files
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
@@ -45,24 +73,26 @@
         - /var/log/k3s
 
     - name: Clean up Cilium BPF state
-      command:
-        cmd: rm -rf /sys/fs/bpf/cilium
-        removes: /sys/fs/bpf/cilium
+      ansible.builtin.file:
+        path: /sys/fs/bpf/cilium
+        state: absent
 
     - name: Flush Cilium iptables chains
-      shell: |
-        iptables-save | grep -iv cilium | iptables-restore
-        ip6tables-save | grep -iv cilium | ip6tables-restore
+      ansible.builtin.shell: |
+        set -euo pipefail
+        { iptables-save | grep -iv cilium || true; } | iptables-restore
+        { ip6tables-save | grep -iv cilium || true; } | ip6tables-restore
+      args:
+        executable: /bin/bash
       changed_when: true
-      ignore_errors: true
 
-- name: "K3s {{ variable_host }} - Clean local kubeconfig"
-  hosts: server[0]
+- name: "K3s teardown Clean local kubeconfig"
+  hosts: "{{ variable_host | default('null') }}[0]"
   gather_facts: false
   become: false
   tasks:
     - name: Remove local kubeconfig
-      file:
+      ansible.builtin.file:
         path: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
         state: absent
       delegate_to: localhost

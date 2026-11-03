@@ -1,71 +1,110 @@
 ---
+# Usage:
+#   ansible-playbook -i inventory/linode.yml play-any--git-patch.yml \
+#     -e variable_host=<group> -e variable_patch_file=<name> -e variable_repo_dir=<path> \
+#     [-e variable_followup_script=<name> [-e variable_followup_force=true]]
 - name: Apply a patch to a Git Repository
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: false
+  become: true
   serial: 1
+  max_fail_percentage: 0
+  vars:
+    patch_src: "{{ playbook_dir }}/files/patches/{{ variable_patch_file | default('') }}"
+    repo_dir: "{{ variable_repo_dir | default('') if variable_repo_dir | default('') is abs else '/home/freecodecamp/' ~ variable_repo_dir | default('') }}"
+    followup_src: "{{ playbook_dir }}/files/scripts/{{ variable_followup_script | default('') }}"
+    followup_dest: "{{ repo_dir }}/.git/followup-{{ variable_followup_script | default('') }}"
+    git_apply: git apply --ignore-space-change --ignore-whitespace
   tasks:
-    - name: Pause for 5 seconds
-      pause:
-        seconds: 5
+    - name: Fail without a patch file or a repository
+      ansible.builtin.assert:
+        that:
+          - variable_patch_file | default('') | length > 0
+          - patch_src is file
+          - variable_repo_dir | default('') | length > 0
+          - variable_followup_script is not defined or followup_src is file
+        fail_msg: >-
+          Put the patch in ansible/files/patches/ and any follow-up script in ansible/files/scripts/.
+          Pass -e variable_patch_file=<name> -e variable_repo_dir=<path>; a relative path is under /home/freecodecamp.
+        quiet: true
 
-    - name: Copy the patch file to the server
-      copy:
-        src: '{{ playbook_dir }}/files/patches/{{ variable_patch_file }}'
-        dest: '/home/freecodecamp/{{ variable_patch_file }}'
-        owner: freecodecamp
-        group: freecodecamp
-        mode: 0644
+    - name: Read the repository
+      ansible.builtin.stat:
+        path: "{{ repo_dir }}/.git"
+      register: repo_git
+
+    - name: Fail when the target is not a Git repository
+      ansible.builtin.assert:
+        that: repo_git.stat.isdir | default(false)
+        fail_msg: "{{ repo_dir }} is not a Git repository on {{ inventory_hostname }}."
+        quiet: true
+
+    - name: Check whether the patch is already applied
+      ansible.builtin.command:
+        cmd: "{{ git_apply }} --reverse --check -"
+        chdir: "{{ repo_dir }}"
+        stdin: "{{ lookup('ansible.builtin.file', patch_src, rstrip=false) }}"
+        stdin_add_newline: false
+      become: true
+      become_user: "{{ repo_git.stat.pw_name }}"
+      register: patch_applied
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Check that the patch applies
+      ansible.builtin.command:
+        cmd: "{{ git_apply }} --check -"
+        chdir: "{{ repo_dir }}"
+        stdin: "{{ lookup('ansible.builtin.file', patch_src, rstrip=false) }}"
+        stdin_add_newline: false
+      become: true
+      become_user: "{{ repo_git.stat.pw_name }}"
+      changed_when: false
+      check_mode: false
+      when: patch_applied.rc != 0
 
     - name: Apply the patch
-      shell: |
-        git apply --ignore-space-change --ignore-whitespace /home/freecodecamp/{{ variable_patch_file }}
-      args:
-        chdir: '/home/freecodecamp/{{ variable_repo_dir }}'
-      register: patch_result
+      ansible.builtin.command:
+        cmd: "{{ git_apply }} -"
+        chdir: "{{ repo_dir }}"
+        stdin: "{{ lookup('ansible.builtin.file', patch_src, rstrip=false) }}"
+        stdin_add_newline: false
+      become: true
+      become_user: "{{ repo_git.stat.pw_name }}"
+      when: patch_applied.rc != 0
 
-    - name: Check if the patch was applied
-      debug:
-        msg: 'Patch was applied'
-      when: patch_result.stdout.find('error') == -1
-      failed_when: patch_result.stdout.find('error') != -1
-
-    - name: Check the status of the repository
-      shell: |
-        git status
-        git diff
-      args:
-        chdir: '/home/freecodecamp/{{ variable_repo_dir }}'
+    - name: Read the changed files
+      ansible.builtin.command:
+        cmd: git diff --stat
+        chdir: "{{ repo_dir }}"
+      become: true
+      become_user: "{{ repo_git.stat.pw_name }}"
       register: status_result
+      changed_when: false
+      check_mode: false
 
-    - name: Show the status of the repository
-      debug:
-        msg: '{{ status_result.stdout }}'
-      when: status_result.stdout.find('error') == -1
-      failed_when: status_result.stdout.find('error') != -1
+    - name: Show the changed files
+      ansible.builtin.debug:
+        var: status_result.stdout_lines
 
     - name: Copy any follow up scripts
-      copy:
-        src: '{{ playbook_dir }}/files/scripts/{{ variable_followup_script }}'
-        dest: '/home/freecodecamp/{{ variable_followup_script }}'
-        owner: freecodecamp
-        group: freecodecamp
-        mode: 0755
+      ansible.builtin.copy:
+        src: "{{ followup_src }}"
+        dest: "{{ followup_dest }}"
+        owner: "{{ repo_git.stat.pw_name }}"
+        group: "{{ repo_git.stat.gr_name }}"
+        mode: "0700"
+      when: variable_followup_script is defined and (patch_applied.rc != 0 or variable_followup_force | default(false) | bool)
 
-    # WARNING:
-    # This is a hack to get around the fact that the variable
-    # variable_source_envs is not being expanded in the shell
-    # task below.
-    #
-    # Use the following syntax when setting variables
-    # that have spaces in them:
-    #
-    # ansible-playbook playbool.yml -e 'variable_source_envs="export MY_VAR=myvalue"'
-    #
     - name: Run any follow up scripts
-      shell:
+      ansible.builtin.shell:
         cmd: |
           {{ variable_source_envs | default("echo no-additional vars set") }}
-          /home/freecodecamp/{{ variable_followup_script }}
+          {{ followup_dest | quote }}
         executable: /bin/bash
-        chdir: '/home/freecodecamp/{{ variable_repo_dir }}'
+        chdir: "{{ repo_dir }}"
+      become: true
+      become_user: "{{ repo_git.stat.pw_name }}"
       register: followup_result
+      when: variable_followup_script is defined and (patch_applied.rc != 0 or variable_followup_force | default(false) | bool)

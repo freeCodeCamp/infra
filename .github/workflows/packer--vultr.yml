@@ -1,0 +1,48 @@
+name: Packer -- Vultr
+
+on: workflow_dispatch
+
+permissions: {}
+
+jobs:
+  build-ubuntu-image:
+    name: Build Ubuntu Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+
+      - name: Use latest Packer
+        uses: hashicorp-contrib/setup-packer@f3a1552a94a787a7bbc433141a8f62336f72a61d # v4
+
+      - name: Check Version
+        run: |
+          echo "Packer version: $(packer version)"
+
+      - name: Check formating
+        run: |
+          packer fmt -check -recursive -diff \
+          ./packer/vultr
+
+      - name: Build Ubuntu Image
+        id: build-ubuntu-image
+        env:
+          VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+          VULTR_ROOT_PASSWORD: ${{ secrets.VULTR_ROOT_PASSWORD }}
+        run: |
+          source ansible/.venv/bin/activate
+
+          packer init \
+          ./packer/vultr
+
+          packer validate \
+          ./packer/vultr
+
+          packer build \
+          ./packer/vultr

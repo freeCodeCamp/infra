@@ -1,0 +1,18 @@
+---
+fluent_bit_version: "5.1.5"
+fluent_bit_binary: /opt/fluent-bit/bin/fluent-bit
+fluent_bit_config: /etc/fluent-bit/fluent-bit.yaml
+fluent_bit_state_dir: /var/lib/fluent-bit
+
+fluent_bit_vlagent_host: ""
+fluent_bit_vlagent_port: 30429
+fluent_bit_http_port: 2020
+fluent_bit_ip_allow: [localhost]
+
+fluent_bit_env: "{{ inventory_hostname.split('-') | first }}"
+fluent_bit_role: "{{ inventory_hostname | regex_replace('^[a-z0-9]+-vm-', '') | regex_replace('-[0-9]+$', '') }}"
+
+fluent_bit_limit_journal: 1G
+fluent_bit_limit_nginx_access: 4G
+fluent_bit_limit_nginx_error: 256M
+fluent_bit_limit_docker: 1G

@@ -1,34 +1,27 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-tailscale--9-down.yml -e variable_host=<group>
 - name: Tailscale - Disconnect from Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   become: true
-  gather_facts: true
+  gather_facts: false
   tasks:
     - name: Run Tailscale Down
-      shell:
-        cmd: |
-          tailscale down
-        executable: /bin/bash
-      no_log: true
+      ansible.builtin.command: tailscale down
       changed_when: true
-      ignore_errors: true
 
-    - name: Check if Tailscale is Connected
-      shell:
-        cmd: |
-          tailscale status --json | jq -r '.Self.Online'
-        executable: /bin/bash
+    - name: Read the Tailscale status
+      ansible.builtin.command: tailscale status --json
+      changed_when: false
+      failed_when: false
+      check_mode: false
       register: tailscale_status
 
-    - name: Check DNS name
-      shell:
-        cmd: |
-          tailscale status --json | jq -r '.Self.DNSName'
-        executable: /bin/bash
-      register: tailscale_dns
-
-    - name: Print Tailscale Status
-      debug:
-        msg: |
-          Tailscale Status: {{ tailscale_status.stdout }}
-          Tailscale DNS: {{ tailscale_dns.stdout }}
+    - name: Fail if the node is still online
+      ansible.builtin.assert:
+        that:
+          - not (((tailscale_status.stdout | default('{}', true) | from_json).Self | default({}, true)).Online | default(false))
+        fail_msg: "{{ inventory_hostname }} is still online on the tailnet."
+        success_msg: "{{ inventory_hostname }} is off the tailnet."
+      when: not ansible_check_mode

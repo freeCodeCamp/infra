@@ -9,11 +9,11 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Packer's official GitHub Actions are unstable & outdated, use a community action instead
       - name: Use latest Packer
-        uses: hashicorp-contrib/setup-packer@d4bd7090802b47529b78f00edf428d0523bc4482 # v3
+        uses: hashicorp-contrib/setup-packer@f3a1552a94a787a7bbc433141a8f62336f72a61d # v4
 
       - name: Check Version
         run: |

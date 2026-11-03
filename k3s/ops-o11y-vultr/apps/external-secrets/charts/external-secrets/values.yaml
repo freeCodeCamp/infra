@@ -1,0 +1,9 @@
+installCRDs: true
+replicaCount: 2
+leaderElect: true
+
+webhook:
+  replicaCount: 2
+
+certController:
+  replicaCount: 2

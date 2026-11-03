@@ -3,6 +3,7 @@
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
   become: true
+  any_errors_fatal: true
   vars:
     first_host: "{{ k3s_init_host }}"
 
@@ -15,36 +16,62 @@
           - server_config_yaml is defined and server_config_yaml | length > 0
         fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
-    - name: Validate the first host of the group
+    - name: Validate the init host is in the group
       ansible.builtin.assert:
         that:
-          - groups[variable_host][0] == first_host
+          - first_host in groups[variable_host]
           - first_host in ansible_play_hosts
         fail_msg: >-
-          k3s_init_host={{ first_host }} holds the datastore; it must be the first host
-          of {{ variable_host }} (inventory gives {{ groups[variable_host][0] }}) and in --limit.
+          k3s_init_host={{ first_host }} holds the datastore; it must be a host
+          of {{ variable_host }} and in --limit.
+
+    - name: Put the init host first in the role's server group (the inventory order is not stable)
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: "k3s_servers_{{ variable_host }}"
+      loop: "{{ [first_host] + (groups[variable_host] | difference([first_host]) | sort) }}"
+      run_once: true
+      changed_when: false
 
     - name: Validate Tailscale connected
       ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
-    - name: Validate the VPC interface
+    - name: Read the VPC address by the VPC CIDR
+      ansible.builtin.command: ip -o -4 addr show to {{ k3s_vpc_cidr }}
+      register: k3s_vpc_addr
+      changed_when: false
+      check_mode: false
+      when: k3s_vpc_cidr is defined
+
+    - name: Validate one VPC address in the VPC CIDR
+      ansible.builtin.assert:
+        that:
+          - k3s_vpc_addr.stdout_lines | length == 1
+        fail_msg: "{{ inventory_hostname }}: {{ k3s_vpc_addr.stdout_lines }}"
+      when: k3s_vpc_cidr is defined
+
+    - name: Validate the VPC interface eth1
       ansible.builtin.assert:
         that:
           - ansible_eth1 is defined
           - ansible_eth1.ipv4.address | regex_search('^10\\.')
         fail_msg: "eth1 carries no 10.x VPC address on {{ inventory_hostname }}."
+      when: k3s_vpc_cidr is not defined
 
     - name: Set network facts
       ansible.builtin.set_fact:
         tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
-        vpc_ip: "{{ ansible_eth1.ipv4.address }}"
+        vpc_iface: "{{ k3s_vpc_addr.stdout.split()[1] if k3s_vpc_cidr is defined else 'eth1' }}"
+        vpc_ip: >-
+          {{ k3s_vpc_addr.stdout.split()[3].split('/') | first if k3s_vpc_cidr is defined
+          else ansible_eth1.ipv4.address }}
 
     - name: Read the live K3s version from the first host
       ansible.builtin.command: k3s --version
       register: k3s_live_version
       changed_when: false
       failed_when: false
-      delegate_to: "{{ groups[variable_host][0] }}"
+      delegate_to: "{{ first_host }}"
       run_once: true
 
     - name: Pin the play to the live version
@@ -55,7 +82,7 @@
     - name: Validate a version is known
       ansible.builtin.assert:
         that: k3s_version is defined and k3s_version | length > 0
-        fail_msg: "No live K3s on {{ groups[variable_host][0] }} and no k3s_version in group_vars."
+        fail_msg: "No live K3s on {{ first_host }} and no k3s_version in group_vars."
 
 - name: K3s servers - Deploy
   hosts: '{{ variable_host | default("null") }}'
@@ -67,12 +94,47 @@
     extra_server_args: >-
       --node-ip={{ vpc_ip }}
       --advertise-address={{ vpc_ip }}
-      --flannel-iface=eth1
+      --flannel-iface={{ vpc_iface }}
       --tls-san={{ inventory_hostname }}
       --tls-san={{ tailscale_ip }}
-    server_group: "{{ variable_host }}"
+    server_group: "k3s_servers_{{ variable_host }}"
     user_kubectl: false
     kubeconfig: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
+  pre_tasks:
+    - name: Read the etcd S3 settings from 1Password once
+      ansible.builtin.set_fact:
+        k3s_etcd_s3_resolved: "{{ k3s_etcd_s3_config }}"
+      run_once: true
+      no_log: true
+      when: k3s_etcd_s3_config is defined
+
+    - name: Validate the etcd S3 settings are not empty
+      ansible.builtin.assert:
+        that:
+          - k3s_etcd_s3_resolved['etcd-s3-endpoint'] | length > 0
+          - k3s_etcd_s3_resolved['etcd-s3-access-key'] | length > 0
+          - k3s_etcd_s3_resolved['etcd-s3-secret-key'] | length > 0
+        fail_msg: "An etcd S3 field read from 1Password is empty; check the item field labels."
+      no_log: true
+      when: k3s_etcd_s3_config is defined
+
+    - name: Create the K3s config drop-in directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s/config.yaml.d
+        state: directory
+        mode: "0755"
+      when: k3s_etcd_s3_config is defined
+
+    # security: the role writes config.yaml as 0644; the R2 key stays in this 0600 file.
+    - name: Write the etcd S3 snapshot drop-in
+      ansible.builtin.copy:
+        content: "{{ k3s_etcd_s3_resolved | to_nice_yaml }}"
+        dest: /etc/rancher/k3s/config.yaml.d/etcd-s3.yaml
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: k3s_etcd_s3_config is defined
   roles:
     - role: k3s.orchestration.prereq
     - role: k3s.orchestration.k3s_server
@@ -86,14 +148,6 @@
     first_host: "{{ k3s_init_host }}"
 
   tasks:
-    - name: Install the Gateway API CRDs
-      ansible.builtin.command: >
-        k3s kubectl apply -f
-        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
-      register: gateway_result
-      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
-      when: inventory_hostname == first_host
-
     - name: Apply the Traefik HelmChartConfig
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
@@ -114,6 +168,15 @@
       ansible.builtin.command: k3s etcd-snapshot save --name "play-{{ ansible_play_hosts | length }}-servers"
       changed_when: true
       when: inventory_hostname == first_host
+
+    - name: Validate the snapshot reached the S3 bucket
+      ansible.builtin.command: k3s etcd-snapshot ls
+      register: snapshot_ls
+      changed_when: false
+      failed_when: >-
+        snapshot_ls.rc != 0 or
+        ('s3://' ~ k3s_etcd_s3_resolved['etcd-s3-bucket'] ~ '/') not in snapshot_ls.stdout
+      when: inventory_hostname == first_host and k3s_etcd_s3_resolved is defined
 
     - name: Fetch the kubeconfig
       ansible.builtin.include_tasks: tasks/fetch-kubeconfig.yml

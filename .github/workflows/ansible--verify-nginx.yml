@@ -6,9 +6,6 @@ name: Ansible --07- Verify NGINX
 # It MUTATES -- a host where NGINX is down gets one restart attempt -- and it
 # reports the host as an anomaly either way, including when the restart
 # worked. A night that healed itself is something to see, not to hide.
-#
-# It is deliberately terminal in the housekeeping chain. Nothing runs after
-# it, so failing here can never stop the fleet being patched.
 
 on:
   workflow_call:
@@ -27,6 +24,15 @@ on:
         description: 'Port the listener probe checks; 0 skips the probe'
         type: number
         default: 80
+      artifact_prefix:
+        description: 'Name prefix of the findings artifact; the housekeeping report reads nginx-verify-*'
+        type: string
+        default: nginx-verify
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: string
+        required: false
+        default: 'linode'
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
@@ -39,6 +45,11 @@ on:
         required: false
       DEVOPS_ALERTS_GITHUB_HMAC:
         description: 'GitHub-only HMAC credential for the DevOps Alerts proxy'
+      VULTR_API_KEY:
+        description: 'The Vultr API key'
+        required: false
+      GOOGLE_CHAT_WEBHOOK:
+        description: 'Google Chat webhook URL; alerts are skipped when unset'
         required: false
   workflow_dispatch:
     inputs:
@@ -61,6 +72,14 @@ on:
         type: number
         required: false
         default: 80
+      provider:
+        description: 'The inventory to use: linode or vultr'
+        type: choice
+        required: true
+        default: 'linode'
+        options:
+          - 'linode'
+          - 'vultr'
 
 # The job only needs to read the repo. It holds the SSH key and the Linode
 # token, so GITHUB_TOKEN gets no write scope it cannot use.
@@ -77,32 +96,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       REPORT: ${{ github.workspace }}/nginx-verify.json
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Setup UV
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-
-      - name: Setup Ansible and Dependencies
-        run: |
-          uv sync
-          source .venv/bin/activate
-          ansible-galaxy install -r requirements.yml
-          ansible --version
-
-      - name: Configure SSH Private Key
-        shell: bash
-        env:
-          # Via env, not inline: printf keeps a key with backslashes intact,
-          # and the secret never becomes shell text.
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh/
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_for_ansible.pem
-          chmod 600 ~/.ssh/id_for_ansible.pem
+      - name: Setup Ansible
+        uses: ./.github/actions/setup-ansible
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Play -- Verify NGINX
         id: play
@@ -116,6 +120,7 @@ jobs:
           HOSTS: ${{ inputs.hosts }}
           VERBOSITY: ${{ inputs.verbosity }}
           NGINX_PORT: ${{ inputs.nginx_port }}
+          PROVIDER: ${{ inputs.provider }}
         run: |
           source .venv/bin/activate
 
@@ -144,9 +149,18 @@ jobs:
             extra_args+=("$VERBOSITY")
           fi
 
+          case "$PROVIDER" in
+            linode) inventory=(-i inventory/linode.yml) ;;
+            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            *)
+              echo "::error::provider must be linode or vultr"
+              exit 1
+              ;;
+          esac
+
           # tee, so the annotate step below can tell "no hosts matched" (normal)
           # from "the play died before reaching them" (not normal).
-          ansible-playbook -i inventory/linode.yml \
+          ansible-playbook "${inventory[@]}" \
           play-any--verify-nginx.yml \
           --private-key=~/.ssh/id_for_ansible.pem \
           -e variable_host="$HOSTS" \
@@ -233,8 +247,8 @@ jobs:
       # overwrite each other. The end-of-run report reads these instead.
       - name: Upload the findings
         if: always() && hashFiles('nginx-verify.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nginx-verify-${{ inputs.hosts }}
+          name: ${{ inputs.artifact_prefix || 'nginx-verify' }}-${{ inputs.hosts }}
           path: nginx-verify.json
           retention-days: 7

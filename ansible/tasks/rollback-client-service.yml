@@ -1,11 +1,24 @@
 ---
 - name: "Update release ID in client-start-{{ service_type }}.sh"
   ansible.builtin.replace:
-    path: "/home/freecodecamp/client/client-start-{{ service_type }}.sh"
-    regexp: 'prd-release-\d{8}-\d+'
-    replace: "{{ client_binaries_id }}"
-    backup: yes
-  when: not dry_run | bool
+    path: "{{ client_root }}/client-start-{{ service_type }}.sh"
+    regexp: "(releases/)[^\\s]+"
+    replace: "\\g<1>{{ client_binaries_id }}"
+  when: not dry_run
+
+- name: "Read the updated start script of client-{{ service_type }}"
+  ansible.builtin.slurp:
+    src: "{{ client_root }}/client-start-{{ service_type }}.sh"
+  register: updated_start_script
+  when: not dry_run and not ansible_check_mode
+
+- name: "Fail if the start script does not name the release - client-{{ service_type }}"
+  ansible.builtin.assert:
+    that:
+      - (updated_start_script.content | b64decode) is regex('releases/' ~ (client_binaries_id | regex_escape) ~ '(\\s|$)', multiline=true)
+    fail_msg: "client-start-{{ service_type }}.sh does not name {{ client_binaries_id }}; client-{{ service_type }} is not restarted."
+    quiet: true
+  when: not dry_run and not ansible_check_mode
 
 - name: "Restart client-{{ service_type }}"
   ansible.builtin.include_tasks:

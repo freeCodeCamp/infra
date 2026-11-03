@@ -1,0 +1,46 @@
+apiVersion: operator.victoriametrics.com/v1
+kind: VLAgent
+metadata:
+  name: vlagent
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  replicaCount: 2
+  remoteWrite:
+    - url: http://vlsingle-vlogs-a.o11y.svc:9428/internal/insert
+    - url: http://vlsingle-vlogs-b.o11y.svc:9428/internal/insert
+  remoteWriteSettings:
+    maxDiskUsagePerURL: 4GiB
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi
+  podMetadata:
+    labels:
+      o11y.freecodecamp.org/component: vlagent
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              o11y.freecodecamp.org/component: vlagent
+          topologyKey: kubernetes.io/hostname
+  serviceSpec:
+    useAsDefault: true
+    spec:
+      type: NodePort
+      ports:
+        - name: http
+          port: 9429
+          targetPort: 9429
+          nodePort: 30429
+          protocol: TCP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi

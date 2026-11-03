@@ -1,12 +1,47 @@
 ---
-- name: Check if Docker is installed
-  stat:
-    path: /usr/bin/docker
-  register: docker_installed
-  no_log: "{{ variable_no_log | default (true) }}"
-
-- name: Install Docker if not installed using the role
-  include_role:
+- name: Add the Docker CE apt repository
+  ansible.builtin.deb822_repository:
     name: docker
-    tasks_from: install-docker.yml
-  when: docker_installed.stat.exists == false
+    types: deb
+    uris: https://download.docker.com/linux/ubuntu
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: stable
+    architectures: amd64
+    signed_by: https://download.docker.com/linux/ubuntu/gpg
+    install_python_debian: true
+    state: present
+
+- name: Install Docker CE
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+
+- name: Create the Docker config directory
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Cap the json-file container logs
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_config | to_nice_json }}\n"
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    docker_daemon_config:
+      log-driver: json-file
+      log-opts:
+        max-size: "{{ docker_log_max_size | string }}"
+        max-file: "{{ docker_log_max_file | string }}"
+  notify: Restart docker
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started

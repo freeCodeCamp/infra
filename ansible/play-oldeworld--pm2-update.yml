@@ -1,7 +1,9 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--pm2-update.yml -e variable_host=<group>
 - name: Move PM2 and its unit to the default Node.js
   hosts: "{{ variable_host | default('null') }}"
   serial: 1
+  max_fail_percentage: 0
   gather_facts: false
   tasks:
     - name: Refresh PM2

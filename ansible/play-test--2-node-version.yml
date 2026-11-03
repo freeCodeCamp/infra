@@ -1,15 +1,14 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-test--2-node-version.yml -e variable_host=<group>
 - name: Test Node Environment - Print Node/NPM/PM2 Versions
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
   gather_facts: false
   become: true
   become_user: freecodecamp
   tasks:
     - name: Print Node, NPM, and PM2 versions
       ansible.builtin.shell: |
-        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        {{ nvm_preamble }}
         echo "Node version:"
         node -v
         echo ""
@@ -25,6 +24,8 @@
         executable: /bin/bash
         chdir: /home/freecodecamp
       register: version_output
+      changed_when: false
+      check_mode: false
 
     - name: Display version information
       ansible.builtin.debug:

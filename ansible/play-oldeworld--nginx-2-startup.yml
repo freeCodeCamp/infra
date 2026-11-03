@@ -1,19 +1,19 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--nginx-2-startup.yml -e variable_host=<group>
 - name: Startup NGINX on the Oldeworld Cluster
   hosts: '{{ variable_host | default("null") }}'
+  gather_facts: false
   become: true
   serial: 1
-  roles:
-    - dns # Configure ansible facts for networking info lookup
 
   tasks:
     - name: Add a delay to stagger the reloads
-      pause:
+      ansible.builtin.pause:
         seconds: 20
       when: variable_add_delay is defined
 
     - name: Check NGINX Config
-      shell:
+      ansible.builtin.shell:
         chdir: /etc/nginx
         cmd: nginx -t
       register: nginx_config_check
@@ -35,7 +35,7 @@
       when: nginx_config_check.rc == 0
 
     - name: Reload NGINX
-      shell:
+      ansible.builtin.shell:
         chdir: /etc/nginx
         cmd: nginx -s 'reload'
       when: nginx_config_check.rc == 0

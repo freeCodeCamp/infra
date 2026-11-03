@@ -1,0 +1,111 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: hosts
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  groups:
+    - name: hosts
+      interval: 1m
+      rules:
+        - alert: HostDown
+          expr: up{job="node",role!="pxy"} == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.env }} {{ $labels.role }} host {{ $labels.instance }} is down."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#hostdown"
+        - alert: NginxVmDown
+          expr: |
+            up{job="node",role="pxy"} == 0
+            or node_systemd_unit_state{job="node",role="pxy",name="nginx.service",state="active"}
+            == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.env }} NGINX VM {{ $labels.instance }} is down."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#nginxvmdown"
+        - alert: DiskSpaceLow
+          expr: |
+            1 - node_filesystem_avail_bytes{job=~"node|o11y/node-exporter",mountpoint="/"}
+            / node_filesystem_size_bytes{job=~"node|o11y/node-exporter",mountpoint="/"} > 0.85
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.instance }} root disk is {{ $value | humanizePercentage }} full."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#diskspacelow"
+        - alert: MemoryHigh
+          expr: |
+            1 - node_memory_MemAvailable_bytes{job=~"node|o11y/node-exporter"}
+            / node_memory_MemTotal_bytes{job=~"node|o11y/node-exporter"} > 0.9
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.instance }} memory is {{ $value | humanizePercentage }} used."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#memoryhigh"
+        - alert: NodeTargetsAbsent
+          expr: absent(up{job="node"})
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: No host in the node job reports a scrape result.
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#nodetargetsabsent"
+    - name: scrape
+      interval: 1m
+      rules:
+        - alert: TargetDown
+          expr: up{job!="node"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.job }} target {{ $labels.instance }} is down."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#targetdown"
+        - alert: ProbeFailed
+          expr: probe_success == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.env }} probe of {{ $labels.instance }} fails."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#probefailed"
+        - alert: ScrapeConfigReloadFailed
+          expr: vm_promscrape_config_last_reload_successful == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} cannot load its new scrape config."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#scrapeconfigreloadfailed"
+        - alert: VmalertExecutionErrors
+          expr: increase(vmalert_execution_errors_total[10m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.job }} pod {{ $labels.pod }} cannot run its rules."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#vmalertexecutionerrors"

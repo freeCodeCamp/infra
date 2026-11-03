@@ -1,0 +1,6 @@
+---
+- name: Remove ufw, so the Vultr firewall groups are the only filter
+  ansible.builtin.apt:
+    name: ufw
+    state: absent
+    purge: true

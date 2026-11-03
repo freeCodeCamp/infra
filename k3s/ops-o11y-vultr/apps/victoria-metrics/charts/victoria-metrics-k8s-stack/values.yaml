@@ -1,0 +1,227 @@
+fullnameOverride: vm
+
+syncJob:
+  enabled: false
+
+defaultRules:
+  enabled: false
+
+defaultDashboards:
+  enabled: false
+
+grafana:
+  enabled: false
+
+victoria-metrics-operator:
+  enabled: true
+  admissionWebhooks:
+    enabled: false
+  crds:
+    cleanup:
+      enabled: false
+
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: false
+
+vmsingle:
+  enabled: false
+
+vmcluster:
+  enabled: true
+  spec:
+    retentionPeriod: "6"
+    replicationFactor: 2
+    vmstorage:
+      replicaCount: 3
+      extraArgs:
+        dedup.minScrapeInterval: 20s
+        storage.minFreeDiskSpaceBytes: 48GB
+      storage:
+        volumeClaimTemplate:
+          spec:
+            resources:
+              requests:
+                storage: 150Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vmstorage
+              topologyKey: kubernetes.io/hostname
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          memory: 4Gi
+    vmselect:
+      replicaCount: 2
+      extraArgs:
+        dedup.minScrapeInterval: 20s
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vmselect
+              topologyKey: kubernetes.io/hostname
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          memory: 2Gi
+    vminsert:
+      replicaCount: 2
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vminsert
+              topologyKey: kubernetes.io/hostname
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+
+vmagent:
+  enabled: true
+  spec:
+    replicaCount: 2
+    scrapeInterval: 20s
+    secrets:
+      - vm-linode-sd
+    inlineScrapeConfig: |
+      - job_name: node
+        scrape_interval: 60s
+        scheme: http
+        metrics_path: /metrics
+        linode_sd_configs:
+          - port: 9100
+            tag_separator: ","
+            authorization:
+              type: Bearer
+              credentials_file: /etc/vm/secrets/vm-linode-sd/LINODE_API_TOKEN
+        relabel_configs:
+          - source_labels: [__meta_linode_instance_label]
+            regex: (.+)
+            target_label: __address__
+            replacement: ${1}.batfish-ray.ts.net:9100
+          - source_labels: [__meta_linode_instance_label]
+            regex: (.+)
+            target_label: instance
+          - source_labels: [__meta_linode_instance_id]
+            regex: (.+)
+            target_label: provider
+            replacement: linode
+          - source_labels: [__meta_linode_region]
+            regex: (.+)
+            target_label: region
+          - source_labels: [__meta_linode_tags]
+            regex: .*,(prd|stg|ops),.*
+            target_label: env
+            replacement: $1
+          - source_labels: [__meta_linode_tags]
+            regex: .*,(clt|api|jms|pxy|nws|backoffice),.*
+            target_label: role
+            replacement: $1
+          - source_labels: [__meta_linode_tags]
+            regex: .*,(ara|chn|cnt|eng|esp|ger|ita|jpn|kor|por|swa|ukr),.*
+            target_label: language
+            replacement: $1
+          - source_labels: [__meta_linode_tags]
+            regex: .*,(new_api|old_api),.*
+            target_label: variant
+            replacement: $1
+          - source_labels: [__meta_linode_tags]
+            regex: .*,oldeworld,.*
+            target_label: estate
+            replacement: oldeworld
+          - source_labels: [__address__]
+            regex: '.+\.batfish-ray\.ts\.net:9100'
+            action: keep
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vmagent
+            topologyKey: kubernetes.io/hostname
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+vmalert:
+  enabled: true
+  spec:
+    replicaCount: 2
+    ruleSelector:
+      matchExpressions:
+        - key: o11y.freecodecamp.org/datasource
+          operator: NotIn
+          values: [vlogs]
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vmalert
+                app.kubernetes.io/instance: vm
+            topologyKey: kubernetes.io/hostname
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+alertmanager:
+  enabled: true
+  monzoTemplate:
+    enabled: false
+  spec:
+    replicaCount: 3
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vmalertmanager
+            topologyKey: kubernetes.io/hostname
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  config:
+    route:
+      receiver: google_chat
+      group_by: [alertname, namespace, job]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - matchers:
+            - alertname="Watchdog"
+          receiver: blackhole
+    receivers:
+      - name: blackhole
+      - name: google_chat
+        webhook_configs:
+          - url: http://calert.o11y.svc:6000/dispatch
+            send_resolved: true

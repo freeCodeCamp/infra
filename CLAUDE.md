@@ -36,22 +36,24 @@ Optional siblings: `PLAN.md` (wave list, multi-wave sprints only), `dispatches/W
 
 This repo owns:
 
-| Path                 | Purpose                                                          |
-| -------------------- | ---------------------------------------------------------------- |
-| `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`)      |
-| `docs/architecture/` | RFCs for non-trivial work                                        |
-| `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)               |
-| `docs/GUIDELINES.md` | Field-note format spec (legacy; field-notes archived 2026-05-10) |
+| Path                 | Purpose                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| `docs/runbooks/`     | Single-purpose ops runbooks (numbered, index `00-index.md`) |
+| `docs/architecture/` | RFCs for non-trivial work (archived RFCs under `archive/`)  |
+| `docs/infra-guides/` | Generic primers (k3s layout, legacy fCC ops, etc.)          |
+| `docs/GUIDELINES.md` | Runbook and RFC format rules                                |
 
 ## Working directory rule
 
-Run every recipe from the repo root. Recipes that need a cluster take it as an arg and export `KUBECONFIG` themselves.
+Run every command from the repo root unless the runbook line says otherwise.
 
 direnv `.envrc` hierarchy:
 
-- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. The session hooks keep an agent out of the plaintext.
+- root `.envrc` → org-wide tokens (`global/.env.enc` + `r2-read/.env.enc`) load on every `cd` into the repo. When `CLAUDECODE` is set (an agent shell), every `.envrc` here decrypts no envelope and loads no `.env`. `KUBECONFIG` still points at the cluster file on disk. The gate is not a security boundary. An agent shell also gets the environment of the shell that started `claude`, so start it with `direnv exec / claude`. An agent asks the operator to run a command that needs a token.
 - `ansible/.envrc` → sources root + adds `$SECRETS_DIR/do-universe/.env.enc` (DO token for the ansible DO inventory).
 - `terraform/ops-o11y/.envrc` → sources root + adds `do-universe/.env.enc` and `tfstate/.env.enc` (state in R2 `infra-tfstate`).
+- `terraform/vultr-base/.envrc` → sources root + adds `tfstate/.env.enc` and `vultr/.env.enc` (`VULTR_API_KEY`, `TF_VAR_state_passphrase`; state encrypted in R2 `infra-tfstate`).
+- `terraform/tst-vultr/.envrc` → same envelopes as `terraform/vultr-base/.envrc`.
 - `k3s/ops-o11y/.envrc` → sources root + exports `KUBECONFIG`.
 - `k3s/ops-backoffice-tools/.envrc` → sources root + adds `do-primary/.env.enc`.
 
@@ -61,27 +63,25 @@ direnv `.envrc` hierarchy:
 
 Private sibling repo at hard-coded relative path `../infra-secrets` (sops + age, single org key, `.sops.yaml` regex `.*`). Root `.envrc` resolves `SECRETS_DIR=../infra-secrets`; any other layout breaks direnv loading. No secrets this repo — not even encrypted.
 
-Layout contract + per-path consumer matrix: `docs/architecture/rfc-secrets-layout.md`.
+Envelope layout and consumers: `docs/runbooks/04-secrets-decrypt.md` §Envelope layout.
 
-Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to JSON parser and silently fails — explicit `--input-type dotenv --output-type dotenv` is required.
+Decrypt envelopes (`*.env.enc`): `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect routes `.enc` to the JSON parser and fails — explicit `--input-type dotenv --output-type dotenv` is required.
 
 ## Operations
 
-**New work adds no `just` recipes (operator 2026-09-03).** The recipes are brittle and abstract too much. Write standard-toolchain commands instead: `terraform -chdir=<dir>`, `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. The existing recipes and the docs that reference them stay as they are.
+**No `justfile` (operator 2026-10-10).** Write standard-toolchain commands: `terraform -chdir=<dir>` (`tofu -chdir=<dir>` for the Vultr dirs), `ansible-playbook <full-playbook-name>.yml`, `helm`, `kubectl`. Carry `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` explicitly on every `kubectl` and `helm` call, so a runbook line pastes into a bare shell. A `just` line in a `gxy-*` example is historical.
 
 ## Ansible
 
+- Plays, inputs and the former `just` recipes: `docs/infra-guides/ansible.md`
+- Root `.envrc` puts `ansible/.venv/bin` on `PATH`. Write `ansible-playbook` and `ansible-*` commands with no `uv run` and no `direnv exec .` prefix.
 - Per-group config: `ansible/inventory/group_vars/<group>.yml`
 - Playbooks generic orchestrators — reference variables, not literal values
 - Add a group: create a group_vars file matching the DO inventory tag
 
 ## Clusters
 
-- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplets `ops-vm-o11y-k3s-fra1-NN` (Terraform `node_count`, default 3; runbook 14), the observability cluster and the seed of the bare-metal `mgmt` cluster. `doctl` shows it in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
+- `ops-o11y` (inventory group `ops_o11y`): DigitalOcean droplet `ops-vm-o11y-k3s-fra1-01`, the observability cluster. Argo CD deploys its apps. Runbook 14 describes the planned three-node cluster (Terraform `node_count`, default 3). `doctl` shows it in VPC `gxy-vpc-fra1`, which keeps its Universe-era name.
 - `ops-backoffice-tools`: legacy.
 
 Verify reality with `doctl compute droplet list` before acting.
-
-## Non-obvious conventions
-
-- `just bootstrap` prepends `play-` + appends `.yml` to playbook arg.

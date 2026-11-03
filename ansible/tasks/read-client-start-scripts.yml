@@ -1,0 +1,26 @@
+---
+- name: Read the client start scripts
+  ansible.builtin.slurp:
+    src: "{{ client_root | default('/home/freecodecamp/client') }}/client-start-{{ item }}.sh"
+  loop:
+    - primary
+    - secondary
+  register: start_scripts
+
+- name: Fail if a start script names no release or no port
+  ansible.builtin.assert:
+    that:
+      - item.content | b64decode | regex_search('releases/[^\\s]+') is not none
+      - item.content | b64decode | regex_search('-p\\s+\\d+') is not none
+    fail_msg: "{{ item.source }} must name releases/<id> and -p <port>."
+    quiet: true
+  loop: "{{ start_scripts.results }}"
+  loop_control:
+    label: "{{ item.source }}"
+
+- name: Read the port of each client service
+  ansible.builtin.set_fact:
+    client_ports: "{{ client_ports | default({}) | combine({item.item: (item.content | b64decode | regex_search('-p\\s+(\\d+)', '\\1') | first | int)}) }}"
+  loop: "{{ start_scripts.results }}"
+  loop_control:
+    label: "{{ item.item }}"

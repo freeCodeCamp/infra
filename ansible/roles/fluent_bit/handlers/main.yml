@@ -1,0 +1,7 @@
+---
+- name: Restart fluent-bit
+  ansible.builtin.systemd:
+    name: fluent-bit
+    state: restarted
+    daemon_reload: true
+  when: fluent_bit_vlagent_host | length > 0

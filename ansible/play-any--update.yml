@@ -2,56 +2,47 @@
 # Usage:
 #   ansible-playbook -i inventory/linode.yml play-any--update.yml \
 #     -e variable_host=stg_oldeworld_clt
-#
-# The tailnet source needs TAILSCALE_OAUTH_CLIENT_ID and TAILSCALE_OAUTH_CLIENT_SECRET
-# in the environment, and it selects hosts by name, not by group:
-#   ansible-playbook -i inventory/tailscale.yml play-any--update.yml \
-#     -e variable_host='stg-vm-oldeworld-clt-*'
 
 - name: Update virtual machines
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
   gather_facts: false
   become: true
   become_user: root
   tasks:
     - name: Wait for connection
-      wait_for_connection:
+      ansible.builtin.wait_for_connection:
         connect_timeout: 60
         sleep: 5
-        delay: 5
         timeout: 300
 
     - name: Update apt repo and cache
       block:
         - name: Update apt cache
-          apt:
-            update_cache: yes
-            force_apt_get: yes
+          ansible.builtin.apt:
+            update_cache: true
+            force_apt_get: true
             cache_valid_time: 3600
             update_cache_retries: 10
             update_cache_retry_max_delay: 30
       rescue:
         - name: Clean apt cache and retry
-          shell: apt-get clean && apt-get update
+          ansible.builtin.shell: apt-get clean && apt-get update
           retries: 3
           delay: 10
 
-    - name: Wait before upgrading
-      pause:
-        seconds: 5
-
     - name: Upgrade all packages
-      apt:
+      ansible.builtin.apt:
         upgrade: dist
-        force_apt_get: yes
+        force_apt_get: true
 
     - name: Autoclean old packages
-      apt:
-        autoclean: yes
-        force_apt_get: yes
+      ansible.builtin.apt:
+        autoclean: true
+        force_apt_get: true
 
     - name: Autoremove unused packages
-      apt:
-        autoremove: yes
-        force_apt_get: yes
+      ansible.builtin.apt:
+        autoremove: true
+        force_apt_get: true

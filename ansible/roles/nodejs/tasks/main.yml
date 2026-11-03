@@ -1,16 +1,25 @@
 ---
-- name: Install or Update NVM
-  shell: |
-    curl --silent "https://api.github.com/repos/nvm-sh/nvm/releases/latest" |
-    grep '"tag_name":' |
-    sed -E 's/.*"([^"]+)".*/\1/' |
-    xargs -I % curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/%/install.sh |
-    bash
+- name: Read the installed nvm version
+  ansible.builtin.shell: "{{ nvm_preamble }} && nvm --version"
   args:
     executable: /bin/bash
+  register: nodejs_nvm_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Install nvm {{ nodejs_nvm_version }}
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/{{ nodejs_nvm_version }}/install.sh | bash
+  args:
+    executable: /bin/bash
+  when: nodejs_nvm_installed.stdout | trim != nodejs_nvm_version | regex_replace('^v', '')
+
 - name: Install or Update Node.js
-  shell: |
-    source ~/.nvm/nvm.sh
+  ansible.builtin.shell: |
+    {{ nvm_preamble }}
+    before=$(nvm version default)
     if [[ {{ nodejs_version }} == "latest" ]]; then
       if [[ $(nvm version) == 'none' ]] ; then
         nvm install --lts --latest-npm --default
@@ -21,6 +30,10 @@
       nvm install {{ nodejs_version }}
       nvm alias default {{ nodejs_version }}
     fi
-    echo "Node.js version $(node --version) installed."
+    after=$(nvm version default)
+    echo "Node.js version $after installed."
+    [[ "$before" == "$after" ]] || echo "default changed: $before -> $after"
   args:
     executable: /bin/bash
+  register: nodejs_install
+  changed_when: "'default changed:' in nodejs_install.stdout"

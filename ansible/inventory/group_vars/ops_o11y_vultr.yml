@@ -1,0 +1,37 @@
+---
+galaxy_name: ops-o11y-vultr
+k3s_init_host: ops-vm-o11y-1
+k3s_version: v1.36.4+k3s1
+k3s_vpc_cidr: "{{ vultr_vpc_cidr }}"
+fluent_bit_ip_allow_extra:
+  - "{{ (server_config_yaml | from_yaml)['cluster-cidr'] | default('10.42.0.0/16') }}"
+
+k3s_etcd_s3_op: R2-User-Token-Infra-O11y-etcd
+k3s_etcd_s3_config:
+  etcd-s3: true
+  etcd-s3-endpoint: >-
+    {{ lookup('community.general.onepassword', k3s_etcd_s3_op, field='Endpoint',
+    vault='Service-Automation', account_id='freecodecamp.1password.com')
+    | regex_replace('^https?://', '') | regex_replace('/.*$', '') }}
+  etcd-s3-bucket: ops-o11y-etcd
+  etcd-s3-region: auto
+  etcd-s3-retention: 60
+  etcd-s3-access-key: >-
+    {{ lookup('community.general.onepassword', k3s_etcd_s3_op, field='Access Key ID',
+    vault='Service-Automation', account_id='freecodecamp.1password.com') }}
+  etcd-s3-secret-key: >-
+    {{ lookup('community.general.onepassword', k3s_etcd_s3_op, field='Secret Access Key',
+    vault='Service-Automation', account_id='freecodecamp.1password.com') }}
+
+server_config_yaml: |
+  write-kubeconfig-mode: "0600"
+  secrets-encryption: true
+  disable:
+    - servicelb
+  etcd-snapshot-schedule-cron: "0 */6 * * *"
+  etcd-snapshot-retention: 20
+  kubelet-arg:
+    - system-reserved=cpu=500m,memory=1536Mi
+    - eviction-hard=memory.available<500Mi,nodefs.available<10%
+  kube-proxy-arg:
+    - nodeport-addresses={{ tailnet_cidr }},{{ k3s_vpc_cidr }}

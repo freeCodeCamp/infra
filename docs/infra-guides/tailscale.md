@@ -1,6 +1,6 @@
 # Tailscale Infrastructure Inventory
 
-Master inventory of all Tailscale devices across the infrastructure.
+Tailscale devices that the repository defines in a file. Hosts also join the tailnet through `ansible/play-tailscale--1a-up.yml` (the Linode fleet), and the `ops-o11y` nodes use it for the API and NodePorts (`ansible/inventory/group_vars/ops_o11y.yml:6`). The admin console lists every device.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ Master inventory of all Tailscale devices across the infrastructure.
                     v                               v
           +-------------------+          +------------------+
           | backoffice-tools  |          | Docker Swarm     |
-          | k3s cluster       |          | (13 nodes)       |
+          | k3s cluster       |          |                  |
           |                   |          |                  |
           | - operator        |          | Host Tailscale   |
           +-------------------+          +------------------+
@@ -24,7 +24,7 @@ Master inventory of all Tailscale devices across the infrastructure.
 | ----------------------------- | ---------------- | -------- | ---- |
 | `ops-k3s-backoffice-operator` | backoffice-tools | Operator | -    |
 
-**Total: 1 device**
+**Defined in the repository: 1 device**
 
 ## Naming Convention
 
@@ -43,10 +43,4 @@ Master inventory of all Tailscale devices across the infrastructure.
 
 **Admin Console:** https://login.tailscale.com/admin/machines
 
-**Upgrade Operators:**
-
-```bash
-helm upgrade tailscale-operator tailscale/tailscale-operator \
-  -n tailscale -f cluster/tailscale/operator-values.yaml \
-  --set oauth.clientId=<ID> --set oauth.clientSecret=<SECRET>
-```
+**Install or upgrade the operator:** [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#tailscale-operator).

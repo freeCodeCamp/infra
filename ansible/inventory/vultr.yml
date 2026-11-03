@@ -1,0 +1,9 @@
+---
+plugin: vultr.cloud.vultr
+api_key: "{{ lookup('ansible.builtin.env', 'VULTR_API_KEY') }}"
+
+groups:
+  provider_vultr: true
+
+compose:
+  ansible_host: vultr_main_ip

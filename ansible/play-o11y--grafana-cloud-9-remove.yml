@@ -1,6 +1,9 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-o11y--grafana-cloud-9-remove.yml -e variable_host=<group>
 - name: Remove Grafana Alloy and its Grafana Cloud shipping
   hosts: "{{ variable_host | default('null') }}"
+  serial: "{{ variable_serial | default('25%') }}"
+  max_fail_percentage: 0
   gather_facts: true
   become: true
   become_user: root

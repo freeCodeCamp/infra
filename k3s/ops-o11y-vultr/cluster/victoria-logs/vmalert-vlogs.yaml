@@ -1,0 +1,34 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: vlogs
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  replicaCount: 2
+  evaluationInterval: 1m
+  ruleSelector:
+    matchLabels:
+      o11y.freecodecamp.org/datasource: vlogs
+  datasource:
+    url: http://vlsingle-vlogs-a.o11y.svc:9428
+  extraArgs:
+    rule.defaultRuleType: vlogs
+  notifiers:
+    - url: http://vmalertmanager-vm-0.vmalertmanager-vm.o11y.svc.cluster.local.:9093
+    - url: http://vmalertmanager-vm-1.vmalertmanager-vm.o11y.svc.cluster.local.:9093
+    - url: http://vmalertmanager-vm-2.vmalertmanager-vm.o11y.svc.cluster.local.:9093
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vmalert
+              app.kubernetes.io/instance: vlogs
+          topologyKey: kubernetes.io/hostname
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi

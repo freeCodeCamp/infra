@@ -1,0 +1,75 @@
+---
+- name: Refuse a receiver that is not an IPv4 address
+  ansible.builtin.assert:
+    that:
+      - fluent_bit_vlagent_host is match('^([0-9]{1,3}[.]){3}[0-9]{1,3}$')
+    fail_msg: "fluent_bit_vlagent_host must be an IPv4 address; IPAddressAllow cannot take a name."
+  when: fluent_bit_vlagent_host | length > 0
+
+- name: Add the Fluent Bit apt repository
+  ansible.builtin.deb822_repository:
+    name: fluent-bit
+    types: deb
+    uris: "https://packages.fluentbit.io/ubuntu/{{ ansible_facts['distribution_release'] }}"
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: main
+    architectures: amd64
+    signed_by: https://packages.fluentbit.io/fluentbit.key
+    install_python_debian: true
+    state: present
+
+- name: Install the pinned Fluent Bit
+  ansible.builtin.apt:
+    name: "fluent-bit={{ fluent_bit_version }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+    allow_change_held_packages: true
+
+- name: Hold the Fluent Bit package
+  ansible.builtin.dpkg_selections:
+    name: fluent-bit
+    selection: hold
+
+- name: Create the Fluent Bit storage directory
+  ansible.builtin.file:
+    path: "{{ fluent_bit_state_dir }}/storage"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the Fluent Bit config
+  ansible.builtin.template:
+    src: fluent-bit.yaml.j2
+    dest: "{{ fluent_bit_config }}"
+    owner: root
+    group: root
+    mode: "0640"
+    validate: "{{ fluent_bit_binary }} -c %s --dry-run"
+  when: fluent_bit_vlagent_host | length > 0
+  notify: Restart fluent-bit
+
+- name: Create the Fluent Bit unit drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/fluent-bit.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Run Fluent Bit with the YAML config
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/fluent-bit.service.d/10-yaml.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fluent-bit
+
+- name: Run Fluent Bit only when it has a receiver
+  ansible.builtin.systemd:
+    name: fluent-bit
+    enabled: "{{ fluent_bit_vlagent_host | length > 0 }}"
+    state: "{{ 'started' if fluent_bit_vlagent_host | length > 0 else 'stopped' }}"
+    daemon_reload: true

@@ -1,0 +1,28 @@
+---
+- name: Test the Swarm node labels
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars_files:
+    - ../vars/swarm.yml
+  vars:
+    expected_labels:
+      stg-vm-api-1: {env: stg, role: api, api.enabled: "true", api.variant: dev}
+      prd-vm-soc-1: {env: prd, role: soc, socrates.enabled: "true", socrates.variant: org}
+      prd-vm-nws-1: {env: prd, role: nws, jms.enabled: "true", jms.variant: org}
+      tst-vm-wkr-1: {env: tst, role: wkr}
+      tst-vm-api-1: {env: tst, role: api}
+      ops-vm-swarm-mgr-1: {env: ops, role: swarm-mgr}
+  tasks:
+    - name: Assert each node gets exactly its expected labels
+      ansible.builtin.assert:
+        that:
+          - swarm_node_labels == item.value
+        fail_msg: "{{ item.key }}: {{ swarm_node_labels | default('undefined') }}"
+        quiet: true
+      vars:
+        swarm_hostname: "{{ item.key }}"
+      loop: "{{ expected_labels | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"

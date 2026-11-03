@@ -2,12 +2,12 @@
 
 Internal tools cluster on k3s with Longhorn storage.
 
+Run every command on this page from the repository root.
+
 ## Access
 
 ```bash
-cd k3s/ops-backoffice-tools
-export KUBECONFIG=$(pwd)/.kubeconfig.yaml
-kubectl get nodes
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
 ```
 
 ## Applications
@@ -22,37 +22,50 @@ kubectl get nodes
 - **Longhorn**: Replicas=2, daily backups to DO Spaces
 - **Backup Target**: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
 
----
+______________________________________________________________________
 
 ## Tailscale Operator
 
-Required for cross-cluster communication.
+Gives tailnet access to the cluster services. It is the only Tailscale device the repository defines ([`tailscale.md`](./tailscale.md)).
+
+`read -rs` takes the OAuth client secret without echo, so it stays out of the shell history.
 
 ```bash
 helm repo add tailscale https://pkgs.tailscale.com/helmcharts
 helm repo update
-helm upgrade tailscale-operator tailscale/tailscale-operator \
-  -n tailscale --create-namespace --install \
-  -f cluster/tailscale/operator-values.yaml \
-  --set oauth.clientId=<CLIENT_ID> \
-  --set oauth.clientSecret=<CLIENT_SECRET>
+(
+  printf 'OAuth client secret: '
+  read -rs TS_OAUTH_CLIENT_SECRET; echo
+  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml helm upgrade tailscale-operator tailscale/tailscale-operator \
+    --namespace tailscale --create-namespace --install \
+    -f k3s/ops-backoffice-tools/cluster/tailscale/operator-values.yaml \
+    --set oauth.clientId=<CLIENT_ID> \
+    --set-file oauth.clientSecret=<(printf %s "$TS_OAUTH_CLIENT_SECRET")
+)
 ```
 
----
+______________________________________________________________________
 
 ## Deployment Pattern
 
 All apps use Kustomize:
 
 ```bash
-# Deploy (decrypts secrets + TLS, applies, cleans up)
-just release ops-backoffice-tools <app>
+# Deploy: decrypt the secrets and TLS, apply, then delete the plaintext
+APP=<app>
+ENC=../infra-secrets/k3s/ops-backoffice-tools
+SEC=k3s/ops-backoffice-tools/apps/$APP/manifests/base/secrets
+sops decrypt --input-type dotenv --output-type dotenv "$ENC/$APP.secrets.env.enc" > "$SEC/.secrets.env" &&
+  sops decrypt "$ENC/$APP.tls.crt.enc" > "$SEC/tls.crt" &&
+  sops decrypt "$ENC/$APP.tls.key.enc" > "$SEC/tls.key" &&
+  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl apply -k "k3s/ops-backoffice-tools/apps/$APP/manifests/base/"
+rm -f "$SEC/.secrets.env" "$SEC/tls.crt" "$SEC/tls.key"
 
 # Check
-kubectl get all -n <app>
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get all -n <app>
 
 # Logs
-kubectl logs -n <app> deploy/<app>
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl logs -n <app> deploy/<app>
 ```
 
 ### Secrets Structure
@@ -65,25 +78,25 @@ apps/<app>/manifests/base/secrets/
 └── tls.key              # Private key (gitignored)
 ```
 
----
+______________________________________________________________________
 
 ## Troubleshooting
 
 ### Tailscale Connectivity
 
 ```bash
-kubectl logs -n tailscale deploy/operator
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl logs -n tailscale deploy/operator
 ```
 
 ### PVC Stuck Pending
 
 ```bash
-kubectl get volumes.longhorn.io -n longhorn-system
-kubectl describe pvc -n <namespace> <pvc-name>
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get volumes.longhorn.io -n longhorn-system
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl describe pvc -n <namespace> <pvc-name>
 ```
 
 ### Longhorn UI
 
 ```bash
-kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
+KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ```

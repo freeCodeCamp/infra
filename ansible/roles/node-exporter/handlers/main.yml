@@ -4,3 +4,4 @@
     name: node_exporter
     state: restarted
     daemon_reload: true
+  when: node_exporter_start | bool

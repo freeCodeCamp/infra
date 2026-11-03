@@ -1,0 +1,5 @@
+[Service]
+ExecStart=
+ExecStart={{ fluent_bit_binary }} -c {{ fluent_bit_config }}
+IPAddressDeny=any
+IPAddressAllow={{ (fluent_bit_ip_allow + [fluent_bit_vlagent_host] | select | list) | join(' ') }}

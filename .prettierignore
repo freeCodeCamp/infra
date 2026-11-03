@@ -4,7 +4,3 @@
 # render time. Exclude the entire chart templates tree.
 k3s/*/apps/*/charts/*/templates/
 k3s/*/apps/*/charts/*/templates/**
-
-# Sample files for sops envelopes (PEM / dotenv) — not YAML in a
-# meaningful sense; preserve operator-friendly layout.
-infra-secrets/**/*.sample

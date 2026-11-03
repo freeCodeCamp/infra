@@ -1,21 +1,35 @@
 ---
+# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--clients-rollback.yml -e variable_host=<group> -e variable_client_binaries_id=<release>
 - name: Rollback
   hosts: "{{ variable_host | default('null') }}"
-  serial: '{{ variable_serial | default(1) }}'
+  serial: 1
+  max_fail_percentage: 0
   gather_facts: false
   vars:
-    dry_run: '{{ variable_dry_run | default(false) }}'
-    client_binaries_id: '{{ variable_client_binaries_id }}'
+    dry_run: "{{ variable_dry_run | default(false) | bool }}"
+    client_binaries_id: "{{ variable_client_binaries_id | default('') }}"
+    client_root: "{{ variable_client_root | default('/home/freecodecamp/client') }}"
   tasks:
+    - name: Fail without a release ID
+      ansible.builtin.assert:
+        that:
+          - client_binaries_id | length > 0
+        fail_msg: Pass -e variable_client_binaries_id=<release directory name>.
+        quiet: true
+
     - name: Check if target release directory exists
       ansible.builtin.stat:
-        path: "/home/freecodecamp/client/releases/{{ client_binaries_id }}"
+        path: "{{ client_root }}/releases/{{ client_binaries_id }}"
       register: release_directory
 
     - name: Fail if release directory does not exist
       ansible.builtin.fail:
-        msg: "Release directory {{ client_binaries_id }} does not exist in /home/freecodecamp/client/releases/"
+        msg: "Release directory {{ client_binaries_id }} does not exist in {{ client_root }}/releases/"
       when: not release_directory.stat.exists
+
+    - name: Read the client start scripts and their ports
+      ansible.builtin.include_tasks:
+        file: tasks/read-client-start-scripts.yml
 
     - name: Update release ID and restart client services (rolling)
       ansible.builtin.include_tasks:
@@ -28,25 +42,23 @@
 
     - name: Save PM2 process list
       ansible.builtin.shell: |
-        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        {{ nvm_preamble }}
         pm2 save
       args:
         executable: /bin/bash
-        chdir: /home/freecodecamp/client
-      when: not dry_run | bool
+        chdir: "{{ client_root }}"
+      when: not dry_run
 
     - name: Display PM2 process status
       ansible.builtin.shell: |
-        export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        {{ nvm_preamble }}
         pm2 ls
       args:
         executable: /bin/bash
-        chdir: /home/freecodecamp/client
+        chdir: "{{ client_root }}"
       register: pm2_status
+      changed_when: false
 
     - name: Show PM2 status
       ansible.builtin.debug:
         msg: "{{ pm2_status.stdout_lines }}"
-
