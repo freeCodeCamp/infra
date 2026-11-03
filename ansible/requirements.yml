@@ -17,3 +17,6 @@ collections:
   - name: https://github.com/k3s-io/k3s-ansible.git
     type: git
     version: 1.2.2
+  # workaround: https://github.com/k3s-io/k3s-ansible/issues/565
+  - name: ansible.utils
+    version: "6.1.1"
