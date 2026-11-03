@@ -1,0 +1,49 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAuth
+metadata:
+  name: o11y
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  replicaCount: 2
+  selectAllByDefault: false
+  unauthorizedUserAccessSpec:
+    url_map:
+      - src_paths:
+          - /select/logsql/.*
+        url_prefix:
+          - http://vlsingle-vlogs-a.o11y.svc:9428
+          - http://vlsingle-vlogs-b.o11y.svc:9428
+        load_balancing_policy: first_available
+      - src_paths:
+          - /select/vmui.*
+        url_prefix:
+          - http://vlsingle-vlogs-a.o11y.svc:9428
+          - http://vlsingle-vlogs-b.o11y.svc:9428
+        load_balancing_policy: first_available
+  podMetadata:
+    labels:
+      o11y.freecodecamp.org/component: vmauth
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              o11y.freecodecamp.org/component: vmauth
+          topologyKey: kubernetes.io/hostname
+  serviceSpec:
+    useAsDefault: true
+    spec:
+      type: NodePort
+      ports:
+        - name: http
+          port: 8427
+          targetPort: 8427
+          nodePort: 30427
+          protocol: TCP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
