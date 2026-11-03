@@ -32,4 +32,4 @@ server_config_yaml: |
     - system-reserved=cpu=500m,memory=1536Mi
     - eviction-hard=memory.available<500Mi,nodefs.available<10%
   kube-proxy-arg:
-    - nodeport-addresses={{ tailnet_cidr }}
+    - nodeport-addresses={{ tailnet_cidr }},{{ k3s_vpc_cidr }}
