@@ -14,16 +14,21 @@ uv sync --locked
 
 On a fresh clone, direnv adds `ansible/.venv/bin` to `PATH` only after `uv sync` and the next `cd` into the repository. The first `ansible-galaxy` call uses the full path for this reason.
 
+Each clone and worktree has its own `.venv` and `.ansible/collections`. Run the two install commands again in each new clone or worktree, and after a pull that changes `pyproject.toml`, `uv.lock` or `requirements.yml`. A stale copy fails in the middle of a play, for example with `Failed to import the required Python library (netaddr)`.
+
 Show the groups:
 
 ```bash
 ansible-inventory -i inventory/linode.yml --graph
 ansible-inventory -i inventory/digitalocean.yml --graph
+ansible-inventory -i inventory/vultr.yml -i inventory/constructed.yml --graph
 ```
+
+The Vultr inventory needs `VULTR_API_KEY`. `ansible/.envrc` loads it from `vultr/.env.enc` when that envelope exists and `CLAUDECODE` is not set. With no key, the inventory gives `HTTP Error 401: Unauthorized`. With no key or no `vultr.cloud` collection, the inventory has no hosts, and the play stops with `Could not match supplied host pattern`.
 
 ## Rules for Every Play
 
-- Give the target group with `-e variable_host=<group>`.
+- Give the target group with `-e variable_host=<group>`. `play-swarm--form.yml` is different: it takes `swarm_manager_group` and `swarm_worker_group`.
 - A group name that does not exist stops the play with `Could not match supplied host pattern`. If you forget `-e variable_host`, the name in the message is `null`.
 - In GitHub Actions, a group with no hosts gives a warning and the play does nothing.
 - Most plays that change hosts do one host at a time and stop at the first host that fails. Some take `-e variable_serial=<n>`. These are different:
@@ -39,6 +44,8 @@ The command form:
 ```bash
 ansible-playbook -i inventory/linode.yml <play> -e variable_host=<group> [-e <input>=<value>]
 ```
+
+For a Vultr group, use `-i inventory/vultr.yml -i inventory/constructed.yml` in place of `-i inventory/linode.yml`.
 
 ## Linode Plays
 
@@ -85,6 +92,13 @@ Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--
 | `play-k3s--servers.yml`  | Install or upgrade k3s on `ops_o11y` (runbook 14)                      | —                                                           |
 | `play-k3s--longhorn.yml` | Install Longhorn on `tools_k3s`                                        | —                                                           |
 | `play-k3s--teardown.yml` | Remove k3s from every host in the group. Takes an etcd snapshot first. | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
+
+## Vultr Plays
+
+| Play                   | What it does                                                                                                                                            | Inputs                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `play-vultr--base.yml` | Configure the base of a Vultr host, one host at a time. Remove ufw. Install the sudo user, fail2ban, Docker, node exporter and Fluent Bit. Harden sshd. | `variable_host=<group>`, `variable_serial=<n>`                                                                                    |
+| `play-swarm--form.yml` | Form the Vultr Swarm and join the workers, then apply the node labels (runbook 18)                                                                      | `swarm_manager_group=<group>`, `swarm_worker_group=<group>[:<group>…]`, `swarm_rejoin=true` for a worker that is in another Swarm |
 
 ## Removed Plays
 
