@@ -85,7 +85,7 @@ direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-k3s--se
 direnv exec . uv run ansible-playbook -i inventory/digitalocean.yml play-o11y--node-exporter-0-install.yml -e variable_host=ops_o11y
 ```
 
-`play-k3s--servers.yml` reads the K3s version from `k3s_init_host` when K3s runs there, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). `k3s_init_host` gets `--cluster-init`; the others join it over the VPC. The play installs the Gateway API CRDs v1.4.0, writes the Traefik `HelmChartConfig`, saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
+`play-k3s--servers.yml` reads the K3s version from `k3s_init_host` when K3s runs there, and from `k3s_version` in `inventory/group_vars/ops_o11y.yml` on a fresh cluster (RFC Q22). `k3s_init_host` gets `--cluster-init`; the others join it over the VPC. The play writes the Traefik `HelmChartConfig` (the Gateway API CRDs come with the K3s `traefik-crd` chart), saves an etcd snapshot named `play-<n>-servers`, and writes `k3s/ops-o11y/.kubeconfig.yaml`. A second run reports `changed=0` for every host.
 
 `k3s_init_host` in `inventory/group_vars/ops_o11y.yml` names the node that holds the datastore. The play asserts that it is in the inventory group and inside `--limit`, and stops otherwise. The play puts it first in the server group that the K3s role reads, because the inventory plugin decides the host order.
 

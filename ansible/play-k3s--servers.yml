@@ -148,14 +148,6 @@
     first_host: "{{ k3s_init_host }}"
 
   tasks:
-    - name: Install the Gateway API CRDs
-      ansible.builtin.command: >
-        k3s kubectl apply -f
-        https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
-      register: gateway_result
-      changed_when: "'created' in gateway_result.stdout or 'configured' in gateway_result.stdout"
-      when: inventory_hostname == first_host
-
     - name: Apply the Traefik HelmChartConfig
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../k3s/shared/traefik-config.yaml"
