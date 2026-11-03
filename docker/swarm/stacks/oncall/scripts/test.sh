@@ -98,7 +98,9 @@ check "avoid inside window exits 0" "$status" 0
 check "avoid inside window starts nothing" "$(dispatch_calls)" 0
 check "avoid inside window reads the last main run" "$(grep '^API ' "$log")" \
   "API http://api.test/repos/freeCodeCamp/news/actions/workflows/deploy-eng.yml/runs?branch=main&status=completed&per_page=1"
-check "avoid skip after a good run posts no chat" "$(chat_calls)" 0
+check "avoid skip after a good run posts one heartbeat" "$(chat_calls)" 1
+check "maintenance skip heartbeat is standard ok" \
+  "$(chat_text_has '✅ *dispatch* · freeCodeCamp/news deploy-eng.yml · heartbeat: scheduled dispatch skipped')" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
 check "avoid skip after a failed run exits 0" "$status" 0
@@ -110,7 +112,7 @@ check "avoid skip after a failed run links that run" \
 check "avoid skip warn is one line" "$(chat_lines)" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$((WED_0100 + 2 * 3600 + 5 * 60)) FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
-check "second window skip after a failed run posts no chat" "$(chat_calls)" 0
+check "later window skip posts one heartbeat" "$(chat_calls)" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 DISPATCH_REF=refs/heads/main FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
 check "full ref reads runs by branch name" "$(grep -c 'runs?branch=main&' "$log")" 1
@@ -121,7 +123,7 @@ check "avoid skip after a cancelled run posts chat" "$(chat_text_has 'the last r
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=503 FAKE_BODY=down
 check "avoid skip with an unreadable API exits 0" "$status" 0
-check "avoid skip with an unreadable API posts no chat" "$(chat_calls)" 0
+check "avoid skip with an unreadable API still posts heartbeat" "$(chat_calls)" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0559
 check "window includes Wed 05:59" "$(dispatch_calls)" 0
@@ -146,8 +148,10 @@ check "dispatch URL" "$(grep '^API ' "$log")" \
 check "dispatch body" "$(grep '^APIDATA ' "$log")" 'APIDATA {"ref":"main"}'
 check "bearer header" "$(grep -c '^H Authorization: Bearer tok$' "$log")" 1
 check "api version header" "$(grep -c '^H X-GitHub-Api-Version: 2022-11-28$' "$log")" 1
-check "success posts no chat" "$(chat_calls)" 0
-check "dispatch POST is never retried" "$(grep -c '^RETRY ' "$log")" 0
+check "successful dispatch posts one heartbeat" "$(chat_calls)" 1
+check "successful dispatch heartbeat is standard ok" \
+  "$(chat_text_has '✅ *dispatch* · freeCodeCamp/news deploy-eng.yml · dispatch accepted (HTTP 204)')" 1
+check "only the heartbeat delivery is retried" "$(grep -c '^RETRY ' "$log")" 1
 
 run_dispatch WINDOW_POLICY=require DISPATCH_NOW=$SAT_0130
 check "require inside window dispatches" "$(api_calls)" 1
@@ -236,12 +240,14 @@ run_watchdog() {
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR - 60))
 check "fresh feed exits 0" "$status" 0
-check "fresh feed posts no chat" "$(chat_calls)" 0
+check "fresh feed posts one heartbeat" "$(chat_calls)" 1
+check "fresh heartbeat is standard ok" \
+  "$(chat_text_has '✅ *watchdog* · news English · feed healthy: last build')" 1
 check "default feed URL" "$(grep '^API ' "$log")" "API https://www.freecodecamp.org/news/rss.xml"
-check "feed GET is retried" "$(grep -c '^RETRY 2$' "$log")" 1
+check "feed GET and heartbeat delivery are retried" "$(grep -c '^RETRY 2$' "$log")" 2
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR))
-check "age equal to the limit is fresh" "$(chat_calls)" 0
+check "age equal to the limit posts a fresh heartbeat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT - 30 * 60))
 check "build under 1h in the future is fresh" "$status" 0
@@ -266,17 +272,19 @@ check "first stale tick that starts late posts chat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 6 * HOUR + 30 * 60))
 check "second stale tick exits 1" "$status" 1
-check "second stale tick posts no chat" "$(chat_calls)" 0
+check "second stale tick posts a held heartbeat" "$(chat_calls)" 1
+check "stale heartbeat names reminder suppression" \
+  "$(chat_text_has '✅ *watchdog* · news English · heartbeat: feed remains stale, reminder not due')" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 10 * HOUR + 30 * 60))
-check "stale tick before the reminder posts no chat" "$(chat_calls)" 0
+check "stale tick before the reminder posts a held heartbeat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 11 * HOUR + 30 * 60))
 check "reminder tick posts chat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR - 60)) \
   FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 18:54:00 +0530')"
-check "positive offset is applied" "$(chat_calls)" 0
+check "positive offset is applied" "$(chat_text_has 'feed healthy')" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 60)) \
   FAKE_BODY="$(feed_xml 'Thu, 01 Oct 2026 09:24:00 -0400')"
@@ -285,6 +293,7 @@ check "negative offset is applied" "$(chat_calls)" 1
 run_watchdog WATCHDOG_NOW=$SAT_0759 FAKE_BODY="$(feed_xml "$FRI_BUILT")"
 check "quiet hours exit 0" "$status" 0
 check "quiet hours fetch nothing" "$(api_calls)" 0
+check "quiet hours post one held heartbeat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$WED_0759 FAKE_BODY="$(feed_xml "$FRI_BUILT")"
 check "quiet hours include Wed 07:59" "$(api_calls)" 0
@@ -293,7 +302,7 @@ run_watchdog WATCHDOG_NOW=$SAT_0800 FAKE_BODY="$(feed_xml "$FRI_BUILT")"
 check "first tick after quiet hours posts chat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((SAT_0800 + 2 * HOUR)) FAKE_BODY="$(feed_xml "$FRI_BUILT")"
-check "later tick after quiet hours follows the reminder" "$(chat_calls)" 0
+check "later tick after quiet hours posts only a held heartbeat" "$(chat_calls)" 1
 
 run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) FAKE_CODE=503
 check "feed 503 exits 1" "$status" 1
@@ -417,6 +426,14 @@ env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat
   GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
   sh -c ". '$here/lib.sh' && chat_notify ok '<b>src' subject summary" >"$work/out" 2>&1
 check "source loses its angle brackets" "$(chat_text_is '✅ *bsrc* · subject · summary')" 1
+
+: >"$log"
+env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://proxy.test/hooks/chat" \
+  CHAT_PROXY_URL="http://proxy.test/hooks/chat" GOOGLE_CHAT_WEBHOOK="http://chat.test/secret" \
+  sh -c ". '$here/lib.sh' && chat_notify warn source subject summary" >"$work/out" 2>&1
+check "CHAT_PROXY_URL takes precedence over the Google webhook" "$(chat_calls)" 1
+check "proxy routing keeps the Google webhook secret out of output" \
+  "$(cat "$work/out" "$log" | grep -c 'chat.test/secret')" 0
 
 if [ "$failures" -gt 0 ]; then
   printf '%s check(s) failed\n' "$failures"

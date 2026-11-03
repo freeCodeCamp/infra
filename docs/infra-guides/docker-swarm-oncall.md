@@ -8,6 +8,17 @@ The Oncall stack provides automated maintenance and monitoring services includin
 
 ## Components
 
+| Service                       | Purpose                                                       |
+| ----------------------------- | ------------------------------------------------------------- |
+| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)             |
+| **svc-update**                | Gantry service updater (auto-updates tagged services)         |
+| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)   |
+| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)   |
+| **svc-chat-relay**            | Converts Gantry notices to the standard chat line             |
+| **svc-chat-proxy**            | Forwards actionable notices and digests successful heartbeats |
+| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
+| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
+| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale      |
 | Service                       | Purpose                                                          |
 | ----------------------------- | ---------------------------------------------------------------- |
 | **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)                |
@@ -27,6 +38,12 @@ Cronjob Scheduler → Scheduled Tasks
 Service Updater → Auto-update tagged services
 Cleanup Job → Weekly prune on all nodes
 Webhook Receiver → On-demand Gantry updates (via GHA)
+Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping) ┐
+Watchdog → news RSS lastBuildDate                                   ├→ Chat proxy → Google Chat
+Gantry (cron and webhook) → Chat relay                              ┘
+                              │
+                              ├→ ✅ JSONL → daily digest at 00:00 UTC
+                              └→ ⚠️ / 🔴 / unknown → immediate forward
 Dispatchers → GitHub workflow_dispatch (news deploys, housekeeping, DOCR garbage collection)
 Watchdog → news RSS lastBuildDate → Google Chat when stale
 Gantry (cron and webhook) → Chat relay → Google Chat
@@ -38,6 +55,7 @@ All services → json-file logging (local, rotated)
 
 - Docker Swarm cluster initialized
 - Docker credentials at `~/.docker/config.json` on manager node
+- The current single-manager placement retained for `chat_proxy_data`. The volume uses Docker's local driver; before adding another eligible manager, migrate the data or constrain the proxy to the labelled node that owns it.
 
 ## Configuration
 
@@ -62,12 +80,13 @@ Export these 3 variables before `docker stack deploy`. Container logs use the lo
 | ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
 | `WEBHOOK_SECRET`        | svc-webhook                  | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
 | `GITHUB_DISPATCH_TOKEN` | dispatchers                  | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
-| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdog, relay | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
+| `GOOGLE_CHAT_WEBHOOK`   | svc-chat-proxy               | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
 
 Anyone with Docker access on the manager can read these values with `docker service inspect`. Rotate a value after you remove such access.
 
 ### Swarm Config Names
 
+Swarm configs are immutable. When you change `run_gantry.sh`, `hooks-relay.json`, a file in `scripts/`, or either file in `proxy/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails.
 Swarm configs are immutable. When you change `run_gantry.sh`, `hooks-relay.json` or a file in `scripts/`, increase the version suffix of its `name:` in `stack-oncall.yml` (for example `oncall_scripts_lib_v1` → `oncall_scripts_lib_v2`). If you do not, `docker stack deploy` fails. `hooks_json` has no versioned `name:`, so before you change `hooks.json`, add one to `hooks_json` in `stack-oncall.yml`.
 
 ### Dispatchers
@@ -85,7 +104,7 @@ The maintenance window is Wed/Sat 00:00–06:00 UTC. `scripts/lib.sh` defines it
 - `avoid`: inside the window, the dispatcher starts nothing. If the last completed run on the branch failed or was cancelled, the first skip of the window (00:00–03:00 UTC) posts a warning to Google Chat.
 - `require`: outside the window, the dispatcher refuses and posts to Google Chat.
 
-The dispatcher posts to Google Chat when the API refuses the request or when a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
+Every accepted dispatch or intentional maintenance-window skip emits an ok heartbeat. The proxy holds that heartbeat for the daily digest. The dispatcher posts actionable warnings/failures immediately when the API refuses the request, a prior run is bad, or a variable is missing. The housekeeping workflow also checks its own start time. It refuses to run outside the window unless you start it with `window_check=false`.
 
 The DOCR garbage collection workflow makes the registry read-only while it runs. It starts only on Wed/Sat 00:00–05:10 UTC. This leaves at least 55 minutes before the 06:05 news deploy. Past runs took 5–26 minutes. It waits up to 60 minutes for DOCR push and cleanup runs in other repos to finish, then skips. It posts each result to Google Chat. To start it outside the window, use `window_check=false`.
 
@@ -97,6 +116,7 @@ The DOCR garbage collection workflow makes the registry read-only while it runs.
 - Posts: the first hour past the limit, then every 6 hours while the feed stays stale.
 - Quiet hours: Wed/Sat 00:00–08:00 UTC. The first check after quiet hours posts if the feed is stale.
 - The watchdog also posts when it cannot read the feed or the date.
+- Every scheduled invocation emits one observable result. Healthy, quiet-hour, and between-reminder heartbeats are held by the proxy; stale/unreadable alerts are forwarded immediately.
 
 ### Google Chat Notifications
 
@@ -111,19 +131,42 @@ Every message from this stack and from the GitHub workflow notifiers is one line
 - A warn or fail message from a GitHub workflow can add detail lines below the line.
 - `scripts/lib.sh` (`chat_notify`) and `.github/actions/notify-chat` make the line. Do not post to Google Chat in a different format.
 
-Gantry sends its notifications to `svc-chat-relay` (`http://svc-chat-relay:9000/hooks/gantry`). The relay makes the standard line and posts it to `GOOGLE_CHAT_WEBHOOK`. The subject is `hourly` for the cron run and `webhook` for a run from `/hooks/run-gantry`. Gantry posts only when it updates a service or when an update fails (`GANTRY_NOTIFICATION_CONDITION=on-change`).
+Gantry sends its notifications to `svc-chat-relay` (`http://svc-chat-relay:9000/hooks/gantry`). The relay makes the standard line and posts it to the internal proxy. The subject is `hourly` for the cron run and `webhook` for a run from `/hooks/run-gantry`. Scheduled Gantry uses `GANTRY_NOTIFICATION_CONDITION=all` so even a no-change run supplies its expected heartbeat. Webhook-triggered Gantry remains `on-change`.
 
 ```text
 ✅ *gantry* · webhook · 1 service(s) updated: prd-news_svc-eng
 🔴 *gantry* · hourly · 1 service(s) update failed: prd-news_svc-eng; 1 service(s) rollback failed: prd-news_svc-eng
 ```
 
-`svc-chat-relay` publishes no port. Only services on the `oncall_default` network can reach it.
+`svc-chat-relay` and `svc-chat-proxy` publish no ports. Only services on the `oncall_default` network can reach them.
+
+### Chat proxy behavior
+
+`scripts/lib.sh` posts to `CHAT_PROXY_URL` when it is set and falls back to direct `GOOGLE_CHAT_WEBHOOK` delivery when it is not. The stack sets the internal URL `http://svc-chat-proxy:8080/hooks/chat`; only `svc-chat-proxy` receives the real Google Chat webhook.
+
+The proxy keeps its state in the `chat_proxy_data` volume:
+
+- `✅` messages are appended to a per-UTC-day JSONL file.
+- If a success cannot be persisted, it is forwarded immediately.
+- `⚠️`, `🔴`, and unknown text messages are forwarded immediately.
+- The prior day's successes are grouped into one digest after 00:00 UTC. Empty days produce no digest.
+- Daily JSONL files are retained for seven days.
+- A failed digest delivery leaves the day undigested and retries it, including after a later midnight, while its retained JSONL file exists.
+- Digest delivery is at-least-once: an unlikely crash after Chat accepts the digest but before local state is persisted can produce a duplicate rather than silently lose the digest.
+
+The expected cron schedules are copied from `stack-oncall.yml` into `proxy/cron-expectations.json`. The proxy tests fail if those values drift. Dispatch, watchdog, and hourly Gantry have a 15-minute grace period. The proxy sends one alert for each expected occurrence that has no matching message; any matching ok, warning, or failure proves that occurrence ran.
+
+The endpoint is intentionally internal and unauthenticated in v1. GitHub workflow notifications, Grafana, Sentry, and UptimeRobot do not use this proxy yet.
 
 ### Tests
 
+Run from the repository root:
+
 ```bash
+python3 -m unittest discover -s docker/swarm/stacks/oncall/proxy -p 'test_*.py' -v
 sh docker/swarm/stacks/oncall/scripts/test.sh
+WEBHOOK_SECRET=x GITHUB_DISPATCH_TOKEN=x GOOGLE_CHAT_WEBHOOK=https://chat.invalid \
+  docker stack config -c docker/swarm/stacks/oncall/stack-oncall.yml >/dev/null
 ```
 
 ### Webhook Configuration
@@ -146,6 +189,8 @@ Start Tailscale first. The `backoffice` context is `ssh://freecodecamp@ops-vm-ba
 
 Run from the repository root. The block decrypts the 3 variables into a subshell and deploys. The secrets are not in your shell after the command. See runbook 04, section 3.
 
+# Deploy stack from the repository root
+docker stack deploy -c docker/swarm/stacks/oncall/stack-oncall.yml oncall
 ```bash
 cd docker/swarm/stacks/oncall
 (
@@ -248,11 +293,35 @@ docker service logs --since 2h oncall_svc-cronjob
 docker service logs --since 2h oncall_svc-update
 docker service logs --since 2h oncall_svc-webhook
 docker service logs --since 2h oncall_svc-chat-relay
+docker service logs --since 2h oncall_svc-chat-proxy
 docker service logs --since 3h oncall_svc-dispatch-news-eng
 docker service logs --since 96h oncall_svc-dispatch-housekeeping
 docker service logs --since 96h oncall_svc-dispatch-docr-gc
 docker service logs --since 2h oncall_svc-watchdog-news
 docker service logs --since 168h oncall_svc-cleanup
+```
+
+## Proxy verification and rollback
+
+After deployment, verify the service and its persistent state on the manager:
+
+```bash
+docker service ps oncall_svc-chat-proxy
+docker service logs --since 15m oncall_svc-chat-proxy
+docker volume inspect oncall_chat_proxy_data
+proxy_container=$(docker ps -q --filter name=oncall_svc-chat-proxy)
+docker exec "$proxy_container" sh -c 'test -w /data && ls -l /data'
+```
+
+Confirm one dispatch, watchdog, and hourly Gantry heartbeat reaches proxy storage before relying on missed-tick alerts. Success heartbeats must not appear immediately in Chat; warnings and failures must.
+
+To roll notification routing back, deploy the previously recorded good revision. `scripts/lib.sh` retains direct-webhook fallback when `CHAT_PROXY_URL` is absent. Do not delete `oncall_chat_proxy_data` during rollback; it contains the pending digest and cron state.
+
+```bash
+# Run from the repository root; replace <known-good-commit> with the revision recorded before deployment.
+git worktree add /tmp/infra-oncall-rollback <known-good-commit>
+docker stack deploy -c /tmp/infra-oncall-rollback/docker/swarm/stacks/oncall/stack-oncall.yml oncall
+git worktree remove /tmp/infra-oncall-rollback
 ```
 
 ## Maintenance
@@ -261,3 +330,4 @@ docker service logs --since 168h oncall_svc-cleanup
 - Update service runs on manager node (placement constraint enforced)
 - Cleanup runs weekly on Monday at 03:30 UTC on all nodes
 - Read the service logs to make sure that the scheduled tasks run
+- Keep `proxy/cron-expectations.json` synchronized with monitored schedule labels in `stack-oncall.yml`; the unit test enforces exact schedule strings

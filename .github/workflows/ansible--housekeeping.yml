@@ -45,7 +45,9 @@ jobs:
         if: steps.check.outputs.allowed != 'true'
         uses: ./.github/actions/notify-chat
         with:
-          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          endpoint: ${{ secrets.DEVOPS_ALERTS_PROXY_URL }}
+          hmac_secret: ${{ secrets.DEVOPS_ALERTS_GITHUB_HMAC }}
+          notification_key: maintenance-window-refusal
           status: warn
           source: housekeeping
           subject: window Wed/Sat 00:00-06:00 UTC
@@ -313,7 +315,8 @@ jobs:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+      DEVOPS_ALERTS_PROXY_URL: ${{ secrets.DEVOPS_ALERTS_PROXY_URL }}
+      DEVOPS_ALERTS_GITHUB_HMAC: ${{ secrets.DEVOPS_ALERTS_GITHUB_HMAC }}
 
   report:
     name: Report
@@ -427,7 +430,9 @@ jobs:
       - name: Post the run summary
         uses: ./.github/actions/notify-chat
         with:
-          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          endpoint: ${{ secrets.DEVOPS_ALERTS_PROXY_URL }}
+          hmac_secret: ${{ secrets.DEVOPS_ALERTS_GITHUB_HMAC }}
+          notification_key: housekeeping-run-summary
           status: ${{ steps.summary.outputs.status }}
           source: housekeeping
           subject: ${{ steps.summary.outputs.subject }}

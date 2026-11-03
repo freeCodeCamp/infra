@@ -7,6 +7,8 @@ x-logging-config: &logging-config
       compress: "true"
 
 x-dispatch-env: &dispatch-env
+  GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN}
+  CHAT_PROXY_URL: http://svc-chat-proxy:8080/hooks/chat
   GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN:?}
   GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
 
@@ -82,6 +84,7 @@ services:
     image: curlimages/curl:8.23.0
     entrypoint: ["/scripts/watchdog.sh"]
     environment:
+      CHAT_PROXY_URL: http://svc-chat-proxy:8080/hooks/chat
       GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
     configs:
       - source: scripts_lib
@@ -129,7 +132,7 @@ services:
       - "GANTRY_UPDATE_TIMEOUT_SECONDS=300"
       - "GANTRY_UPDATE_OPTIONS=--with-registry-auth"
       - "GANTRY_NOTIFICATION_APPRISE_URL=http://svc-chat-relay:9000/hooks/gantry?trigger=hourly"
-      - "GANTRY_NOTIFICATION_CONDITION=on-change"
+      - "GANTRY_NOTIFICATION_CONDITION=all"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "/home/freecodecamp/.docker:/root/.docker"
@@ -174,12 +177,75 @@ services:
       restart_policy:
         condition: none
 
+  svc-chat-proxy:
+    image: python:3.12.15-alpine3.24@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4
+    command: ["python3", "/app/chat_proxy.py"]
+    environment:
+      GOOGLE_CHAT_WEBHOOK_FILE: /run/secrets/google_chat_webhook
+      GITHUB_ACTIONS_HMAC_SECRET_FILE: /run/secrets/github_actions_hmac
+      GITHUB_ACTIONS_HMAC_SECRET_PREVIOUS_FILE: /run/secrets/github_actions_hmac_previous
+      GITHUB_ACTIONS_REQUIRED: "true"
+      GITHUB_ACTIONS_SIGNATURE_TTL_SECONDS: "300"
+      GRAFANA_HMAC_SECRET_FILE: /run/secrets/grafana_hmac
+      GRAFANA_HMAC_SECRET_PREVIOUS_FILE: /run/secrets/grafana_hmac_previous
+      GRAFANA_REQUIRED: "true"
+      GRAFANA_SIGNATURE_TTL_SECONDS: "300"
+      CHAT_PROXY_EXPECTATIONS: /app/cron-expectations.json
+      CHAT_PROXY_DATA_DIR: /data
+      CHAT_PROXY_GRACE_MINUTES: "15"
+      CHAT_PROXY_RETENTION_DAYS: "30"
+      CHAT_PROXY_MAX_QUEUE_DEPTH: "10000"
+      CHAT_PROXY_MIN_FREE_BYTES: "67108864"
+      PORT: "8080"
+      EXTERNAL_PORT: "8081"
+    configs:
+      - source: chat_proxy_script
+        target: /app/chat_proxy.py
+        mode: 0555
+      - source: chat_proxy_expectations
+        target: /app/cron-expectations.json
+        mode: 0444
+    secrets:
+      - source: chat_proxy_google_chat_webhook
+        target: google_chat_webhook
+        mode: 0400
+      - source: chat_proxy_github_actions_hmac
+        target: github_actions_hmac
+        mode: 0400
+      - source: chat_proxy_github_actions_hmac_previous
+        target: github_actions_hmac_previous
+        mode: 0400
+      - source: chat_proxy_grafana_hmac
+        target: grafana_hmac
+        mode: 0400
+      - source: chat_proxy_grafana_hmac_previous
+        target: grafana_hmac_previous
+        mode: 0400
+    volumes:
+      - chat_proxy_data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    stop_grace_period: 45s
+    <<: *logging-config
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - "node.role == manager"
+          - "node.labels.chat_proxy_data == true"
+
   svc-chat-relay:
     image: lwlook/webhook@sha256:93f708c6c0d6469b4a0f7f654d5f25054e54dccba1cf316a1d7e48e2be736c9a
     command:
       - "-verbose"
       - "-hooks=/hooks.json"
     environment:
+      - "CHAT_PROXY_URL=http://svc-chat-proxy:8080/hooks/chat"
       - "GOOGLE_CHAT_WEBHOOK=${GOOGLE_CHAT_WEBHOOK:?}"
     configs:
       - source: hooks_relay
@@ -238,13 +304,13 @@ configs:
     name: oncall_run_gantry_v2
     file: ./run_gantry.sh
   scripts_lib:
-    name: oncall_scripts_lib_v1
+    name: oncall_scripts_lib_v2
     file: ./scripts/lib.sh
   scripts_dispatch:
-    name: oncall_scripts_dispatch_v2
+    name: oncall_scripts_dispatch_v3
     file: ./scripts/dispatch.sh
   scripts_watchdog:
-    name: oncall_scripts_watchdog_v1
+    name: oncall_scripts_watchdog_v2
     file: ./scripts/watchdog.sh
   hooks_relay:
     name: oncall_hooks_relay_v1
@@ -252,3 +318,29 @@ configs:
   scripts_relay:
     name: oncall_scripts_relay_v1
     file: ./scripts/relay.sh
+  chat_proxy_script:
+    name: oncall_chat_proxy_script_v4
+    file: ./proxy/chat_proxy.py
+  chat_proxy_expectations:
+    name: oncall_chat_proxy_expectations_v1
+    file: ./proxy/cron-expectations.json
+
+secrets:
+  chat_proxy_google_chat_webhook:
+    external: true
+    name: oncall_google_chat_webhook_v1
+  chat_proxy_github_actions_hmac:
+    external: true
+    name: oncall_github_actions_hmac_v1
+  chat_proxy_github_actions_hmac_previous:
+    external: true
+    name: oncall_github_actions_hmac_previous_v1
+  chat_proxy_grafana_hmac:
+    external: true
+    name: oncall_grafana_hmac_v1
+  chat_proxy_grafana_hmac_previous:
+    external: true
+    name: oncall_grafana_hmac_previous_v1
+
+volumes:
+  chat_proxy_data:
