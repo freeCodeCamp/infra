@@ -2,6 +2,18 @@
 # Usage:
 #   ansible-playbook -i inventory/linode.yml play-tailscale--1a-up.yml \
 #     -e variable_host=<group>
+- name: Tailscale - Read the auth key
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Read the auth key from 1Password once
+      ansible.builtin.set_fact:
+        tailscale_auth_key: >-
+          {{ lookup('community.general.onepassword', 'Tailscale-Auth-Key-vultr-lift', field='credential',
+          vault='Service-Automation', account_id='freecodecamp.1password.com') }}
+      no_log: true
+      when: tailscale_auth_key is not defined
+
 - name: Tailscale - Connect to Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
   serial: "{{ variable_serial | default(1) }}"
@@ -9,13 +21,15 @@
   become: true
   gather_facts: false
   vars:
-    tailscale_auth_key: "{{ lookup('ansible.builtin.env', 'TAILSCALE_AUTH_KEY') }}"
+    tailscale_auth_key: "{{ hostvars['localhost'].tailscale_auth_key | default('') }}"
   tasks:
     - name: Fail without an auth key
       ansible.builtin.assert:
         that:
           - tailscale_auth_key | length > 0
-        fail_msg: Export TAILSCALE_AUTH_KEY before you run this play.
+        fail_msg: >-
+          No auth key: the credential field of Service-Automation/Tailscale-Auth-Key-vultr-lift
+          is empty, -e tailscale_auth_key is empty, or --limit left out localhost.
         quiet: true
 
     - name: Check if Tailscale is Installed

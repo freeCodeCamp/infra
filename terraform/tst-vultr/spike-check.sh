@@ -3,7 +3,8 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-First join the tailnet, from ansible/ (again after each re-create):
+First sign in to op (freecodecamp.1password.com), then join the tailnet,
+from ansible/ (again after each re-create):
   ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
     play-tailscale--0-install.yml -e variable_host=tst_pxy:tst_mgr:tst_wkr
   ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
