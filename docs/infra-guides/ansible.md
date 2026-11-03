@@ -24,7 +24,7 @@ ansible-inventory -i inventory/digitalocean.yml --graph
 ## Rules for Every Play
 
 - Give the target group with `-e variable_host=<group>`.
-- A group name that does not exist stops the play with `Could not match supplied host pattern`. If you forget `-e variable_host`, the name in the message is `null` (`play-k3s--bootstrap.yml` says `variable_host` is undefined).
+- A group name that does not exist stops the play with `Could not match supplied host pattern`. If you forget `-e variable_host`, the name in the message is `null`.
 - In GitHub Actions, a group with no hosts gives a warning and the play does nothing.
 - Most plays that change hosts do one host at a time and stop at the first host that fails. Some take `-e variable_serial=<n>`. These are different:
   - `play-any--cleanup-clients.yml` does all hosts at the same time and does not stop on a failed host.
@@ -78,14 +78,13 @@ ansible-playbook -i inventory/linode.yml <play> -e variable_host=<group> [-e <in
 
 ## DigitalOcean k3s Plays
 
-Use `-i inventory/digitalocean.yml`.
+Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--servers.yml` with `-i inventory/vultr.yml -i inventory/constructed.yml -e variable_host=ops_o11y_vultr`.
 
-| Play                      | What it does                                                                                                                                                                    | Inputs                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `play-k3s--servers.yml`   | Install or upgrade k3s on `ops_o11y` (runbook 14)                                                                                                                               | —                                                           |
-| `play-k3s--bootstrap.yml` | Install k3s and Cilium on a new cluster. The group config must set `cilium_cluster_id`. No cluster on `main` has the `k3s/<cluster>/cluster/{security,cilium}/` files it reads. | `DO_SPACES_ACCESS_KEY`, `DO_SPACES_SECRET_KEY` (env)        |
-| `play-k3s--longhorn.yml`  | Install Longhorn on `tools_k3s`                                                                                                                                                 | —                                                           |
-| `play-k3s--teardown.yml`  | Remove k3s from every host in the group. Takes an etcd snapshot first.                                                                                                          | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
+| Play                     | What it does                                                           | Inputs                                                      |
+| ------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `play-k3s--servers.yml`  | Install or upgrade k3s on `ops_o11y` (runbook 14)                      | —                                                           |
+| `play-k3s--longhorn.yml` | Install Longhorn on `tools_k3s`                                        | —                                                           |
+| `play-k3s--teardown.yml` | Remove k3s from every host in the group. Takes an etcd snapshot first. | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
 
 ## Removed Plays
 
@@ -100,6 +99,7 @@ Use `-i inventory/digitalocean.yml`.
 | `play-ghost--0-backup.yml`, `play-oldeworld--ghost-0-initialize.yml`              | None. Ghost is retired (runbook 17).                                                  |
 | `play-o11y--grafana-cloud-0-linuxvm.yml`, `play-o11y--grafana-cloud-1-docker.yml` | None. Alloy is retired. `play-o11y--grafana-cloud-9-remove.yml` removes it.           |
 | `play-test--0-docker-swarm.yml`                                                   | None.                                                                                 |
+| `play-k3s--bootstrap.yml`                                                         | `play-k3s--servers.yml`. No cluster runs Cilium.                                      |
 
 ## Former `just` Recipes
 

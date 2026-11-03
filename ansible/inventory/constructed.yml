@@ -5,6 +5,11 @@ strict: false
 groups:
   ops_o11y_vultr: "vultr_label | default('') is match('^ops-vm-o11y-[0-9]+$')"
 
+compose:
+  node_exporter_systemd_unit_include:
+    "'^(cron|docker|fail2ban|fluent-bit|k3s|node_exporter|ssh|tailscaled)[.]service'
+    if vultr_label | default('') is match('^ops-vm-o11y-[0-9]+$') else not_an_o11y_host"
+
 keyed_groups:
   - key:
       "vultr_label | regex_replace('-[0-9]+$', '') | replace('-vm-', '_')

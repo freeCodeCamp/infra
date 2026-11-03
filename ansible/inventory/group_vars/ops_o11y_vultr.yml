@@ -2,6 +2,7 @@
 galaxy_name: ops-o11y-vultr
 k3s_init_host: ops-vm-o11y-1
 k3s_version: v1.36.4+k3s1
+k3s_vpc_cidr: "{{ vultr_vpc_cidr }}"
 
 server_config_yaml: |
   write-kubeconfig-mode: "0600"

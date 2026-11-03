@@ -27,17 +27,35 @@
     - name: Validate Tailscale connected
       ansible.builtin.include_tasks: tasks/assert-tailscale.yml
 
-    - name: Validate the VPC interface
+    - name: Read the VPC address by the VPC CIDR
+      ansible.builtin.command: ip -o -4 addr show to {{ k3s_vpc_cidr }}
+      register: k3s_vpc_addr
+      changed_when: false
+      check_mode: false
+      when: k3s_vpc_cidr is defined
+
+    - name: Validate one VPC address in the VPC CIDR
+      ansible.builtin.assert:
+        that:
+          - k3s_vpc_addr.stdout_lines | length == 1
+        fail_msg: "{{ inventory_hostname }}: {{ k3s_vpc_addr.stdout_lines }}"
+      when: k3s_vpc_cidr is defined
+
+    - name: Validate the VPC interface eth1
       ansible.builtin.assert:
         that:
           - ansible_eth1 is defined
           - ansible_eth1.ipv4.address | regex_search('^10\\.')
         fail_msg: "eth1 carries no 10.x VPC address on {{ inventory_hostname }}."
+      when: k3s_vpc_cidr is not defined
 
     - name: Set network facts
       ansible.builtin.set_fact:
         tailscale_ip: "{{ ansible_tailscale0.ipv4.address }}"
-        vpc_ip: "{{ ansible_eth1.ipv4.address }}"
+        vpc_iface: "{{ k3s_vpc_addr.stdout.split()[1] if k3s_vpc_cidr is defined else 'eth1' }}"
+        vpc_ip: >-
+          {{ k3s_vpc_addr.stdout.split()[3].split('/') | first if k3s_vpc_cidr is defined
+          else ansible_eth1.ipv4.address }}
 
     - name: Read the live K3s version from the first host
       ansible.builtin.command: k3s --version
@@ -67,7 +85,7 @@
     extra_server_args: >-
       --node-ip={{ vpc_ip }}
       --advertise-address={{ vpc_ip }}
-      --flannel-iface=eth1
+      --flannel-iface={{ vpc_iface }}
       --tls-san={{ inventory_hostname }}
       --tls-san={{ tailscale_ip }}
     server_group: "{{ variable_host }}"

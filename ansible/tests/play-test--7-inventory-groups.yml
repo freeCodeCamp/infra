@@ -42,6 +42,17 @@
           - groups['provider_vultr'] | intersect(groups['provider_linode']) | length == 0
         fail_msg: A host is in both provider groups
 
+    - name: Assert the o11y hosts get the K3s settings and the others keep the provider units
+      ansible.builtin.assert:
+        that:
+          - hostvars['ops-vm-o11y-1'].k3s_vpc_cidr == '10.50.0.0/20'
+          - hostvars['ops-vm-o11y-1'].node_exporter_systemd_unit_include ==
+            '^(cron|docker|fail2ban|fluent-bit|k3s|node_exporter|ssh|tailscaled)[.]service'
+          - hostvars['tst-vm-mgr-1'].node_exporter_systemd_unit_include ==
+            '^(cron|docker|fail2ban|fluent-bit|node_exporter|ssh|tailscaled)[.]service'
+          - hostvars['tst-vm-mgr-1'].k3s_vpc_cidr is not defined
+        fail_msg: The o11y K3s settings are wrong or reach other hosts
+
     - name: Assert hosts outside the naming rule get no new group
       ansible.builtin.assert:
         that:
