@@ -3,6 +3,7 @@
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
   become: true
+  any_errors_fatal: true
   vars:
     first_host: "{{ k3s_init_host }}"
 
@@ -15,14 +16,22 @@
           - server_config_yaml is defined and server_config_yaml | length > 0
         fail_msg: "Missing group_vars. Populate inventory/group_vars/{{ variable_host }}.yml"
 
-    - name: Validate the first host of the group
+    - name: Validate the init host is in the group
       ansible.builtin.assert:
         that:
-          - groups[variable_host][0] == first_host
+          - first_host in groups[variable_host]
           - first_host in ansible_play_hosts
         fail_msg: >-
-          k3s_init_host={{ first_host }} holds the datastore; it must be the first host
-          of {{ variable_host }} (inventory gives {{ groups[variable_host][0] }}) and in --limit.
+          k3s_init_host={{ first_host }} holds the datastore; it must be a host
+          of {{ variable_host }} and in --limit.
+
+    - name: Put the init host first in the role's server group (the inventory order is not stable)
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: "k3s_servers_{{ variable_host }}"
+      loop: "{{ [first_host] + (groups[variable_host] | difference([first_host]) | sort) }}"
+      run_once: true
+      changed_when: false
 
     - name: Validate Tailscale connected
       ansible.builtin.include_tasks: tasks/assert-tailscale.yml
@@ -62,7 +71,7 @@
       register: k3s_live_version
       changed_when: false
       failed_when: false
-      delegate_to: "{{ groups[variable_host][0] }}"
+      delegate_to: "{{ first_host }}"
       run_once: true
 
     - name: Pin the play to the live version
@@ -73,7 +82,7 @@
     - name: Validate a version is known
       ansible.builtin.assert:
         that: k3s_version is defined and k3s_version | length > 0
-        fail_msg: "No live K3s on {{ groups[variable_host][0] }} and no k3s_version in group_vars."
+        fail_msg: "No live K3s on {{ first_host }} and no k3s_version in group_vars."
 
 - name: K3s servers - Deploy
   hosts: '{{ variable_host | default("null") }}'
@@ -88,7 +97,7 @@
       --flannel-iface={{ vpc_iface }}
       --tls-san={{ inventory_hostname }}
       --tls-san={{ tailscale_ip }}
-    server_group: "{{ variable_host }}"
+    server_group: "k3s_servers_{{ variable_host }}"
     user_kubectl: false
     kubeconfig: "{{ playbook_dir }}/../k3s/{{ galaxy_name }}/.kubeconfig.yaml"
   pre_tasks:
