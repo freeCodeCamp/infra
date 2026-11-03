@@ -80,6 +80,23 @@ def from_milliseconds(value):
     return datetime.fromtimestamp(value / 1000, UTC)
 
 
+def is_https_url(value):
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        parts = urlsplit(value)
+        port = parts.port
+    except ValueError:
+        return False
+    return (
+        parts.scheme.lower() == "https"
+        and bool(parts.hostname)
+        and not parts.username
+        and not parts.password
+        and (port is None or 1 <= port <= 65535)
+    )
+
+
 def sanitize_link(value):
     if (
         not isinstance(value, str)
@@ -1486,6 +1503,9 @@ class ChatProxy:
         if not self.webhook:
             LOG.error("Google Chat destination is empty; message remains queued")
             return {"success": False, "error_class": "missing_destination", "transient": True}
+        if not is_https_url(self.webhook):
+            LOG.error("Google Chat destination must be an HTTPS URL")
+            return {"success": False, "error_class": "invalid_destination", "transient": False}
         body = json.dumps(payload, ensure_ascii=False).encode()
         request = Request(
             self.webhook,
@@ -2107,7 +2127,7 @@ class ChatProxy:
     def readiness(self):
         try:
             if (
-                not self.webhook
+                not is_https_url(self.webhook)
                 or (self.github_required and not self.github_secrets)
                 or (self.grafana_required and not self.grafana_secrets)
             ):
