@@ -1,0 +1,48 @@
+---
+- name: Refuse an unknown output or a host with no VPC address
+  ansible.builtin.assert:
+    that:
+      - maps_write in ['upstreams', 'scrape']
+      - maps_expected | length > 0
+      - maps_expected | difference(maps_addr.keys() | list) | length == 0
+    fail_msg: "maps_write {{ maps_write }}; no VPC address for {{ maps_expected | difference(maps_addr.keys() | list) }}"
+
+- name: Write the upstream map
+  when: maps_write == 'upstreams'
+  block:
+    - name: Render the upstream map
+      ansible.builtin.set_fact:
+        maps_upstreams_text: "{{ lookup('ansible.builtin.template', '../templates/vultr-maps/upstreams.yaml.j2') }}"
+
+    - name: Refuse a map with a missing block, an empty block or a Linode name
+      ansible.builtin.assert:
+        that:
+          - maps_blocks | length == 22
+          - maps_blocks | rejectattr('servers') | length == 0
+          - "'oldeworld' not in maps_upstreams_text"
+        fail_msg: "{{ maps_blocks | length }} blocks; empty {{ maps_blocks | rejectattr('servers') | map(attribute='name') | list }}"
+      vars:
+        maps_blocks: "{{ (maps_upstreams_text | from_yaml).nginx_upstreams }}"
+
+    - name: Write the plain upstream map
+      ansible.builtin.copy:
+        content: "{{ maps_upstreams_text }}"
+        dest: "{{ maps_upstreams_path }}"
+        mode: "0600"
+
+    - name: Report the upstream map
+      ansible.builtin.debug:
+        msg: "22 upstream blocks from {{ maps_expected | length }} hosts: {{ maps_upstreams_path }}"
+
+- name: Write the scrape file
+  when: maps_write == 'scrape'
+  block:
+    - name: Write the static scrape targets
+      ansible.builtin.template:
+        src: ../templates/vultr-maps/vmstaticscrape.yaml.j2
+        dest: "{{ maps_scrape_path }}"
+        mode: "0644"
+
+    - name: Report the scrape file
+      ansible.builtin.debug:
+        msg: "Node and Fluent Bit targets for {{ maps_addr | length }} hosts: {{ maps_scrape_path }}"

@@ -1,0 +1,122 @@
+---
+- name: Test the Vultr map generator
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  check_mode: false
+  vars_files:
+    - ../vars/vultr-maps.yml
+  vars:
+    test_dir: "{{ lookup('ansible.builtin.env', 'TMPDIR') | default('/tmp/', true) }}vultr-maps-test"
+    test_roles: "{{ ['api', 'soc', 'nws', 'pxy'] | product(['1', '2', '3']) | map('join', '-') | map('regex_replace', '^', 'stg-vm-') | list }}"
+    test_clients: "{{ vultr_maps_client_langs | product(['0', '1']) | map('join', '-') | map('regex_replace', '^', 'stg-vm-clt-') | list }}"
+    test_names: "{{ test_roles + test_clients + ['ops-vm-swarm-mgr-1'] }}"
+    maps_env: stg
+    maps_upstreams_path: "{{ test_dir }}/upstreams.yaml"
+    maps_scrape_path: "{{ test_dir }}/scrape.yaml"
+  tasks:
+    - name: Make an empty output directory
+      ansible.builtin.file:
+        path: "{{ test_dir }}"
+        state: "{{ item }}"
+        mode: "0700"
+      loop: [absent, directory]
+
+    - name: Give each host a fake VPC address
+      ansible.builtin.set_fact:
+        test_addr: "{{ test_addr | default({}) | combine({item: '10.50.1.' ~ (index + 1)}) }}"
+      loop: "{{ test_names }}"
+      loop_control:
+        index_var: index
+
+    - name: Render the upstream map
+      ansible.builtin.include_tasks: ../tasks/vultr-maps.yml
+      vars:
+        maps_write: upstreams
+        maps_expected: "{{ test_names }}"
+        maps_addr: "{{ test_addr }}"
+
+    - name: Read the upstream map
+      ansible.builtin.set_fact:
+        test_upstreams: "{{ (lookup('ansible.builtin.file', maps_upstreams_path) | from_yaml).nginx_upstreams }}"
+        test_upstreams_text: "{{ lookup('ansible.builtin.file', maps_upstreams_path) }}"
+
+    - name: Assert the upstream map holds each block with the right ports
+      ansible.builtin.assert:
+        that:
+          - test_upstreams | length == 22
+          - test_upstreams | map(attribute='name') | unique | length == 22
+          - "'oldeworld' not in test_upstreams_text"
+          - by_name['jms-eng'].servers == [test_addr['stg-vm-nws-1'] ~ ':4001', test_addr['stg-vm-nws-2'] ~ ':4001', test_addr['stg-vm-nws-3'] ~ ':4001']
+          - by_name['jms-ukr'].servers | select('search', ':4008$') | length == 3
+          - by_name['jms-eng'].least_conn is not defined
+          - by_name['api'].least_conn
+          - by_name['api'].servers | length == 6
+          - by_name['api'].servers | select('search', ':2345$') | length == 3
+          - by_name['api'].servers | select('search', ':2346$') | length == 3
+          - test_addr['stg-vm-api-1'] ~ ':2345' in by_name['api'].servers
+          - by_name['socrates'].least_conn
+          - test_addr['stg-vm-soc-3'] ~ ':4011' in by_name['socrates'].servers
+          - by_name['socrates'].servers | length == 6
+          - by_name['client-ara'].least_conn
+          - by_name['client-ara'].servers | length == 4
+          - test_addr['stg-vm-clt-ara-1'] ~ ':52525' in by_name['client-ara'].servers
+          - test_upstreams | selectattr('name', 'match', '^news-') | length == 0
+      vars:
+        by_name: "{{ dict(test_upstreams | map(attribute='name') | zip(test_upstreams)) }}"
+
+    - name: Render the scrape file
+      ansible.builtin.include_tasks: ../tasks/vultr-maps.yml
+      vars:
+        maps_write: scrape
+        maps_expected: "{{ test_names }}"
+        maps_addr: "{{ test_addr }}"
+
+    - name: Read the scrape file
+      ansible.builtin.set_fact:
+        test_scrapes: "{{ lookup('ansible.builtin.file', maps_scrape_path) | from_yaml_all | list }}"
+
+    - name: Assert the scrape file holds both jobs with the labels the rules read
+      ansible.builtin.assert:
+        that:
+          - test_scrapes | length == 2
+          - node.spec.jobName == 'node'
+          - fluent.spec.jobName == 'fluent-bit'
+          - node.spec.targetEndpoints | length == test_names | length
+          - fluent.spec.targetEndpoints | length == test_names | length
+          - fluent.spec.targetEndpoints[0].path == '/api/v2/metrics/prometheus'
+          - node_clt.targets == [test_addr['stg-vm-clt-eng-0'] ~ ':9100']
+          - "node_clt.labels == {'env': 'stg', 'role': 'clt', 'language': 'eng', 'instance': 'stg-vm-clt-eng-0', 'provider': 'vultr', 'region': 'ewr'}"
+          - node_mgr.labels.env == 'ops'
+          - node_mgr.labels.role == 'swarm-mgr'
+          - node_mgr.labels.language is not defined
+      vars:
+        node: "{{ test_scrapes[0] }}"
+        fluent: "{{ test_scrapes[1] }}"
+        node_clt: "{{ node.spec.targetEndpoints | selectattr('labels.instance', 'eq', 'stg-vm-clt-eng-0') | first }}"
+        node_mgr: "{{ node.spec.targetEndpoints | selectattr('labels.instance', 'eq', 'ops-vm-swarm-mgr-1') | first }}"
+
+    - name: Try a host with no VPC address
+      block:
+        - name: Render with one address missing
+          ansible.builtin.include_tasks: ../tasks/vultr-maps.yml
+          vars:
+            maps_write: upstreams
+            maps_expected: "{{ test_names }}"
+            maps_addr: "{{ test_addr | dict2items | rejectattr('key', 'eq', 'stg-vm-nws-2') | items2dict }}"
+            maps_upstreams_path: "{{ test_dir }}/missing.yaml"
+        - name: Fail because the render passed
+          ansible.builtin.set_fact:
+            test_missing_passed: true
+      rescue:
+        - name: Note the refusal
+          ansible.builtin.set_fact:
+            test_missing_refused: "{{ 'stg-vm-nws-2' in ansible_failed_result.msg }}"
+
+    - name: Assert the generator refuses a missing address and writes nothing
+      ansible.builtin.assert:
+        that:
+          - test_missing_refused | default(false)
+          - test_missing_passed is not defined
+          - query('ansible.builtin.fileglob', test_dir ~ '/missing.yaml') | length == 0

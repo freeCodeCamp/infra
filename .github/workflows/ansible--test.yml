@@ -64,3 +64,8 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check tests/play-test--6-verify-node-exporter.yml
+
+      - name: Unit Test the Vultr Map Generator
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--9-vultr-maps.yml

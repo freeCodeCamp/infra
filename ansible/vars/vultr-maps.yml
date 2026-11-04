@@ -1,0 +1,26 @@
+---
+vultr_maps_jms_ports:
+  eng: 4001
+  chn: 4002
+  esp: 4003
+  ita: 4004
+  jpn: 4005
+  kor: 4006
+  por: 4007
+  ukr: 4008
+vultr_maps_api_ports: [2345, 2346]
+vultr_maps_socrates_ports: [4010, 4011]
+vultr_maps_client_ports: [50505, 52525]
+vultr_maps_client_langs:
+  - eng
+  - chn
+  - cnt
+  - esp
+  - ger
+  - ita
+  - jpn
+  - por
+  - ukr
+  - swa
+  - kor
+  - ara
