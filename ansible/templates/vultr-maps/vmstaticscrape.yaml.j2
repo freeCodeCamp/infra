@@ -20,7 +20,7 @@
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMStaticScrape
 metadata:
-  name: vultr-hosts-node
+  name: vultr-{{ maps_env }}-node
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
@@ -31,7 +31,7 @@ spec:
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMStaticScrape
 metadata:
-  name: vultr-hosts-fluent-bit
+  name: vultr-{{ maps_env }}-fluent-bit
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:

@@ -112,10 +112,11 @@ Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--
 
 ## Vultr Plays
 
-| Play                   | What it does                                                                                                                                            | Inputs                                                                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `play-vultr--base.yml` | Configure the base of a Vultr host, one host at a time. Remove ufw. Install the sudo user, fail2ban, Docker, node exporter and Fluent Bit. Harden sshd. | `variable_host=<group>`, `variable_serial=<n>`                                                                                    |
-| `play-swarm--form.yml` | Form the Vultr Swarm and join the workers, then apply the node labels (runbook 18)                                                                      | `swarm_manager_group=<group>`, `swarm_worker_group=<group>[:<group>…]`, `swarm_rejoin=true` for a worker that is in another Swarm |
+| Play                          | What it does                                                                                                                                            | Inputs                                                                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `play-vultr--base.yml`        | Configure the base of a Vultr host, one host at a time. Remove ufw. Install the sudo user, fail2ban, Docker, node exporter and Fluent Bit. Harden sshd. | `variable_host=<group>`, `variable_serial=<n>`                                                                                    |
+| `play-swarm--form.yml`        | Form the Vultr Swarm and join the workers, then apply the node labels (runbook 18)                                                                      | `swarm_manager_group=<group>`, `swarm_worker_group=<group>[:<group>…]`, `swarm_rejoin=true` for a worker that is in another Swarm |
+| `play-vultr--render-maps.yml` | Read each VPC address. Write the NGINX upstream map (plain, to encrypt) or the vmagent targets. Stops when a host of the fleet has no address.          | `maps_env=stg\|prd\|ops`, `maps_write=upstreams\|scrape` (`ops` takes `scrape` only)                                              |
 
 ## Removed Plays
 

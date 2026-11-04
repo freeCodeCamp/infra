@@ -1,9 +1,8 @@
 ---
 - name: Read the VPC addresses
-  hosts: "{{ variable_host | default('null') }}:&provider_vultr"
+  hosts: "~^{{ maps_env | default('null') }}-vm-(?!o11y):&provider_vultr"
   gather_facts: false
   become: false
-  strategy: free
   tasks:
     - name: Read the VPC address of this host
       ansible.builtin.command: ip -o -4 addr show to {{ vultr_vpc_cidr }}
@@ -31,9 +30,7 @@
   vars:
     secrets_dir: "{{ lookup('ansible.builtin.env', 'SECRETS_DIR') | default(playbook_dir ~ '/../../infra-secrets', true) }}"
     maps_upstreams_path: "{{ secrets_dir }}/docker/vultr/pxy-upstreams-{{ maps_env }}.yaml.plaintext"
-    maps_scrape_path: "{{ playbook_dir }}/../k3s/ops-o11y-vultr/cluster/victoria-metrics/vmstaticscrape-vultr-hosts.yaml"
-    maps_expected: "{{ query('ansible.builtin.inventory_hostnames', variable_host ~ ':&provider_vultr') }}"
-    maps_addr: "{{ maps_expected | map('extract', hostvars) | selectattr('maps_vpc_ip', 'defined') | items2dict(key_name='inventory_hostname', value_name='maps_vpc_ip') }}"
+    maps_scrape_path: "{{ playbook_dir }}/../k3s/ops-o11y-vultr/cluster/victoria-metrics/vmstaticscrape-vultr-{{ maps_env }}.yaml"
   tasks:
     - name: Make the output directory
       ansible.builtin.file:
