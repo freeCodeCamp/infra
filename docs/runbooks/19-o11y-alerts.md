@@ -108,27 +108,43 @@ A host uses more than 90% of its memory for 15 minutes.
 
 ## FluentBitDroppedRecords
 
-Fluent Bit on a Vultr host dropped log records in the last 15 minutes. Those records are lost.
+Fluent Bit on a Vultr host dropped log records in the last 15 minutes. One of two causes applies:
 
-1. Read the output counters on the host. Use the `instance` label of the alert:
+- The log agent refused the records with an HTTP 4xx status. Fluent Bit keeps a copy in `/var/lib/fluent-bit/storage/rejected`, up to 256M.
+- The buffer of an output became full, and Fluent Bit removed the oldest records. Those records are lost.
+
+1. Find the cause. Use the `instance` label of the alert:
 
    ```sh
-   ssh freecodecamp@<host> curl -s http://127.0.0.1:2020/api/v2/metrics/prometheus
+   ssh freecodecamp@<instance> 'sudo journalctl -u fluent-bit --since -30min --no-pager | grep -E "HTTP status=|will not be retried"'
    ```
 
-1. Compare `fluentbit_output_dropped_records_total` and `fluentbit_output_errors_total`. If the errors increase, do the steps in [FluentBitBufferBacklog](#fluentbitbufferbacklog).
+1. If the output shows `will not be retried`, the log agent refused the records. Read the status on the line before it, then examine the log of the log agent:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l o11y.freecodecamp.org/component=vlagent --tail=100
+   ```
+
+1. If the output does not show `will not be retried`, do the steps in [FluentBitBufferBacklog](#fluentbitbufferbacklog).
 
 ## FluentBitBufferBacklog
 
-Fluent Bit on a Vultr host has used half of its log buffer for 15 minutes. The log cluster does not accept the records fast enough. A full buffer drops records.
+An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minutes. The output cannot send records to the log agent as fast as it reads them. Each output has its own limit. A full buffer drops records.
 
-1. Examine the log pods:
+1. Examine the log agent pods:
 
    ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -o wide
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l o11y.freecodecamp.org/component=vlagent -o wide
    ```
 
-1. If a pod is not ready, examine its events and its log. The buffer empties when the pod accepts records again.
+1. If a pod is not ready, examine its events and its log. The buffer empties when the log agent accepts records again.
+1. If each pod is ready, find the send error on the host. Use the `instance` label of the alert:
+
+   ```sh
+   ssh freecodecamp@<instance> 'sudo journalctl -u fluent-bit --since -30min --no-pager | tail -50'
+   ```
+
+1. A connection error shows a fault in the VPC network or the node. An HTTP 5xx status shows a fault in the log agent.
 
 ## NodeTargetsAbsent
 
