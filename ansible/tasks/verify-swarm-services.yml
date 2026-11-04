@@ -1,0 +1,12 @@
+---
+- name: Wait for the Swarm services to reach their targets
+  ansible.builtin.script:
+    cmd: >-
+      {{ playbook_dir }}/../docker/swarm/stacks/oncall/scripts/swarm-check.sh
+      {{ variable_service_prefix | default('') | quote }}
+  register: swarm_services
+  until: swarm_services.rc == 0
+  retries: "{{ variable_swarm_retries | default(40) }}"
+  delay: 30
+  changed_when: false
+  check_mode: false

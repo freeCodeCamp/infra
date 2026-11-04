@@ -80,3 +80,28 @@
 6. Add the container registry details to Portainer.
 
 7. Deploy the remaining stacks: [API](docker-swarm-api.md) only from Portainer, [News](docker-swarm-news.md) from Portainer or the CLI, and [Socrates](docker-swarm-socrates.md#deployment) and [oncall](docker-swarm-oncall.md#deployment) only from the CLI. Do not manage the portainer stack from within the Portainer UI.
+
+## Stray Overlay Device
+
+Symptom: tasks on one node stay `Rejected` with this error, and the service stays below its target:
+
+```text
+network sandbox join failed: subnet sandbox join failed for "<subnet>": error creating vxlan interface: file exists
+```
+
+Cause: at shutdown, Docker moves each overlay device to the host namespace, then deletes it. If the daemon exits between these two steps, the device stays. The next daemon does not remove it. Upstream issue: [moby#49555](https://github.com/moby/moby/issues/49555).
+
+A stray device on `ingress` shows a different symptom. The tasks stay at their target, and the Docker journal shows `Failed creating ingress network: ... file exists`.
+
+Fix: on the node, find the device and delete it. On a node without the guard below, a Docker restart does not clear the device. Swarm starts the tasks at its next attempt.
+
+```shell
+ip -o link show type vxlan
+sudo ip link delete <vx-device>
+```
+
+Three controls guard against this fault:
+
+- `play-swarm--docker-guard.yml` deletes stray devices each time Docker starts, and holds the Docker packages. See [Ansible Plays](ansible.md#swarm-docker-plays).
+- `svc-watchdog-swarm` and `svc-watchdog-vxlan` post to Google Chat. See [Swarm Watchdogs](docker-swarm-oncall.md#swarm-watchdogs).
+- The housekeeping workflow checks the staging Swarm before it updates production. See [Housekeeping Workflow](ansible.md#housekeeping-workflow).

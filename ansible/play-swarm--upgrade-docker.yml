@@ -1,0 +1,45 @@
+---
+- name: Upgrade Docker on one Swarm node at a time
+  hosts: "{{ variable_host | default('null') }}"
+  serial: 1
+  max_fail_percentage: 0
+  gather_facts: false
+  become: true
+  become_user: root
+  vars_files:
+    - roles/docker/defaults/main.yml
+  tasks:
+    - name: Install the overlay guard
+      ansible.builtin.include_role:
+        name: docker
+        tasks_from: overlay-guard.yml
+
+    - name: Upgrade the held packages
+      block:
+        - name: Release the hold
+          ansible.builtin.dpkg_selections:
+            name: "{{ item }}"
+            selection: install
+          loop: "{{ docker_held_packages }}"
+
+        - name: Upgrade Docker
+          ansible.builtin.apt:
+            name: "{{ docker_held_packages }}"
+            state: latest # noqa package-latest
+            update_cache: true
+            force_apt_get: true
+      always:
+        - name: Hold the Docker packages again
+          ansible.builtin.dpkg_selections:
+            name: "{{ item }}"
+            selection: hold
+          loop: "{{ docker_held_packages }}"
+
+    - name: Check this node
+      ansible.builtin.include_tasks: tasks/verify-swarm-node.yml
+
+    - name: Check the services from the manager
+      ansible.builtin.include_tasks:
+        file: tasks/verify-swarm-services.yml
+        apply:
+          delegate_to: "{{ groups[variable_manager | default('ops_backoffice')] | first }}"

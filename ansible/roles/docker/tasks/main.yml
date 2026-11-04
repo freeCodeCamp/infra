@@ -45,3 +45,6 @@
     name: docker
     enabled: true
     state: started
+
+- name: Guard Docker against stray overlay devices
+  ansible.builtin.include_tasks: overlay-guard.yml

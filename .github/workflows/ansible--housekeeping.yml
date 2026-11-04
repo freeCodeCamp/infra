@@ -174,9 +174,23 @@ jobs:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  gate-swarm-stg:
+    name: Gate Swarm (staging)
+    needs: reboot-stg
+    uses: ./.github/workflows/ansible--verify-swarm.yml
+    with:
+      hosts: stg_oldeworld_api:stg_oldeworld_jms
+      service_prefix: stg-
+      verbosity: "-v"
+      provider: linode
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
   update-prd:
     name: Update (production)
-    needs: reboot-stg
+    needs: gate-swarm-stg
     strategy:
       fail-fast: false
       matrix:
@@ -315,9 +329,23 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
 
+  verify-swarm:
+    name: Verify Swarm
+    needs: [window, reboot-prd]
+    if: ${{ !cancelled() && needs.window.outputs.allowed == 'true' }}
+    uses: ./.github/workflows/ansible--verify-swarm.yml
+    with:
+      hosts: stg_oldeworld_api:stg_oldeworld_jms:prd_oldeworld_api:prd_oldeworld_jms:ops_backoffice
+      verbosity: "-v"
+      provider: linode
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
   report:
     name: Report
-    needs: [window, uptime, update-stg, reboot-web-stg, gate-web-stg, reboot-stg, update-prd, reboot-web-prd, gate-web-prd, reboot-prd, verify-nginx]
+    needs: [window, uptime, update-stg, reboot-web-stg, gate-web-stg, reboot-stg, gate-swarm-stg, update-prd, reboot-web-prd, gate-web-prd, reboot-prd, verify-nginx, verify-swarm]
     # always(), not success(): the run that most needs a message is the one
     # that failed. Once this posts on every run, a Wednesday or Saturday with
     # NO message means the workflow never ran at all -- the one failure no
@@ -350,11 +378,13 @@ jobs:
           REBOOT_WEB_STG: ${{ needs.reboot-web-stg.result }}
           GATE_WEB_STG: ${{ needs.gate-web-stg.result }}
           REBOOT_STG: ${{ needs.reboot-stg.result }}
+          GATE_SWARM_STG: ${{ needs.gate-swarm-stg.result }}
           UPDATE_PRD: ${{ needs.update-prd.result }}
           REBOOT_WEB_PRD: ${{ needs.reboot-web-prd.result }}
           GATE_WEB_PRD: ${{ needs.gate-web-prd.result }}
           REBOOT_PRD: ${{ needs.reboot-prd.result }}
           VERIFY: ${{ needs.verify-nginx.result }}
+          VERIFY_SWARM: ${{ needs.verify-swarm.result }}
         run: |
           python3 - <<'PYEOF'
           import glob, json, os
@@ -367,11 +397,13 @@ jobs:
               ("reboot-web-stg", os.environ["REBOOT_WEB_STG"]),
               ("gate-web-stg", os.environ["GATE_WEB_STG"]),
               ("reboot-stg", os.environ["REBOOT_STG"]),
+              ("gate-swarm-stg", os.environ["GATE_SWARM_STG"]),
               ("update-prd", os.environ["UPDATE_PRD"]),
               ("reboot-web-prd", os.environ["REBOOT_WEB_PRD"]),
               ("gate-web-prd", os.environ["GATE_WEB_PRD"]),
               ("reboot-prd", os.environ["REBOOT_PRD"]),
               ("verify", os.environ["VERIFY"]),
+              ("verify-swarm", os.environ["VERIFY_SWARM"]),
           ]
 
           checked, bad = 0, []
