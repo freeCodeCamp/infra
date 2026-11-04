@@ -27,9 +27,15 @@ Export the ID that the line prints:
 export SNAPSHOT_ID=<ID>
 ```
 
-## 2. Remove the old tailnet device
+## 2. Check the tailnet delete credentials
 
-In the Tailscale admin console, remove the device `ops-vm-swarm-mgr-1`. If you do not, the new VM joins as `ops-vm-swarm-mgr-1-1` ([kb/1098](https://tailscale.com/kb/1098/machine-names)).
+The destroy in step 3 deletes the old tailnet device through the Tailscale API (`terraform/modules/vultr-fleet/tailscale-device-delete.sh`). If the old device stays, the new VM joins as `ops-vm-swarm-mgr-1-1` ([kb/1098](https://tailscale.com/kb/1098/machine-names)). The script needs the OAuth client in `vultr/.env.enc`:
+
+```sh
+direnv exec terraform/ops-swarm-vultr env | grep -c '^TAILSCALE_DEVICES_OAUTH_CLIENT_'
+```
+
+The command must print `2`.
 
 ## 3. Re-create the manager
 
@@ -37,7 +43,7 @@ In the Tailscale admin console, remove the device `ops-vm-swarm-mgr-1`. If you d
 direnv exec terraform/ops-swarm-vultr tofu -chdir=terraform/ops-swarm-vultr apply -var snapshot_id="$SNAPSHOT_ID" -replace='module.fleet.vultr_instance.this["ops-vm-swarm-mgr-1"]'
 ```
 
-The plan must show 1 to add and 1 to destroy.
+The plan must show 1 to add and 1 to destroy. Between `Destroying...` and `Destruction complete`, the output shows `(local-exec): tailscale: deleted <node ID> ops-vm-swarm-mgr-1.<tailnet>.ts.net (200)`. If the VM was not on the tailnet, it shows `tailscale: no tag:added-by-ops device for ops-vm-swarm-mgr-1`. Use `-replace`, not `tofu taint`: a tainted resource skips the delete.
 
 Remove the old host key of the manager from your `known_hosts`:
 
@@ -110,7 +116,7 @@ Run the same steps on the test VMs, with these changes:
 
 - Step 1: use the snapshot of the last `tst-vultr` apply, not the newest one. A different snapshot re-creates every test VM. Read it with `direnv exec terraform/tst-vultr tofu -chdir=terraform/tst-vultr state show 'vultr_instance.tst["tst-vm-mgr-1"]' | grep snapshot_id`.
 - Step 3: `direnv exec terraform/tst-vultr tofu -chdir=terraform/tst-vultr apply -var snapshot_id="$SNAPSHOT_ID" -replace='vultr_instance.tst["tst-vm-mgr-1"]'`, then `ssh-keygen -R tst-vm-mgr-1`.
-- Steps 2, 5 and 6: `ops-vm-swarm-mgr-1` becomes `tst-vm-mgr-1`, `ops_swarm_mgr` becomes `tst_mgr`, and the worker groups become `tst_wkr`.
+- Steps 2, 5 and 6: `terraform/ops-swarm-vultr` becomes `terraform/tst-vultr`, `ops-vm-swarm-mgr-1` becomes `tst-vm-mgr-1`, `ops_swarm_mgr` becomes `tst_mgr`, and the worker groups become `tst_wkr`.
 - Step 7: skip it. From the repo root, run `SNAPSHOT_ID="$SNAPSHOT_ID" CONSOLE_LOGIN_OK=yes direnv exec terraform/tst-vultr terraform/tst-vultr/spike-check.sh`.
 
 Record the time from step 3 to the last `Ready` node.
@@ -120,4 +126,5 @@ Record the time from step 3 to the last `Ready` node.
 - **A run of the Swarm play without `swarm_rejoin` stops with "… outside the Swarm on … Re-run with -e swarm_rejoin=true".** A worker is in another Swarm, or a failed join left it `pending` or `error`. Run the same command again with `-e swarm_rejoin=true`. The worker leaves and joins this Swarm.
 - **A worker join times out with HTTP 503.** The worker cannot reach the manager on tcp/2377 over the VPC. On the manager, run `ss -Hltn sport = :2377`. From the worker, run `nc -z -w 5 <manager VPC address> 2377`. A host firewall on either VM is the usual cause; the image removes `ufw`.
 - **`docker node ls` shows a node twice, one copy `Down`.** That node joined again with a new node ID. Run `ssh freecodecamp@ops-vm-swarm-mgr-1 sudo docker node rm <ID of the Down copy>`.
-- **The tailnet name is `ops-vm-swarm-mgr-1-1`.** The old device was still in the tailnet (step 2). Remove both devices, then run the second command of step 5 again.
+- **The apply stops with `curl: (22) … error: <code>`, `tailscale: delete … failed: HTTP <code>` or a variable `is not set`.** The VM is not deleted. A `curl: (22)` 401 or a missing variable: the OAuth client in `vultr/.env.enc` is wrong or absent (step 2). A 403 on the delete: the client has no right to delete that device. Fix the cause and run step 3 again.
+- **The tailnet name is `ops-vm-swarm-mgr-1-1`.** The old device was still in the tailnet: it did not have the tag `tag:added-by-ops`, or the VM was destroyed without the delete (`tofu taint`, or a delete in the Vultr console). Remove both devices in the Tailscale admin console, then run the second command of step 5 again.
