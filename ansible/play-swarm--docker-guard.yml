@@ -1,0 +1,13 @@
+---
+- name: Guard Docker on the Swarm nodes
+  hosts: "{{ variable_host | default('null') }}"
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Install the overlay guard
+      ansible.builtin.include_role:
+        name: docker
+        tasks_from: overlay-guard.yml

@@ -1,0 +1,37 @@
+---
+# workaround: https://github.com/moby/moby/issues/49555
+- name: Install the stray overlay device cleanup
+  ansible.builtin.copy:
+    src: docker-clean-stray-vxlan
+    dest: /usr/local/sbin/docker-clean-stray-vxlan
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the Docker systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Run the cleanup before Docker starts
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/clean-stray-vxlan.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Service]
+      ExecStartPre=-/usr/local/sbin/docker-clean-stray-vxlan
+
+- name: Load the drop-in without restarting Docker
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Hold the Docker packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ docker_held_packages }}"

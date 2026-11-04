@@ -1,0 +1,18 @@
+#!/bin/sh
+# workaround: https://github.com/moby/moby/issues/49555
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+ip -o link show type vxlan | while read -r _ name _; do
+  name=${name%%[:@]*}
+  case "$name" in
+  vx-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-?????)
+    if ip link delete "$name"; then
+      printf 'deleted stray overlay device %s\n' "$name"
+    else
+      printf 'could not delete stray overlay device %s\n' "$name"
+    fi
+    ;;
+  esac
+done
+exit 0

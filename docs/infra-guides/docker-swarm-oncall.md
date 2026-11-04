@@ -19,6 +19,8 @@ The Oncall stack provides automated maintenance and monitoring services includin
 | **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat    |
 | **svc-dispatch-docr-gc**      | Starts the infra `docr--garbage-collection.yml` workflow Wed/Sat |
 | **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale         |
+| **svc-watchdog-swarm**        | Posts to Google Chat when a service or a node is not healthy     |
+| **svc-watchdog-vxlan**        | Posts to Google Chat when a node has a stray overlay device      |
 
 ## Architecture
 
@@ -58,11 +60,11 @@ All services → json-file logging (local, rotated)
 
 Export these 3 variables before `docker stack deploy`. Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
 
-| Variable                | Used by                      | Value                                                                               |
-| ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
-| `WEBHOOK_SECRET`        | svc-webhook                  | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
-| `GITHUB_DISPATCH_TOKEN` | dispatchers                  | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
-| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdog, relay | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
+| Variable                | Used by                       | Value                                                                               |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------------- |
+| `WEBHOOK_SECRET`        | svc-webhook                   | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
+| `GITHUB_DISPATCH_TOKEN` | dispatchers                   | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
+| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdogs, relay | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
 
 Anyone with Docker access on the manager can read these values with `docker service inspect`. Rotate a value after you remove such access.
 
@@ -97,6 +99,19 @@ The DOCR garbage collection workflow makes the registry read-only while it runs.
 - Posts: the first hour past the limit, then every 6 hours while the feed stays stale.
 - Quiet hours: Wed/Sat 00:00–08:00 UTC. The first check after quiet hours posts if the feed is stale.
 - The watchdog also posts when it cannot read the feed or the date.
+
+### Swarm Watchdogs
+
+`svc-watchdog-swarm` runs on the manager every 30 minutes. It runs `scripts/swarm-check.sh`, reads again after 60 seconds, and posts each finding that stays.
+
+- It finds services below their target, and nodes with 3 or more rejected tasks in the last 15 minutes.
+- It does not check cron services or jobs.
+- It posts on each run while the finding stays.
+- Quiet hours: Wed/Sat 00:00–06:00 UTC. Housekeeping restarts nodes in this window, and its [Swarm checks](ansible.md#housekeeping-workflow) report on the run.
+
+`svc-watchdog-vxlan` runs on each node at minutes 5 and 35, on the host network. It posts when the node has a [stray overlay device](docker-swarm.md#stray-overlay-device) on two reads, 5 seconds apart. A stray device on `ingress` does not reduce the task count, so `svc-watchdog-swarm` does not find it.
+
+`ansible/play-swarm--verify.yml` also uses `scripts/swarm-check.sh`.
 
 ### Google Chat Notifications
 

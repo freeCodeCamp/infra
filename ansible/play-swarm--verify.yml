@@ -1,0 +1,18 @@
+---
+- name: Check the Swarm nodes
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Check this node
+      ansible.builtin.include_tasks: tasks/verify-swarm-node.yml
+
+- name: Check the Swarm services
+  hosts: "{{ variable_manager | default('ops_backoffice') }}"
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Check the services from the manager
+      ansible.builtin.include_tasks: tasks/verify-swarm-services.yml

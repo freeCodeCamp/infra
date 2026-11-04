@@ -83,6 +83,23 @@ For a Vultr group, use `-i inventory/vultr.yml -i inventory/constructed.yml` in 
 | `play-tailscale--9-down.yml`                | Disconnect from the tailnet                                                                 | Yes           | `variable_serial`                                                                                                                                                                       |
 | `play-test--2-node-version.yml`             | Show the Node.js, npm and PM2 versions                                                      | No            | —                                                                                                                                                                                       |
 
+## Swarm Docker Plays
+
+Run these on the Swarm node groups. The role `docker` applies the same guard to Vultr hosts.
+
+| Play                             | What it does                                                                                                                                        | Changes hosts | Inputs                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------- |
+| `play-swarm--docker-guard.yml`   | Install the stray overlay device cleanup that runs before Docker starts, and hold the Docker packages. It does not restart Docker.                  | Yes           | `variable_serial`                                                       |
+| `play-swarm--verify.yml`         | Check that each node is active with no stray overlay device. Then check the services from the manager.                                              | No            | `variable_service_prefix`, `variable_manager`, `variable_swarm_retries` |
+| `play-swarm--upgrade-docker.yml` | Upgrade the held Docker packages on one node at a time, hold them again, and run the same checks after each node. This restarts Docker on the node. | Yes           | `variable_service_prefix`, `variable_manager`, `variable_swarm_retries` |
+
+`play-any--update.yml` does not upgrade held packages. To upgrade Docker, run `play-swarm--upgrade-docker.yml`. Start with a staging group:
+
+```bash
+ansible-playbook -i inventory/linode.yml play-swarm--upgrade-docker.yml \
+  -e variable_host=stg_oldeworld_jms -e variable_service_prefix=stg-
+```
+
 ## DigitalOcean k3s Plays
 
 Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--servers.yml` with `-i inventory/vultr.yml -i inventory/constructed.yml -e variable_host=ops_o11y_vultr`.
@@ -152,9 +169,11 @@ If the decrypt fails, the current kubeconfig stays as it is. The new file has mo
 
 ## Housekeeping Workflow
 
-`ansible--housekeeping.yml` runs in this order: the maintenance window check, uptime, update staging, reboot staging NGINX, check staging NGINX, reboot staging, the same steps on production, then a last NGINX check on staging and production.
+`ansible--housekeeping.yml` runs in this order: the maintenance window check, uptime, update staging, reboot staging NGINX, check staging NGINX, reboot staging, check the staging Swarm, the same update, reboot and NGINX steps on production, then a last NGINX check and a last Swarm check on staging and production.
 
 - Outside Wednesday and Saturday 00:00-06:00 UTC, the run stops at the window check. Dispatch it with `window_check=false` to run it at another time.
 - If the staging NGINX check finds a problem, the production steps do not run that night. This is also true when the restart fixed NGINX.
 - The last NGINX check runs on `stg_oldeworld_pxy` and `prd_oldeworld_pxy`, also when the production steps did not run. It can restart NGINX on both groups.
-- The NGINX check posts its findings to Google Chat. The run summary in Google Chat shows each skipped stage.
+- If the staging Swarm check fails, the production steps do not run that night. It checks each staging API and JMS node, and each `stg-` service from the manager.
+- The last Swarm check runs on all Swarm nodes and services, also when the production steps did not run.
+- The NGINX check posts its findings to Google Chat. The run summary in Google Chat shows each skipped stage. A failed Swarm check shows as a failed stage in that summary, and the job log has the findings.
