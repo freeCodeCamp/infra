@@ -109,3 +109,25 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#vmalertexecutionerrors"
+    - name: fluent-bit
+      interval: 1m
+      rules:
+        - alert: FluentBitDroppedRecords
+          expr: increase(fluentbit_output_dropped_records_total{job="fluent-bit"}[15m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Fluent Bit on {{ $labels.instance }} dropped log records."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#fluentbitdroppedrecords"
+        - alert: FluentBitBufferBacklog
+          expr: fluentbit_output_chunk_available_capacity_percent{job="fluent-bit"} < 50
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Fluent Bit on {{ $labels.instance }} has used half of its log buffer."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#fluentbitbufferbacklog"

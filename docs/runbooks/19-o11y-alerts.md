@@ -106,6 +106,30 @@ A host uses more than 90% of its memory for 15 minutes.
 
 1. Restart the service that leaks memory. If the use is normal for the role, resize the VM.
 
+## FluentBitDroppedRecords
+
+Fluent Bit on a Vultr host dropped log records in the last 15 minutes. Those records are lost.
+
+1. Read the output counters on the host. Use the `instance` label of the alert:
+
+   ```sh
+   ssh freecodecamp@<host> curl -s http://127.0.0.1:2020/api/v2/metrics/prometheus
+   ```
+
+1. Compare `fluentbit_output_dropped_records_total` and `fluentbit_output_errors_total`. If the errors increase, do the steps in [FluentBitBufferBacklog](#fluentbitbufferbacklog).
+
+## FluentBitBufferBacklog
+
+Fluent Bit on a Vultr host has used half of its log buffer for 15 minutes. The log cluster does not accept the records fast enough. A full buffer drops records.
+
+1. Examine the log pods:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -o wide
+   ```
+
+1. If a pod is not ready, examine its events and its log. The buffer empties when the pod accepts records again.
+
 ## NodeTargetsAbsent
 
 The `node` scrape job has no targets for 10 minutes. The metrics of each host stop, and HostDown cannot fire.
