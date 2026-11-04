@@ -18,6 +18,8 @@
       ops_swarm_mgr: [ops-vm-swarm-mgr-1]
       ops_o11y: []
       ops_o11y_vultr: [ops-vm-o11y-1]
+      vultr_pxy: [prd-vm-pxy-2]
+      vultr_clt: [prd-vm-clt-eng-0]
   tasks:
     - name: Assert each group holds exactly its expected hosts
       ansible.builtin.assert:
@@ -52,6 +54,20 @@
             '^(cron|docker|fail2ban|fluent-bit|node_exporter|ssh|tailscaled)[.]service'
           - hostvars['tst-vm-mgr-1'].k3s_vpc_cidr is not defined
         fail_msg: The o11y K3s settings are wrong or reach other hosts
+
+    - name: Assert the Vultr proxy and client settings reach only Vultr hosts
+      ansible.builtin.assert:
+        that:
+          - hostvars['prd-vm-pxy-2'].pxy_tier == 'prd'
+          - hostvars['prd-vm-pxy-2'].nginx_org_series == '1.30'
+          - hostvars['prd-vm-pxy-2'].node_exporter_systemd_unit_include ==
+            '^(cron|docker|fail2ban|fluent-bit|nginx|node_exporter|ssh|tailscaled)[.]service'
+          - hostvars['prd-vm-clt-eng-0'].node_exporter_systemd_unit_include ==
+            '^(cron|docker|fail2ban|fluent-bit|node_exporter|pm2-freecodecamp|ssh|tailscaled)[.]service'
+          - hostvars['prd-vm-clt-eng-0'].pm2_app_ports == [50505, 52525]
+          - hostvars['prd-vm-oldeworld-pxy-1'].nginx_org_series is not defined
+          - hostvars['tst-vm-pxy-1'].pxy_tier is not defined
+        fail_msg: The Vultr proxy or client settings are wrong or reach other hosts
 
     - name: Assert hosts outside the naming rule get no new group
       ansible.builtin.assert:

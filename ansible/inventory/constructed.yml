@@ -4,6 +4,8 @@ strict: false
 
 groups:
   ops_o11y_vultr: "vultr_label | default('') is match('^ops-vm-o11y-[0-9]+$')"
+  vultr_pxy: "vultr_label | default('') is match('^(stg|prd)-vm-pxy-[0-9]+$')"
+  vultr_clt: "vultr_label | default('') is match('^(stg|prd)-vm-clt-')"
 
 compose:
   node_exporter_systemd_unit_include:
