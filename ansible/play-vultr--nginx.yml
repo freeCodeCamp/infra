@@ -15,8 +15,6 @@
       - freecodecamp.dev.key
       - freecodecamp.org.crt
       - freecodecamp.org.key
-    nginx_aop_ca_url: https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem
-    nginx_aop_ca_sha256: c14fed0ce5210db0719fea11d1f10b33750dc17d609aeaf47c75e9eff0d7b843
     nginx_probe_port: 8081
   pre_tasks:
     - name: Decrypt the Origin CA files once for this host
@@ -90,60 +88,7 @@
       no_log: true
       register: nginx_tls_written
 
-    - name: Download the Cloudflare client CA
-      ansible.builtin.get_url:
-        url: "{{ nginx_aop_ca_url }}"
-        dest: "{{ nginx_ssl_dir }}/cloudflare-aop-ca.pem"
-        checksum: "sha256:{{ nginx_aop_ca_sha256 }}"
-        owner: root
-        group: root
-        mode: "0640"
-      register: nginx_aop_ca_downloaded
-
-    - name: Create the client certificate of the probe listener
-      ansible.builtin.command:
-        argv:
-          - openssl
-          - req
-          - -x509
-          - -newkey
-          - rsa:2048
-          - -nodes
-          - -days
-          - "36500"
-          - -subj
-          - /CN={{ inventory_hostname }}-probe
-          - -keyout
-          - "{{ nginx_ssl_dir }}/probe.key"
-          - -out
-          - "{{ nginx_ssl_dir }}/probe.crt"
-        creates: "{{ nginx_ssl_dir }}/probe.crt"
-
-    - name: Restrict the probe key
-      ansible.builtin.file:
-        path: "{{ nginx_ssl_dir }}/probe.key"
-        owner: root
-        group: root
-        mode: "0640"
-
-    - name: Read the certificates that the proxy trusts
-      ansible.builtin.slurp:
-        src: "{{ nginx_ssl_dir }}/{{ item }}"
-      loop:
-        - cloudflare-aop-ca.pem
-        - probe.crt
-      register: nginx_client_cas
-
-    - name: Write the trusted client certificates
-      ansible.builtin.copy:
-        content: "{{ nginx_client_cas.results | map(attribute='content') | map('b64decode') | map('trim') | join('\n') }}\n"
-        dest: "{{ nginx_ssl_dir }}/origin-client-ca.pem"
-        owner: root
-        group: root
-        mode: "0640"
-      register: nginx_client_ca_written
-
-    - name: Write the client certificate check and the probe listener
+    - name: Write the probe listener
       ansible.builtin.template:
         src: templates/vultr-nginx/origin.conf.j2
         dest: "{{ nginx_config_dir }}/conf.d/vultr-origin.conf"
@@ -220,8 +165,6 @@
       vars:
         nginx_reload_triggers:
           - "{{ nginx_tls_written }}"
-          - "{{ nginx_aop_ca_downloaded }}"
-          - "{{ nginx_client_ca_written }}"
           - "{{ nginx_origin_written }}"
           - "{{ nginx_upstreams_seeded }}"
           - "{{ git_update }}"
