@@ -11,3 +11,4 @@ docker_held_packages:
   - containerd.io
 docker_log_max_size: 50m
 docker_log_max_file: "5"
+docker_group_users: []

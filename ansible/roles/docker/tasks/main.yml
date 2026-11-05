@@ -46,5 +46,13 @@
     enabled: true
     state: started
 
+- name: Add the Docker users to the docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_group_users }}"
+  tags: [login_user]
+
 - name: Guard Docker against stray overlay devices
   ansible.builtin.include_tasks: overlay-guard.yml

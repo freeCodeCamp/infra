@@ -3,6 +3,8 @@ vultr_vpc_cidr: 10.50.0.0/20
 vultr_internet_check_url: http://archive.ubuntu.com/ubuntu/
 vultr_internet_check_delay: 10
 
+docker_group_users: [freecodecamp]
+
 node_exporter_bind: vpc
 node_exporter_vpc_cidr: "{{ vultr_vpc_cidr }}"
 node_exporter_systemd_unit_include: "^(cron|docker|fail2ban|fluent-bit|node_exporter|ssh|tailscaled)[.]service"
