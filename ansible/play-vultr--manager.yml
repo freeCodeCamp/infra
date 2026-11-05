@@ -1,0 +1,95 @@
+---
+- name: Configure the Vultr Swarm manager for deploys
+  hosts: "{{ variable_host | default('null') }}:&ops_swarm_mgr:&provider_vultr"
+  max_fail_percentage: 0
+  become: true
+  become_user: root
+  gather_facts: false
+  vars:
+    manager_user: freecodecamp
+    manager_home: /home/freecodecamp
+    manager_service: svc:swarm-wh-vultr
+    manager_linode_service: svc:swarm-wh
+    manager_webhook_port: 9889
+  tasks:
+    - name: Read the Tailscale Services this host serves
+      ansible.builtin.command: tailscale serve status --json
+      register: manager_serve_status
+      changed_when: false
+      check_mode: false
+
+    - name: Read the Tailscale Services this host advertises
+      ansible.builtin.command: tailscale debug prefs
+      register: manager_prefs
+      changed_when: false
+      check_mode: false
+
+    - name: Keep the served and advertised Services
+      ansible.builtin.set_fact:
+        manager_serving: "{{ (manager_serve_status.stdout | from_json).Services | default({}) | list }}"
+        manager_advertised: "{{ (manager_prefs.stdout | from_json).AdvertiseServices | default([], true) }}"
+
+    - name: Refuse a host that holds the Linode webhook Service
+      ansible.builtin.assert:
+        that:
+          - manager_linode_service not in manager_serving
+          - manager_linode_service not in manager_advertised
+        fail_msg: "{{ inventory_hostname }} holds {{ manager_linode_service }}, so Linode webhooks reach it. Clear it with tailscale serve clear."
+        quiet: true
+
+    - name: Install age
+      ansible.builtin.apt:
+        name: age
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Clone the infra repository that the deploy workflows read
+      ansible.builtin.git:
+        repo: https://github.com/freeCodeCamp/infra.git
+        dest: "{{ manager_home }}/infra"
+        version: main
+        force: false
+      become: true
+      become_user: "{{ manager_user }}"
+
+    - name: Link the Swarm config path that the deploy workflows read
+      ansible.builtin.file:
+        src: "{{ manager_home }}/infra/docker/swarm"
+        dest: "{{ manager_home }}/docker-swarm-config"
+        state: link
+        owner: "{{ manager_user }}"
+        group: "{{ manager_user }}"
+
+    - name: Create the Docker client directories that the oncall stack mounts
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ manager_user }}"
+        group: "{{ manager_user }}"
+        mode: "0700"
+      loop:
+        - "{{ manager_home }}/.docker"
+        - "{{ manager_home }}/.docker/buildx"
+
+    - name: Serve the webhook on the tailnet
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - serve
+          - --service={{ manager_service }}
+          - --https=443
+          - --yes
+          - 127.0.0.1:{{ manager_webhook_port }}
+      changed_when: true
+      when: manager_service not in manager_serving
+
+    - name: Advertise the Service again after a Tailscale reset
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - serve
+          - advertise
+          - "{{ manager_service }}"
+      changed_when: true
+      when: manager_service in manager_serving and manager_service not in manager_advertised

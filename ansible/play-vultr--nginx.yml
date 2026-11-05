@@ -1,0 +1,184 @@
+---
+- name: Configure NGINX on a Vultr proxy
+  hosts: "{{ variable_host | default('null') }}:&vultr_pxy"
+  serial: 1
+  max_fail_percentage: 0
+  become: true
+  become_user: root
+  gather_facts: false
+  vars:
+    nginx_ssl_from_files: false
+    nginx_ssl_dir: "{{ nginx_config_dir }}/ssl"
+    nginx_tls_required:
+      - dhparam.pem
+      - freecodecamp.dev.crt
+      - freecodecamp.dev.key
+      - freecodecamp.org.crt
+      - freecodecamp.org.key
+    nginx_aop_ca_url: https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem
+    nginx_aop_ca_sha256: c14fed0ce5210db0719fea11d1f10b33750dc17d609aeaf47c75e9eff0d7b843
+    nginx_probe_port: 8081
+  pre_tasks:
+    - name: Decrypt the Origin CA files once for this host
+      ansible.builtin.set_fact:
+        nginx_tls_to_write: "{{ nginx_tls_files }}"
+      no_log: true
+
+    - name: Refuse an envelope without each file the sites read
+      ansible.builtin.assert:
+        that:
+          - nginx_tls_required | difference(nginx_tls_to_write | list) | length == 0
+        fail_msg: "The Origin CA envelope lacks {{ nginx_tls_required | difference(nginx_tls_to_write | list) }}"
+        quiet: true
+
+    - name: Read the VPC address of this host
+      ansible.builtin.command: ip -o -4 addr show to {{ vultr_vpc_cidr }}
+      register: nginx_vpc_addr
+      changed_when: false
+      check_mode: false
+
+    - name: Refuse a host without exactly one VPC address
+      ansible.builtin.assert:
+        that:
+          - nginx_vpc_addr.stdout_lines | length == 1
+        fail_msg: "{{ inventory_hostname }}: {{ nginx_vpc_addr.stdout_lines }}"
+        quiet: true
+
+    - name: Keep the VPC address
+      ansible.builtin.set_fact:
+        nginx_probe_ip: "{{ (nginx_vpc_addr.stdout.split()[3]).split('/') | first }}"
+
+  roles:
+    - nginx
+
+  tasks:
+    - name: Clone the NGINX config and the error pages
+      ansible.builtin.include_tasks: roles/nginx/tasks/config-nginx.yml
+
+    - name: Create the directories the repository ignores
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - {path: "{{ nginx_ssl_dir }}", mode: "0750"}
+        - {path: "{{ nginx_upstreams_path | dirname }}", mode: "0755"}
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Write the Origin CA files
+      ansible.builtin.copy:
+        content: "{{ item.value }}"
+        dest: "{{ nginx_ssl_dir }}/{{ item.key }}"
+        owner: root
+        group: root
+        mode: "0640"
+      loop: "{{ nginx_tls_to_write | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      no_log: true
+
+    - name: Download the Cloudflare client CA
+      ansible.builtin.get_url:
+        url: "{{ nginx_aop_ca_url }}"
+        dest: "{{ nginx_ssl_dir }}/cloudflare-aop-ca.pem"
+        checksum: "sha256:{{ nginx_aop_ca_sha256 }}"
+        owner: root
+        group: root
+        mode: "0640"
+
+    - name: Create the client certificate of the probe listener
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - req
+          - -x509
+          - -newkey
+          - rsa:2048
+          - -nodes
+          - -days
+          - "36500"
+          - -subj
+          - /CN={{ inventory_hostname }}-probe
+          - -keyout
+          - "{{ nginx_ssl_dir }}/probe.key"
+          - -out
+          - "{{ nginx_ssl_dir }}/probe.crt"
+        creates: "{{ nginx_ssl_dir }}/probe.crt"
+
+    - name: Restrict the probe key
+      ansible.builtin.file:
+        path: "{{ nginx_ssl_dir }}/probe.key"
+        owner: root
+        group: root
+        mode: "0640"
+
+    - name: Read the certificates that the proxy trusts
+      ansible.builtin.slurp:
+        src: "{{ nginx_ssl_dir }}/{{ item }}"
+      loop:
+        - cloudflare-aop-ca.pem
+        - probe.crt
+      register: nginx_client_cas
+
+    - name: Write the trusted client certificates
+      ansible.builtin.copy:
+        content: "{{ nginx_client_cas.results | map(attribute='content') | map('b64decode') | map('trim') | join('\n') }}\n"
+        dest: "{{ nginx_ssl_dir }}/origin-client-ca.pem"
+        owner: root
+        group: root
+        mode: "0640"
+
+    - name: Write the client certificate check and the probe listener
+      ansible.builtin.template:
+        src: templates/vultr-nginx/origin.conf.j2
+        dest: "{{ nginx_config_dir }}/conf.d/vultr-origin.conf"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Write the upstream names on a new host
+      ansible.builtin.copy:
+        content: |
+          {% for upstream in nginx_seed_names %}
+          upstream {{ upstream }} {
+            server 0.0.0.0:32323;
+          }
+          {% endfor %}
+        dest: "{{ nginx_upstreams_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+        force: false
+      vars:
+        nginx_seed_names: "{{ nginx_upstreams | map(attribute='name') }}"
+
+    - name: Write the listed upstream blocks
+      ansible.builtin.include_tasks: roles/nginx/tasks/render-upstreams.yml
+
+    - name: Check the NGINX config
+      ansible.builtin.command:
+        chdir: "{{ nginx_config_dir }}"
+        cmd: nginx -t
+      changed_when: false
+      check_mode: false
+
+    - name: Start NGINX
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Reload NGINX
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+      changed_when: false
+
+    - name: Check that NGINX holds the probe listener
+      ansible.builtin.wait_for:
+        host: "{{ nginx_probe_ip }}"
+        port: "{{ nginx_probe_port }}"
+        timeout: 30

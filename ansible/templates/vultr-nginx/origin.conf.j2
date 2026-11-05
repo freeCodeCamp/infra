@@ -1,0 +1,15 @@
+ssl_verify_client on;
+ssl_client_certificate {{ nginx_ssl_dir }}/origin-client-ca.pem;
+
+server {
+  listen {{ nginx_probe_ip }}:{{ nginx_probe_port }};
+
+  location / {
+    proxy_pass https://127.0.0.1:443;
+    proxy_ssl_server_name on;
+    proxy_ssl_name $host;
+    proxy_set_header Host $host;
+    proxy_ssl_certificate {{ nginx_ssl_dir }}/probe.crt;
+    proxy_ssl_certificate_key {{ nginx_ssl_dir }}/probe.key;
+  }
+}

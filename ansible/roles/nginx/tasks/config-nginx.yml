@@ -42,3 +42,4 @@
     owner: root
     group: root
     mode: "0644"
+  when: nginx_ssl_from_files | default(true)
