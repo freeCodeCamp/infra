@@ -30,8 +30,8 @@ The Vultr inventory needs `VULTR_API_KEY`. `ansible/.envrc` loads it from `vultr
 
 - Give the target group with `-e variable_host=<group>`. `play-swarm--form.yml` is different: it takes `swarm_manager_group` and `swarm_worker_group`.
 - A group name that does not exist stops the play with `Could not match supplied host pattern`. If you forget `-e variable_host`, the name in the message is `null`.
-- In GitHub Actions, a group with no hosts gives a warning and the play does nothing. With the `vultr` provider, a group name that does not exist fails the run. The `update` and `reboot` workflows take `check: true` to run with `--check`.
-- `ansible--housekeeping.yml` and `ansible--cleanup-clients.yml` name a group and a provider on each job leg. An environment moves to Vultr at its traffic cutover, in one commit that changes its legs.
+- In GitHub Actions, a group with no hosts gives a warning and the play does nothing. With the `vultr` provider, the run fails on a group with no hosts or a group name that does not exist, because a Vultr group exists only when a host matches it. The `update` and `reboot` workflows take `check: true` to run with `--check`.
+- `ansible--housekeeping.yml` and `ansible--cleanup-clients.yml` name a group and a provider on each job leg. An environment moves to Vultr at its traffic cutover, by a change to its legs.
 - Most plays that change hosts do one host at a time and stop at the first host that fails. Some take `-e variable_serial=<n>`. These are different:
   - `play-any--cleanup-clients.yml` does all hosts at the same time and does not stop on a failed host.
   - `play-o11y--node-exporter-9-remove.yml` and `play-o11y--grafana-cloud-9-remove.yml` do 25% of the hosts at a time.
