@@ -986,23 +986,11 @@ class ChatProxy:
             ):
                 raise ValueError("invalid Grafana values")
 
-    def _canonicalize_grafana(self, payload, received_at):
+    def _grafana_payload_values(self, payload):
         allowed_fields = {
-            "receiver",
-            "status",
-            "alerts",
-            "groupLabels",
-            "commonLabels",
-            "commonAnnotations",
-            "externalURL",
-            "appVersion",
-            "version",
-            "groupKey",
-            "truncatedAlerts",
-            "orgId",
-            "title",
-            "state",
-            "message",
+            "receiver", "status", "alerts", "groupLabels", "commonLabels", "commonAnnotations",
+            "externalURL", "appVersion", "version", "groupKey", "truncatedAlerts", "orgId",
+            "title", "state", "message",
         }
         required_fields = allowed_fields - {"appVersion"}
         if (
@@ -1038,7 +1026,6 @@ class ChatProxy:
                 result[key] = item
             return result
 
-        receiver = bounded_string(payload["receiver"], 200)
         status = bounded_string(payload["status"], 16)
         state_value = bounded_string(payload["state"], 16)
         if status not in {"firing", "resolved"}:
@@ -1051,6 +1038,7 @@ class ChatProxy:
         if not isinstance(truncated, int) or isinstance(truncated, bool) or truncated < 0:
             raise ValueError("invalid Grafana truncation count")
         group_key = bounded_string(payload["groupKey"], 4096)
+        bounded_string(payload["receiver"], 200)
         bounded_string(payload["title"], 8192, allow_empty=True)
         bounded_string(payload["message"], 32768, allow_empty=True)
         bounded_string(payload["externalURL"], 2048, allow_empty=True)
@@ -1059,12 +1047,21 @@ class ChatProxy:
         common_labels = string_map(payload["commonLabels"])
         string_map(payload["groupLabels"])
         string_map(payload["commonAnnotations"])
-
         alerts = payload["alerts"]
         if not isinstance(alerts, list) or not 1 <= len(alerts) <= MAX_GRAFANA_ALERTS:
             raise ValueError("invalid Grafana alerts")
-        normalized_alerts = self._normalize_grafana_alerts(alerts, bounded_string, string_map)
+        return (
+            status,
+            truncated,
+            group_key,
+            common_labels,
+            self._normalize_grafana_alerts(alerts, bounded_string, string_map),
+        )
 
+    def _canonicalize_grafana(self, payload, received_at):
+        status, truncated, group_key, common_labels, normalized_alerts = self._grafana_payload_values(
+            payload
+        )
         return self._build_grafana_event(
             normalized_alerts, common_labels, status, truncated, group_key, received_at
         )
