@@ -774,20 +774,10 @@ class ChatProxy:
         ).hexdigest()
         return event, f"legacy:{fingerprint}"
 
-    def _canonicalize_github(self, payload, received_at, observed_at):
+    def _github_values(self, payload):
         allowed_fields = {
-            "schema",
-            "status",
-            "source",
-            "subject",
-            "summary",
-            "details",
-            "link",
-            "link_label",
-            "repository",
-            "run_id",
-            "run_attempt",
-            "notification_key",
+            "schema", "status", "source", "subject", "summary", "details", "link",
+            "link_label", "repository", "run_id", "run_attempt", "notification_key",
         }
         if (
             not isinstance(payload, dict)
@@ -809,20 +799,18 @@ class ChatProxy:
         repository = required_string("repository", 201)
         if not GITHUB_REPOSITORY.fullmatch(repository):
             raise ValueError("invalid repository")
-        repository_key = repository.lower()
         run_id = required_string("run_id", 32)
         run_attempt = required_string("run_attempt", 10)
         if not run_id.isdigit() or int(run_id) < 1 or not run_attempt.isdigit() or int(run_attempt) < 1:
             raise ValueError("invalid run identity")
-        run_id = str(int(run_id))
-        run_attempt = str(int(run_attempt))
         notification_key = required_string("notification_key", 200)
         if not GITHUB_NOTIFICATION_KEY.fullmatch(notification_key):
             raise ValueError("invalid notification_key")
-        source = sanitize_one_line(required_string("source", 200))
-        subject = sanitize_one_line(required_string("subject", 300))
-        summary = sanitize_one_line(required_string("summary", 1000))
-        if not source or not subject or not summary:
+        text = {
+            name: sanitize_one_line(required_string(name, maximum))
+            for name, maximum in (("source", 200), ("subject", 300), ("summary", 1000))
+        }
+        if not all(text.values()):
             raise ValueError("sanitized text field is empty")
         details_value = payload.get("details")
         if details_value is None:
@@ -844,60 +832,77 @@ class ChatProxy:
         if not isinstance(link_label_value, str) or not link_label_value:
             raise ValueError("invalid link_label")
         link_label = sanitize_one_line(link_label_value)
-        if len(link_label) > 100:
+        if not link_label or len(link_label) > 100:
             raise ValueError("invalid link_label")
-        identity_tuple = (repository_key, run_id, run_attempt, notification_key)
-        identity = json.dumps(identity_tuple, separators=(",", ":"))
+        identity_tuple = (repository.lower(), str(int(run_id)), str(int(run_attempt)), notification_key)
         state = states[status]
-        if state == "ok":
-            details = None
-        routing_action = "digest" if state == "ok" else "immediate"
+        return {
+            "status": status,
+            "state": state,
+            "source": text["source"],
+            "subject": text["subject"],
+            "summary": text["summary"],
+            "details": None if state == "ok" else details,
+            "link": link,
+            "link_label": link_label,
+            "identity_tuple": identity_tuple,
+        }
+
+    def _build_github_event(self, values, received_at, observed_at):
+        identity_tuple = values["identity_tuple"]
+        identity = json.dumps(identity_tuple, separators=(",", ":"))
+        state = values["state"]
         event = {
             "schema": "fcc.alert-event/v1",
             "event_id": str(uuid.uuid4()),
-            "source": {"id": "github-actions", "instance": source, "adapter": "github-actions/v1"},
+            "source": {"id": "github-actions", "instance": values["source"], "adapter": "github-actions/v1"},
             "provider": {
                 "event_id": identity,
                 "delivery_id": identity,
                 "incident_key": json.dumps(
-                    (repository_key, run_id, notification_key), separators=(",", ":")
+                    (identity_tuple[0], identity_tuple[1], identity_tuple[3]), separators=(",", ":")
                 ),
             },
             "kind": "job",
             "state": state,
             "severity": SEVERITY_BY_STATE[state],
-            "subject": {"key": notification_key, "label": subject},
-            "summary": summary,
-            "details": details,
-            "link": link,
-            "link_label": link_label,
+            "subject": {"key": identity_tuple[3], "label": values["subject"]},
+            "summary": values["summary"],
+            "details": values["details"],
+            "link": values["link"],
+            "link_label": values["link_label"],
             "observed_at": isoformat(observed_at),
             "received_at": isoformat(received_at),
             "heartbeat": {"expectation_id": None, "scheduled_for": None},
             "routing": {
-                "action": routing_action,
+                "action": "digest" if state == "ok" else "immediate",
                 "policy_version": 1,
-                "reason": "github-success" if routing_action == "digest" else "github-actionable",
+                "reason": "github-success" if state == "ok" else "github-actionable",
             },
         }
+        return event, identity
+
+    def _canonicalize_github(self, payload, received_at, observed_at):
+        values = self._github_values(payload)
+        event, identity = self._build_github_event(values, received_at, observed_at)
         self._validate_event(event)
         dedupe_key = hashlib.sha256(identity.encode()).hexdigest()
         semantic = {
-            "status": status,
-            "source": source,
-            "subject": subject,
-            "summary": summary,
-            "details": details,
-            "link": link,
-            "link_label": link_label,
-            "identity": identity_tuple,
+            "status": values["status"],
+            "source": values["source"],
+            "subject": values["subject"],
+            "summary": values["summary"],
+            "details": values["details"],
+            "link": values["link"],
+            "link_label": values["link_label"],
+            "identity": values["identity_tuple"],
         }
         payload_fingerprint = hashlib.sha256(
             json.dumps(semantic, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
         return event, f"github:{dedupe_key}", payload_fingerprint
 
-    def _canonicalize_grafana(self, payload, received_at):
+    def _canonicalize_grafana(self, payload, received_at):  # noqa: C901
         allowed_fields = {
             "receiver",
             "status",
@@ -1514,7 +1519,8 @@ class ChatProxy:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=15) as response:
+            # The destination is restricted to HTTPS by is_https_url above.
+            with urlopen(request, timeout=15) as response:  # nosec B310
                 if 200 <= response.status < 300:
                     return {"success": True, "http_status": response.status}
                 return {"success": False, "http_status": response.status, "transient": response.status in (408, 425, 429) or response.status >= 500, "error_class": "http"}
@@ -2450,14 +2456,16 @@ def main():
     max_request_bytes = int(os.environ.get("CHAT_PROXY_MAX_REQUEST_BYTES", "65536"))
     request_timeout = int(os.environ.get("CHAT_PROXY_REQUEST_TIMEOUT_SECONDS", "10"))
     internal_server = ProxyServer(
-        ("0.0.0.0", int(os.environ.get("PORT", "8080"))),
+        # Docker services must listen on all container interfaces.
+        ("0.0.0.0", int(os.environ.get("PORT", "8080"))),  # nosec B104
         proxy,
         max_request_bytes,
         request_timeout,
         allowed_post_paths=("/hooks/chat",),
     )
     external_server = ProxyServer(
-        ("0.0.0.0", int(os.environ.get("EXTERNAL_PORT", "8081"))),
+        # Docker services must listen on all container interfaces.
+        ("0.0.0.0", int(os.environ.get("EXTERNAL_PORT", "8081"))),  # nosec B104
         proxy,
         max_request_bytes,
         request_timeout,

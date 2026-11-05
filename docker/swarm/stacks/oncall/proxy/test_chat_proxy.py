@@ -13,7 +13,12 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import Request, urlopen as _urlopen
+
+
+def urlopen(request, *, timeout):
+    # Test URLs are constructed from the local test server only.
+    return _urlopen(request, timeout=timeout)  # nosec B310
 
 from chat_proxy import (
     ChatProxy,
