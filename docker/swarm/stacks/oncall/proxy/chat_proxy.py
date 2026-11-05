@@ -774,18 +774,7 @@ class ChatProxy:
         ).hexdigest()
         return event, f"legacy:{fingerprint}"
 
-    def _github_values(self, payload):
-        allowed_fields = {
-            "schema", "status", "source", "subject", "summary", "details", "link",
-            "link_label", "repository", "run_id", "run_attempt", "notification_key",
-        }
-        if (
-            not isinstance(payload, dict)
-            or set(payload) != allowed_fields
-            or payload.get("schema") != GITHUB_EVENT_SCHEMA
-        ):
-            raise ValueError("unsupported GitHub event contract")
-
+    def _github_required_values(self, payload):
         def required_string(name, maximum):
             value = payload.get(name)
             if not isinstance(value, str) or not value or len(value) > maximum:
@@ -806,6 +795,9 @@ class ChatProxy:
         notification_key = required_string("notification_key", 200)
         if not GITHUB_NOTIFICATION_KEY.fullmatch(notification_key):
             raise ValueError("invalid notification_key")
+        return status, states[status], repository, run_id, run_attempt, notification_key, required_string
+
+    def _github_content_values(self, payload, required_string):
         text = {
             name: sanitize_one_line(required_string(name, maximum))
             for name, maximum in (("source", 200), ("subject", 300), ("summary", 1000))
@@ -834,8 +826,24 @@ class ChatProxy:
         link_label = sanitize_one_line(link_label_value)
         if not link_label or len(link_label) > 100:
             raise ValueError("invalid link_label")
+        return text, details, link, link_label
+
+    def _github_values(self, payload):
+        allowed_fields = {
+            "schema", "status", "source", "subject", "summary", "details", "link",
+            "link_label", "repository", "run_id", "run_attempt", "notification_key",
+        }
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != allowed_fields
+            or payload.get("schema") != GITHUB_EVENT_SCHEMA
+        ):
+            raise ValueError("unsupported GitHub event contract")
+        status, state, repository, run_id, run_attempt, notification_key, required_string = (
+            self._github_required_values(payload)
+        )
+        text, details, link, link_label = self._github_content_values(payload, required_string)
         identity_tuple = (repository.lower(), str(int(run_id)), str(int(run_attempt)), notification_key)
-        state = states[status]
         return {
             "status": status,
             "state": state,
@@ -902,7 +910,83 @@ class ChatProxy:
         ).hexdigest()
         return event, f"github:{dedupe_key}", payload_fingerprint
 
-    def _canonicalize_grafana(self, payload, received_at):  # noqa: C901
+    def _normalize_grafana_alerts(self, alerts, bounded_string, string_map):
+        alert_allowed = {
+            "status", "labels", "annotations", "startsAt", "endsAt", "generatorURL",
+            "fingerprint", "silenceURL", "dashboardURL", "panelURL", "ruleUID", "values",
+            "valueString", "imageURL", "embeddedImage", "orgId", "enrichments",
+        }
+        alert_required = {
+            "status", "labels", "annotations", "startsAt", "endsAt", "generatorURL",
+            "fingerprint", "silenceURL", "dashboardURL", "panelURL", "values", "valueString",
+        }
+        normalized_alerts = []
+        for alert in alerts:
+            self._validate_grafana_alert_shape(alert, alert_allowed, alert_required)
+            labels = string_map(alert["labels"])
+            annotations = string_map(alert["annotations"])
+            fingerprint = bounded_string(alert["fingerprint"], 64)
+            if not GRAFANA_FINGERPRINT.fullmatch(fingerprint):
+                raise ValueError("invalid Grafana fingerprint")
+            try:
+                starts_at = parse_timestamp(bounded_string(alert["startsAt"], 64))
+                ends_at = parse_timestamp(bounded_string(alert["endsAt"], 64))
+            except (TypeError, ValueError):
+                raise ValueError("invalid Grafana alert timestamp") from None
+            for field in (
+                "generatorURL", "silenceURL", "dashboardURL", "panelURL", "valueString",
+                "ruleUID", "imageURL", "embeddedImage",
+            ):
+                if field in alert:
+                    bounded_string(alert[field], 16384, allow_empty=True)
+            self._validate_grafana_values(alert["values"])
+            if "orgId" in alert and (
+                not isinstance(alert["orgId"], int)
+                or isinstance(alert["orgId"], bool)
+                or alert["orgId"] < 1
+            ):
+                raise ValueError("invalid Grafana alert organization")
+            normalized_alerts.append(
+                {
+                    "status": alert["status"],
+                    "labels": labels,
+                    "annotations": annotations,
+                    "starts_at": starts_at,
+                    "ends_at": ends_at,
+                    "fingerprint": fingerprint,
+                    "dashboard_url": alert["dashboardURL"],
+                    "panel_url": alert["panelURL"],
+                    "generator_url": alert["generatorURL"],
+                }
+            )
+        return normalized_alerts
+
+    def _validate_grafana_alert_shape(self, alert, allowed, required):
+        if (
+            not isinstance(alert, dict)
+            or set(alert) - allowed
+            or not required.issubset(alert)
+            or alert["status"] not in {"firing", "resolved"}
+        ):
+            raise ValueError("invalid Grafana alert")
+
+    def _validate_grafana_values(self, values):
+        if values is None:
+            return
+        if not isinstance(values, dict) or len(values) > 100:
+            raise ValueError("invalid Grafana values")
+        for key, value in values.items():
+            if (
+                not isinstance(key, str)
+                or not key
+                or len(key) > 100
+                or isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                raise ValueError("invalid Grafana values")
+
+    def _canonicalize_grafana(self, payload, received_at):
         allowed_fields = {
             "receiver",
             "status",
@@ -979,144 +1063,24 @@ class ChatProxy:
         alerts = payload["alerts"]
         if not isinstance(alerts, list) or not 1 <= len(alerts) <= MAX_GRAFANA_ALERTS:
             raise ValueError("invalid Grafana alerts")
-        alert_allowed = {
-            "status",
-            "labels",
-            "annotations",
-            "startsAt",
-            "endsAt",
-            "generatorURL",
-            "fingerprint",
-            "silenceURL",
-            "dashboardURL",
-            "panelURL",
-            "ruleUID",
-            "values",
-            "valueString",
-            "imageURL",
-            "embeddedImage",
-            "orgId",
-            "enrichments",
-        }
-        alert_required = {
-            "status",
-            "labels",
-            "annotations",
-            "startsAt",
-            "endsAt",
-            "generatorURL",
-            "fingerprint",
-            "silenceURL",
-            "dashboardURL",
-            "panelURL",
-            "values",
-            "valueString",
-        }
-        normalized_alerts = []
-        for alert in alerts:
-            if (
-                not isinstance(alert, dict)
-                or set(alert) - alert_allowed
-                or not alert_required.issubset(alert)
-                or alert["status"] not in {"firing", "resolved"}
-            ):
-                raise ValueError("invalid Grafana alert")
-            labels = string_map(alert["labels"])
-            annotations = string_map(alert["annotations"])
-            fingerprint = bounded_string(alert["fingerprint"], 64)
-            if not GRAFANA_FINGERPRINT.fullmatch(fingerprint):
-                raise ValueError("invalid Grafana fingerprint")
-            try:
-                starts_at = parse_timestamp(bounded_string(alert["startsAt"], 64))
-                ends_at = parse_timestamp(bounded_string(alert["endsAt"], 64))
-            except (TypeError, ValueError):
-                raise ValueError("invalid Grafana alert timestamp") from None
-            for field in (
-                "generatorURL",
-                "silenceURL",
-                "dashboardURL",
-                "panelURL",
-                "valueString",
-                "ruleUID",
-                "imageURL",
-                "embeddedImage",
-            ):
-                if field in alert:
-                    bounded_string(alert[field], 16384, allow_empty=True)
-            values = alert["values"]
-            if values is not None:
-                if not isinstance(values, dict) or len(values) > 100:
-                    raise ValueError("invalid Grafana values")
-                for key, value in values.items():
-                    if (
-                        not isinstance(key, str)
-                        or not key
-                        or len(key) > 100
-                        or isinstance(value, bool)
-                        or not isinstance(value, (int, float))
-                        or not math.isfinite(value)
-                    ):
-                        raise ValueError("invalid Grafana values")
-            if "orgId" in alert and (
-                not isinstance(alert["orgId"], int)
-                or isinstance(alert["orgId"], bool)
-                or alert["orgId"] < 1
-            ):
-                raise ValueError("invalid Grafana alert organization")
-            normalized_alerts.append(
-                {
-                    "status": alert["status"],
-                    "labels": labels,
-                    "annotations": annotations,
-                    "starts_at": starts_at,
-                    "ends_at": ends_at,
-                    "fingerprint": fingerprint,
-                    "dashboard_url": alert["dashboardURL"],
-                    "panel_url": alert["panelURL"],
-                    "generator_url": alert["generatorURL"],
-                }
-            )
+        normalized_alerts = self._normalize_grafana_alerts(alerts, bounded_string, string_map)
 
+        return self._build_grafana_event(
+            normalized_alerts, common_labels, status, truncated, group_key, received_at
+        )
+
+    def _build_grafana_event(
+        self, normalized_alerts, common_labels, status, truncated, group_key, received_at
+    ):
         is_test = all(
             alert["labels"].get("alertname") == "TestAlert"
             and alert["labels"].get("instance") == "Grafana"
             and alert["annotations"].get("summary") == "Notification test"
             for alert in normalized_alerts
         )
-        alert_names = {
-            alert["labels"].get("alertname", "") for alert in normalized_alerts
-        }
-        if status == "resolved":
-            event_state = "resolved"
-        elif is_test:
-            event_state = "test"
-        elif "DatasourceError" in alert_names:
-            event_state = "error"
-        elif "DatasourceNoData" in alert_names:
-            event_state = "no_data"
-        else:
-            event_state = "firing"
-
-        display_names = []
-        detail_lines = []
-        for alert in normalized_alerts:
-            labels = alert["labels"]
-            annotations = alert["annotations"]
-            name = labels.get("rulename") or labels.get("alertname") or "Grafana alert"
-            name = sanitize_one_line(name) or "Grafana alert"
-            if len(name) > 200:
-                name = name[:199] + "…"
-            if name not in display_names:
-                display_names.append(name)
-            detail_parts = []
-            for key in ("summary", "description", "grafana_state_reason"):
-                value = annotations.get(key)
-                if value:
-                    sanitized = sanitize_one_line(value)
-                    if sanitized and sanitized not in detail_parts:
-                        detail_parts.append(sanitized)
-            if detail_parts:
-                detail_lines.append(f"{name}: {'; '.join(detail_parts)}")
+        alert_names = {alert["labels"].get("alertname", "") for alert in normalized_alerts}
+        event_state = self._grafana_event_state(status, is_test, alert_names)
+        display_names, detail_lines = self._grafana_display_details(normalized_alerts)
         names_text = ", ".join(display_names[:5])
         if len(display_names) > 5:
             names_text += f", +{len(display_names) - 5} more"
@@ -1138,19 +1102,7 @@ class ChatProxy:
         details = sanitize_details("\n".join(detail_lines)) or None
         if details and len(details) > EVENT_LIMITS["details"]:
             details = details[: EVENT_LIMITS["details"] - 1] + "…"
-
-        link = None
-        for alert in normalized_alerts:
-            for candidate in (
-                alert["dashboard_url"],
-                alert["panel_url"],
-                alert["generator_url"],
-            ):
-                link = sanitize_link(candidate)
-                if link:
-                    break
-            if link:
-                break
+        link = self._grafana_link(normalized_alerts)
         observed_candidates = [
             alert["ends_at"] if status == "resolved" else alert["starts_at"]
             for alert in normalized_alerts
@@ -1158,7 +1110,6 @@ class ChatProxy:
         observed_at = max(observed_candidates)
         if status == "resolved" and observed_at.year == 1:
             raise ValueError("resolved Grafana alert has no end time")
-
         occurrence_members = sorted(
             (alert["fingerprint"], isoformat(alert["starts_at"]))
             for alert in normalized_alerts
@@ -1210,6 +1161,50 @@ class ChatProxy:
         }
         self._validate_event(event)
         return event, f"grafana:{provider_event_id}"
+
+    def _grafana_event_state(self, status, is_test, alert_names):
+        if status == "resolved":
+            return "resolved"
+        if is_test:
+            return "test"
+        if "DatasourceError" in alert_names:
+            return "error"
+        if "DatasourceNoData" in alert_names:
+            return "no_data"
+        return "firing"
+
+    def _grafana_display_details(self, normalized_alerts):
+        display_names = []
+        detail_lines = []
+        for alert in normalized_alerts:
+            labels = alert["labels"]
+            annotations = alert["annotations"]
+            name = labels.get("rulename") or labels.get("alertname") or "Grafana alert"
+            name = sanitize_one_line(name) or "Grafana alert"
+            if len(name) > 200:
+                name = name[:199] + "…"
+            if name not in display_names:
+                display_names.append(name)
+            detail_parts = []
+            for key in ("summary", "description", "grafana_state_reason"):
+                value = annotations.get(key)
+                if value:
+                    sanitized = sanitize_one_line(value)
+                    if sanitized and sanitized not in detail_parts:
+                        detail_parts.append(sanitized)
+            if detail_parts:
+                detail_lines.append(f"{name}: {'; '.join(detail_parts)}")
+        return display_names, detail_lines
+
+    def _grafana_link(self, normalized_alerts):
+        for alert in normalized_alerts:
+            for candidate in (
+                alert["dashboard_url"], alert["panel_url"], alert["generator_url"]
+            ):
+                link = sanitize_link(candidate)
+                if link:
+                    return link
+        return None
 
     def verify_github_signature(self, raw_body, timestamp, signature, received_at=None):
         if not self.github_secrets:
