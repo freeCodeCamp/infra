@@ -7,7 +7,6 @@ x-logging-config: &logging-config
       compress: "true"
 
 x-dispatch-env: &dispatch-env
-  GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN}
   CHAT_PROXY_URL: http://svc-chat-proxy:8080/hooks/chat
   GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN:?}
   GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
