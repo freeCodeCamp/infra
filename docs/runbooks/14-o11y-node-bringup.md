@@ -148,7 +148,7 @@ The `apps` Kustomization waits on `platform-configs` and `cluster-dns`, so nothi
 ```sh
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system rollout restart deployment coredns
 KUBECONFIG=k3s/ops-o11y/.kubeconfig.yaml kubectl -n kube-system run dnscheck --rm -it --restart=Never \
-  --image=busybox:1.37 -- nslookup ops-vm-o11y-k3s-fra1-01.batfish-ray.ts.net
+  --image=busybox:1.37 -- nslookup ops-vm-o11y-k3s-fra1-01.<tailnet>.ts.net
 ```
 
 Then the Verify section.
@@ -372,7 +372,7 @@ Delete the three devices in the tailnet admin console, then revoke the tokens: t
 
 - **VictoriaMetrics and Grafana are one replica each.** A node loss reschedules them onto another node with the same volume; expect a gap of a few minutes, not a lost history. The fleet does not notice a dead collector, which is still the accepted trade.
 - **Rancher's hostname is a value in git.** It carries the port `30443`, because Traefik is a NodePort on the tailnet. Do not open 443 on the firewall to remove the port; the tailnet-only posture is the design.
-- **The tailnet suffix is hard-coded** as `batfish-ray.ts.net` in the VictoriaMetrics values. A tailnet rename breaks all 80 targets at once.
+- **The tailnet suffix is hard-coded** in the VictoriaMetrics values. A tailnet rename breaks all 80 targets at once.
 - **Linode label must equal the Tailscale hostname.** A rebuilt host that re-registers as `<name>-1` fails at DNS while its label is unchanged.
 - **A powered-off Linode stays a target** and reports `up=0`. That is the host-down signal.
 - **No alert rules yet.** Contact points and the policy exist; the capacity rules from the single-node era (`vm_storage_is_read_only`, free disk under `1.5 × vm_free_disk_space_limit_bytes`, root filesystem under 25 %, `vm_promscrape_discovery_linode_failures_total > 0`, `count(up{job="node"}) < 68`) are the first rules to write, as provisioned `rules.yaml` under `alerting`.

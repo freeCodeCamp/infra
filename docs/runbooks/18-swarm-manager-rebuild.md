@@ -89,6 +89,8 @@ ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-vultr-
 
 The play restores the `~/infra` checkout, the `~/docker-swarm-config` link, the Docker client directories and the webhook Service. The manager must be on the tailnet first (step 5).
 
+Approve the new host of the Service. In the Tailscale admin console, open **Services** and select `svc:swarm-wh-vultr`. In **Service hosts**, find the pending host and select **Approve**.
+
 Go back to the repo root:
 
 ```sh

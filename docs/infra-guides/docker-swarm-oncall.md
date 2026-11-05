@@ -226,7 +226,7 @@ Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephem
       -d '{"GANTRY_SERVICES_FILTERS":"name=${{ env.STACK_NAME }}_${{ env.SERVICE_NAME }}"}'
 ```
 
-**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname), `WEBHOOK_SECRET`
+**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname: `swarm-wh.<tailnet>.ts.net` on Linode, `swarm-wh-vultr.<tailnet>.ts.net` on Vultr), `WEBHOOK_SECRET`
 
 ## Testing Webhook
 

@@ -4,6 +4,8 @@
 
 ## Usage
 
+These steps are for the Linode Swarm. The Vultr Swarm has no Portainer, and `play-swarm--form.yml` forms it and applies its labels. See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment).
+
 0. Set context as needed with:
 
    ```shell

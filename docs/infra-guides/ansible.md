@@ -112,13 +112,35 @@ Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--
 
 ## Vultr Plays
 
-| Play                          | What it does                                                                                                                                                                                                      | Inputs                                                                                                                                                                                                                                              |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `play-vultr--base.yml`        | Configure the base of a Vultr host, one host at a time. Remove ufw. Install the sudo user, fail2ban, Docker, node exporter and Fluent Bit. Harden sshd.                                                           | `variable_host=<group>`, `variable_serial=<n>`                                                                                                                                                                                                      |
-| `play-swarm--form.yml`        | Form the Vultr Swarm and join the workers, then apply the node labels (runbook 18)                                                                                                                                | `swarm_manager_group=<group>`, `swarm_worker_group=<group>[:<group>…]`, `swarm_rejoin=true` for a worker that is in another Swarm                                                                                                                   |
-| `play-vultr--render-maps.yml` | Read each VPC address. Write the NGINX upstream map (plain, to encrypt) or the vmagent targets. Stops when a host of the fleet has no address.                                                                    | `maps_env=stg\|prd\|ops`, `maps_write=upstreams\|scrape` (`ops` takes `scrape` only)                                                                                                                                                                |
-| `play-vultr--manager.yml`     | Prepare the Swarm manager for deploys: `age`, the `~/infra` checkout and its `~/docker-swarm-config` link, `~/.docker`, and the `svc:swarm-wh-vultr` Tailscale Service. Stops when the host holds `svc:swarm-wh`. | `variable_host=ops_swarm_mgr`. Join the tailnet first with `play-tailscale--0-install.yml` and `play-tailscale--1a-up.yml` with `-e variable_tags=tag:added-by-ops,tag:deployment-tgt`.                                                             |
-| `play-vultr--nginx.yml`       | Install and start NGINX on a Vultr proxy. Write the Origin CA files, the upstream blocks and the probe listener on the VPC address, port 8081.                                                                    | `variable_host=<group>`. Reads `docker/vultr/pxy-origin-tls.yaml.enc` and `docker/vultr/pxy-upstreams-<tier>.yaml.enc`.                                                                                                                             |
+| Play                          | What it does                                                                                                                                                                                                      | Inputs                                                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `play-vultr--base.yml`        | Configure the base of a Vultr host, one host at a time. Remove ufw. Install the sudo user, fail2ban, Docker, node exporter and Fluent Bit. Harden sshd.                                                           | `variable_host=<group>`, `variable_serial=<n>`                                                                                                                                          |
+| `play-swarm--form.yml`        | Form the Vultr Swarm and join the workers, then apply the node labels (runbook 18)                                                                                                                                | `swarm_manager_group=<group>`, `swarm_worker_group=<group>[:<group>…]`, `swarm_rejoin=true` for a worker that is in another Swarm                                                       |
+| `play-vultr--render-maps.yml` | Read each VPC address. Write the NGINX upstream map (plain, to encrypt) or the vmagent targets. Stops when a host of the fleet has no address.                                                                    | `maps_env=stg\|prd\|ops`, `maps_write=upstreams\|scrape` (`ops` takes `scrape` only)                                                                                                    |
+| `play-vultr--manager.yml`     | Prepare the Swarm manager for deploys: `age`, the `~/infra` checkout and its `~/docker-swarm-config` link, `~/.docker`, and the `svc:swarm-wh-vultr` Tailscale Service. Stops when the host holds `svc:swarm-wh`. | `variable_host=ops_swarm_mgr`. Join the tailnet first with `play-tailscale--0-install.yml` and `play-tailscale--1a-up.yml` with `-e variable_tags=tag:added-by-ops,tag:deployment-tgt`. |
+| `play-vultr--nginx.yml`       | Install and start NGINX on a Vultr proxy. Write the Origin CA files, the upstream blocks and the probe listener on the VPC address, port 8081.                                                                    | `variable_host=<group>`. Reads `docker/vultr/pxy-origin-tls.yaml.enc` and `docker/vultr/pxy-upstreams-<tier>.yaml.enc`.                                                                 |
+
+### Configure a Vultr Environment
+
+Run the steps in this order. No step moves traffic. Cloudflare sends traffic to a proxy only after a load balancer pool or a DNS record names it.
+
+1. Run `play-vultr--base.yml` on each host of the environment.
+2. Run `play-swarm--form.yml`.
+3. Define `svc:swarm-wh-vultr` once. In the Tailscale admin console, open **Services**, select **Advertise**, then **Define a Service**. Set the endpoint `tcp:443` and the tag `tag:services`.
+4. Run `play-tailscale--0-install.yml` and `play-tailscale--1a-up.yml` on `ops_swarm_mgr`, then `play-vultr--manager.yml`. In **Services**, select the Service and **Approve** its host.
+5. Make the two envelopes of the proxies. Do step 6 for each file.
+   - `pxy-origin-tls`: a YAML map `nginx_tls_files`, one key for each file in `/etc/nginx/ssl` (`dhparam.pem`, `freecodecamp.dev.crt`, `freecodecamp.dev.key`, `freecodecamp.org.crt`, `freecodecamp.org.key`). The play refuses a map that lacks a key.
+   - `pxy-upstreams-<tier>`: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams` writes the plaintext file.
+6. From `../infra-secrets`, encrypt the file and delete the plaintext:
+
+   ```bash
+   sops -e --input-type yaml --output-type yaml docker/vultr/<name>.yaml.plaintext > docker/vultr/<name>.yaml.enc
+   rm -P docker/vultr/<name>.yaml.plaintext
+   ```
+
+7. Run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
+
+A re-created VM has new addresses. Render the upstream map again, encrypt it, and run `play-vultr--nginx.yml`.
 
 ## Removed Plays
 
