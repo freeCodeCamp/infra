@@ -38,7 +38,7 @@ jobs:
       matrix:
         include:
           - { group: prd_oldeworld_clt, provider: linode }
-          - { group: stg_oldeworld_clt, provider: linode }
+          - { group: stg_clt, provider: vultr }
 
     steps:
       - name: Checkout

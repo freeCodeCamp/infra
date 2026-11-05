@@ -61,13 +61,15 @@ jobs:
       matrix:
         include:
           - { group: ops_all, provider: linode }
-          - { group: stg_oldeworld_api, provider: linode }
+          - { group: ops_swarm_mgr, provider: vultr }
+          - { group: stg_api, provider: vultr }
           - { group: prd_oldeworld_api, provider: linode }
-          - { group: stg_oldeworld_pxy, provider: linode }
+          - { group: stg_pxy, provider: vultr }
           - { group: prd_oldeworld_pxy, provider: linode }
-          - { group: stg_oldeworld_jms, provider: linode }
+          - { group: stg_soc, provider: vultr }
+          - { group: stg_nws, provider: vultr }
           - { group: prd_oldeworld_jms, provider: linode }
-          - { group: stg_oldeworld_clt, provider: linode }
+          - { group: stg_clt, provider: vultr }
           - { group: prd_oldeworld_clt_eng, provider: linode }
           - { group: prd_oldeworld_clt_chn, provider: linode }
           - { group: prd_oldeworld_clt_cnt, provider: linode }
@@ -98,15 +100,16 @@ jobs:
       fail-fast: false
       matrix:
         host_groups:
-          - stg_oldeworld_api
-          - stg_oldeworld_pxy
-          - stg_oldeworld_jms
-          - stg_oldeworld_clt
+          - stg_api
+          - stg_pxy
+          - stg_soc
+          - stg_nws
+          - stg_clt
     uses: ./.github/workflows/ansible--update.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      provider: linode
+      provider: vultr
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -120,12 +123,12 @@ jobs:
       fail-fast: false
       matrix:
         host_groups:
-          - stg_oldeworld_pxy
+          - stg_pxy
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      provider: linode
+      provider: vultr
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -139,12 +142,12 @@ jobs:
       fail-fast: false
       matrix:
         host_groups:
-          - stg_oldeworld_pxy
+          - stg_pxy
     uses: ./.github/workflows/ansible--verify-nginx.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      provider: linode
+      provider: vultr
       stage: Gate NGINX (staging)
       artifact_prefix: nginx-gate
     secrets:
@@ -160,14 +163,15 @@ jobs:
       fail-fast: false
       matrix:
         host_groups:
-          - stg_oldeworld_api
-          - stg_oldeworld_jms
-          - stg_oldeworld_clt
+          - stg_api
+          - stg_soc
+          - stg_nws
+          - stg_clt
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      provider: linode
+      provider: vultr
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -179,10 +183,11 @@ jobs:
     needs: reboot-stg
     uses: ./.github/workflows/ansible--verify-swarm.yml
     with:
-      hosts: stg_oldeworld_api:stg_oldeworld_jms
+      hosts: stg_api:stg_soc:stg_nws
+      manager: ops_swarm_mgr
       service_prefix: stg-
       verbosity: "-v"
-      provider: linode
+      provider: vultr
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
@@ -196,6 +201,7 @@ jobs:
       matrix:
         include:
           - { group: ops_all, provider: linode }
+          - { group: ops_swarm_mgr, provider: vultr }
           - { group: prd_oldeworld_api, provider: linode }
           - { group: prd_oldeworld_pxy, provider: linode }
           - { group: prd_oldeworld_jms, provider: linode }
@@ -270,6 +276,7 @@ jobs:
       matrix:
         include:
           - { group: ops_all, provider: linode }
+          - { group: ops_swarm_mgr, provider: vultr }
           - { group: prd_oldeworld_api, provider: linode }
           - { group: prd_oldeworld_jms, provider: linode }
           - { group: prd_oldeworld_clt_eng, provider: linode }
@@ -314,7 +321,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { group: stg_oldeworld_pxy, provider: linode }
+          - { group: stg_pxy, provider: vultr }
           - { group: prd_oldeworld_pxy, provider: linode }
 
     uses: ./.github/workflows/ansible--verify-nginx.yml
@@ -337,7 +344,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { hosts: "stg_oldeworld_api:stg_oldeworld_jms:prd_oldeworld_api:prd_oldeworld_jms:ops_backoffice", manager: ops_backoffice, provider: linode }
+          - { hosts: "stg_api:stg_soc:stg_nws:ops_swarm_mgr", manager: ops_swarm_mgr, provider: vultr }
+          - { hosts: "prd_oldeworld_api:prd_oldeworld_jms:ops_backoffice", manager: ops_backoffice, provider: linode }
     uses: ./.github/workflows/ansible--verify-swarm.yml
     with:
       hosts: ${{ matrix.hosts }}
