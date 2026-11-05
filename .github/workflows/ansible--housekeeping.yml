@@ -63,25 +63,26 @@ jobs:
           - { group: ops_all, provider: linode }
           - { group: ops_swarm_mgr, provider: vultr }
           - { group: stg_api, provider: vultr }
-          - { group: prd_oldeworld_api, provider: linode }
+          - { group: prd_api, provider: vultr }
           - { group: stg_pxy, provider: vultr }
-          - { group: prd_oldeworld_pxy, provider: linode }
+          - { group: prd_pxy, provider: vultr }
           - { group: stg_soc, provider: vultr }
           - { group: stg_nws, provider: vultr }
-          - { group: prd_oldeworld_jms, provider: linode }
+          - { group: prd_soc, provider: vultr }
+          - { group: prd_nws, provider: vultr }
           - { group: stg_clt, provider: vultr }
-          - { group: prd_oldeworld_clt_eng, provider: linode }
-          - { group: prd_oldeworld_clt_chn, provider: linode }
-          - { group: prd_oldeworld_clt_cnt, provider: linode }
-          - { group: prd_oldeworld_clt_esp, provider: linode }
-          - { group: prd_oldeworld_clt_ger, provider: linode }
-          - { group: prd_oldeworld_clt_ita, provider: linode }
-          - { group: prd_oldeworld_clt_jpn, provider: linode }
-          - { group: prd_oldeworld_clt_por, provider: linode }
-          - { group: prd_oldeworld_clt_ukr, provider: linode }
-          - { group: prd_oldeworld_clt_swa, provider: linode }
-          - { group: prd_oldeworld_clt_kor, provider: linode }
-          - { group: prd_oldeworld_clt_ara, provider: linode }
+          - { group: prd_clt_eng, provider: vultr }
+          - { group: prd_clt_chn, provider: vultr }
+          - { group: prd_clt_cnt, provider: vultr }
+          - { group: prd_clt_esp, provider: vultr }
+          - { group: prd_clt_ger, provider: vultr }
+          - { group: prd_clt_ita, provider: vultr }
+          - { group: prd_clt_jpn, provider: vultr }
+          - { group: prd_clt_por, provider: vultr }
+          - { group: prd_clt_ukr, provider: vultr }
+          - { group: prd_clt_swa, provider: vultr }
+          - { group: prd_clt_kor, provider: vultr }
+          - { group: prd_clt_ara, provider: vultr }
 
     uses: ./.github/workflows/ansible--uptime.yml
     with:
@@ -202,21 +203,22 @@ jobs:
         include:
           - { group: ops_all, provider: linode }
           - { group: ops_swarm_mgr, provider: vultr }
-          - { group: prd_oldeworld_api, provider: linode }
-          - { group: prd_oldeworld_pxy, provider: linode }
-          - { group: prd_oldeworld_jms, provider: linode }
-          - { group: prd_oldeworld_clt_eng, provider: linode }
-          - { group: prd_oldeworld_clt_chn, provider: linode }
-          - { group: prd_oldeworld_clt_cnt, provider: linode }
-          - { group: prd_oldeworld_clt_esp, provider: linode }
-          - { group: prd_oldeworld_clt_ger, provider: linode }
-          - { group: prd_oldeworld_clt_ita, provider: linode }
-          - { group: prd_oldeworld_clt_jpn, provider: linode }
-          - { group: prd_oldeworld_clt_por, provider: linode }
-          - { group: prd_oldeworld_clt_ukr, provider: linode }
-          - { group: prd_oldeworld_clt_swa, provider: linode }
-          - { group: prd_oldeworld_clt_kor, provider: linode }
-          - { group: prd_oldeworld_clt_ara, provider: linode }
+          - { group: prd_api, provider: vultr }
+          - { group: prd_pxy, provider: vultr }
+          - { group: prd_soc, provider: vultr }
+          - { group: prd_nws, provider: vultr }
+          - { group: prd_clt_eng, provider: vultr }
+          - { group: prd_clt_chn, provider: vultr }
+          - { group: prd_clt_cnt, provider: vultr }
+          - { group: prd_clt_esp, provider: vultr }
+          - { group: prd_clt_ger, provider: vultr }
+          - { group: prd_clt_ita, provider: vultr }
+          - { group: prd_clt_jpn, provider: vultr }
+          - { group: prd_clt_por, provider: vultr }
+          - { group: prd_clt_ukr, provider: vultr }
+          - { group: prd_clt_swa, provider: vultr }
+          - { group: prd_clt_kor, provider: vultr }
+          - { group: prd_clt_ara, provider: vultr }
     uses: ./.github/workflows/ansible--update.yml
     with:
       hosts: ${{ matrix.group }}
@@ -235,12 +237,12 @@ jobs:
       fail-fast: false
       matrix:
         host_groups:
-          - prd_oldeworld_pxy
+          - prd_pxy
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      provider: linode
+      provider: vultr
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -254,12 +256,12 @@ jobs:
       fail-fast: false
       matrix:
         host_groups:
-          - prd_oldeworld_pxy
+          - prd_pxy
     uses: ./.github/workflows/ansible--verify-nginx.yml
     with:
       hosts: ${{ matrix.host_groups }}
       verbosity: "-v"
-      provider: linode
+      provider: vultr
       stage: Gate NGINX (production)
       artifact_prefix: nginx-gate
     secrets:
@@ -277,20 +279,21 @@ jobs:
         include:
           - { group: ops_all, provider: linode }
           - { group: ops_swarm_mgr, provider: vultr }
-          - { group: prd_oldeworld_api, provider: linode }
-          - { group: prd_oldeworld_jms, provider: linode }
-          - { group: prd_oldeworld_clt_eng, provider: linode }
-          - { group: prd_oldeworld_clt_chn, provider: linode }
-          - { group: prd_oldeworld_clt_cnt, provider: linode }
-          - { group: prd_oldeworld_clt_esp, provider: linode }
-          - { group: prd_oldeworld_clt_ger, provider: linode }
-          - { group: prd_oldeworld_clt_ita, provider: linode }
-          - { group: prd_oldeworld_clt_jpn, provider: linode }
-          - { group: prd_oldeworld_clt_por, provider: linode }
-          - { group: prd_oldeworld_clt_ukr, provider: linode }
-          - { group: prd_oldeworld_clt_swa, provider: linode }
-          - { group: prd_oldeworld_clt_kor, provider: linode }
-          - { group: prd_oldeworld_clt_ara, provider: linode }
+          - { group: prd_api, provider: vultr }
+          - { group: prd_soc, provider: vultr }
+          - { group: prd_nws, provider: vultr }
+          - { group: prd_clt_eng, provider: vultr }
+          - { group: prd_clt_chn, provider: vultr }
+          - { group: prd_clt_cnt, provider: vultr }
+          - { group: prd_clt_esp, provider: vultr }
+          - { group: prd_clt_ger, provider: vultr }
+          - { group: prd_clt_ita, provider: vultr }
+          - { group: prd_clt_jpn, provider: vultr }
+          - { group: prd_clt_por, provider: vultr }
+          - { group: prd_clt_ukr, provider: vultr }
+          - { group: prd_clt_swa, provider: vultr }
+          - { group: prd_clt_kor, provider: vultr }
+          - { group: prd_clt_ara, provider: vultr }
     uses: ./.github/workflows/ansible--reboot.yml
     with:
       hosts: ${{ matrix.group }}
@@ -322,7 +325,7 @@ jobs:
       matrix:
         include:
           - { group: stg_pxy, provider: vultr }
-          - { group: prd_oldeworld_pxy, provider: linode }
+          - { group: prd_pxy, provider: vultr }
 
     uses: ./.github/workflows/ansible--verify-nginx.yml
     with:
@@ -344,8 +347,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { hosts: "stg_api:stg_soc:stg_nws:ops_swarm_mgr", manager: ops_swarm_mgr, provider: vultr }
-          - { hosts: "prd_oldeworld_api:prd_oldeworld_jms:ops_backoffice", manager: ops_backoffice, provider: linode }
+          - { hosts: "stg_api:stg_soc:stg_nws:prd_api:prd_soc:prd_nws:ops_swarm_mgr", manager: ops_swarm_mgr, provider: vultr }
+          - { hosts: "ops_backoffice", manager: ops_backoffice, provider: linode }
     uses: ./.github/workflows/ansible--verify-swarm.yml
     with:
       hosts: ${{ matrix.hosts }}

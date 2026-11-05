@@ -37,7 +37,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { group: prd_oldeworld_clt, provider: linode }
+          - { group: prd_clt, provider: vultr }
           - { group: stg_clt, provider: vultr }
 
     steps:
