@@ -1,0 +1,35 @@
+services:
+  svc-dispatch-news-eng:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"
+
+  svc-dispatch-housekeeping:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"
+
+  svc-dispatch-docr-gc:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"
+
+  svc-watchdog-news:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"
+
+  svc-watchdog-swarm:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"
+
+  svc-watchdog-vxlan:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"
+
+  svc-cleanup:
+    deploy:
+      labels:
+        - "swarm.cronjob.enable=false"

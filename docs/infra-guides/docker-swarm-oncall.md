@@ -175,6 +175,8 @@ cd docker/swarm/stacks/oncall
 )
 ```
 
+On the Vultr Swarm, until the production cutover, use `docker --context vultr stack deploy -c stack-oncall.yml -c stack-oncall.vultr.yml oncall`. The second file turns off the scheduled dispatch, watchdog and cleanup jobs, so only one Swarm runs them. `svc-watchdog-vxlan` and `svc-cleanup` are global and each runs once at deploy. At the cutover, deploy without the second file on Vultr. On the Linode Swarm, turn the same jobs off.
+
 If the manager reports a permission error on `/home/freecodecamp/.docker`, run this on the manager (`ssh freecodecamp@ops-vm-backoffice`):
 
 ```bash
