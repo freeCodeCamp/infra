@@ -22,14 +22,6 @@ on:
         type: boolean
         required: true
         default: false
-      provider:
-        description: 'The inventory to use: linode or vultr'
-        type: choice
-        required: true
-        default: 'linode'
-        options:
-          - 'linode'
-          - 'vultr'
 
 defaults:
   run:
@@ -44,9 +36,9 @@ jobs:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
     strategy:
       matrix:
-        host_groups:
-          - 'prd_oldeworld_clt'
-          - 'stg_oldeworld_clt'
+        include:
+          - { group: prd_oldeworld_clt, provider: linode }
+          - { group: stg_oldeworld_clt, provider: linode }
 
     steps:
       - name: Checkout
@@ -59,11 +51,11 @@ jobs:
 
       - name: Play -- Cleanup Clients
         env:
-          HOSTS: ${{ matrix.host_groups }}
+          HOSTS: ${{ matrix.group }}
           SERIAL: ${{ inputs.serial || 0 }}
           DRY_RUN: ${{ inputs.dry_run || false }}
           VERBOSITY: ${{ inputs.verbosity }}
-          PROVIDER: ${{ inputs.provider || 'linode' }}
+          PROVIDER: ${{ matrix.provider }}
         run: |
           source .venv/bin/activate
           case "$SERIAL" in
@@ -92,7 +84,10 @@ jobs:
           fi
           case "$PROVIDER" in
             linode) inventory=(-i inventory/linode.yml) ;;
-            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            vultr)
+              inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
+              export ANSIBLE_HOST_PATTERN_MISMATCH=error
+              ;;
             *)
               echo "::error::provider must be linode or vultr"
               exit 1

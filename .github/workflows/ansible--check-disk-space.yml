@@ -108,7 +108,10 @@ jobs:
           esac
           case "$PROVIDER" in
             linode) inventory=(-i inventory/linode.yml) ;;
-            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            vultr)
+              inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
+              export ANSIBLE_HOST_PATTERN_MISMATCH=error
+              ;;
             *)
               echo "::error::provider must be linode or vultr"
               exit 1

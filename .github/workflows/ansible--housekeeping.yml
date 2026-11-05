@@ -59,33 +59,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host_groups:
-          - ops_all
-          - stg_oldeworld_api
-          - prd_oldeworld_api
-          - stg_oldeworld_pxy
-          - prd_oldeworld_pxy
-          - stg_oldeworld_jms
-          - prd_oldeworld_jms
-          - stg_oldeworld_clt
-          - prd_oldeworld_clt_eng
-          - prd_oldeworld_clt_chn
-          - prd_oldeworld_clt_cnt
-          - prd_oldeworld_clt_esp
-          - prd_oldeworld_clt_ger
-          - prd_oldeworld_clt_ita
-          - prd_oldeworld_clt_jpn
-          - prd_oldeworld_clt_por
-          - prd_oldeworld_clt_ukr
-          - prd_oldeworld_clt_swa
-          - prd_oldeworld_clt_kor
-          - prd_oldeworld_clt_ara
+        include:
+          - { group: ops_all, provider: linode }
+          - { group: stg_oldeworld_api, provider: linode }
+          - { group: prd_oldeworld_api, provider: linode }
+          - { group: stg_oldeworld_pxy, provider: linode }
+          - { group: prd_oldeworld_pxy, provider: linode }
+          - { group: stg_oldeworld_jms, provider: linode }
+          - { group: prd_oldeworld_jms, provider: linode }
+          - { group: stg_oldeworld_clt, provider: linode }
+          - { group: prd_oldeworld_clt_eng, provider: linode }
+          - { group: prd_oldeworld_clt_chn, provider: linode }
+          - { group: prd_oldeworld_clt_cnt, provider: linode }
+          - { group: prd_oldeworld_clt_esp, provider: linode }
+          - { group: prd_oldeworld_clt_ger, provider: linode }
+          - { group: prd_oldeworld_clt_ita, provider: linode }
+          - { group: prd_oldeworld_clt_jpn, provider: linode }
+          - { group: prd_oldeworld_clt_por, provider: linode }
+          - { group: prd_oldeworld_clt_ukr, provider: linode }
+          - { group: prd_oldeworld_clt_swa, provider: linode }
+          - { group: prd_oldeworld_clt_kor, provider: linode }
+          - { group: prd_oldeworld_clt_ara, provider: linode }
 
     uses: ./.github/workflows/ansible--uptime.yml
     with:
-      hosts: ${{ matrix.host_groups }}
+      hosts: ${{ matrix.group }}
       verbosity: "-v"
-      provider: linode
+      provider: ${{ matrix.provider }}
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
@@ -194,28 +194,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host_groups:
-          - ops_all
-          - prd_oldeworld_api
-          - prd_oldeworld_pxy
-          - prd_oldeworld_jms
-          - prd_oldeworld_clt_eng
-          - prd_oldeworld_clt_chn
-          - prd_oldeworld_clt_cnt
-          - prd_oldeworld_clt_esp
-          - prd_oldeworld_clt_ger
-          - prd_oldeworld_clt_ita
-          - prd_oldeworld_clt_jpn
-          - prd_oldeworld_clt_por
-          - prd_oldeworld_clt_ukr
-          - prd_oldeworld_clt_swa
-          - prd_oldeworld_clt_kor
-          - prd_oldeworld_clt_ara
+        include:
+          - { group: ops_all, provider: linode }
+          - { group: prd_oldeworld_api, provider: linode }
+          - { group: prd_oldeworld_pxy, provider: linode }
+          - { group: prd_oldeworld_jms, provider: linode }
+          - { group: prd_oldeworld_clt_eng, provider: linode }
+          - { group: prd_oldeworld_clt_chn, provider: linode }
+          - { group: prd_oldeworld_clt_cnt, provider: linode }
+          - { group: prd_oldeworld_clt_esp, provider: linode }
+          - { group: prd_oldeworld_clt_ger, provider: linode }
+          - { group: prd_oldeworld_clt_ita, provider: linode }
+          - { group: prd_oldeworld_clt_jpn, provider: linode }
+          - { group: prd_oldeworld_clt_por, provider: linode }
+          - { group: prd_oldeworld_clt_ukr, provider: linode }
+          - { group: prd_oldeworld_clt_swa, provider: linode }
+          - { group: prd_oldeworld_clt_kor, provider: linode }
+          - { group: prd_oldeworld_clt_ara, provider: linode }
     uses: ./.github/workflows/ansible--update.yml
     with:
-      hosts: ${{ matrix.host_groups }}
+      hosts: ${{ matrix.group }}
       verbosity: "-v"
-      provider: linode
+      provider: ${{ matrix.provider }}
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -268,27 +268,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host_groups:
-          - ops_all
-          - prd_oldeworld_api
-          - prd_oldeworld_jms
-          - prd_oldeworld_clt_eng
-          - prd_oldeworld_clt_chn
-          - prd_oldeworld_clt_cnt
-          - prd_oldeworld_clt_esp
-          - prd_oldeworld_clt_ger
-          - prd_oldeworld_clt_ita
-          - prd_oldeworld_clt_jpn
-          - prd_oldeworld_clt_por
-          - prd_oldeworld_clt_ukr
-          - prd_oldeworld_clt_swa
-          - prd_oldeworld_clt_kor
-          - prd_oldeworld_clt_ara
+        include:
+          - { group: ops_all, provider: linode }
+          - { group: prd_oldeworld_api, provider: linode }
+          - { group: prd_oldeworld_jms, provider: linode }
+          - { group: prd_oldeworld_clt_eng, provider: linode }
+          - { group: prd_oldeworld_clt_chn, provider: linode }
+          - { group: prd_oldeworld_clt_cnt, provider: linode }
+          - { group: prd_oldeworld_clt_esp, provider: linode }
+          - { group: prd_oldeworld_clt_ger, provider: linode }
+          - { group: prd_oldeworld_clt_ita, provider: linode }
+          - { group: prd_oldeworld_clt_jpn, provider: linode }
+          - { group: prd_oldeworld_clt_por, provider: linode }
+          - { group: prd_oldeworld_clt_ukr, provider: linode }
+          - { group: prd_oldeworld_clt_swa, provider: linode }
+          - { group: prd_oldeworld_clt_kor, provider: linode }
+          - { group: prd_oldeworld_clt_ara, provider: linode }
     uses: ./.github/workflows/ansible--reboot.yml
     with:
-      hosts: ${{ matrix.host_groups }}
+      hosts: ${{ matrix.group }}
       verbosity: "-v"
-      provider: linode
+      provider: ${{ matrix.provider }}
       serial: 1
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -313,15 +313,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host_groups:
-          - stg_oldeworld_pxy
-          - prd_oldeworld_pxy
+        include:
+          - { group: stg_oldeworld_pxy, provider: linode }
+          - { group: prd_oldeworld_pxy, provider: linode }
 
     uses: ./.github/workflows/ansible--verify-nginx.yml
     with:
-      hosts: ${{ matrix.host_groups }}
+      hosts: ${{ matrix.group }}
       verbosity: "-v"
-      provider: linode
+      provider: ${{ matrix.provider }}
       stage: Verify NGINX
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
@@ -333,11 +333,17 @@ jobs:
     name: Verify Swarm
     needs: [window, reboot-prd]
     if: ${{ !cancelled() && needs.window.outputs.allowed == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { hosts: "stg_oldeworld_api:stg_oldeworld_jms:prd_oldeworld_api:prd_oldeworld_jms:ops_backoffice", manager: ops_backoffice, provider: linode }
     uses: ./.github/workflows/ansible--verify-swarm.yml
     with:
-      hosts: stg_oldeworld_api:stg_oldeworld_jms:prd_oldeworld_api:prd_oldeworld_jms:ops_backoffice
+      hosts: ${{ matrix.hosts }}
+      manager: ${{ matrix.manager }}
       verbosity: "-v"
-      provider: linode
+      provider: ${{ matrix.provider }}
     secrets:
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}

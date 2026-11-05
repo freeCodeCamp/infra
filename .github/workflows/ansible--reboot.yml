@@ -18,6 +18,11 @@ on:
         type: string
         required: false
         default: 'linode'
+      check:
+        description: 'Run in check mode, so no host changes'
+        type: boolean
+        required: false
+        default: false
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
@@ -57,6 +62,11 @@ on:
         options:
           - 'linode'
           - 'vultr'
+      check:
+        description: 'Run in check mode, so no host changes'
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -85,6 +95,7 @@ jobs:
           VERBOSITY: ${{ inputs.verbosity }}
           SERIAL: ${{ inputs.serial }}
           PROVIDER: ${{ inputs.provider }}
+          CHECK: ${{ inputs.check }}
         run: |
           source .venv/bin/activate
           case "$HOSTS" in
@@ -104,6 +115,9 @@ jobs:
           if [ -n "$VERBOSITY" ]; then
             extra_args+=("$VERBOSITY")
           fi
+          if [ "$CHECK" = "true" ]; then
+            extra_args+=(--check)
+          fi
           case "$SERIAL" in
             '') ;;
             *[!0-9]*)
@@ -114,7 +128,10 @@ jobs:
           esac
           case "$PROVIDER" in
             linode) inventory=(-i inventory/linode.yml) ;;
-            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            vultr)
+              inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
+              export ANSIBLE_HOST_PATTERN_MISMATCH=error
+              ;;
             *)
               echo "::error::provider must be linode or vultr"
               exit 1
