@@ -29,32 +29,9 @@
       vars:
         nodejs_version: '{{ variable_nodejs_version | default("v24") }}'
 
-    - name: Read the global npm packages
-      ansible.builtin.shell:
-        cmd: "{{ nvm_preamble }} && npm ls -g --depth=0 --json"
-        chdir: /home/freecodecamp
-        executable: /bin/bash
-      register: npm_global_ls
-      changed_when: false
-      failed_when: npm_global_ls.stdout | length == 0
-      check_mode: false
-
-    - name: Pick the global packages that are missing or at another version
-      ansible.builtin.set_fact:
-        npm_global_missing: "{{ npm_global_missing | default([]) + [item] }}"
-      loop: "{{ nodejs_global_packages + nodejs_extra_global_packages | default([]) }}"
-      vars:
-        pkg_name: "{{ item.rsplit('@', 1)[0] if '@' in item[1:] else item }}"
-        pkg_want: "{{ item.rsplit('@', 1)[1] if '@' in item[1:] else '' }}"
-        pkg_have: "{{ (((npm_global_ls.stdout | from_json).dependencies | default({})).get(pkg_name) or {}).get('version', '') }}"
-      when: not (pkg_have | length > 0 and (pkg_want == '' or pkg_have == pkg_want or pkg_have.split('.')[0] == pkg_want))
-
-    - name: Install Global Dependencies
-      ansible.builtin.shell:
-        cmd: "{{ nvm_preamble }} && npm i -g {{ npm_global_missing | map('quote') | join(' ') }}"
-        chdir: /home/freecodecamp
-        executable: /bin/bash
-      when: npm_global_missing | default([]) | length > 0
+    - name: Install the global packages
+      ansible.builtin.include_tasks:
+        file: tasks/nodejs-globals.yml
 
     - name: Read the PM2 modules
       ansible.builtin.shell:

@@ -1,0 +1,87 @@
+---
+- name: Prepare a Vultr client host for client deploys
+  hosts: "{{ variable_host | default('null') }}:&vultr_clt"
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
+  become: true
+  become_user: "{{ pm2_user }}"
+  gather_facts: false
+  vars:
+    nodejs_global_packages: [pm2@7]
+    pm2_unit: "pm2-{{ pm2_user }}"
+  tasks:
+    - name: Read the default Node.js
+      ansible.builtin.shell: "{{ nvm_preamble }} && nvm version default"
+      args:
+        executable: /bin/bash
+      register: clients_node_default
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Install Node.js on a host without a default version
+      ansible.builtin.include_role:
+        name: nodejs
+      vars:
+        nodejs_version: v24
+      when: clients_node_default.stdout is not match('^v[0-9]')
+
+    - name: Install the global packages
+      ansible.builtin.include_tasks:
+        file: tasks/nodejs-globals.yml
+
+    - name: Clone the client config repository
+      ansible.builtin.git:
+        repo: https://github.com/freeCodeCamp/client-config.git
+        dest: /home/freecodecamp/client
+        update: false
+        single_branch: true
+        version: master
+
+    - name: Resolve the default Node.js and its PM2
+      ansible.builtin.shell: |
+        {{ nvm_preamble }}
+        node_bin=$(dirname "$(nvm which default)")
+        printf '%s\n%s\n' "$node_bin" "$(readlink -f "$node_bin/pm2")"
+      args:
+        executable: /bin/bash
+      register: pm2_default_node
+      changed_when: false
+      check_mode: false
+
+    - name: Set the PM2 paths
+      ansible.builtin.set_fact:
+        pm2_node_bin: "{{ pm2_default_node.stdout_lines[0] }}"
+        pm2_bin: "{{ pm2_default_node.stdout_lines[1] }}"
+
+    - name: Write the PM2 unit
+      ansible.builtin.template:
+        src: pm2/pm2-freecodecamp.service.j2
+        dest: "/etc/systemd/system/{{ pm2_unit }}.service"
+        mode: "0644"
+      become_user: root
+      register: clients_pm2_unit
+
+    - name: Enable and start the PM2 unit before the first pm2 call, so the unit owns the daemon
+      ansible.builtin.systemd_service:
+        name: "{{ pm2_unit }}"
+        enabled: true
+        state: started
+        daemon_reload: "{{ clients_pm2_unit.changed }}"
+      become_user: root
+
+    - name: Read the PM2 modules
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && pm2 jlist"
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      register: pm2_jlist
+      changed_when: false
+      check_mode: false
+
+    - name: Install pm2-logrotate
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && pm2 install pm2-logrotate"
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      when: "'\"name\":\"pm2-logrotate\"' not in pm2_jlist.stdout"
