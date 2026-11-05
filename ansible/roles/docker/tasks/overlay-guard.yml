@@ -25,13 +25,19 @@
     content: |
       [Service]
       ExecStartPre=-/usr/local/sbin/docker-clean-stray-vxlan
+  register: docker_guard_dropin
 
-- name: Load the drop-in without restarting Docker
+- name: Load the drop-in without restarting Docker # noqa: no-handler
   ansible.builtin.systemd:
     daemon_reload: true
+  when: docker_guard_dropin is changed
 
 - name: Hold the Docker packages
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
   loop: "{{ docker_held_packages }}"
+  register: docker_hold
+  until: docker_hold is succeeded
+  retries: 12
+  delay: 10
