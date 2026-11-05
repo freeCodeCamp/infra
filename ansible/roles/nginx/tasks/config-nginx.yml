@@ -12,7 +12,7 @@
     - /etc/nginx
   when: nginx_config_is_from_repo.stat.exists == false
 
-- name: Clone the NGINX configuration files from the repository
+- name: Clone the NGINX configuration files from the repository # noqa: var-naming[no-role-prefix]
   ansible.builtin.git:
     repo: https://github.com/freeCodeCamp/nginx-config
     dest: /etc/nginx
@@ -22,6 +22,7 @@
     single_branch: true
     version: main
     accept_hostkey: true
+  register: git_update
 
 - name: Clone the error pages from the repository
   ansible.builtin.git:

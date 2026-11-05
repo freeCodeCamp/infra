@@ -4,7 +4,7 @@
 
 The Vultr Swarm has one manager. The manager holds the Raft state of the Swarm. When the manager goes, the Swarm goes with it: the workers cannot elect a new manager, and you cannot deploy. This runbook makes a new Swarm: a new manager, the workers join it again, and you deploy the stacks again.
 
-> **Outage.** Each worker stops its tasks when it leaves the old Swarm. The Vultr services do not run until you deploy the stacks again (step 7). Before you start, move the Cloudflare traffic to the Linode pool while that pool exists.
+> **Outage.** Each worker stops its tasks when it leaves the old Swarm. The Vultr services do not run until you deploy the stacks again (step 8). Before you start, move the Cloudflare traffic to the Linode pool while that pool exists.
 
 Run every command from the repo root unless the step says otherwise.
 
@@ -81,13 +81,21 @@ Check that every node is `Ready`:
 ssh freecodecamp@ops-vm-swarm-mgr-1 sudo docker node ls
 ```
 
+## 7. Prepare the manager for deploys
+
+```sh
+ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-vultr--manager.yml -e variable_host=ops_swarm_mgr
+```
+
+The play restores the `~/infra` checkout, the `~/docker-swarm-config` link, the Docker client directories and the webhook Service. The manager must be on the tailnet first (step 5).
+
 Go back to the repo root:
 
 ```sh
 cd ..
 ```
 
-## 7. Deploy the stacks again
+## 8. Deploy the stacks again
 
 The new Swarm has no stacks and no configs. If your machine has no `vultr` Docker context, create it:
 
@@ -117,7 +125,7 @@ Run the same steps on the test VMs, with these changes:
 - Step 1: use the snapshot of the last `tst-vultr` apply, not the newest one. A different snapshot re-creates every test VM. Read it with `direnv exec terraform/tst-vultr tofu -chdir=terraform/tst-vultr state show 'vultr_instance.tst["tst-vm-mgr-1"]' | grep snapshot_id`.
 - Step 3: `direnv exec terraform/tst-vultr tofu -chdir=terraform/tst-vultr apply -var snapshot_id="$SNAPSHOT_ID" -replace='vultr_instance.tst["tst-vm-mgr-1"]'`, then `ssh-keygen -R tst-vm-mgr-1`.
 - Steps 2, 5 and 6: `terraform/ops-swarm-vultr` becomes `terraform/tst-vultr`, `ops-vm-swarm-mgr-1` becomes `tst-vm-mgr-1`, `ops_swarm_mgr` becomes `tst_mgr`, and the worker groups become `tst_wkr`.
-- Step 7: skip it. From the repo root, run `SNAPSHOT_ID="$SNAPSHOT_ID" CONSOLE_LOGIN_OK=yes direnv exec terraform/tst-vultr terraform/tst-vultr/spike-check.sh`.
+- Steps 7 and 8: skip them. From the repo root, run `SNAPSHOT_ID="$SNAPSHOT_ID" CONSOLE_LOGIN_OK=yes direnv exec terraform/tst-vultr terraform/tst-vultr/spike-check.sh`.
 
 Record the time from step 3 to the last `Ready` node.
 

@@ -34,8 +34,22 @@
         that:
           - manager_linode_service not in manager_serving
           - manager_linode_service not in manager_advertised
-        fail_msg: "{{ inventory_hostname }} holds {{ manager_linode_service }}, so Linode webhooks reach it. Clear it with tailscale serve clear."
+        fail_msg:
+          - "{{ inventory_hostname }} holds {{ manager_linode_service }}, so Linode webhooks reach it."
+          - "Clear it with tailscale serve clear {{ manager_linode_service }}."
         quiet: true
+
+    - name: Refuse a Service that points at another target
+      ansible.builtin.assert:
+        that:
+          - manager_found_target == manager_wanted_target
+        fail_msg: "{{ inventory_hostname }} serves {{ manager_service }} to {{ manager_found_target }}, not to {{ manager_wanted_target }}."
+        quiet: true
+      when: manager_service in manager_serving
+      vars:
+        manager_wanted_target: "http://127.0.0.1:{{ manager_webhook_port }}"
+        manager_found_web: "{{ (manager_serve_status.stdout | from_json).Services[manager_service].Web | default({}) }}"
+        manager_found_target: "{{ (manager_found_web | dict2items | first | default({'value': {}})).value.Handlers['/'].Proxy | default('none') }}"
 
     - name: Install age
       ansible.builtin.apt:

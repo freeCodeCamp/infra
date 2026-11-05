@@ -48,6 +48,15 @@
       ansible.builtin.set_fact:
         nginx_probe_ip: "{{ (nginx_vpc_addr.stdout.split()[3]).split('/') | first }}"
 
+    - name: Let NGINX bind a VPC address that comes up late
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        value: "1"
+        sysctl_file: /etc/sysctl.d/60-nginx-probe.conf
+        sysctl_set: true
+        state: present
+        reload: true
+
   roles:
     - nginx
 
@@ -79,6 +88,7 @@
       loop_control:
         label: "{{ item.key }}"
       no_log: true
+      register: nginx_tls_written
 
     - name: Download the Cloudflare client CA
       ansible.builtin.get_url:
@@ -88,6 +98,7 @@
         owner: root
         group: root
         mode: "0640"
+      register: nginx_aop_ca_downloaded
 
     - name: Create the client certificate of the probe listener
       ansible.builtin.command:
@@ -130,6 +141,7 @@
         owner: root
         group: root
         mode: "0640"
+      register: nginx_client_ca_written
 
     - name: Write the client certificate check and the probe listener
       ansible.builtin.template:
@@ -138,11 +150,30 @@
         owner: root
         group: root
         mode: "0644"
+      register: nginx_origin_written
 
-    - name: Write the upstream names on a new host
+    - name: Read the upstreams file on the host
+      ansible.builtin.slurp:
+        src: "{{ nginx_upstreams_path }}"
+      register: nginx_seed_read
+      failed_when: false
+
+    - name: Decrypt the upstream names once for this host
+      ansible.builtin.set_fact:
+        nginx_seed_names: "{{ nginx_upstreams | map(attribute='name') | list }}"
+      no_log: true
+
+    - name: Find the upstream names that the file lacks
+      ansible.builtin.set_fact:
+        nginx_seed_current: "{{ nginx_seed_text }}{{ '\n' if nginx_seed_text and not nginx_seed_text.endswith('\n') else '' }}"
+        nginx_seed_missing: "{{ nginx_seed_names | difference(nginx_seed_text | regex_findall('^upstream (\\S+) \\{', multiline=true)) }}"
+      vars:
+        nginx_seed_text: "{{ nginx_seed_read.content | default('') | b64decode }}"
+
+    - name: Add the upstream names that the file lacks
       ansible.builtin.copy:
         content: |
-          {% for upstream in nginx_seed_names %}
+          {{ nginx_seed_current }}{% for upstream in nginx_seed_missing %}
           upstream {{ upstream }} {
             server 0.0.0.0:32323;
           }
@@ -151,19 +182,29 @@
         owner: root
         group: root
         mode: "0644"
-        force: false
-      vars:
-        nginx_seed_names: "{{ nginx_upstreams | map(attribute='name') }}"
+      when: nginx_seed_missing | length > 0
+      register: nginx_upstreams_seeded
 
     - name: Write the listed upstream blocks
       ansible.builtin.include_tasks: roles/nginx/tasks/render-upstreams.yml
 
-    - name: Check the NGINX config
-      ansible.builtin.command:
-        chdir: "{{ nginx_config_dir }}"
-        cmd: nginx -t
-      changed_when: false
-      check_mode: false
+    - name: Check the NGINX config and restore the previous commit when it fails
+      block:
+        - name: Check the NGINX config
+          ansible.builtin.command:
+            chdir: "{{ nginx_config_dir }}"
+            cmd: nginx -t
+          changed_when: false
+          check_mode: false
+
+      rescue:
+        - name: Restore the previous config
+          ansible.builtin.include_tasks: tasks/restore-nginx-config.yml
+          when: git_update.before is truthy
+
+        - name: Stop the run before any reload
+          ansible.builtin.fail:
+            msg: "nginx -t failed on {{ inventory_hostname }}: {{ ansible_failed_result.stderr | default('') }} {{ nginx_restore_summary | default('') }}"
 
     - name: Start NGINX
       ansible.builtin.service:
@@ -175,7 +216,16 @@
       ansible.builtin.service:
         name: nginx
         state: reloaded
-      changed_when: false
+      when: nginx_reload_triggers | select('changed') | list | length > 0
+      vars:
+        nginx_reload_triggers:
+          - "{{ nginx_tls_written }}"
+          - "{{ nginx_aop_ca_downloaded }}"
+          - "{{ nginx_client_ca_written }}"
+          - "{{ nginx_origin_written }}"
+          - "{{ nginx_upstreams_seeded }}"
+          - "{{ git_update }}"
+          - "{{ nginx_upstreams_written }}"
 
     - name: Check that NGINX holds the probe listener
       ansible.builtin.wait_for:
