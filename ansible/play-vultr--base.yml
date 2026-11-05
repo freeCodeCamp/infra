@@ -5,6 +5,24 @@
   max_fail_percentage: 0
   become: true
   become_user: root
+  pre_tasks:
+    - name: Check the internet before this play changes the host
+      block:
+        - name: Read the package archive
+          ansible.builtin.uri:
+            url: "{{ vultr_internet_check_url }}"
+            timeout: 10
+          register: base_internet
+          until: base_internet is succeeded
+          retries: 3
+          delay: "{{ vultr_internet_check_delay }}"
+          check_mode: false
+
+      rescue:
+        - name: Stop the run on this host
+          ansible.builtin.fail:
+            msg: "{{ inventory_hostname }} failed the internet check: {{ ansible_failed_result.msg | default('no error text') }}"
+
   roles:
     - ufw_off
     - sudo_user

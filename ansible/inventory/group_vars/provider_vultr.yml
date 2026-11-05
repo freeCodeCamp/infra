@@ -1,5 +1,7 @@
 ---
 vultr_vpc_cidr: 10.50.0.0/20
+vultr_internet_check_url: http://archive.ubuntu.com/ubuntu/
+vultr_internet_check_delay: 10
 
 node_exporter_bind: vpc
 node_exporter_vpc_cidr: "{{ vultr_vpc_cidr }}"
