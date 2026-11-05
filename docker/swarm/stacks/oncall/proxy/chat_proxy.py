@@ -986,6 +986,31 @@ class ChatProxy:
             ):
                 raise ValueError("invalid Grafana values")
 
+    def _bounded_grafana_string(self, value, maximum, *, allow_empty=False):
+        if (
+            not isinstance(value, str)
+            or (not allow_empty and not value)
+            or len(value) > maximum
+        ):
+            raise ValueError("invalid Grafana string field")
+        return value
+
+    def _grafana_string_map(self, value):
+        if not isinstance(value, dict) or len(value) > 100:
+            raise ValueError("invalid Grafana label map")
+        result = {}
+        for key, item in value.items():
+            if (
+                not isinstance(key, str)
+                or not key
+                or len(key) > 200
+                or not isinstance(item, str)
+                or len(item) > 2000
+            ):
+                raise ValueError("invalid Grafana label map")
+            result[key] = item
+        return result
+
     def _grafana_payload_values(self, payload):
         allowed_fields = {
             "receiver", "status", "alerts", "groupLabels", "commonLabels", "commonAnnotations",
@@ -1001,31 +1026,8 @@ class ChatProxy:
         ):
             raise ValueError("unsupported Grafana webhook contract")
 
-        def bounded_string(value, maximum, *, allow_empty=False):
-            if (
-                not isinstance(value, str)
-                or (not allow_empty and not value)
-                or len(value) > maximum
-            ):
-                raise ValueError("invalid Grafana string field")
-            return value
-
-        def string_map(value):
-            if not isinstance(value, dict) or len(value) > 100:
-                raise ValueError("invalid Grafana label map")
-            result = {}
-            for key, item in value.items():
-                if (
-                    not isinstance(key, str)
-                    or not key
-                    or len(key) > 200
-                    or not isinstance(item, str)
-                    or len(item) > 2000
-                ):
-                    raise ValueError("invalid Grafana label map")
-                result[key] = item
-            return result
-
+        bounded_string = self._bounded_grafana_string
+        string_map = self._grafana_string_map
         status = bounded_string(payload["status"], 16)
         state_value = bounded_string(payload["state"], 16)
         if status not in {"firing", "resolved"}:
