@@ -157,25 +157,55 @@ All services log to the local Docker `json-file` driver, rotated per node:
 
 ## Deployment
 
-Start Tailscale first. The `backoffice` context is `ssh://freecodecamp@ops-vm-backoffice`, and that name resolves only on the tailnet. On a new machine, create the context once: `docker context create backoffice --docker host=ssh://freecodecamp@ops-vm-backoffice`.
+**Who:** an operator with the `infra-secrets` age key and Tailscale access to the manager. The command needs `sops`, so an agent cannot run it.
 
-Run from the repository root. The block decrypts the 3 variables into a subshell and deploys. The secrets are not in your shell after the command. See runbook 04, section 3.
+**When:** after a change to a file in this directory. No workflow deploys this stack, so a push does not change the live stack. A first deploy and an update use the same command.
 
-```bash
-cd docker/swarm/stacks/oncall
-(
-  set -eu
-  secrets=$(sops decrypt --input-type dotenv --output-type dotenv \
-    ../../../../../infra-secrets/docker/oldeworld/oncall.env.enc)
-  while IFS= read -r line; do
-    case $line in '' | '#'*) continue ;; esac
-    export "$line"
-  done <<< "$secrets"
-  docker --context backoffice stack deploy -c stack-oncall.yml oncall
-)
-```
+| Swarm                               | Context      | Deploy command                                                                             |
+| ----------------------------------- | ------------ | ------------------------------------------------------------------------------------------ |
+| Linode                              | `backoffice` | `docker --context backoffice stack deploy -c stack-oncall.yml oncall`                      |
+| Vultr, until the production cutover | `vultr`      | `docker --context vultr stack deploy -c stack-oncall.yml -c stack-oncall.vultr.yml oncall` |
 
-On the Vultr Swarm, until the production cutover, use `docker --context vultr stack deploy -c stack-oncall.yml -c stack-oncall.vultr.yml oncall`. The second file turns off the scheduled dispatch, watchdog and cleanup jobs, so only one Swarm runs them. `svc-watchdog-vxlan` and `svc-cleanup` are global and each runs once at deploy. At the cutover, deploy without the second file on Vultr. On the Linode Swarm, turn the same jobs off.
+`stack-oncall.vultr.yml` turns off the scheduled dispatch, watchdog and cleanup jobs, so only one Swarm runs them. At the cutover, deploy without this file on Vultr, and turn the same jobs off on the Linode Swarm.
+
+1. Start Tailscale. The manager names resolve only on the tailnet.
+2. On a new machine, create the context once:
+
+   ```bash
+   docker context create backoffice --docker host=ssh://freecodecamp@ops-vm-backoffice
+   docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
+   ```
+
+3. If you changed a config file, increase its version first. See [Swarm Config Names](#swarm-config-names).
+4. From the repository root, run this block. Replace `<deploy command>` with the command for your Swarm. The block decrypts the 3 variables into a subshell, so they are not in your shell after the command. `sops exec-env` cannot read this file, so the loop is necessary. See runbook 04, section 3.
+
+   ```bash
+   cd docker/swarm/stacks/oncall
+   (
+     set -eu
+     secrets=$(sops decrypt --input-type dotenv --output-type dotenv \
+       ../../../../../infra-secrets/docker/oldeworld/oncall.env.enc)
+     while IFS= read -r line; do
+       case $line in '' | '#'*) continue ;; esac
+       export "$line"
+     done <<< "$secrets"
+     <deploy command>
+   )
+   ```
+
+5. Check the services. `svc-webhook`, `svc-chat-relay` and `svc-cronjob` show `1/1`:
+
+   ```bash
+   docker --context vultr service ls --filter name=oncall_
+   ```
+
+6. On Vultr, until the cutover, check the scheduler. Only `oncall_svc-update` has an `Add cronjob` line:
+
+   ```bash
+   docker --context vultr service logs --raw oncall_svc-cronjob
+   ```
+
+`svc-watchdog-vxlan` and `svc-cleanup` are global and each runs once at deploy, on each node. They do not retry, so a rejected task waits for its next scheduled run.
 
 If the manager reports a permission error on `/home/freecodecamp/.docker`, run this on the manager (`ssh freecodecamp@ops-vm-backoffice`):
 
