@@ -54,6 +54,9 @@ ansible/inventory/hosts
 
 .ansible/
 
+# one-time import blocks with Cloudflare record IDs
+terraform/cf-origin-records/imports.tf
+
 # dossier: internal scratchpad theater tooling
 .scratchpad/
 

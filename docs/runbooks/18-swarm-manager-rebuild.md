@@ -4,7 +4,7 @@
 
 The Vultr Swarm has one manager. The manager holds the Raft state of the Swarm. When the manager goes, the Swarm goes with it: the workers cannot elect a new manager, and you cannot deploy. This runbook makes a new Swarm: a new manager, the workers join it again, and you deploy the stacks again.
 
-> **Outage.** Each worker stops its tasks when it leaves the old Swarm. The Vultr services do not run until you deploy the stacks again (step 8). Before you start, move the Cloudflare traffic to the Linode pool while that pool exists.
+> **Outage.** Each worker stops its tasks when it leaves the old Swarm. The Vultr services do not run until you deploy the stacks again (step 8). Before you start, move the Cloudflare traffic to Linode one step at a time while Linode exists ([20-traffic-rotation.md](20-traffic-rotation.md)).
 
 Run every command from the repo root unless the step says otherwise.
 
@@ -118,7 +118,7 @@ Check that each service has its replicas:
 ssh freecodecamp@ops-vm-swarm-mgr-1 sudo docker service ls
 ```
 
-Move the Cloudflare traffic back to the Vultr pool.
+Move the Cloudflare traffic back to Vultr ([20-traffic-rotation.md](20-traffic-rotation.md)).
 
 ## Practise on `tst-vultr`
 
