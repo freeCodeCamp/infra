@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restore-drill-metrics
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 150Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restore-drill-metrics
+spec:
+  restartPolicy: Never
+  initContainers:
+    - name: vmrestore
+      image: victoriametrics/vmrestore:v1.154.0
+      args:
+        - -storageDataPath=/vm-data
+        - -src=s3://ops-o11y-backups/vmstorage/vmstorage-vm-0
+        - -customS3Endpoint=$(R2_ENDPOINT)
+      env:
+        - name: AWS_REGION
+          value: auto
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: o11y-r2-backups
+              key: access_key_id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: o11y-r2-backups
+              key: secret_access_key
+        - name: R2_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: o11y-r2-backups
+              key: endpoint
+      volumeMounts:
+        - name: data
+          mountPath: /vm-data
+  containers:
+    - name: vmstorage
+      image: victoriametrics/vmstorage:v1.154.0-cluster
+      args:
+        - -storageDataPath=/vm-data
+        - -retentionPeriod=6
+        - -httpListenAddr=:8482
+      ports:
+        - containerPort: 8482
+      volumeMounts:
+        - name: data
+          mountPath: /vm-data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: restore-drill-metrics
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restore-drill-logs
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 70Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restore-drill-logs
+spec:
+  restartPolicy: Never
+  initContainers:
+    - name: rclone
+      image: rclone/rclone:1.75.2
+      args:
+        - copy
+        - r2:ops-o11y-backups/vlogs
+        - /victoria-logs-data/partitions
+      env:
+        - name: RCLONE_CONFIG_R2_TYPE
+          value: s3
+        - name: RCLONE_CONFIG_R2_PROVIDER
+          value: Cloudflare
+        - name: RCLONE_CONFIG_R2_REGION
+          value: auto
+        - name: RCLONE_S3_NO_CHECK_BUCKET
+          value: "true"
+        - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: o11y-r2-backups
+              key: access_key_id
+        - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: o11y-r2-backups
+              key: secret_access_key
+        - name: RCLONE_CONFIG_R2_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: o11y-r2-backups
+              key: endpoint
+      volumeMounts:
+        - name: data
+          mountPath: /victoria-logs-data
+  containers:
+    - name: victoria-logs
+      image: victoriametrics/victoria-logs:v1.53.0
+      args:
+        - -storageDataPath=/victoria-logs-data
+        - -retentionPeriod=14d
+        - -httpListenAddr=:9428
+      ports:
+        - containerPort: 9428
+      volumeMounts:
+        - name: data
+          mountPath: /victoria-logs-data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: restore-drill-logs

@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vlogs-backup
+spec:
+  schedule: "30 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: rclone
+              image: rclone/rclone:1.75.2
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  post() { wget -qO- --post-data='' "$VLOGS_URL/internal/partition/snapshot/$1"; }
+                  post 'delete_stale?max_age=1d' >/dev/null
+                  snapshots=$(post create)
+                  paths=$(printf '%s' "$snapshots" | tr -d '[]"' | tr ',' ' ')
+                  if [ -z "$paths" ]; then
+                    echo "no partitions to back up"
+                    exit 1
+                  fi
+                  for path in $paths; do
+                    partition=${path#*/partitions/}
+                    partition=${partition%%/*}
+                    rclone sync "$path" "$BACKUP_DST/$partition"
+                    post "delete?path=$path" >/dev/null
+                  done
+                  rclone delete --min-age 15d --rmdirs "$BACKUP_DST"
+                  echo "backed up: $paths"
+              env:
+                - name: VLOGS_URL
+                  value: http://vlsingle-vlogs-a.o11y.svc:9428
+                - name: BACKUP_DST
+                  value: r2:ops-o11y-backups/vlogs
+                - name: RCLONE_CONFIG_R2_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_R2_PROVIDER
+                  value: Cloudflare
+                - name: RCLONE_CONFIG_R2_REGION
+                  value: auto
+                - name: RCLONE_S3_NO_CHECK_BUCKET
+                  value: "true"
+                - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: access_key_id
+                - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: secret_access_key
+                - name: RCLONE_CONFIG_R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: endpoint
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              volumeMounts:
+                - name: data
+                  mountPath: /victoria-logs-data
+                  readOnly: true
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: vlsingle-vlogs-a

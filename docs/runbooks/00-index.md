@@ -10,6 +10,7 @@ Single-purpose ops runbooks. Each file owns one operational concern.
 | 14  | [14-o11y-node-bringup.md](14-o11y-node-bringup.md)         | Operator | Bring up / grow the ops-o11y cluster (target state) |
 | 18  | [18-swarm-manager-rebuild.md](18-swarm-manager-rebuild.md) | Operator | Rebuild the Vultr Swarm after a manager loss        |
 | 19  | [19-o11y-alerts.md](19-o11y-alerts.md)                     | Operator | An ops-o11y-vultr alert fires                       |
+| 21  | [21-o11y-backup-restore.md](21-o11y-backup-restore.md)     | Operator | Restore o11y data, or a nightly backup fails        |
 
 Archived in [`archive/2026-10-15/`](archive/2026-10-15/):
 

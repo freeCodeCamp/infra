@@ -1,0 +1,188 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vmbackup-vmstorage-vm-0
+spec:
+  schedule: "0 1 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: vmbackup
+              image: victoriametrics/vmbackup:v1.154.0
+              args:
+                - -storageDataPath=/vm-data
+                - -snapshot.createURL=http://vmstorage-vm-0.vmstorage-vm.o11y.svc:8482/snapshot/create
+                - -dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-0
+                - -customS3Endpoint=$(R2_ENDPOINT)
+              env:
+                - name: AWS_REGION
+                  value: auto
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: access_key_id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: secret_access_key
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: endpoint
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
+              volumeMounts:
+                - name: data
+                  mountPath: /vm-data
+                  readOnly: true
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: vmstorage-db-vmstorage-vm-0
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vmbackup-vmstorage-vm-1
+spec:
+  schedule: "30 1 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: vmbackup
+              image: victoriametrics/vmbackup:v1.154.0
+              args:
+                - -storageDataPath=/vm-data
+                - -snapshot.createURL=http://vmstorage-vm-1.vmstorage-vm.o11y.svc:8482/snapshot/create
+                - -dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-1
+                - -customS3Endpoint=$(R2_ENDPOINT)
+              env:
+                - name: AWS_REGION
+                  value: auto
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: access_key_id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: secret_access_key
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: endpoint
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
+              volumeMounts:
+                - name: data
+                  mountPath: /vm-data
+                  readOnly: true
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: vmstorage-db-vmstorage-vm-1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vmbackup-vmstorage-vm-2
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: vmbackup
+              image: victoriametrics/vmbackup:v1.154.0
+              args:
+                - -storageDataPath=/vm-data
+                - -snapshot.createURL=http://vmstorage-vm-2.vmstorage-vm.o11y.svc:8482/snapshot/create
+                - -dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-2
+                - -customS3Endpoint=$(R2_ENDPOINT)
+              env:
+                - name: AWS_REGION
+                  value: auto
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: access_key_id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: secret_access_key
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: o11y-r2-backups
+                      key: endpoint
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
+              volumeMounts:
+                - name: data
+                  mountPath: /vm-data
+                  readOnly: true
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: vmstorage-db-vmstorage-vm-2

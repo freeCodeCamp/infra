@@ -109,6 +109,16 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#vmalertexecutionerrors"
+        - alert: O11yBackupStale
+          expr: time() - kube_cronjob_status_last_successful_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"} > 129600
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CronJob {{ $labels.cronjob }} has had no successful backup for 36 hours."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#o11ybackupstale"
     - name: fluent-bit
       interval: 1m
       rules:

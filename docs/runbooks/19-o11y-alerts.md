@@ -234,6 +234,14 @@ A vmalert pod failed to run one or more of its rules in each 10 minutes, for 5 m
 
 1. If a rule expression is wrong, correct the rule in git. Argo CD syncs the fix.
 
+## O11yBackupStale
+
+A nightly backup to R2 has not succeeded for 36 hours. The `cronjob` label names it. Examine the last Job, then see [21-o11y-backup-restore.md](21-o11y-backup-restore.md):
+
+```sh
+kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get jobs --sort-by=.metadata.creationTimestamp
+```
+
 ## NginxHigh5xxRate
 
 More than 5% of the requests to one `server_name` return a 5xx status for 5 minutes, with at least 100 requests in each 5 minutes.
