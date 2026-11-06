@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: restore-vmstorage-vm-0
   labels:
-    restore: vmstorage
+    restore-disk: vmstorage-vm-0
 spec:
   backoffLimit: 1
   template:
@@ -47,7 +47,7 @@ kind: Job
 metadata:
   name: restore-vmstorage-vm-1
   labels:
-    restore: vmstorage
+    restore-disk: vmstorage-vm-1
 spec:
   backoffLimit: 1
   template:
@@ -91,7 +91,7 @@ kind: Job
 metadata:
   name: restore-vmstorage-vm-2
   labels:
-    restore: vmstorage
+    restore-disk: vmstorage-vm-2
 spec:
   backoffLimit: 1
   template:
@@ -135,7 +135,7 @@ kind: Job
 metadata:
   name: restore-vlogs-a
   labels:
-    restore: vlogs-a
+    restore-disk: vlogs-a
 spec:
   backoffLimit: 1
   template:
@@ -145,7 +145,7 @@ spec:
         - name: rclone
           image: rclone/rclone:1.75.2
           args:
-            - copy
+            - sync
             - r2:ops-o11y-backups/vlogs
             - /victoria-logs-data/partitions
           env:
@@ -185,7 +185,7 @@ kind: Job
 metadata:
   name: restore-vlogs-b
   labels:
-    restore: vlogs-b
+    restore-disk: vlogs-b
 spec:
   backoffLimit: 1
   template:
@@ -195,7 +195,7 @@ spec:
         - name: rclone
           image: rclone/rclone:1.75.2
           args:
-            - copy
+            - sync
             - r2:ops-o11y-backups/vlogs
             - /victoria-logs-data/partitions
           env:

@@ -110,7 +110,7 @@ spec:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#vmalertexecutionerrors"
         - alert: O11yBackupStale
-          expr: time() - kube_cronjob_status_last_successful_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"} > 129600
+          expr: time() - (kube_cronjob_status_last_successful_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"} or kube_cronjob_created{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"}) > 129600
           for: 5m
           labels:
             severity: warning

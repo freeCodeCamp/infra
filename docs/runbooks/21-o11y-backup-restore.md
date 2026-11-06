@@ -57,9 +57,11 @@ The practice uses new disks and new pods. It does not touch the running data. Th
 
 ## Restore after a loss
 
-Do not restore after the loss of one `vmstorage` disk. Each sample is on 2 of the 3 VMs, so the data stays available. Restore only if 2 or more disks are lost. Restore `vlogs-a` or `vlogs-b` only if its disk is lost.
+Restore only the lost disks. A restore rolls a disk back to its last backup, so a healthy disk loses newer samples.
 
-If a VM is gone, delete its PersistentVolumeClaim and let the workload create a new, empty disk before you start. The restore fills that disk.
+> **Danger.** A backup makes the bucket match its disk. If a backup runs on a new, empty disk, it deletes the only copy of that disk. Stop the backups (step 2) before you delete a disk.
+
+Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available after the loss of one disk. You can choose the time of that restore. Do steps 1 to 3 now, and keep the backup of that disk stopped until you restore it. `O11yBackupStale` fires as a reminder.
 
 1. Stop the Argo CD sync, so that it does not undo the next steps:
 
@@ -73,6 +75,34 @@ If a VM is gone, delete its PersistentVolumeClaim and let the workload create a 
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd patch application victoria-logs --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+   ```
+
+1. Stop the backup of each lost disk. This example is `vmstorage-vm-0`. For a logs disk, stop `vlogs-backup`:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch cronjob vmbackup-vmstorage-vm-0 --type merge -p '{"spec":{"suspend":true}}'
+   ```
+
+1. Replace each lost disk. A finished Job can hold the disk, so first read and delete the Jobs of that CronJob. Then delete the PersistentVolumeClaim and the pod, and wait for the new claim. For `vlogs-a`, the claim is `vlsingle-vlogs-a`, and the pod name starts with `vlsingle-vlogs-a-`.
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get jobs -o name | grep vmbackup-vmstorage-vm-0
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete <job name from the command before>
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete pvc vmstorage-db-vmstorage-vm-0 --wait=false
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete pod vmstorage-vm-0
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=jsonpath='{.status.phase}'=Bound --timeout=10m pvc/vmstorage-db-vmstorage-vm-0
    ```
 
 1. Stop the workload. For metrics:
@@ -95,21 +125,27 @@ If a VM is gone, delete its PersistentVolumeClaim and let the workload create a 
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y scale deployment vlsingle-vlogs-a --replicas=0
    ```
 
-1. Run the restore. Use the label for the disks that you restore: `restore=vmstorage` (all 3), or `restore=vlogs-a`, or `restore=vlogs-b`:
+1. Run the restore once for each lost disk. The label is `restore-disk=<disk>`, where `<disk>` is `vmstorage-vm-0`, `vmstorage-vm-1`, `vmstorage-vm-2`, `vlogs-a` or `vlogs-b`:
 
    ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y apply -l restore=vmstorage -f k3s/ops-o11y-vultr/tools/restore.yaml
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y apply -l restore-disk=vmstorage-vm-0 -f k3s/ops-o11y-vultr/tools/restore.yaml
    ```
 
    ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=condition=Complete --timeout=4h -l restore=vmstorage job
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=condition=Complete --timeout=4h -l restore-disk=vmstorage-vm-0 job
    ```
 
 1. Start the workload again. Set `paused` to `false` on the same resource, and set the replicas back: `3` for `vmstorage-vm`, `1` for a VLSingle.
 1. Delete the restore Jobs:
 
    ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete job -l restore=vmstorage
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete job -l restore-disk
+   ```
+
+1. Read the row counts of the workload, and make sure that the data is back. Start each backup again only after this. Argo CD does not undo the stop:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch cronjob vmbackup-vmstorage-vm-0 --type merge -p '{"spec":{"suspend":false}}'
    ```
 
 1. Start the Argo CD sync again. The root application restores the sync of the other applications:
@@ -120,8 +156,9 @@ If a VM is gone, delete its PersistentVolumeClaim and let the workload create a 
 
 ## Failure modes
 
-| Symptom                                          | Cause                                       | Fix                                                              |
-| ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------------------- |
-| The pod is in `CreateContainerConfigError`       | The Secret `o11y-r2-backups` does not exist | Examine `kubectl -n o11y get externalsecret o11y-r2-backups`     |
-| The log shows `403` or `AccessDenied`            | The R2 key cannot use the bucket            | Check the key scope in the Cloudflare dashboard                  |
-| `vlogs-backup` prints `no partitions to back up` | `vlogs-a` has no data                       | Examine the log shipper ([19-o11y-alerts.md](19-o11y-alerts.md)) |
+| Symptom                                              | Cause                                       | Fix                                                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| The pod is in `CreateContainerConfigError`           | The Secret `o11y-r2-backups` does not exist | Examine `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get externalsecret o11y-r2-backups`                    |
+| `vmrestore` stops because the backup is not complete | The last backup failed part way             | Run the next backup first. If the disk is lost, add `-skipBackupCompleteCheck` to the restore Job; the restore can be incomplete |
+| The log shows `403` or `AccessDenied`                | The R2 key cannot use the bucket            | Check the key scope in the Cloudflare dashboard                                                                                  |
+| `vlogs-backup` prints `no partitions to back up`     | `vlogs-a` has no data                       | Examine the log shipper ([19-o11y-alerts.md](19-o11y-alerts.md))                                                                 |
