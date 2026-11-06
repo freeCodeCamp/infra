@@ -59,6 +59,7 @@
         src: pm2/pm2-freecodecamp.service.j2
         dest: "/etc/systemd/system/{{ pm2_unit }}.service"
         mode: "0644"
+      become: true
       become_user: root
       register: clients_pm2_unit
 
@@ -68,6 +69,7 @@
         enabled: true
         state: started
         daemon_reload: "{{ clients_pm2_unit.changed }}"
+      become: true
       become_user: root
 
     - name: Read the PM2 modules
