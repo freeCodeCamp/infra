@@ -31,6 +31,28 @@ kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y port-forward sv
 
 Then open `http://127.0.0.1:9093/#/silences` and add a silence with an end time.
 
+## Test the alert path
+
+This test proves that an alert reaches the Google Chat space. It does not prove that the rule expression is correct. People in the space see the messages, so tell them first.
+
+1. Read the list of alerts that the test sends:
+
+   ```sh
+   k3s/ops-o11y-vultr/tools/alert-drill.sh --dry-run
+   ```
+
+1. Send the alerts:
+
+   ```sh
+   k3s/ops-o11y-vultr/tools/alert-drill.sh --send
+   ```
+
+1. In the Google Chat space, make sure that one message with `Drill-` in its title comes for each alert in the list, in about 1 minute. About 16 minutes after you send, each alert gets a message or a thread reply that ends in `Resolved`. Do not send again during this time: Alertmanager merges the alerts and posts no new messages.
+1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in.
+1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
+
+To add the names of the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`), give their file after `--dry-run` or `--send`: `k3s/ops-o11y-vultr/cluster/victoria-logs/vmrule-logs.yaml`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
+
 ## HostDown
 
 A host does not answer the node exporter scrape for 3 minutes. The alert does not cover the NGINX VMs; see [NginxVmDown](#nginxvmdown).
@@ -72,9 +94,9 @@ An NGINX VM does not answer the node exporter scrape, or `nginx.service` is not 
 
 1. If the VM does not answer or NGINX does not start, make sure that the VM gets no traffic:
    - Linode VM: each NodeBalancer of the environment (`prd-nb-oldeworld-pxy-1` to `-3`, `stg-nb-oldeworld-pxy`) checks the TCP connection to each NGINX VM on ports 80 and 443 every 10 seconds. After 3 failed checks, it stops sending traffic to the VM. In Linode Cloud Manager, open each NodeBalancer and make sure that the nodes of the VM show `DOWN`.
-   - Vultr VM, when the Vultr hosts are scraped: in the Cloudflare dashboard, open the zone, then **DNS** > **Records**. Delete each proxied A record that points at the public IP address of the VM.
+   - Vultr VM, when the Vultr hosts are scraped: add the VM to `proxies_down` ([20-traffic-rotation.md](20-traffic-rotation.md)).
 
-1. Repair or rebuild the VM. For a Vultr VM, add the records again.
+1. Repair or rebuild the VM. For a Vultr VM, remove it from `proxies_down`.
 
 ## DiskSpaceLow
 
