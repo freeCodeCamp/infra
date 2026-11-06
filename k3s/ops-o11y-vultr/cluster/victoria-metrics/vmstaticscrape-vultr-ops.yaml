@@ -1,0 +1,39 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: vultr-ops-node
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: node
+  targetEndpoints:
+    - targets: ["10.50.0.6:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: ops
+        role: swarm-mgr
+        instance: ops-vm-swarm-mgr-1
+        provider: vultr
+        region: ewr
+
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: vultr-ops-fluent-bit
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: fluent-bit
+  targetEndpoints:
+    - targets: ["10.50.0.6:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: ops
+        role: swarm-mgr
+        instance: ops-vm-swarm-mgr-1
+        provider: vultr
+        region: ewr

@@ -1,0 +1,717 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: vultr-stg-node
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: node
+  targetEndpoints:
+    - targets: ["10.50.0.33:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: api
+        instance: stg-vm-api-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.27:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: api
+        instance: stg-vm-api-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.16:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: api
+        instance: stg-vm-api-3
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.31:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ara
+        instance: stg-vm-clt-ara-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.29:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ara
+        instance: stg-vm-clt-ara-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.38:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: chn
+        instance: stg-vm-clt-chn-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.30:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: chn
+        instance: stg-vm-clt-chn-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.37:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: cnt
+        instance: stg-vm-clt-cnt-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.19:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: cnt
+        instance: stg-vm-clt-cnt-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.20:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: eng
+        instance: stg-vm-clt-eng-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.15:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: eng
+        instance: stg-vm-clt-eng-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.11:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: esp
+        instance: stg-vm-clt-esp-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.10:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: esp
+        instance: stg-vm-clt-esp-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.34:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ger
+        instance: stg-vm-clt-ger-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.25:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ger
+        instance: stg-vm-clt-ger-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.8:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ita
+        instance: stg-vm-clt-ita-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.23:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ita
+        instance: stg-vm-clt-ita-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.35:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: jpn
+        instance: stg-vm-clt-jpn-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.7:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: jpn
+        instance: stg-vm-clt-jpn-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.28:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: kor
+        instance: stg-vm-clt-kor-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.39:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: kor
+        instance: stg-vm-clt-kor-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.42:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: por
+        instance: stg-vm-clt-por-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.22:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: por
+        instance: stg-vm-clt-por-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.9:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: swa
+        instance: stg-vm-clt-swa-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.18:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: swa
+        instance: stg-vm-clt-swa-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.21:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ukr
+        instance: stg-vm-clt-ukr-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.26:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ukr
+        instance: stg-vm-clt-ukr-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.41:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: nws
+        instance: stg-vm-nws-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.17:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: nws
+        instance: stg-vm-nws-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.12:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: nws
+        instance: stg-vm-nws-3
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.13:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: pxy
+        instance: stg-vm-pxy-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.36:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: pxy
+        instance: stg-vm-pxy-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.14:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: pxy
+        instance: stg-vm-pxy-3
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.24:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: soc
+        instance: stg-vm-soc-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.32:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: soc
+        instance: stg-vm-soc-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.40:9100"]
+      path: /metrics
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: soc
+        instance: stg-vm-soc-3
+        provider: vultr
+        region: ewr
+
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: vultr-stg-fluent-bit
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  jobName: fluent-bit
+  targetEndpoints:
+    - targets: ["10.50.0.33:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: api
+        instance: stg-vm-api-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.27:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: api
+        instance: stg-vm-api-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.16:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: api
+        instance: stg-vm-api-3
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.31:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ara
+        instance: stg-vm-clt-ara-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.29:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ara
+        instance: stg-vm-clt-ara-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.38:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: chn
+        instance: stg-vm-clt-chn-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.30:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: chn
+        instance: stg-vm-clt-chn-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.37:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: cnt
+        instance: stg-vm-clt-cnt-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.19:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: cnt
+        instance: stg-vm-clt-cnt-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.20:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: eng
+        instance: stg-vm-clt-eng-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.15:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: eng
+        instance: stg-vm-clt-eng-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.11:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: esp
+        instance: stg-vm-clt-esp-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.10:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: esp
+        instance: stg-vm-clt-esp-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.34:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ger
+        instance: stg-vm-clt-ger-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.25:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ger
+        instance: stg-vm-clt-ger-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.8:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ita
+        instance: stg-vm-clt-ita-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.23:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ita
+        instance: stg-vm-clt-ita-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.35:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: jpn
+        instance: stg-vm-clt-jpn-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.7:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: jpn
+        instance: stg-vm-clt-jpn-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.28:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: kor
+        instance: stg-vm-clt-kor-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.39:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: kor
+        instance: stg-vm-clt-kor-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.42:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: por
+        instance: stg-vm-clt-por-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.22:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: por
+        instance: stg-vm-clt-por-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.9:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: swa
+        instance: stg-vm-clt-swa-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.18:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: swa
+        instance: stg-vm-clt-swa-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.21:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ukr
+        instance: stg-vm-clt-ukr-0
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.26:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: clt
+        language: ukr
+        instance: stg-vm-clt-ukr-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.41:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: nws
+        instance: stg-vm-nws-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.17:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: nws
+        instance: stg-vm-nws-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.12:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: nws
+        instance: stg-vm-nws-3
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.13:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: pxy
+        instance: stg-vm-pxy-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.36:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: pxy
+        instance: stg-vm-pxy-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.14:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: pxy
+        instance: stg-vm-pxy-3
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.24:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: soc
+        instance: stg-vm-soc-1
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.32:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: soc
+        instance: stg-vm-soc-2
+        provider: vultr
+        region: ewr
+    - targets: ["10.50.0.40:2020"]
+      path: /api/v2/metrics/prometheus
+      scrape_interval: 60s
+      labels:
+        env: stg
+        role: soc
+        instance: stg-vm-soc-3
+        provider: vultr
+        region: ewr
