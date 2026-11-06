@@ -33,7 +33,7 @@ The practice uses new disks and new pods. It does not touch the running data. Th
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y apply -f k3s/ops-o11y-vultr/tools/restore-drill.yaml
    ```
 
-1. Wait for each restore to complete, and record the time:
+1. Wait for each restore to complete, and record the time. This wait does not end if a restore fails, so examine the pods with `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pod restore-drill-metrics restore-drill-logs`:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=condition=Ready --timeout=4h pod/restore-drill-metrics pod/restore-drill-logs
@@ -61,7 +61,12 @@ Restore only the lost disks. A restore rolls a disk back to its last backup, so 
 
 > **Danger.** A backup makes the bucket match its disk. If a backup runs on a new, empty disk, it deletes the only copy of that disk. Stop the backups (step 2) before you delete a disk.
 
-Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available after the loss of one disk. You can choose the time of that restore. Do steps 1 to 3 now, and keep the backup of that disk stopped until you restore it. `O11yBackupStale` fires as a reminder.
+A disk is on its VM, so a lost disk usually means a lost VM. If a VM is lost, do steps 1 and 2 before it joins the cluster again, and delete each Pending backup Job of that disk. Otherwise a backup can run on the new, empty disk.
+
+Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available after the loss of one disk. You can choose the time of that restore. Do steps 1 to 3 now, and keep the backup of that disk stopped until you restore it. `O11yBackupStale` fires as a reminder. During the delay:
+
+- The new disk takes samples that the restore can remove. Those samples have one copy.
+- You can start the Argo CD sync again after step 3, because it does not undo the stopped backup. Do step 1 again before the restore.
 
 1. Stop the Argo CD sync, so that it does not undo the next steps:
 
@@ -101,9 +106,15 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete pod vmstorage-vm-0
    ```
 
+   If the VM is dead, this delete does not end. Stop it, and add `--force --grace-period=0`.
+
+   Wait for the new claim. The command ends only when a claim is `Bound` and is not being deleted. For a VLSingle, this can take about 1 minute. Do not go on to step 4 before it ends:
+
    ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=jsonpath='{.status.phase}'=Bound --timeout=10m pvc/vmstorage-db-vmstorage-vm-0
+   until [ "$(kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pvc vmstorage-db-vmstorage-vm-0 -o jsonpath='{.status.phase}/{.metadata.deletionTimestamp}')" = "Bound/" ]; do sleep 5; done
    ```
+
+> **Outage.** For metrics, step 4 stops all 3 `vmstorage` pods. All metrics, metric alerts and queries stop until step 6, and this can take hours. Tell the Google Chat space first. Sentry reports a missed Watchdog check-in. Samples that `vmagent` cannot hold on its disk during this time are lost.
 
 1. Stop the workload. For metrics:
 
@@ -131,8 +142,14 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y apply -l restore-disk=vmstorage-vm-0 -f k3s/ops-o11y-vultr/tools/restore.yaml
    ```
 
+   This wait does not end if the Job fails, so examine the Job in a second terminal:
+
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=condition=Complete --timeout=4h -l restore-disk=vmstorage-vm-0 job
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get job -l restore-disk=vmstorage-vm-0 -w
    ```
 
 1. Start the workload again. Set `paused` to `false` on the same resource, and set the replicas back: `3` for `vmstorage-vm`, `1` for a VLSingle.
@@ -142,7 +159,17 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete job -l restore-disk
    ```
 
-1. Read the row counts of the workload, and make sure that the data is back. Start each backup again only after this. Argo CD does not undo the stop:
+1. Read the row counts, and make sure that the data is back. For a VLSingle, read its pod name with `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods`.
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get --raw /api/v1/namespaces/o11y/pods/vmstorage-vm-0:8482/proxy/metrics | grep '^vm_rows{'
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get --raw /api/v1/namespaces/o11y/pods/<VLSingle pod>:9428/proxy/metrics | grep '^vl_storage_rows'
+   ```
+
+1. When the data is back, start each backup again. Argo CD does not undo the stop:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch cronjob vmbackup-vmstorage-vm-0 --type merge -p '{"spec":{"suspend":false}}'

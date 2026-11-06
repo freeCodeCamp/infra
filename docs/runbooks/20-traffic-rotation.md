@@ -35,7 +35,7 @@ Do this once, before the first window. It takes the existing Linode records into
    direnv exec terraform/cf-origin-records tofu -chdir=terraform/cf-origin-records init
    ```
 
-1. Put the import blocks at `terraform/cf-origin-records/imports.tf`. The blocks hold the Cloudflare record IDs, so they are not in this repository, and Git ignores this path. Each block sets `to = cloudflare_dns_record.origin["<host>/linode-<N>"]` and `id = "<zone ID>/<record ID>"`.
+1. Put the import blocks at `terraform/cf-origin-records/imports.tf`. The blocks hold the Cloudflare record IDs, so they are not in this repository, and Git ignores this path. The operator keeps them in private notes. To make them again, read the IDs with the Cloudflare API call `GET /zones/<zone ID>/dns_records?type=A&per_page=500`. Each block sets `to = cloudflare_dns_record.origin["<host>/linode-<N>"]` and `id = "<zone ID>/<record ID>"`.
 
 1. Plan and apply. The plan must show 27 to import, 1 to add (`terraform_data.guard`), 0 to change and 0 to destroy. If it shows something else, stop.
 
@@ -132,7 +132,7 @@ Set the word of the step before, and apply. Go back one step at a time. Do not g
 
 While the Linode records exist, the two fleets run the same versions, so no deploy is necessary.
 
-After the freeze lifts, deploys reach only Vultr. To return to Linode then, first deploy the running versions to Linode.
+After the freeze lifts, deploys reach only Vultr. To return to Linode then, follow [22-migration-rollback.md](22-migration-rollback.md), section Go back after a freeze lifts.
 
 ## A Vultr NGINX VM must get no traffic
 
