@@ -124,7 +124,7 @@ Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--
 
 ### Configure a Vultr Environment
 
-Run the steps in this order. No step moves traffic. Cloudflare sends traffic to a proxy only after a DNS record names it ([runbook 20](../runbooks/20-traffic-rotation.md)).
+Run the steps in this order. No step moves traffic. Cloudflare sends traffic to a proxy only after a DNS record names it ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), private repo).
 
 1. Run `play-vultr--base.yml` on each host of the environment.
 2. Run `play-swarm--form.yml`.

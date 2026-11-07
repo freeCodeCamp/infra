@@ -7,7 +7,7 @@ This runbook applies until Linode is shut down. Run every command from the repo 
 ## Preconditions
 
 - You recorded the old and new value of each deploy-target secret when you set it.
-- [20-traffic-rotation.md](20-traffic-rotation.md) is the procedure for each record change.
+- The [traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md) in the private repo `freeCodeCamp/terraform-cloudflare` is the procedure for each record change.
 
 ## Deploy-target secrets
 
@@ -26,7 +26,7 @@ These secrets select the fleet that a deploy reaches. `gh secret set` prompts fo
 
 The two fleets run the same versions, so no deploy is necessary.
 
-1. Move the records back one step at a time ([20-traffic-rotation.md](20-traffic-rotation.md), section Go back).
+1. Move the records back one step at a time ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), section Go back).
 1. Read the alerts and the request errors. Find the cause before you go on.
 1. If you stop the move, set each deploy-target secret of that environment back to its Linode value. Then lift the freeze.
 
@@ -45,7 +45,7 @@ Deploys reached only Vultr after the freeze, so Linode can be behind. Do these s
    ```
 
 1. Wait until each run ends with success. Examine each with `gh run list --repo <repo> --limit 5`.
-1. Move the records back one step at a time ([20-traffic-rotation.md](20-traffic-rotation.md), section Go back).
+1. Move the records back one step at a time ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), section Go back).
 1. For production, move the `oncall` jobs back. Use the block in section Deployment of [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md), first with the Vultr command with `stack-oncall.vultr.yml`, then with the Linode command.
 
 ## Deploy during a freeze

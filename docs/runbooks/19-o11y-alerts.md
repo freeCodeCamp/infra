@@ -94,7 +94,7 @@ An NGINX VM does not answer the node exporter scrape, or `nginx.service` is not 
 
 1. If the VM does not answer or NGINX does not start, make sure that the VM gets no traffic:
    - Linode VM: each NodeBalancer of the environment (`prd-nb-oldeworld-pxy-1` to `-3`, `stg-nb-oldeworld-pxy`) checks the TCP connection to each NGINX VM on ports 80 and 443 every 10 seconds. After 3 failed checks, it stops sending traffic to the VM. In Linode Cloud Manager, open each NodeBalancer and make sure that the nodes of the VM show `DOWN`.
-   - Vultr VM, when the Vultr hosts are scraped: add the VM to `proxies_down` ([20-traffic-rotation.md](20-traffic-rotation.md)).
+   - Vultr VM, when the Vultr hosts are scraped: add the VM to `proxies_down` ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), private repo).
 
 1. Repair or rebuild the VM. For a Vultr VM, remove it from `proxies_down`.
 
