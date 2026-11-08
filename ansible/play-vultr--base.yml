@@ -23,6 +23,9 @@
           ansible.builtin.fail:
             msg: "{{ inventory_hostname }} failed the internet check: {{ ansible_failed_result.msg | default('no error text') }}"
 
+    - name: Upgrade a new host and reboot it once
+      ansible.builtin.import_tasks: tasks/vultr-first-configure.yml
+
   roles:
     - ufw_off
     - sudo_user

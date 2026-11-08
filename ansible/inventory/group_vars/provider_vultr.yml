@@ -2,6 +2,9 @@
 vultr_vpc_cidr: 10.50.0.0/20
 vultr_internet_check_url: http://archive.ubuntu.com/ubuntu/
 vultr_internet_check_delay: 10
+vultr_first_configure_marker: /var/lib/freecodecamp-first-configure
+vultr_first_configure_lock_timeout: 1800
+vultr_first_configure_reboot_timeout: 600
 
 docker_group_users: [freecodecamp]
 

@@ -1,0 +1,53 @@
+---
+- name: Test the Vultr first-configure step
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  check_mode: false
+  vars_files:
+    - ../inventory/group_vars/provider_vultr.yml
+  vars:
+    test_dir: "{{ [lookup('ansible.builtin.env', 'TMPDIR') | default('/tmp', true), 'vultr-first-configure-test'] | path_join }}"
+    test_play: "{{ lookup('ansible.builtin.file', '../play-vultr--base.yml') | from_yaml | first }}"
+  tasks:
+    - name: Assert the base play runs the step in its pre-tasks, before the docker role
+      ansible.builtin.assert:
+        that:
+          - test_play.pre_tasks | map('dict2items') | flatten | selectattr('key', 'eq', 'ansible.builtin.import_tasks')
+            | map(attribute='value') | list == ['tasks/vultr-first-configure.yml']
+          - "'docker' in test_play.roles"
+        fail_msg: "pre_tasks: {{ test_play.pre_tasks | map(attribute='name') | list }}"
+
+    - name: Make a marker that shows the step finished
+      ansible.builtin.file:
+        path: "{{ test_dir }}"
+        state: "{{ item }}"
+        mode: "0700"
+      loop: [absent, directory]
+
+    - name: Write the marker
+      ansible.builtin.copy:
+        content: done
+        dest: "{{ test_dir }}/marker"
+        mode: "0600"
+
+    - name: Run the step on a host with the marker
+      ansible.builtin.include_tasks: ../tasks/vultr-first-configure.yml
+      vars:
+        vultr_first_configure_marker: "{{ test_dir }}/marker"
+
+    - name: Assert the step skipped each task after the marker check
+      ansible.builtin.assert:
+        that:
+          - first_configure_marker.stat.exists
+          - first_configure_upgrade is skipped
+          - first_configure_clean is skipped
+          - first_configure_reboot_flag is skipped
+          - first_configure_reboot is skipped
+          - first_configure_done is skipped
+
+    - name: Delete the test marker
+      ansible.builtin.file:
+        path: "{{ test_dir }}"
+        state: absent
