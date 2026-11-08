@@ -16,11 +16,15 @@ spec:
       port: 9100
   relabelConfigs:
     - sourceLabels: [__meta_vultr_instance_label]
-      regex: "(stg|prd)-vm-(api|soc|nws|pxy|clt)-.+|ops-vm-swarm-mgr-[0-9]+"
+      regex: "(stg|prd)-vm-((api|soc|nws|pxy)-[0-9]+|clt-[a-z]+-[0-9]+)|ops-vm-swarm-mgr-[0-9]+"
       action: keep
     - sourceLabels: [__meta_vultr_instance_internal_ip, __address__]
       regex: "(.+);[^:]+:([0-9]+)"
       replacement: "$1:$2"
+      targetLabel: __address__
+    - sourceLabels: [__meta_vultr_instance_internal_ip]
+      regex: "^$"
+      replacement: "no-vpc-address.invalid:9100"
       targetLabel: __address__
     - sourceLabels: [__meta_vultr_instance_label]
       regex: "([a-z]+)-vm-(swarm-mgr|[a-z]+)-.+"
@@ -60,11 +64,15 @@ spec:
       port: 2020
   relabelConfigs:
     - sourceLabels: [__meta_vultr_instance_label]
-      regex: "(stg|prd)-vm-(api|soc|nws|pxy|clt)-.+|ops-vm-swarm-mgr-[0-9]+"
+      regex: "(stg|prd)-vm-((api|soc|nws|pxy)-[0-9]+|clt-[a-z]+-[0-9]+)|ops-vm-swarm-mgr-[0-9]+"
       action: keep
     - sourceLabels: [__meta_vultr_instance_internal_ip, __address__]
       regex: "(.+);[^:]+:([0-9]+)"
       replacement: "$1:$2"
+      targetLabel: __address__
+    - sourceLabels: [__meta_vultr_instance_internal_ip]
+      regex: "^$"
+      replacement: "no-vpc-address.invalid:2020"
       targetLabel: __address__
     - sourceLabels: [__meta_vultr_instance_label]
       regex: "([a-z]+)-vm-(swarm-mgr|[a-z]+)-.+"
