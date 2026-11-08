@@ -64,8 +64,10 @@ ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-tailsc
 ```
 
 ```sh
-ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-tailscale--1a-up.yml -e variable_host=ops_swarm_mgr -e variable_ssh=false -e variable_tags=tag:added-by-ops,tag:deployment-tgt
+ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-tailscale--1a-up.yml -e variable_host=ops_swarm_mgr -e variable_ssh=true -e variable_tags=tag:added-by-ops,tag:deployment-tgt
 ```
+
+Keep `variable_ssh=true`. The api deploy reaches the manager through Tailscale SSH, because CI has no SSH key. This play also removes the webhook Service from the manager. Step 7 adds it again, so do not skip step 7.
 
 ## 6. Form the new Swarm
 
