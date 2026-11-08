@@ -15,6 +15,11 @@ resources:
   limits:
     memory: 128Mi
 
+dnsConfig:
+  options:
+    - name: ndots
+      value: "1"
+
 config:
   modules:
     http_2xx:
@@ -24,3 +29,4 @@ config:
         valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
         follow_redirects: true
         preferred_ip_protocol: ip4
+        ip_protocol_fallback: false
