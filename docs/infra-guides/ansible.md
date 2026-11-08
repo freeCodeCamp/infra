@@ -133,12 +133,14 @@ Run the steps in this order. No step moves traffic. Cloudflare sends traffic to 
 5. Make the two envelopes of the proxies. Do step 6 for each file.
    - `pxy-origin-tls`: a YAML map `nginx_tls_files`, one key for each file in `/etc/nginx/ssl` (`dhparam.pem`, `freecodecamp.dev.crt`, `freecodecamp.dev.key`, `freecodecamp.org.crt`, `freecodecamp.org.key`). The play refuses a map that lacks a key.
    - `pxy-upstreams-<tier>`: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams` writes the plaintext file.
-6. From `../infra-secrets`, encrypt the file and delete the plaintext:
+6. From `../infra-secrets`, encrypt the file and delete the plaintext. The command writes a temporary file and replaces the envelope only when `sops` succeeds, so a second run cannot empty the envelope:
 
    ```bash
-   sops -e --input-type yaml --output-type yaml docker/vultr/<name>.yaml.plaintext > docker/vultr/<name>.yaml.enc
+   sops -e --input-type yaml --output-type yaml docker/vultr/<name>.yaml.plaintext > docker/vultr/<name>.yaml.enc.tmp && mv docker/vultr/<name>.yaml.enc.tmp docker/vultr/<name>.yaml.enc
    rm -P docker/vultr/<name>.yaml.plaintext
    ```
+
+   Commit the envelope at once.
 
 7. Run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
 8. Run `play-vultr--clients.yml -e variable_host=<tier>_clt`. The client hosts join the tailnet at the traffic ramp, so `deploy-client.yml` cannot reach them before that.
