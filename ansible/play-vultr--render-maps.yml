@@ -30,7 +30,6 @@
   vars:
     secrets_dir: "{{ lookup('ansible.builtin.env', 'SECRETS_DIR') | default(playbook_dir ~ '/../../infra-secrets', true) }}"
     maps_upstreams_path: "{{ secrets_dir }}/docker/vultr/pxy-upstreams-{{ maps_env }}.yaml.plaintext"
-    maps_scrape_path: "{{ playbook_dir }}/../k3s/ops-o11y-vultr/cluster/victoria-metrics/vmstaticscrape-vultr-{{ maps_env }}.yaml"
   tasks:
     - name: Make the output directory
       ansible.builtin.file:

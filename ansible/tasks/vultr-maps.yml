@@ -2,18 +2,19 @@
 - name: Refuse an unknown output
   ansible.builtin.assert:
     that:
-      - maps_write in ['upstreams', 'scrape']
-    fail_msg: "maps_write must be upstreams or scrape: {{ maps_write }}"
+      - maps_write == 'upstreams'
+    fail_msg: "maps_write must be upstreams: {{ maps_write }}"
 
 - name: Refuse an unknown environment
   ansible.builtin.assert:
     that:
-      - maps_env in (['stg', 'prd'] if maps_write == 'upstreams' else ['stg', 'prd', 'ops'])
+      - maps_env in ['stg', 'prd']
     fail_msg: "maps_env {{ maps_env }} has no {{ maps_write }} output"
 
 - name: Keep the VPC addresses that were read
   ansible.builtin.set_fact:
-    maps_addr: "{{ groups['all'] | intersect(vultr_maps_names) | map('extract', hostvars)
+    maps_addr:
+      "{{ groups['all'] | intersect(vultr_maps_names) | map('extract', hostvars)
       | selectattr('maps_vpc_ip', 'defined') | items2dict(key_name='inventory_hostname', value_name='maps_vpc_ip') }}"
 
 - name: Refuse a host with no VPC address
@@ -28,10 +29,3 @@
     dest: "{{ maps_upstreams_path }}"
     mode: "0600"
   when: maps_write == 'upstreams'
-
-- name: Write the static scrape targets
-  ansible.builtin.template:
-    src: ../templates/vultr-maps/vmstaticscrape.yaml.j2
-    dest: "{{ maps_scrape_path }}"
-    mode: "0644"
-  when: maps_write == 'scrape'

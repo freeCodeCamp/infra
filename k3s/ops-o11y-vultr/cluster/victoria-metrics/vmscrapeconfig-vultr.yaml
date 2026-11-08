@@ -1,0 +1,88 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMScrapeConfig
+metadata:
+  name: vultr-node
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  path: /metrics
+  scrape_interval: 60s
+  vultrSDConfigs:
+    - authorization:
+        credentials:
+          name: vultr-sd
+          key: api-key
+      port: 9100
+  relabelConfigs:
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "(stg|prd)-vm-(api|soc|nws|pxy|clt)-.+|ops-vm-swarm-mgr-[0-9]+"
+      action: keep
+    - sourceLabels: [__meta_vultr_instance_internal_ip, __address__]
+      regex: "(.+);[^:]+:([0-9]+)"
+      replacement: "$1:$2"
+      targetLabel: __address__
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "([a-z]+)-vm-(swarm-mgr|[a-z]+)-.+"
+      replacement: "$1"
+      targetLabel: env
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "([a-z]+)-vm-(swarm-mgr|[a-z]+)-.+"
+      replacement: "$2"
+      targetLabel: role
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "[a-z]+-vm-clt-([a-z]+)-[0-9]+"
+      replacement: "$1"
+      targetLabel: language
+    - sourceLabels: [__meta_vultr_instance_label]
+      targetLabel: instance
+    - sourceLabels: [__meta_vultr_instance_region]
+      targetLabel: region
+    - targetLabel: provider
+      replacement: vultr
+    - targetLabel: job
+      replacement: node
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMScrapeConfig
+metadata:
+  name: vultr-fluent-bit
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  path: /api/v2/metrics/prometheus
+  scrape_interval: 60s
+  vultrSDConfigs:
+    - authorization:
+        credentials:
+          name: vultr-sd
+          key: api-key
+      port: 2020
+  relabelConfigs:
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "(stg|prd)-vm-(api|soc|nws|pxy|clt)-.+|ops-vm-swarm-mgr-[0-9]+"
+      action: keep
+    - sourceLabels: [__meta_vultr_instance_internal_ip, __address__]
+      regex: "(.+);[^:]+:([0-9]+)"
+      replacement: "$1:$2"
+      targetLabel: __address__
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "([a-z]+)-vm-(swarm-mgr|[a-z]+)-.+"
+      replacement: "$1"
+      targetLabel: env
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "([a-z]+)-vm-(swarm-mgr|[a-z]+)-.+"
+      replacement: "$2"
+      targetLabel: role
+    - sourceLabels: [__meta_vultr_instance_label]
+      regex: "[a-z]+-vm-clt-([a-z]+)-[0-9]+"
+      replacement: "$1"
+      targetLabel: language
+    - sourceLabels: [__meta_vultr_instance_label]
+      targetLabel: instance
+    - sourceLabels: [__meta_vultr_instance_region]
+      targetLabel: region
+    - targetLabel: provider
+      replacement: vultr
+    - targetLabel: job
+      replacement: fluent-bit

@@ -26,4 +26,4 @@ vultr_maps_client_langs:
   - ara
 vultr_maps_role_names: "{{ ['pxy', 'api', 'soc', 'nws'] | product(['1', '2', '3']) | map('join', '-') | map('regex_replace', '^', maps_env ~ '-vm-') | list }}"
 vultr_maps_client_names: "{{ vultr_maps_client_langs | product(['0', '1']) | map('join', '-') | map('regex_replace', '^', maps_env ~ '-vm-clt-') | list }}"
-vultr_maps_names: "{{ ['ops-vm-swarm-mgr-1'] if maps_env == 'ops' else vultr_maps_role_names + vultr_maps_client_names }}"
+vultr_maps_names: "{{ vultr_maps_role_names + vultr_maps_client_names }}"
