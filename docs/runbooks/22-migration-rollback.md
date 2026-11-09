@@ -39,11 +39,13 @@ The two fleets run the same versions, so no deploy is necessary.
 
 1. Move the records back one step at a time ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), section Go back).
 1. Read the alerts and the request errors. Find the cause before you go on.
-1. If you stop the move, set target 1 of each app of that environment to its Linode value, and delete the `_2` secrets. Then lift the freeze.
+1. If you stop the move, set target 1 of each app of that environment to its Linode value, and delete the `_2` secrets.
+1. If you stop the move in production and you turned the `oncall` jobs off on Linode at the start of the freeze, turn them on again. Use the block in section Deployment of [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md) with the Linode command, without `stack-oncall.vultr.yml`.
+1. If you stop the move, lift the freeze.
 
 ## Go back after a freeze lifts
 
-When target 2 named the other fleet for each app, both fleets run the same versions. Do steps 1, 2, 6 and 7 only.
+When target 2 named the other fleet for each app, both fleets run the same versions. Do steps 1, 2, 5, 6 and 7 only.
 
 When a deploy reached one fleet only, Linode can be behind. Do these steps in this order:
 
@@ -60,6 +62,7 @@ When a deploy reached one fleet only, Linode can be behind. Do these steps in th
 1. Wait until each run ends with success. Examine each with `gh run list --repo <repo> --limit 5`.
 1. Move the records back one step at a time ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), section Go back).
 1. For production, move the `oncall` jobs back. Use the block in section Deployment of [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md), first with the Vultr command with `stack-oncall.vultr.yml`, then with the Linode command.
+1. If the Ansible workflows of the environment run on Vultr, move them back. Open a PR that reverts the commit that moved them (`git log --oneline -- .github/workflows/ansible--housekeeping.yml`), and merge it after CI passes.
 
 ## Deploy to both fleets
 

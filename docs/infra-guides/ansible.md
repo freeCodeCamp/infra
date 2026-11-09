@@ -206,7 +206,7 @@ If the decrypt fails, the current kubeconfig stays as it is. The new file has mo
 
 - Outside Wednesday and Saturday 00:00-06:00 UTC, the run stops at the window check. Dispatch it with `window_check=false` to run it at another time.
 - If the staging NGINX check finds a problem, the production steps do not run that night. This is also true when the restart fixed NGINX.
-- The last NGINX check runs on `stg_pxy` and `prd_oldeworld_pxy`, also when the production steps did not run. It can restart NGINX on both groups.
+- The last NGINX check runs on `stg_pxy` and `prd_pxy`, also when the production steps did not run. It can restart NGINX on both groups.
 - If the staging Swarm check fails, the production steps do not run that night. It checks each staging `api`, `soc` and `nws` node, and each `stg-` service from the manager.
 - The last Swarm check runs on all Swarm nodes and services, also when the production steps did not run.
 - The NGINX check posts its findings to Google Chat. The run summary in Google Chat shows each skipped stage. A failed Swarm check shows as a failed stage in that summary, and the job log has the findings.
