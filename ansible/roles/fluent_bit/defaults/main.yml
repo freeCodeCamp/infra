@@ -16,3 +16,14 @@ fluent_bit_limit_journal: 1G
 fluent_bit_limit_nginx_access: 4G
 fluent_bit_limit_nginx_error: 256M
 fluent_bit_limit_docker: 1G
+
+fluent_bit_push_metrics: true
+fluent_bit_vpc_cidr: ""
+fluent_bit_node_exporter_port: 9100
+fluent_bit_metrics_port: 30428
+fluent_bit_metrics_interval: 60s
+fluent_bit_limit_metrics: 256M
+fluent_bit_provider: vultr
+fluent_bit_region: ewr
+fluent_bit_metrics_role: "{{ 'clt' if fluent_bit_role.startswith('clt-') else fluent_bit_role }}"
+fluent_bit_metrics_language: "{{ fluent_bit_role | regex_replace('^clt-', '') if fluent_bit_role.startswith('clt-') else '' }}"

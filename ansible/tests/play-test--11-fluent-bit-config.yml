@@ -1,0 +1,137 @@
+---
+- name: Add the Fluent Bit config fixtures
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  check_mode: false
+  tasks:
+    - name: Add each fixture host
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        groups: fluent_bit_fixture
+        ansible_connection: local
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+        test_vpc_ip: "{{ item.vpc_ip }}"
+        test_push: "{{ item.push }}"
+        test_role: "{{ item.role }}"
+        test_language: "{{ item.language }}"
+      loop:
+        - name: prd-vm-clt-eng-0
+          vpc_ip: 10.50.1.10
+          push: true
+          role: clt
+          language: eng
+        - name: stg-vm-pxy-1
+          vpc_ip: 10.50.1.11
+          push: true
+          role: pxy
+          language: ""
+        - name: ops-vm-o11y-1
+          vpc_ip: 10.50.0.5
+          push: false
+          role: o11y
+          language: ""
+
+- name: Test the Fluent Bit config
+  hosts: all
+  gather_facts: false
+  become: false
+  check_mode: false
+  vars_files:
+    - ../roles/fluent_bit/defaults/main.yml
+  vars:
+    test_dir: "{{ [lookup('ansible.builtin.env', 'TMPDIR') | default('/tmp', true), 'fluent-bit-config-test'] | path_join }}"
+    test_path: "{{ test_dir }}/{{ inventory_hostname }}.yaml"
+  tasks:
+    - name: Skip every host that is not a fixture
+      ansible.builtin.meta: end_host
+      when: "'fluent_bit_fixture' not in group_names"
+
+    - name: Set the host inputs over the role defaults
+      ansible.builtin.set_fact:
+        fluent_bit_vlagent_host: 10.50.0.5
+        fluent_bit_vpc_ip: "{{ test_vpc_ip }}"
+        fluent_bit_push_metrics: "{{ test_push | bool }}"
+
+    - name: Make the output directory
+      ansible.builtin.file:
+        path: "{{ test_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Render the config
+      ansible.builtin.template:
+        src: ../roles/fluent_bit/templates/fluent-bit.yaml.j2
+        dest: "{{ test_path }}"
+        mode: "0600"
+
+    - name: Read the config
+      ansible.builtin.set_fact:
+        test_pipeline: "{{ (lookup('ansible.builtin.file', test_path) | from_yaml).pipeline }}"
+
+    - name: Read the metrics parts
+      ansible.builtin.set_fact:
+        test_metric_inputs: "{{ test_pipeline.inputs | selectattr('tag', 'match', '^metrics[.]') | list }}"
+        test_metric_outputs: "{{ test_pipeline.outputs | selectattr('name', 'eq', 'prometheus_remote_write') | list }}"
+        test_log_outputs: "{{ test_pipeline.outputs | selectattr('name', 'eq', 'http') | list }}"
+        test_labels: >-
+          {{ ['instance ' ~ inventory_hostname, 'env ' ~ inventory_hostname.split('-') | first,
+              'role ' ~ test_role, 'provider vultr', 'region ewr']
+             + (['language ' ~ test_language] if test_language else []) }}
+
+    - name: Check that log records never reach a metrics output, and metrics never reach the log filter
+      ansible.builtin.assert:
+        that:
+          - test_log_outputs | length == 4
+          - test_log_outputs | map(attribute='match') | select('match', '^metrics') | list == []
+          - test_pipeline.filters | map(attribute='match') | select('defined') | list == []
+          - test_log_tags | reject('match', test_filter_regex) | list == []
+          - test_metric_tags | select('match', test_filter_regex) | list == []
+      vars:
+        test_filter_regex: "{{ test_pipeline.filters | map(attribute='match_regex') | first }}"
+        test_log_tags: [journal, nginx.access, nginx.error, docker]
+        test_metric_tags: [metrics.node, metrics.fluentbit]
+
+    - name: Check that a host without push sends no metrics
+      ansible.builtin.assert:
+        that:
+          - test_metric_inputs == []
+          - test_metric_outputs == []
+      when: not fluent_bit_push_metrics
+
+    - name: Check the metrics inputs of a pushing host
+      ansible.builtin.assert:
+        that:
+          - test_metric_inputs | length == 2
+          - node.name == 'prometheus_scrape'
+          - node.host == fluent_bit_vpc_ip
+          - node.port == 9100
+          - node.metrics_path == '/metrics'
+          - node.scrape_interval == '60s'
+          - node['storage.type'] == 'filesystem'
+          - own.name == 'fluentbit_metrics'
+          - own.scrape_interval == '60s'
+          - own['storage.type'] == 'filesystem'
+      vars:
+        node: "{{ test_metric_inputs | selectattr('tag', 'eq', 'metrics.node') | first }}"
+        own: "{{ test_metric_inputs | selectattr('tag', 'eq', 'metrics.fluentbit') | first }}"
+      when: fluent_bit_push_metrics
+
+    - name: Check the metrics outputs of a pushing host
+      ansible.builtin.assert:
+        that:
+          - test_metric_outputs | length == 2
+          - test_metric_outputs | map(attribute='match') | sort == ['metrics.fluentbit', 'metrics.node']
+          - test_metric_outputs | map(attribute='host') | unique == ['10.50.0.5']
+          - test_metric_outputs | map(attribute='port') | unique == [30428]
+          - test_metric_outputs | map(attribute='uri') | unique == ['/api/v1/write']
+          - test_metric_outputs | map(attribute='retry_limit') | unique == ['no_limits']
+          - node['storage.total_limit_size'] == '256M'
+          - own['storage.total_limit_size'] == '256M'
+          - node.add_label | sort == (test_labels + ['job node']) | sort
+          - own.add_label | sort == (test_labels + ['job fluent-bit']) | sort
+      vars:
+        node: "{{ test_metric_outputs | selectattr('match', 'eq', 'metrics.node') | first }}"
+        own: "{{ test_metric_outputs | selectattr('match', 'eq', 'metrics.fluentbit') | first }}"
+      when: fluent_bit_push_metrics

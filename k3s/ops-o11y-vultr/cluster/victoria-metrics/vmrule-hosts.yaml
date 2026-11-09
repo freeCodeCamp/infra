@@ -10,7 +10,12 @@ spec:
       interval: 1m
       rules:
         - alert: HostDown
-          expr: up{job="node",role!="pxy"} == 0
+          expr: |
+            up{job="node",role!="pxy"} == 0
+            or (
+              lag(node_boot_time_seconds{job="node",provider="vultr",role!="pxy"}[1d]) > 120
+              and on() (count(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120) > 0)
+            )
           for: 3m
           labels:
             severity: critical
@@ -22,6 +27,10 @@ spec:
         - alert: NginxVmDown
           expr: |
             up{job="node",role="pxy"} == 0
+            or (
+              lag(node_boot_time_seconds{job="node",provider="vultr",role="pxy"}[1d]) > 120
+              and on() (count(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120) > 0)
+            )
             or node_systemd_unit_state{job="node",role="pxy",name="nginx.service",state="active"}
             == 0
           for: 2m
@@ -66,6 +75,16 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#nodetargetsabsent"
+        - alert: VultrMetricsPushDown
+          expr: absent(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: No Vultr host has sent metrics for 2 minutes.
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#vultrmetricspushdown"
     - name: scrape
       interval: 1m
       rules:

@@ -1,0 +1,9 @@
+---
+- name: Configure Fluent Bit on a Vultr host
+  hosts: "{{ variable_host | default('null') }}:&provider_vultr"
+  serial: "{{ variable_serial | default(1) }}"
+  max_fail_percentage: 0
+  become: true
+  become_user: root
+  roles:
+    - fluent_bit
