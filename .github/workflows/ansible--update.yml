@@ -55,13 +55,9 @@ on:
         required: true
         default: 1
       provider:
-        description: 'The inventory to use: linode or vultr'
-        type: choice
+        description: 'The inventory to use: type linode or vultr; there is no default, so each run names its fleet'
+        type: string
         required: true
-        default: 'linode'
-        options:
-          - 'linode'
-          - 'vultr'
       check:
         description: 'Run in check mode, so no host changes'
         type: boolean

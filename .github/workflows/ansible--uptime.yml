@@ -45,7 +45,7 @@ on:
         description: 'The inventory to use: linode or vultr'
         type: choice
         required: true
-        default: 'linode'
+        default: 'vultr'
         options:
           - 'linode'
           - 'vultr'
