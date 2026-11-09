@@ -132,6 +132,9 @@ vmagent:
             regex: .*,(prd|stg|ops),.*
             target_label: env
             replacement: $1
+          - source_labels: [env]
+            regex: stg
+            action: drop
           - source_labels: [__meta_linode_tags]
             regex: .*,(clt|api|jms|pxy|nws|backoffice),.*
             target_label: role
