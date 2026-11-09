@@ -40,7 +40,8 @@ The two fleets run the same versions, so no deploy is necessary.
 1. Move the records back one step at a time ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), section Go back).
 1. Read the alerts and the request errors. Find the cause before you go on.
 1. If you stop the move, set target 1 of each app of that environment to its Linode value, and delete the `_2` secrets.
-1. If you stop the move in production and you turned the `oncall` jobs off on Linode at the start of the freeze, turn them on again. Use the block in section Deployment of [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md) with the Linode command, without `stack-oncall.vultr.yml`. Then lift the freeze.
+1. If you stop the move in production and you turned the `oncall` jobs off on Linode at the start of the freeze, turn them on again. Use the block in section Deployment of [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md) with the Linode command, without `stack-oncall.vultr.yml`.
+1. If you stop the move, lift the freeze.
 
 ## Go back after a freeze lifts
 
