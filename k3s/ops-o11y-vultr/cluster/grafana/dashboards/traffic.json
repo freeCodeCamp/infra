@@ -406,7 +406,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count by (provider) (up{job=\"node\",env=\"$env\"} == 1)",
+          "expr": "count by (provider) (lag(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]) <= 120)",
           "legendFormat": "{{provider}}",
           "range": true
         }
@@ -2189,7 +2189,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count by (provider, role) (up{job=\"node\",env=\"$env\"} == 1) / count by (provider, role) (up{job=\"node\",env=\"$env\"})",
+          "expr": "count by (provider, role) (lag(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]) <= 120) / count by (provider, role) (last_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]))",
           "legendFormat": "{{provider}} {{role}}",
           "range": true
         }
