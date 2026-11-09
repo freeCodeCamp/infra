@@ -23,6 +23,8 @@ Then open `http://127.0.0.1:8880/vmalert/alerts`. For the log rules, use `svc/vm
 
 To read logs, open the VictoriaLogs UI at `http://<o11y node>:30427/select/vmui` and log in.
 
+To see traffic, errors, probes and host health, open Grafana at `http://<o11y node>:30300` and log in with the 1Password item `o11y-grafana-admin`. The home page is the dashboard **Traffic and health**. The folder **freeCodeCamp** also has **Fleet capacity and stability**. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards.
+
 To silence an alert during planned work, open the Alertmanager UI:
 
 ```sh
