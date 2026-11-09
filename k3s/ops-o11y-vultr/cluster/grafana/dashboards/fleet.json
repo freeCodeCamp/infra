@@ -108,10 +108,10 @@
           "uid": "victoriametrics"
         },
         "query": {
-          "query": "label_values(up{job=\"node\",env=\"$env\"}, role)",
+          "query": "label_values(node_boot_time_seconds{job=\"node\",env=\"$env\"}, role)",
           "refId": "role"
         },
-        "definition": "label_values(up{job=\"node\",env=\"$env\"}, role)",
+        "definition": "label_values(node_boot_time_seconds{job=\"node\",env=\"$env\"}, role)",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
@@ -356,7 +356,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(changes(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range]) > bool 0)",
+          "expr": "sum((max_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range]) - min_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range])) > bool 60)",
           "legendFormat": "hosts rebooted",
           "range": false,
           "instant": true
@@ -711,7 +711,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count by (provider, role) (up{job=\"node\",env=\"$env\",role=~\"$role\"})",
+          "expr": "count by (provider, role) (last_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[1d]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -1613,7 +1613,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count by (provider) (up{job=\"node\",env=\"$env\",role=~\"$role\"} == 1)",
+          "expr": "count by (provider) (lag(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[1d]) <= 120)",
           "legendFormat": "{{provider}}",
           "range": true
         }
@@ -1721,7 +1721,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "max by (instance, provider, role) (changes(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range])) > 0",
+          "expr": "max by (instance, provider, role) ((max_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range]) - min_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range])) > bool 60) == 1",
           "legendFormat": "",
           "range": false,
           "instant": true,

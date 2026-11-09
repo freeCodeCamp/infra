@@ -291,12 +291,13 @@ More than 5% of the requests to one `server_name` return a 5xx status for 5 minu
 
 ## NginxUpstreamErrors
 
-An NGINX VM logs more than 10 upstream errors in 5 minutes for 5 minutes.
+An NGINX VM logs more than 10 upstream errors in 5 minutes for 5 minutes. The alert does not count an error for an IPv6 upstream address. The Vultr VMs have no IPv6 route, so NGINX tries the IPv6 address of a CDN host, fails at once and uses IPv4.
 
 1. Read the errors in the VictoriaLogs UI. Use the `host` label of the alert:
 
    ```text
    _time:15m _stream:{level=~"error|crit|alert|emerg",host="<host>"} upstream
+     !~"upstream: \"https?://\\["
    ```
 
 1. If one upstream fails, examine that service. If all upstreams fail, examine the network of the VM.
