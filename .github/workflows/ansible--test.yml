@@ -69,3 +69,8 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check tests/play-test--9-vultr-maps.yml
+
+      - name: Unit Test the Fluent Bit Config
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--11-fluent-bit-config.yml

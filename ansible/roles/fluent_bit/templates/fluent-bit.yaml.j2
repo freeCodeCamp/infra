@@ -60,10 +60,25 @@ pipeline:
       rotate_wait: 300
       skip_long_lines: on
       storage.type: filesystem
+{% if fluent_bit_push_metrics | bool %}
+
+    - name: prometheus_scrape
+      tag: metrics.node
+      host: {{ fluent_bit_vpc_ip }}
+      port: {{ fluent_bit_node_exporter_port }}
+      metrics_path: /metrics
+      scrape_interval: {{ fluent_bit_metrics_interval }}
+      storage.type: filesystem
+
+    - name: fluentbit_metrics
+      tag: metrics.fluentbit
+      scrape_interval: {{ fluent_bit_metrics_interval }}
+      storage.type: filesystem
+{% endif %}
 
   filters:
     - name: modify
-      match: "*"
+      match_regex: '^(journal|nginx\..+|docker)$'
       add:
         - host {{ inventory_hostname }}
         - env {{ fluent_bit_env }}
@@ -91,3 +106,23 @@ pipeline:
 
 {% endif %}
 {% endfor %}
+{% if fluent_bit_push_metrics | bool %}
+{% set labels = ['instance ' ~ inventory_hostname, 'env ' ~ fluent_bit_env,
+                 'role ' ~ fluent_bit_metrics_role, 'provider ' ~ fluent_bit_provider,
+                 'region ' ~ fluent_bit_region]
+   + (['language ' ~ fluent_bit_metrics_language] if fluent_bit_metrics_language else []) %}
+{% for out in [{'match': 'metrics.node', 'job': 'node'}, {'match': 'metrics.fluentbit', 'job': 'fluent-bit'}] %}
+
+    - name: prometheus_remote_write
+      match: {{ out.match }}
+      host: {{ fluent_bit_vlagent_host }}
+      port: {{ fluent_bit_metrics_port }}
+      uri: /api/v1/write
+      add_label:
+{% for label in ['job ' ~ out.job] + labels %}
+        - {{ label }}
+{% endfor %}
+      retry_limit: no_limits
+      storage.total_limit_size: {{ fluent_bit_limit_metrics }}
+{% endfor %}
+{% endif %}

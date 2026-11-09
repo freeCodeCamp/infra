@@ -6,6 +6,26 @@
     fail_msg: "fluent_bit_vlagent_host must be an IPv4 address; IPAddressAllow cannot take a name."
   when: fluent_bit_vlagent_host | length > 0
 
+- name: Find the VPC address that the node exporter listens on
+  when: fluent_bit_push_metrics | bool and fluent_bit_vlagent_host | length > 0
+  block:
+    - name: Read the VPC address of this host
+      ansible.builtin.command: ip -o -4 addr show to {{ fluent_bit_vpc_cidr }}
+      register: fluent_bit_vpc_addr
+      changed_when: false
+      check_mode: false
+
+    - name: Refuse a host without exactly one VPC address
+      ansible.builtin.assert:
+        that:
+          - fluent_bit_vpc_cidr | length > 0
+          - fluent_bit_vpc_addr.stdout_lines | length == 1
+        fail_msg: "{{ inventory_hostname }}: {{ fluent_bit_vpc_addr.stdout_lines }}"
+
+    - name: Keep the VPC address
+      ansible.builtin.set_fact:
+        fluent_bit_vpc_ip: "{{ (fluent_bit_vpc_addr.stdout.split()[3]).split('/') | first }}"
+
 - name: Add the Fluent Bit apt repository
   ansible.builtin.deb822_repository:
     name: fluent-bit

@@ -57,7 +57,11 @@ To add the names of the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`), 
 
 ## HostDown
 
-A host does not answer the node exporter scrape for 3 minutes. The alert does not cover the NGINX VMs; see [NginxVmDown](#nginxvmdown).
+A host does not send metrics for about 5 minutes. The alert does not cover the NGINX VMs; see [NginxVmDown](#nginxvmdown).
+
+- A Linode host: the scrape of its node exporter fails.
+- A Vultr host: the host has sent metrics in the last day, but not in the last 2 minutes. Fluent Bit on the host reads the node exporter and sends the metrics. If Fluent Bit stops, this alert fires.
+- A destroyed or rebuilt Vultr VM alerts until it sends again or until it has been gone for 1 day. Silence the alert for that `instance` before you destroy the VM.
 
 1. Connect to the host. Use the `instance` label of the alert:
 
@@ -78,9 +82,16 @@ A host does not answer the node exporter scrape for 3 minutes. The alert does no
    ssh freecodecamp@<instance> sudo systemctl restart node_exporter
    ```
 
+1. On a Vultr host, examine Fluent Bit too, and start it again if it stopped:
+
+   ```sh
+   ssh freecodecamp@<instance> sudo systemctl status fluent-bit
+   ssh freecodecamp@<instance> sudo systemctl restart fluent-bit
+   ```
+
 ## NginxVmDown
 
-An NGINX VM does not answer the node exporter scrape, or `nginx.service` is not active, for 2 minutes. The `node` scrape job finds the Linode hosts and the Vultr hosts.
+An NGINX VM does not send metrics, or `nginx.service` is not active, for about 4 minutes. The rule for a missing host is the same as in [HostDown](#hostdown).
 
 1. Examine NGINX on the VM:
 
@@ -132,7 +143,7 @@ A host uses more than 90% of its memory for 15 minutes.
 
 ## FluentBitDroppedRecords
 
-Fluent Bit on a Vultr host dropped log records in the last 15 minutes. One of two causes applies:
+Fluent Bit on a Vultr host dropped log records or metrics in the last 15 minutes. The `name` label names the output: `http.*` sends logs to the log agent, `prometheus_remote_write.*` sends metrics to vmagent. One of two causes applies:
 
 - The log agent refused the records with an HTTP 4xx status. Fluent Bit keeps a copy in `/var/lib/fluent-bit/storage/rejected`, up to 256M.
 - The buffer of an output became full, and Fluent Bit removed the oldest records. Those records are lost.
@@ -153,7 +164,7 @@ Fluent Bit on a Vultr host dropped log records in the last 15 minutes. One of tw
 
 ## FluentBitBufferBacklog
 
-An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minutes. The output cannot send records to the log agent as fast as it reads them. Each output has its own limit. A full buffer drops records.
+An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minutes. The output cannot send records to the log agent (`http.*`) or metrics to vmagent (`prometheus_remote_write.*`) as fast as it reads them. Each output has its own limit. A full buffer drops records.
 
 1. Examine the log agent pods:
 
@@ -180,7 +191,29 @@ The `node` scrape job has no targets for 10 minutes. The metrics of each host st
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs deploy/vmagent-vm -c vmagent --tail=50
    ```
 
-1. If the log shows `401` or `403` from the cloud provider API, replace the API token that the service discovery uses.
+1. If the log shows `401` or `403` from the Linode API, replace the API token that the service discovery uses.
+
+The Vultr hosts are not in the scrape. See [VultrMetricsPushDown](#vultrmetricspushdown).
+
+## VultrMetricsPushDown
+
+No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxVmDown do not fire for the Vultr hosts while this alert fires. Each Vultr host sends its metrics to port 30428 on `fluent_bit_vlagent_host` (`ansible/inventory/group_vars/provider_vultr.yml`). Fluent Bit keeps up to 256M of metrics on disk and sends them when the receiver is back.
+
+1. Make sure that the o11y node at that address is `Ready`, and that vmagent runs:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get nodes -o wide
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get svc vmagent-vm
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l app.kubernetes.io/name=vmagent
+   ```
+
+   The Service must show `8429:30428/TCP`.
+
+1. Examine the Fluent Bit log on one Vultr host:
+
+   ```sh
+   ssh freecodecamp@<host> 'sudo journalctl -u fluent-bit --since -30min --no-pager | grep prometheus_remote_write | tail -20'
+   ```
 
 ## TargetDown
 
