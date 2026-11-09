@@ -97,8 +97,9 @@ Run these on the Swarm node groups. The role `docker` applies the same guard to 
 `play-any--update.yml` does not upgrade held packages. To upgrade Docker, run `play-swarm--upgrade-docker.yml`. Start with a staging group:
 
 ```bash
-ansible-playbook -i inventory/linode.yml play-swarm--upgrade-docker.yml \
-  -e variable_host=stg_oldeworld_jms -e variable_service_prefix=stg-
+ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
+  play-swarm--upgrade-docker.yml -e variable_host=stg_api \
+  -e variable_manager=ops_swarm_mgr -e variable_service_prefix=stg-
 ```
 
 ## DigitalOcean k3s Plays

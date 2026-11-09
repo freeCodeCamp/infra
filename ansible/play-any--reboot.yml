@@ -1,8 +1,4 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-any--reboot.yml \
-#     -e variable_host=stg_oldeworld_clt
-
 - name: Reboot a machine and wait for it to come back
   hosts: "{{ variable_host | default('null') }}"
   serial: "{{ variable_serial | default(1) }}"

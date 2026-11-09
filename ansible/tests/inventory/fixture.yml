@@ -29,8 +29,6 @@ provider_linode:
   hosts:
     prd-vm-oldeworld-pxy-1:
       tags: [prd, oldeworld, prd_oldeworld_pxy]
-    stg-vm-oldeworld-api-1:
-      tags: [stg, oldeworld, stg_oldeworld_api, new_api]
     prd-vm-oldeworld-clt-eng-0:
       tags: [prd, oldeworld, prd_oldeworld_clt, clt, eng]
     ops-vm-backoffice:
@@ -39,9 +37,6 @@ provider_linode:
 prd_oldeworld_pxy:
   hosts:
     prd-vm-oldeworld-pxy-1:
-stg_oldeworld_api:
-  hosts:
-    stg-vm-oldeworld-api-1:
 prd_oldeworld_clt:
   hosts:
     prd-vm-oldeworld-clt-eng-0:

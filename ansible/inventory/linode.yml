@@ -8,9 +8,6 @@ access_token: "{{ lookup('env', 'LINODE_API_TOKEN') }}"
 groups:
   provider_linode: true
 
-  # Staging Instances
-  stg_all: "'stg' in (tags|list)"
-
   # Production Instances
   prd_all: "'prd' in (tags|list)"
 
@@ -21,15 +18,6 @@ groups:
   # Oldeworld Cluster -- ALL
   oldeworld_all: "'oldeworld' in (tags|list)"
 
-  # Oldeworld Cluster -- STG
-  stg_oldeworld_all: "'stg' in (tags|list) and 'oldeworld' in (tags|list)"
-  stg_oldeworld_api: "'stg_oldeworld_api' in (tags|list)"
-  stg_oldeworld_api_old: "'stg_oldeworld_api' in (tags|list) and 'old_api' in (tags|list)"
-  stg_oldeworld_api_new: "'stg_oldeworld_api' in (tags|list) and 'new_api' in (tags|list)"
-  stg_oldeworld_clt: "'stg_oldeworld_clt' in (tags|list)"
-  stg_oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list)"
-  stg_oldeworld_jms: "'stg_oldeworld_jms' in (tags|list)"
-
   # Oldeworld Cluster -- PRD
   prd_oldeworld_all: "'prd' in (tags|list) and 'oldeworld' in (tags|list)"
   prd_oldeworld_api: "'prd_oldeworld_api' in (tags|list)"
@@ -39,55 +27,16 @@ groups:
   prd_oldeworld_pxy: "'prd_oldeworld_pxy' in (tags|list)"
   prd_oldeworld_jms: "'prd_oldeworld_jms' in (tags|list)"
 
-  # Oldeworld Cluster -- role families across STG and PRD
-  oldeworld_api: "'stg_oldeworld_api' in (tags|list) or 'prd_oldeworld_api' in (tags|list)"
-  oldeworld_clt: "'stg_oldeworld_clt' in (tags|list) or 'prd_oldeworld_clt' in (tags|list)"
-  oldeworld_pxy: "'stg_oldeworld_pxy' in (tags|list) or 'prd_oldeworld_pxy' in (tags|list)"
-  oldeworld_jms: "'stg_oldeworld_jms' in (tags|list) or 'prd_oldeworld_jms' in (tags|list)"
+  oldeworld_api: "'prd_oldeworld_api' in (tags|list)"
+  oldeworld_clt: "'prd_oldeworld_clt' in (tags|list)"
+  oldeworld_pxy: "'prd_oldeworld_pxy' in (tags|list)"
+  oldeworld_jms: "'prd_oldeworld_jms' in (tags|list)"
 
   # Every Linode VM that carries node_exporter: oldeworld_all plus ops_backoffice.
   # Roll it in two passes: fleet_all:!oldeworld_pxy, then oldeworld_pxy with
   # -e variable_serial=1 (play-o11y--node-exporter-0-install.yml refuses any
   # batch larger than one that contains a proxy host).
   fleet_all: "'oldeworld' in (tags|list) or 'ops_backoffice' in (tags|list)"
-
-  # Oldeworld Cluster -- Clients by Language - STG
-  stg_oldeworld_clt_eng:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'eng' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_chn:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'chn' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_cnt:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'cnt' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_esp:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'esp' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_ger:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ger' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_ita:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ita' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_jpn:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'jpn' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_por:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'por' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_ukr:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ukr' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_swa:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'swa' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_kor:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'kor' in
-    (tags|list) and 'clt' in (tags|list)"
-  stg_oldeworld_clt_ara:
-    "'stg' in (tags|list) and 'oldeworld' in (tags|list) and 'ara' in
-    (tags|list) and 'clt' in (tags|list)"
 
   # Oldeworld Cluster -- Clients by Language - PRD
   prd_oldeworld_clt_eng:

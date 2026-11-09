@@ -1,8 +1,4 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-any--update.yml \
-#     -e variable_host=stg_oldeworld_clt
-
 - name: Update virtual machines
   hosts: "{{ variable_host | default('null') }}"
   serial: "{{ variable_serial | default(1) }}"

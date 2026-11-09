@@ -9,7 +9,7 @@
       tst_pxy: [tst-vm-pxy-1]
       tst_mgr: [tst-vm-mgr-1]
       tst_wkr: [tst-vm-wkr-1]
-      stg_api: [stg-vm-api-1, stg-vm-oldeworld-api-1]
+      stg_api: [stg-vm-api-1]
       prd_pxy: [prd-vm-pxy-2, prd-vm-oldeworld-pxy-1]
       prd_soc: [prd-vm-soc-1]
       prd_nws: [prd-vm-nws-1]

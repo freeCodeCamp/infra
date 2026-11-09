@@ -8,10 +8,6 @@
 #
 #   ansible-playbook -i inventory/linode.yml \
 #     play-oldeworld--nginx-3-harden-unit.yml \
-#     -e variable_host=stg_oldeworld_pxy
-#
-#   ansible-playbook -i inventory/linode.yml \
-#     play-oldeworld--nginx-3-harden-unit.yml \
 #     -e variable_host=prd_oldeworld_pxy
 #
 # Deliberately NOT the full nginx role: no package install, no dns role, no
