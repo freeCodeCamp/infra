@@ -137,11 +137,9 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "expr": "env:$env server_name:* | stats rate() rps",
-          "legendFormat": "req/s",
-          "queryType": "statsRange",
-          "editorMode": "code",
-          "step": "5m"
+          "expr": "_time:5m env:$env server_name:* | stats rate() rps",
+          "queryType": "stats",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
@@ -200,18 +198,16 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "expr": "env:$env server_name:* | stats count() if (status:>=500) e5xx, count() total | math (e5xx / total) * 100 as pct | fields pct",
-          "legendFormat": "5xx %",
-          "queryType": "statsRange",
-          "editorMode": "code",
-          "step": "5m"
+          "expr": "_time:5m env:$env server_name:* | stats count() if (status:>=500) e5xx, count() total | math (e5xx / total) * 100 as pct | fields pct",
+          "queryType": "stats",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "decimals": 2,
-          "noValue": "0",
+          "noValue": "No traffic",
           "color": {
             "mode": "thresholds"
           },
@@ -271,11 +267,9 @@
             "type": "victoriametrics-logs-datasource",
             "uid": "victorialogs"
           },
-          "expr": "env:$env server_name:* | stats quantile(0.95, request_time) p95",
-          "legendFormat": "p95",
-          "queryType": "statsRange",
-          "editorMode": "code",
-          "step": "5m"
+          "expr": "_time:5m env:$env server_name:* | stats quantile(0.95, request_time) p95",
+          "queryType": "stats",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {

@@ -227,7 +227,7 @@
         "defaults": {
           "unit": "percent",
           "decimals": 3,
-          "noValue": "0",
+          "noValue": "No traffic",
           "color": {
             "mode": "thresholds"
           },
@@ -357,7 +357,7 @@
             "uid": "victoriametrics"
           },
           "expr": "sum(changes(node_boot_time_seconds{job=\"node\",env=\"$env\",role=~\"$role\"}[$__range]) > bool 0)",
-          "legendFormat": "reboots",
+          "legendFormat": "hosts rebooted",
           "range": false,
           "instant": true
         },

@@ -1,6 +1,7 @@
 rbac:
-  create: true
-  namespaced: true
+  create: false
+
+automountServiceAccountToken: false
 
 testFramework:
   enabled: false
@@ -41,7 +42,7 @@ grafana.ini:
   auth.anonymous:
     enabled: false
   dashboards:
-    default_home_dashboard_path: /tmp/dashboards/freeCodeCamp/traffic.json
+    default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/traffic.json
 
 datasources:
   datasources.yaml:
@@ -68,20 +69,18 @@ datasources:
         secureJsonData:
           basicAuthPassword: $VMAUTH_LOGS_PASSWORD
 
-sidecar:
-  dashboards:
-    enabled: true
-    label: grafana_dashboard
-    labelValue: "1"
-    folderAnnotation: grafana_folder
-    provider:
-      foldersFromFilesStructure: true
-      allowUiUpdates: false
-
 dashboardProviders:
   dashboardproviders.yaml:
     apiVersion: 1
     providers:
+      - name: freecodecamp
+        orgId: 1
+        folder: freeCodeCamp
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/freecodecamp
       - name: victoriametrics
         orgId: 1
         folder: VictoriaMetrics
@@ -98,6 +97,11 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/hosts
+
+dashboardsConfigMaps:
+  freecodecamp: grafana-dashboards-freecodecamp
+
+defaultCurlOptions: "-sfL --retry 3"
 
 dashboards:
   victoriametrics:
