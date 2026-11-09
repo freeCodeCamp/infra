@@ -278,7 +278,6 @@ jobs:
       matrix:
         include:
           - { group: ops_all, provider: linode }
-          - { group: ops_swarm_mgr, provider: vultr }
           - { group: prd_api, provider: vultr }
           - { group: prd_soc, provider: vultr }
           - { group: prd_nws, provider: vultr }
@@ -305,6 +304,20 @@ jobs:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  reboot-mgr:
+    name: Reboot (Swarm manager)
+    needs: reboot-prd
+    uses: ./.github/workflows/ansible--reboot.yml
+    with:
+      hosts: ops_swarm_mgr
+      verbosity: "-v"
+      provider: vultr
+      serial: 1
+    secrets:
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
   # Terminal by design. Nothing runs after it, so a red verify can never stop
   # the fleet being patched -- which is the property the rest of this chain
   # does not have, since every other stage skips everything downstream when it
@@ -315,7 +328,7 @@ jobs:
   # finding rather than a normal absence.
   verify-nginx:
     name: Verify NGINX
-    needs: [window, reboot-prd]
+    needs: [window, reboot-prd, reboot-mgr]
     # This condition widens rather than narrows: it makes the check run even
     # when a stage above failed or was skipped, which is exactly when a
     # service is most likely to be down.
@@ -341,7 +354,7 @@ jobs:
 
   verify-swarm:
     name: Verify Swarm
-    needs: [window, reboot-prd]
+    needs: [window, reboot-prd, reboot-mgr]
     if: ${{ !cancelled() && needs.window.outputs.allowed == 'true' }}
     strategy:
       fail-fast: false
@@ -362,7 +375,7 @@ jobs:
 
   report:
     name: Report
-    needs: [window, uptime, update-stg, reboot-web-stg, gate-web-stg, reboot-stg, gate-swarm-stg, update-prd, reboot-web-prd, gate-web-prd, reboot-prd, verify-nginx, verify-swarm]
+    needs: [window, uptime, update-stg, reboot-web-stg, gate-web-stg, reboot-stg, gate-swarm-stg, update-prd, reboot-web-prd, gate-web-prd, reboot-prd, reboot-mgr, verify-nginx, verify-swarm]
     # always(), not success(): the run that most needs a message is the one
     # that failed. Once this posts on every run, a Wednesday or Saturday with
     # NO message means the workflow never ran at all -- the one failure no
@@ -400,6 +413,7 @@ jobs:
           REBOOT_WEB_PRD: ${{ needs.reboot-web-prd.result }}
           GATE_WEB_PRD: ${{ needs.gate-web-prd.result }}
           REBOOT_PRD: ${{ needs.reboot-prd.result }}
+          REBOOT_MGR: ${{ needs.reboot-mgr.result }}
           VERIFY: ${{ needs.verify-nginx.result }}
           VERIFY_SWARM: ${{ needs.verify-swarm.result }}
         run: |
@@ -419,6 +433,7 @@ jobs:
               ("reboot-web-prd", os.environ["REBOOT_WEB_PRD"]),
               ("gate-web-prd", os.environ["GATE_WEB_PRD"]),
               ("reboot-prd", os.environ["REBOOT_PRD"]),
+              ("reboot-mgr", os.environ["REBOOT_MGR"]),
               ("verify", os.environ["VERIFY"]),
               ("verify-swarm", os.environ["VERIFY_SWARM"]),
           ]
