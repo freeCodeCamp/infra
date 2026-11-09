@@ -74,3 +74,18 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check tests/play-test--11-fluent-bit-config.yml
+
+      - name: Unit Test the Constructed Inventory Groups
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check -i tests/inventory/fixture.yml -i inventory/constructed.yml tests/play-test--7-inventory-groups.yml
+
+      - name: Unit Test the Swarm Labels
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--8-swarm-labels.yml
+
+      - name: Unit Test the Vultr First Configure
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--10-vultr-first-configure.yml
