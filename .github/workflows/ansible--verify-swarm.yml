@@ -39,15 +39,15 @@ on:
         description: 'Swarm nodes to check for state and stray overlay devices'
         type: string
         required: true
-        default: 'stg_oldeworld_api:stg_oldeworld_jms'
+        default: 'prd_api:prd_soc:prd_nws:ops_swarm_mgr'
       service_prefix:
         description: 'Check only the services with this name prefix; empty checks all'
         type: string
-        default: 'stg-'
+        default: 'prd-'
       manager:
         description: 'The host group of the Swarm manager'
         type: string
-        default: 'ops_backoffice'
+        default: 'ops_swarm_mgr'
       verbosity:
         description: 'The verbosity level for logs'
         type: choice
@@ -61,7 +61,7 @@ on:
         description: 'The inventory to use: linode or vultr'
         type: choice
         required: true
-        default: 'linode'
+        default: 'vultr'
         options:
           - 'linode'
           - 'vultr'
