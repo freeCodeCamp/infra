@@ -1,6 +1,6 @@
 # 14 — mgmt cluster bringup (ops-o11y)
 
-> **Target state.** This runbook describes the planned cluster. The live `ops-o11y` cluster is one node, and Argo CD deploys its apps: `argocd`, `cluster-dns`, `grafana` and `victoria-metrics` from `k3s/ops-o11y/apps/*/application.yaml`. Flux, External Secrets, cert-manager, Rancher and the DO CSI driver are not installed.
+> **Retired.** The `ops-o11y` cluster was retired in November 2026. The growth plan in this runbook was not done. Do not use this runbook. `k3s/ops-o11y/` is deleted. `terraform/ops-o11y/` stays until the operator destroys the droplet. The current cluster is `ops-o11y-vultr` ([19-o11y-alerts.md](19-o11y-alerts.md)).
 
 **Audience:** operator. **Trigger:** growth of the single `ops-vm-o11y-k3s-fra1-01` node into the three-server `mgmt` cluster (T58), a later rebuild of one node, or a rebuild of the whole cluster after a total loss.
 
