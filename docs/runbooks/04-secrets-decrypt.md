@@ -74,11 +74,10 @@ Platform-wide envelopes are `<scope>/.env.enc`. Cluster-local envelopes are `k3s
 | Envelope                                                                    | Consumer                                                                                |
 | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `global/.env.enc`, `r2-read/.env.enc`                                       | root `.envrc`                                                                           |
-| `do-universe/.env.enc`                                                      | `ansible/.envrc`                                                                        |
 | `tfstate/.env.enc`                                                          | `terraform/{vultr-base,*-vultr}/.envrc`, `cf-origin-records/.envrc` ¹                   |
 | `vultr/.env.enc`                                                            | `ansible/.envrc`, `terraform/{vultr-base,*-vultr}/.envrc`, `cf-origin-records/.envrc` ¹ |
 | `cloudflare/.env.enc`                                                       | `cf-origin-records/.envrc` ¹                                                            |
-| `do-primary/.env.enc`                                                       | `k3s/ops-backoffice-tools/.envrc`                                                       |
+| `do-primary/.env.enc`                                                       | `k3s/ops-backoffice-tools/.envrc`, `docs/infra-guides/ansible.md` (DigitalOcean plays)  |
 | `docker/oldeworld/oncall.env.enc`                                           | `docs/infra-guides/docker-swarm-oncall.md`                                              |
 | `docker/oldeworld/socrates-{prd,stg}.env.enc`                               | `docs/infra-guides/docker-swarm-socrates.md`                                            |
 | `docker/oldeworld/pxy-upstreams-prd.yaml.enc`                               | `ansible/inventory/group_vars/oldeworld_pxy.yml`                                        |

@@ -21,7 +21,7 @@ When a change alters an operator step, update its runbook or guide in the same c
 
 - `../infra-secrets` is a private sibling repo at that hard-coded relative path (sops + age). The root `.envrc` sets `SECRETS_DIR=../infra-secrets`. Another layout breaks direnv. This repo holds no secrets, not even encrypted ones.
 - Envelope layout, consumers and decrypt commands: `docs/runbooks/04-secrets-decrypt.md`. sops auto-detect reads `.enc` as JSON and fails, so give `--input-type dotenv --output-type dotenv`.
-- The envelopes `do-universe/` and `tfstate/` keep their Universe-era names, because current work reads them. Do not rename them. The operator replaces them one at a time.
+- The envelope `tfstate/` keeps its Universe-era name, because current work reads it. Do not rename it. The operator replaces it later.
 - When `CLAUDECODE` is set, each `.envrc` decrypts no envelope and loads no `.env`. This gate is not a security boundary: an agent shell also gets the environment of the shell that started it, so start the agent with `direnv exec / claude`.
 - Ask the operator to run a command that needs a token or a 1Password value.
 

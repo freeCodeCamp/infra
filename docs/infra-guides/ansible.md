@@ -4,7 +4,7 @@ The plays in `ansible/` and the commands that replace the `justfile` (removed 20
 
 ## Before You Start
 
-Run the play commands from `ansible/`. Run the former `just` recipes from the repository root. direnv loads the Linode and DigitalOcean tokens and puts `ansible/.venv/bin` on `PATH`, so `ansible-*` commands need no `uv run`.
+Run the play commands from `ansible/`. Run the former `just` recipes from the repository root. direnv loads the Linode and Vultr tokens and puts `ansible/.venv/bin` on `PATH`, so `ansible-*` commands need no `uv run`.
 
 ```bash
 cd ansible
@@ -25,6 +25,8 @@ ansible-inventory -i inventory/vultr.yml -i inventory/constructed.yml --graph
 ```
 
 The Vultr inventory needs `VULTR_API_KEY`. `ansible/.envrc` loads it from `vultr/.env.enc` when that envelope exists and `CLAUDECODE` is not set. With no key, the inventory gives `HTTP Error 401: Unauthorized`. With no key or no `vultr.cloud` collection, the inventory has no hosts, and the play stops with `Could not match supplied host pattern`.
+
+The DigitalOcean inventory needs the `DO_API_TOKEN` of the main team. `ansible/.envrc` does not load it. Run each DigitalOcean command in the subshell of [runbook 04](../runbooks/04-secrets-decrypt.md#3-run-commands-with-the-secrets-in-the-environment-dotenv-only), step 3. From `ansible/`, the envelope path is `../../infra-secrets/do-primary/.env.enc`.
 
 ## Rules for Every Play
 
@@ -104,7 +106,7 @@ ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
 
 ## DigitalOcean k3s Plays
 
-Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--servers.yml` with `-i inventory/vultr.yml -i inventory/constructed.yml -e variable_host=ops_o11y_vultr`.
+Use `-i inventory/digitalocean.yml` in the subshell with `../../infra-secrets/do-primary/.env.enc` (see the inventory note above). For the Vultr o11y cluster, run `play-k3s--servers.yml` with `-i inventory/vultr.yml -i inventory/constructed.yml -e variable_host=ops_o11y_vultr`.
 
 | Play                     | What it does                                                           | Inputs                                                      |
 | ------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
