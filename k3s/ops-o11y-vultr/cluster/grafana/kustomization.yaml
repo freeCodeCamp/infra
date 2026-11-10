@@ -12,25 +12,25 @@ configMapGenerator:
       - dashboards/fleet.json
   - name: grafana-dashboard-victoriametrics-cluster
     files:
-      - dashboards/upstream/victoriametrics-cluster.json
+      - dashboards/victoriametrics-cluster.json
   - name: grafana-dashboard-vmagent
     files:
-      - dashboards/upstream/vmagent.json
+      - dashboards/vmagent.json
   - name: grafana-dashboard-vmalert
     files:
-      - dashboards/upstream/vmalert.json
+      - dashboards/vmalert.json
   - name: grafana-dashboard-vmauth
     files:
-      - dashboards/upstream/vmauth.json
+      - dashboards/vmauth.json
   - name: grafana-dashboard-operator
     files:
-      - dashboards/upstream/operator.json
+      - dashboards/operator.json
   - name: grafana-dashboard-victorialogs
     files:
-      - dashboards/upstream/victorialogs.json
+      - dashboards/victorialogs.json
   - name: grafana-dashboard-vlagent
     files:
-      - dashboards/upstream/vlagent.json
+      - dashboards/vlagent.json
   - name: grafana-dashboard-node-exporter-full
     files:
-      - dashboards/upstream/node-exporter-full.json
+      - dashboards/node-exporter-full.json
