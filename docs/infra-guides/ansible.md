@@ -108,6 +108,8 @@ Use `-i inventory/digitalocean.yml` in the subshell with `../../infra-secrets/do
 | `play-k3s--longhorn.yml` | Install Longhorn on `tools_k3s`                                        | —                                                           |
 | `play-k3s--teardown.yml` | Remove k3s from every host in the group. Takes an etcd snapshot first. | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
 
+`play-k3s--servers.yml` saves a `play-` etcd snapshot, then keeps only the newest `k3s_etcd_play_snapshot_retention` of them, on the host and in R2. K3s retention does not remove a manual snapshot. To keep only the newest 3 manual snapshots, run `sudo k3s etcd-snapshot prune --name on-demand --etcd-snapshot-retention 3 --etcd-s3-retention 3` on the node that saved them. It prunes the local `on-demand` files of that node, and every `on-demand` object in R2 from any node. Give both flags: without `--etcd-s3-retention`, R2 keeps the `etcd-s3-retention` count from the group vars (60).
+
 ## Vultr Plays
 
 | Play                          | What it does                                                                                                                                                                                                                                                                                                         | Inputs                                                                                                                                                                                  |

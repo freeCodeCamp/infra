@@ -7,6 +7,7 @@ fluent_bit_push_metrics: false
 fluent_bit_ip_allow_extra:
   - "{{ (server_config_yaml | from_yaml)['cluster-cidr'] | default('10.42.0.0/16') }}"
 
+k3s_etcd_play_snapshot_retention: 3
 k3s_etcd_s3_op: R2-User-Token-Infra-O11y-etcd
 k3s_etcd_s3_config:
   etcd-s3: true
