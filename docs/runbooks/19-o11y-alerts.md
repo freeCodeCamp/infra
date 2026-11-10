@@ -4,6 +4,12 @@
 
 Each alert has one section here. The section name is the alert name. The alert links to its section in the `runbook_url` annotation.
 
+Each Chat message has a title with the severity, the alert name and the state (`Firing` or `Resolved`). Then it shows the start time in UTC. It also shows each of these when the alert has it: the host (the `host` label, or the `instance` label), the `env` and `role` labels, the summary, the description and the runbook link. The template is `message.tmpl` in `k3s/ops-o11y-vultr/cluster/victoria-metrics/calert.yaml`. calert reads its config and template only when it starts. After a change to `calert-config` alone, wait until Argo CD shows `calert-config` synced, then restart calert:
+
+```sh
+kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y rollout restart deploy/calert
+```
+
 Run every command from the repo root unless the step says otherwise.
 
 ## Preconditions
@@ -49,7 +55,7 @@ This test proves that an alert reaches the Google Chat space. It does not prove 
    k3s/ops-o11y-vultr/tools/alert-drill.sh --send
    ```
 
-1. In the Google Chat space, make sure that one message with `Drill-` in its title comes for each alert in the list, in about 1 minute. About 16 minutes after you send, each alert gets a message or a thread reply that ends in `Resolved`. Do not send again during this time: Alertmanager merges the alerts and posts no new messages.
+1. In the Google Chat space, make sure that one message with `DRILL-` in its title comes for each alert in the list, in about 1 minute. About 16 minutes after you send, each alert gets a message or a thread reply with a title that ends in `Resolved`. Do not send again during this time: Alertmanager merges the alerts and posts no new messages.
 1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in. While the silence is on, each run of the CronJob fails with `Watchdog is not active; no check-in`, and the last 3 failed Jobs stay in the `o11y` namespace. This is correct.
 1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
 

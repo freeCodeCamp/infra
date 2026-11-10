@@ -14,7 +14,7 @@ data:
     type = "google_chat"
     max_idle_conns = 50
     timeout = "30s"
-    template = "static/message.tmpl"
+    template = "/app/message.tmpl"
     thread_ttl = "12h"
     threaded_replies = true
     threading_mode = "alert"
@@ -22,6 +22,16 @@ data:
     retry_max = 3
     retry_wait_min = "1s"
     retry_wait_max = "5s"
+  message.tmpl: |
+    *{{ with .Labels.severity }}({{ . | toUpper }}) {{ end }}{{ .Labels.alertname }} - {{ .Status | Title }}*
+    {{ with .Labels.host | Default .Labels.instance }}Host: {{ . }}
+    {{ end }}{{ with .Labels.env }}Env: {{ . }}
+    {{ end }}{{ with .Labels.role }}Role: {{ . }}
+    {{ end }}Started: {{ .StartsAt.UTC.Format "2006-01-02 15:04 MST" }}
+    {{ with .Annotations.summary }}Summary: {{ . }}
+    {{ end }}{{ with .Annotations.description }}Description: {{ . }}
+    {{ end }}{{ with .Annotations.runbook_url }}Runbook: {{ . }}
+    {{ end -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -92,6 +102,9 @@ spec:
             - name: config
               mountPath: /app/config.toml
               subPath: config.toml
+            - name: config
+              mountPath: /app/message.tmpl
+              subPath: message.tmpl
       volumes:
         - name: config
           configMap:
