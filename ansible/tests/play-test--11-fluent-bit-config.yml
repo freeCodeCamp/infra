@@ -16,22 +16,26 @@
         test_push: "{{ item.push }}"
         test_role: "{{ item.role }}"
         test_language: "{{ item.language }}"
+        test_token: "{{ item.token }}"
       loop:
         - name: prd-vm-clt-eng-0
           vpc_ip: 10.50.1.10
           push: true
           role: clt
           language: eng
+          token: "not-a-secret#fixture: token"
         - name: stg-vm-pxy-1
           vpc_ip: 10.50.1.11
           push: true
           role: pxy
           language: ""
+          token: ""
         - name: ops-vm-o11y-1
           vpc_ip: 10.50.0.5
           push: false
           role: o11y
           language: ""
+          token: "not-a-secret#fixture: token"
 
 - name: Test the Fluent Bit config
   hosts: all
@@ -53,6 +57,7 @@
         fluent_bit_vlagent_host: 10.50.0.5
         fluent_bit_vpc_ip: "{{ test_vpc_ip }}"
         fluent_bit_push_metrics: "{{ test_push | bool }}"
+        fluent_bit_sender_token: "{{ test_token }}"
 
     - name: Make the output directory
       ansible.builtin.file:
@@ -134,7 +139,6 @@
           - test_metric_outputs | length == 2
           - test_metric_outputs | map(attribute='match') | sort == ['metrics.fluentbit', 'metrics.node']
           - test_metric_outputs | map(attribute='host') | unique == ['10.50.0.5']
-          - test_metric_outputs | map(attribute='port') | unique == [30428]
           - test_metric_outputs | map(attribute='uri') | unique == ['/api/v1/write']
           - test_metric_outputs | map(attribute='retry_limit') | unique == ['no_limits']
           - node['storage.total_limit_size'] == '256M'
@@ -145,3 +149,22 @@
         node: "{{ test_metric_outputs | selectattr('match', 'eq', 'metrics.node') | first }}"
         own: "{{ test_metric_outputs | selectattr('match', 'eq', 'metrics.fluentbit') | first }}"
       when: fluent_bit_push_metrics
+
+    - name: Check that a host with a sender token sends each output to vmauth with the token
+      ansible.builtin.assert:
+        that:
+          - test_log_outputs | map(attribute='port') | unique == [30427]
+          - test_log_outputs | map(attribute='header') | unique == [test_header]
+          - test_metric_outputs | map(attribute='port') | unique == ([30427] if fluent_bit_push_metrics else [])
+          - test_metric_outputs | map(attribute='header') | unique == ([test_header] if fluent_bit_push_metrics else [])
+      vars:
+        test_header: "Authorization Bearer {{ test_token }}"
+      when: test_token | length > 0
+
+    - name: Check that a host without a sender token sends to the agents with no token
+      ansible.builtin.assert:
+        that:
+          - test_log_outputs | map(attribute='port') | unique == [30429]
+          - test_metric_outputs | map(attribute='port') | unique == ([30428] if fluent_bit_push_metrics else [])
+          - (test_log_outputs + test_metric_outputs) | selectattr('header', 'defined') | list == []
+      when: test_token | length == 0

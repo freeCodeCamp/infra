@@ -83,3 +83,42 @@ spec:
     - secretKey: password
       remoteRef:
         key: o11y-vmauth-logs-reader/password
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMUser
+metadata:
+  name: fluent-bit-sender
+  labels:
+    o11y.freecodecamp.org/vmauth: o11y
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  tokenRef:
+    name: vmauth-fluent-bit-sender
+    key: token
+  targetRefs:
+    - static:
+        url: http://vlagent-vlagent.o11y.svc:9429
+      paths:
+        - /insert/jsonline
+    - static:
+        url: http://vmagent-vm.o11y.svc:8429
+      paths:
+        - /api/v1/write
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: vmauth-fluent-bit-sender
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: vmauth-fluent-bit-sender
+    creationPolicy: Owner
+  data:
+    - secretKey: token
+      remoteRef:
+        key: o11y-fluent-bit-sender/credential

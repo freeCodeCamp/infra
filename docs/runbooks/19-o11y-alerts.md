@@ -94,6 +94,12 @@ A host does not send metrics for about 5 minutes. The alert does not cover the N
    ssh freecodecamp@<instance> sudo systemctl restart fluent-bit
    ```
 
+1. If Fluent Bit runs, look for a refused sender token. A `401` also stops the logs of the host. Do the steps in [Sender token](../infra-guides/ansible.md#sender-token):
+
+   ```sh
+   ssh freecodecamp@<instance> 'sudo journalctl -u fluent-bit --since -30min --no-pager | grep -c "HTTP status=401"'
+   ```
+
 ## NginxVmDown
 
 An NGINX VM does not send metrics, or `nginx.service` is not active, for about 4 minutes. The rule for a missing host is the same as in [HostDown](#hostdown).
@@ -147,7 +153,7 @@ A host uses more than 90% of its memory for 15 minutes.
 
 Fluent Bit on a Vultr host dropped log records or metrics in the last 15 minutes. The `name` label names the output: `http.*` sends logs to the log agent, `prometheus_remote_write.*` sends metrics to vmagent. One of two causes applies:
 
-- The log agent refused the records with an HTTP 4xx status. Fluent Bit keeps a copy in `/var/lib/fluent-bit/storage/rejected`, up to 256M.
+- vmauth or the log agent refused the records with an HTTP 4xx status. Fluent Bit keeps a copy in `/var/lib/fluent-bit/storage/rejected`, up to 256M.
 - The buffer of an output became full, and Fluent Bit removed the oldest records. Those records are lost.
 
 1. Find the cause. Use the `instance` label of the alert:
@@ -156,7 +162,9 @@ Fluent Bit on a Vultr host dropped log records or metrics in the last 15 minutes
    ssh freecodecamp@<instance> 'sudo journalctl -u fluent-bit --since -30min --no-pager | grep -E "HTTP status=|will not be retried"'
    ```
 
-1. If the output shows `will not be retried`, the log agent refused the records. Read the status on the line before it, then examine the log of the log agent:
+1. If the output shows `will not be retried`, read the status on the line before it.
+1. If the status is `401`, vmauth refused the sender token of the host. Do the steps in [Sender token](../infra-guides/ansible.md#sender-token).
+1. For another 4xx status, the log agent refused the records. Examine the log of the log agent:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l o11y.freecodecamp.org/component=vlagent --tail=100
@@ -181,27 +189,30 @@ An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minut
    ssh freecodecamp@<instance> 'sudo journalctl -u fluent-bit --since -30min --no-pager | tail -50'
    ```
 
-1. A connection error shows a fault in the VPC network or the node. An HTTP 5xx status shows a fault in the log agent.
+1. A connection error shows a fault in the VPC network or the node. An HTTP 5xx status shows a fault in vmauth or the log agent. Examine the vmauth log for the request: `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l o11y.freecodecamp.org/component=vmauth --tail=100`. An HTTP 401 status on metrics shows a wrong sender token; see [Sender token](../infra-guides/ansible.md#sender-token).
 
 ## VultrMetricsPushDown
 
-No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxVmDown do not fire for the Vultr hosts while this alert fires. Each Vultr host sends its metrics to port 30428 on `fluent_bit_vlagent_host` (`ansible/inventory/group_vars/provider_vultr.yml`). Fluent Bit keeps up to 256M of metrics on disk and sends them when the receiver is back.
+No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxVmDown do not fire for the Vultr hosts while this alert fires. Each Vultr host sends its metrics to `fluent_bit_vlagent_host` (`ansible/inventory/group_vars/provider_vultr.yml`): to vmauth on port 30427 when the host has the sender token, or to vmagent on port 30428 when it does not. Fluent Bit keeps up to 256M of metrics on disk and sends them when the receiver is back.
 
-1. Make sure that the o11y node at that address is `Ready`, and that vmagent runs:
+1. Make sure that the o11y node at that address is `Ready`, and that vmauth and vmagent run:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get nodes -o wide
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get svc vmagent-vm
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get svc vmauth-o11y vmagent-vm
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l app.kubernetes.io/name=vmagent
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l o11y.freecodecamp.org/component=vmauth
    ```
 
-   The Service must show `8429:30428/TCP`.
+   The Services must show `8427:30427/TCP` and `8429:30428/TCP`.
 
 1. Examine the Fluent Bit log on one Vultr host:
 
    ```sh
    ssh freecodecamp@<host> 'sudo journalctl -u fluent-bit --since -30min --no-pager | grep prometheus_remote_write | tail -20'
    ```
+
+1. If the log shows `HTTP status=401`, vmauth refused the sender token. Fluent Bit keeps the metrics and sends them again. Do the steps in [Sender token](../infra-guides/ansible.md#sender-token).
 
 ## TargetDown
 

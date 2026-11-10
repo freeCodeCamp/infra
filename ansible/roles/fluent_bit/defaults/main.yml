@@ -6,6 +6,8 @@ fluent_bit_state_dir: /var/lib/fluent-bit
 
 fluent_bit_vlagent_host: ""
 fluent_bit_vlagent_port: 30429
+fluent_bit_vmauth_port: 30427
+fluent_bit_sender_token: ""
 fluent_bit_http_port: 2020
 fluent_bit_ip_allow: [localhost]
 

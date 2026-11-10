@@ -67,6 +67,7 @@
     group: root
     mode: "0640"
     validate: "{{ fluent_bit_binary }} -c %s --dry-run"
+  diff: false
   when: fluent_bit_vlagent_host | length > 0
   notify: Restart fluent-bit
 
