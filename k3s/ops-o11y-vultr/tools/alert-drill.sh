@@ -32,10 +32,12 @@ if [ "$(jq length <<<"$RULES")" -eq 0 ]; then
   echo "no alert rules in: $*" >&2
   exit 1
 fi
+STARTS_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 ENDS_AT=$(date -u -v+15M +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+15 minutes' +%Y-%m-%dT%H:%M:%SZ)
-PAYLOAD=$(jq -c --arg ends "$ENDS_AT" 'map({
+PAYLOAD=$(jq -c --arg starts "$STARTS_AT" --arg ends "$ENDS_AT" 'map({
   labels: {alertname: "DRILL-\(.alert)", severity: .severity, drill: "true"},
   annotations: {summary: "DRILL: test alert for \(.alert). No action needed.", runbook_url: .runbook_url},
+  startsAt: $starts,
   endsAt: $ends
 })' <<<"$RULES")
 
