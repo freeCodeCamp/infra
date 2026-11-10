@@ -1,0 +1,17 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: argocd-application-controller
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  namespaceSelector:
+    matchNames:
+      - argocd
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-metrics
+      app.kubernetes.io/component: application-controller
+  endpoints:
+    - port: http-metrics
+      path: /metrics

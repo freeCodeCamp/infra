@@ -27,6 +27,8 @@ server:
       memory: 256Mi
 
 controller:
+  metrics:
+    enabled: true
   resources:
     requests:
       cpu: 100m

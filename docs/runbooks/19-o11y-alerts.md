@@ -259,6 +259,25 @@ A nightly backup to R2 has not succeeded for 36 hours. The `cronjob` label names
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get jobs --sort-by=.metadata.creationTimestamp
 ```
 
+## ArgoCDAppUnhealthy
+
+An Argo CD Application is not `Healthy`, or not `Synced`, for 15 minutes. The `name` label names the Application. `OutOfSync` means that the cluster is different from git. `Unknown` means that Argo CD cannot compare them. `Synced` but not `Healthy` means that a resource from git does not work. During a restore with [21-o11y-backup-restore.md](21-o11y-backup-restore.md), the sync is stopped, so this alert fires until the restore ends.
+
+1. Find the status of each Application:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd get applications
+   ```
+
+1. Read the conditions and the resources that are not healthy or not synced:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd describe application <name>
+   ```
+
+1. If a pod is not healthy, examine its events and its log.
+1. If the sync fails because a manifest or a chart value is wrong, correct it in git. Argo CD syncs the fix.
+
 ## NginxHigh5xxRate
 
 More than 5% of the requests to one `server_name` return a 5xx status for 5 minutes, with at least 100 requests in each 5 minutes.

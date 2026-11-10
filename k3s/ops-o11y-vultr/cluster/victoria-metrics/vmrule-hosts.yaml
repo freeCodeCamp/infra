@@ -144,3 +144,20 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#fluentbitbufferbacklog"
+    - name: argocd
+      interval: 1m
+      rules:
+        - alert: ArgoCDAppUnhealthy
+          expr: |
+            max by (name) (
+              argocd_app_info{health_status!="Healthy"}
+              or argocd_app_info{sync_status!="Synced"}
+            )
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Argo CD app {{ $labels.name }} is not Healthy and Synced for 15 minutes."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#argocdappunhealthy"
