@@ -1,6 +1,6 @@
 # Tailscale Infrastructure Inventory
 
-Tailscale devices that the repository defines in a file. Hosts also join the tailnet through `ansible/play-tailscale--1a-up.yml`, and the `ops-o11y` nodes use it for the API and NodePorts (`ansible/inventory/group_vars/ops_o11y.yml:6`). The admin console lists every device.
+Tailscale devices that the repository defines in a file. Hosts also join the tailnet through `ansible/play-tailscale--1a-up.yml`. The admin console lists every device.
 
 On Linode, each host joins. On Vultr, only the 3 o11y VMs, the Swarm manager and the client VMs join. Other Vultr VMs use public SSH (key-only).
 

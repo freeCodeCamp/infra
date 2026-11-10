@@ -108,7 +108,7 @@ Use `-i inventory/digitalocean.yml`. For the Vultr o11y cluster, run `play-k3s--
 
 | Play                     | What it does                                                           | Inputs                                                      |
 | ------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `play-k3s--servers.yml`  | Install or upgrade k3s on `ops_o11y` (runbook 14)                      | —                                                           |
+| `play-k3s--servers.yml`  | Install or upgrade k3s on `ops_o11y_vultr`                             | —                                                           |
 | `play-k3s--longhorn.yml` | Install Longhorn on `tools_k3s`                                        | —                                                           |
 | `play-k3s--teardown.yml` | Remove k3s from every host in the group. Takes an etcd snapshot first. | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
 
@@ -187,7 +187,7 @@ Run these from the repository root.
 
 ## Kubeconfig From an Envelope
 
-Only `ops-backoffice-tools` has a kubeconfig envelope. The `ops-o11y` kubeconfig comes from `play-k3s--servers.yml`. Run from the repository root:
+Only `ops-backoffice-tools` has a kubeconfig envelope. The `ops-o11y-vultr` kubeconfig comes from `play-k3s--servers.yml`. Run from the repository root:
 
 ```bash
 (
