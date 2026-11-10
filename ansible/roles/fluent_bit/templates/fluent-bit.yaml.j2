@@ -77,6 +77,13 @@ pipeline:
 {% endif %}
 
   filters:
+    - name: grep
+      match: journal
+      logical_op: and
+      exclude:
+        - _SYSTEMD_UNIT ^fluent-bit\.service$
+        - 'MESSAGE ^\[[^\]]+\] \[ info\] '
+
     - name: modify
       match_regex: '^(journal|nginx\..+|docker)$'
       add:

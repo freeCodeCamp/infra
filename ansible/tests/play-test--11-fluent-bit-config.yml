@@ -85,13 +85,23 @@
         that:
           - test_log_outputs | length == 4
           - test_log_outputs | map(attribute='match') | select('match', '^metrics') | list == []
-          - test_pipeline.filters | map(attribute='match') | select('defined') | list == []
+          - test_pipeline.filters | map(attribute='match') | select('defined') | list == ['journal']
           - test_log_tags | reject('match', test_filter_regex) | list == []
           - test_metric_tags | select('match', test_filter_regex) | list == []
       vars:
-        test_filter_regex: "{{ test_pipeline.filters | map(attribute='match_regex') | first }}"
+        test_filter_regex: "{{ (test_pipeline.filters | selectattr('name', 'eq', 'modify') | first).match_regex }}"
         test_log_tags: [journal, nginx.access, nginx.error, docker]
         test_metric_tags: [metrics.node, metrics.fluentbit]
+
+    - name: Check that the journal drops only the info lines of Fluent Bit itself
+      ansible.builtin.assert:
+        that:
+          - test_grep | length == 1
+          - test_grep[0].match == 'journal'
+          - test_grep[0].logical_op == 'and'
+          - test_grep[0].exclude == ['_SYSTEMD_UNIT ^fluent-bit\.service$', 'MESSAGE ^\[[^\]]+\] \[ info\] ']
+      vars:
+        test_grep: "{{ test_pipeline.filters | selectattr('name', 'eq', 'grep') | list }}"
 
     - name: Check that a host without push sends no metrics
       ansible.builtin.assert:

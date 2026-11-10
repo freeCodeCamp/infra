@@ -153,6 +153,8 @@ A re-created VM has new addresses. Render the upstream map again, encrypt it, an
 
 Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the VPC address and sends the metrics to vmagent on port 30428 of `fluent_bit_vlagent_host`. The base play installs this, so a rebuilt VM needs no render for monitoring. To change only the Fluent Bit config, run `play-vultr--fluent-bit.yml -e variable_host=<group>`. The o11y nodes do not send metrics this way (`fluent_bit_push_metrics: false`), because the cluster scrapes them.
 
+Fluent Bit does not send its own `info` journal lines to VictoriaLogs. Its warnings and errors go there. To see all its lines, run `journalctl -u fluent-bit` on the host.
+
 ## Removed Plays
 
 | Removed                                                                           | Use instead                                                                           |
@@ -172,20 +174,20 @@ Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the
 
 Run these from the repository root.
 
-| Recipe                                    | Command                                                                                                                                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `just bootstrap <play> <group>`           | `cd ansible && ansible-playbook -i inventory/digitalocean.yml play-<play>.yml -e variable_host=<group>`                                                                                                                         |
-| `just bootstrap-tools`                    | `cd ansible && uv sync --locked && .venv/bin/ansible-galaxy install -r requirements.yml`                                                                                                                                        |
+| Recipe                                    | Command                                                                                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `just bootstrap <play> <group>`           | `cd ansible && ansible-playbook -i inventory/digitalocean.yml play-<play>.yml -e variable_host=<group>`                           |
+| `just bootstrap-tools`                    | `cd ansible && uv sync --locked && .venv/bin/ansible-galaxy install -r requirements.yml`                                          |
 | `just provision <cmd> <ws>`               | `terraform -chdir=terraform/<ws> <cmd>`. List the workspaces with `find terraform -name .terraform.lock.hcl -exec dirname {} \;`. |
-| `just release ops-backoffice-tools <app>` | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern)                                                                                                                                                       |
-| `just configure-kubeconfig <cluster>`     | See [Kubeconfig From an Envelope](#kubeconfig-from-an-envelope).                                                                                                                                                                |
-| `just configure-secret <name>`            | `sops edit --input-type dotenv --output-type dotenv ../infra-secrets/<name>/.env.enc`                                                                                                                                           |
-| `just configure-policy <cluster>`         | No replacement. No cluster has a `cluster/policy` folder.                                                                                                                                                                       |
-| `just inspect-secret <name>`              | [Runbook 04](../runbooks/04-secrets-decrypt.md)                                                                                                                                                                                 |
-| `just verify-app <cluster> <app>`         | `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl -n <app> get deploy,sts,pods,svc,secrets -o wide`                                                                                                                            |
-| `just inspect-crds <cluster> <filter>`    | `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl get crd \| grep -i <filter>`                                                                                                                                                 |
-| `just verify-manifests`                   | The `kubeconform` command in `.github/workflows/k8s--validate.yml`                                                                                                                                                              |
-| `just verify-secrets`                     | No replacement. Decrypt one envelope with runbook 04 to test the key.                                                                                                                                                           |
+| `just release ops-backoffice-tools <app>` | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern)                                                         |
+| `just configure-kubeconfig <cluster>`     | See [Kubeconfig From an Envelope](#kubeconfig-from-an-envelope).                                                                  |
+| `just configure-secret <name>`            | `sops edit --input-type dotenv --output-type dotenv ../infra-secrets/<name>/.env.enc`                                             |
+| `just configure-policy <cluster>`         | No replacement. No cluster has a `cluster/policy` folder.                                                                         |
+| `just inspect-secret <name>`              | [Runbook 04](../runbooks/04-secrets-decrypt.md)                                                                                   |
+| `just verify-app <cluster> <app>`         | `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl -n <app> get deploy,sts,pods,svc,secrets -o wide`                              |
+| `just inspect-crds <cluster> <filter>`    | `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl get crd \| grep -i <filter>`                                                   |
+| `just verify-manifests`                   | The `kubeconform` command in `.github/workflows/k8s--validate.yml`                                                                |
+| `just verify-secrets`                     | No replacement. Decrypt one envelope with runbook 04 to test the key.                                                             |
 
 ## Kubeconfig From an Envelope
 
