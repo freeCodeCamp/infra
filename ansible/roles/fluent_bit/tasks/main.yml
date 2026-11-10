@@ -45,10 +45,10 @@
     state: present
     update_cache: true
     cache_valid_time: "{{ fluent_bit_apt_cache_valid_time if fluent_bit_installed == fluent_bit_version and fluent_bit_repo is not changed else 0 }}"
-  vars:
-    fluent_bit_installed: "{{ (ansible_facts.packages['fluent-bit'] | default([{}]) | first).version | default('') }}"
     allow_downgrade: true
     allow_change_held_packages: true
+  vars:
+    fluent_bit_installed: "{{ (ansible_facts.packages['fluent-bit'] | default([{}]) | first).version | default('') }}"
 
 - name: Hold the Fluent Bit package
   ansible.builtin.dpkg_selections:
