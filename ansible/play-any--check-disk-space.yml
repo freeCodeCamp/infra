@@ -4,9 +4,6 @@
 #   ansible-playbook -i inventory/linode.yml play-any--check-disk-space.yml \
 #     -e variable_host=prd_oldeworld_api
 #
-#   ansible-playbook -i inventory/digitalocean.yml play-any--check-disk-space.yml \
-#     -e variable_host=ops_o11y
-#
 # Read-only. It measures, it never frees anything.
 #
 # Tune the grade with extra-vars. Use the JSON form for the fstype list:
