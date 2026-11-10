@@ -41,6 +41,8 @@ grafana.ini:
     allow_sign_up: false
   auth.anonymous:
     enabled: false
+  unified_alerting:
+    enabled: false
   dashboards:
     default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/traffic.json
 
@@ -81,44 +83,78 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/freecodecamp
-      - name: victoriametrics
+      - name: victoriametrics-cluster
         orgId: 1
         folder: VictoriaMetrics
         type: file
         disableDeletion: true
         allowUiUpdates: false
         options:
-          path: /var/lib/grafana/dashboards/victoriametrics
-      - name: hosts
+          path: /var/lib/grafana/dashboards/victoriametrics-cluster
+      - name: vmagent
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vmagent
+      - name: vmalert
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vmalert
+      - name: vmauth
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vmauth
+      - name: operator
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/operator
+      - name: victorialogs
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/victorialogs
+      - name: vlagent
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vlagent
+      - name: node-exporter-full
         orgId: 1
         folder: Hosts
         type: file
         disableDeletion: true
         allowUiUpdates: false
         options:
-          path: /var/lib/grafana/dashboards/hosts
+          path: /var/lib/grafana/dashboards/node-exporter-full
 
 dashboardsConfigMaps:
   freecodecamp: grafana-dashboards-freecodecamp
-
-defaultCurlOptions: "-sfL --retry 3"
-
-dashboards:
-  victoriametrics:
-    victoriametrics-cluster:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/29c43cd2fee05409499a4d1b38e950e1b7f13bd4/dashboards/victoriametrics-cluster.json
-    vmagent:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/29c43cd2fee05409499a4d1b38e950e1b7f13bd4/dashboards/vmagent.json
-    vmalert:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/29c43cd2fee05409499a4d1b38e950e1b7f13bd4/dashboards/vmalert.json
-    vmauth:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/29c43cd2fee05409499a4d1b38e950e1b7f13bd4/dashboards/vmauth.json
-    operator:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/29c43cd2fee05409499a4d1b38e950e1b7f13bd4/dashboards/operator.json
-    victorialogs:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaLogs/915d91904bf7f5be66ab00f88947ae7fc1431acc/dashboards/victorialogs.json
-    vlagent:
-      url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaLogs/915d91904bf7f5be66ab00f88947ae7fc1431acc/dashboards/vlagent.json
-  hosts:
-    node-exporter-full:
-      url: https://raw.githubusercontent.com/rfmoz/grafana-dashboards/b07d8a90d8fadd112e9ac841b777ee863cda850b/prometheus/node-exporter-full.json
+  victoriametrics-cluster: grafana-dashboard-victoriametrics-cluster
+  vmagent: grafana-dashboard-vmagent
+  vmalert: grafana-dashboard-vmalert
+  vmauth: grafana-dashboard-vmauth
+  operator: grafana-dashboard-operator
+  victorialogs: grafana-dashboard-victorialogs
+  vlagent: grafana-dashboard-vlagent
+  node-exporter-full: grafana-dashboard-node-exporter-full

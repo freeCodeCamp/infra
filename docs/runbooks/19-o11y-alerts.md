@@ -23,7 +23,7 @@ Then open `http://127.0.0.1:8880/vmalert/alerts`. For the log rules, use `svc/vm
 
 To read logs, open the VictoriaLogs UI at `http://<o11y node>:30427/select/vmui` and log in.
 
-To see traffic, errors, probes and host health, open Grafana at `http://<o11y node>:30300` and log in with the 1Password item `o11y-grafana-admin` (vault `Infra-IaC-ESO`, fields `username` and `password`). Grafana does not start without this item. The home page is the dashboard **Traffic and health**. The folder **freeCodeCamp** also has **Fleet capacity and stability**. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards.
+To see traffic, errors, probes and host health, open Grafana at `http://<o11y node>:30300` and log in with the 1Password item `o11y-grafana-admin` (vault `Infra-IaC-ESO`, fields `username` and `password`). Grafana does not start without this item. The home page is the dashboard **Traffic and health**. The folder **freeCodeCamp** also has **Fleet capacity and stability**. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards. These are files in `k3s/ops-o11y-vultr/cluster/grafana/dashboards/upstream/`, so Grafana starts without GitHub. They come from `VictoriaMetrics/VictoriaMetrics` at `29c43cd2`, `VictoriaMetrics/VictoriaLogs` at `915d9190` and `rfmoz/grafana-dashboards` at `b07d8a90`, with the panels removed whose metrics we do not collect. Grafana alerting is off; all alerts come from Alertmanager.
 
 To silence an alert during planned work, open the Alertmanager UI:
 
