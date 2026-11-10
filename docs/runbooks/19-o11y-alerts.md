@@ -286,13 +286,31 @@ An NGINX VM logs more than 10 upstream errors in 5 minutes for 5 minutes. The al
 
 ## Watchdog
 
-The Watchdog alert always fires. A CronJob sends a Sentry check-in each 5 minutes while the Watchdog is active in Alertmanager. If Sentry reports a missed check-in, the alert path is broken.
+The Watchdog alert always fires. A CronJob sends a Sentry check-in each 5 minutes while the Watchdog is active in Alertmanager. The CronJob also stops its check-ins for 15 minutes after Alertmanager fails to send a notification to Google Chat. If Sentry reports a missed check-in, the alert path is broken.
+
+The Watchdog does not go to Google Chat. Thus the CronJob finds a broken path to Google Chat only when a real alert fails to send. The check-ins start again within about 20 minutes after the last failure. Thus an OK monitor in Sentry does not prove that the path to Google Chat works again.
 
 1. Examine the CronJob runs:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get jobs --sort-by=.metadata.creationTimestamp
    ```
+
+1. Read the log of the last failed Job:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs job/<job-name>
+   ```
+
+1. If the log shows `Alertmanager notifications failing; no check-in`, examine the calert pods and their logs, and the Alertmanager logs:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l app.kubernetes.io/name=calert
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l app.kubernetes.io/name=calert --tail 50
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l app.kubernetes.io/name=vmalertmanager -c alertmanager --tail 50
+   ```
+
+1. If the log shows `cannot read Alertmanager notification metrics` or `no Alertmanager notification metrics`, make sure that `vmselect` runs and that VictoriaMetrics scrapes Alertmanager.
 
 1. Make sure that vmalert and Alertmanager run:
 

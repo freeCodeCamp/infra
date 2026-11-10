@@ -10,7 +10,7 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
-      activeDeadlineSeconds: 60
+      activeDeadlineSeconds: 120
       template:
         spec:
           restartPolicy: Never
@@ -54,6 +54,18 @@ spec:
                     *'"alertname":"Watchdog"'*) ;;
                     *) echo "Watchdog is not active; no check-in"; exit 1 ;;
                   esac
+                  vm='http://vmselect-vm.o11y.svc:8481/select/0/prometheus/api/v1/query'
+                  fq='query=sum(increase(alertmanager_notifications_failed_total{reason!="contextCanceled"}[15m]))'
+                  failed=$(curl -fsS --max-time 10 -G --data-urlencode "$fq" "$vm") || {
+                    echo "cannot read Alertmanager notification metrics; no check-in"
+                    exit 1
+                  }
+                  case "$failed" in
+                    *'"isPartial":true'*) echo "partial Alertmanager notification metrics; no check-in"; exit 1 ;;
+                    *'"result":[]'*) echo "no Alertmanager notification metrics; no check-in"; exit 1 ;;
+                    *'"value":['*',"0"]'*) ;;
+                    *) echo "Alertmanager notifications failing; no check-in"; exit 1 ;;
+                  esac
                   printf 'url = "%s?status=ok"\n' "$CHECKIN_URL" |
-                    curl -fsS --max-time 10 --retry 2 --retry-all-errors -o /dev/null -K -
+                    curl -4 -fsS --max-time 10 --retry 2 --retry-all-errors -o /dev/null -K -
                   echo "check-in sent"
