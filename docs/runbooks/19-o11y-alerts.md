@@ -41,7 +41,7 @@ Then open `http://127.0.0.1:9093/#/silences` and add a silence with an end time.
 
 ## Test the alert path
 
-This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"`. Alertmanager sends them to the receiver `google_chat_drill`, and calert posts them to the drill space, not to the alert space. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook`. The test does not use the webhook of the alert space.
+This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"` and a name that starts with `DRILL-`. Alertmanager sends them to the receiver `google_chat_drill`, and calert posts them to the drill space, not to the alert space. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook` in the vault `Infra-IaC-ESO`. The test does not use the webhook of the alert space.
 
 1. Read the list of alerts that the test sends:
 
