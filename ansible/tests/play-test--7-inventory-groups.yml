@@ -16,7 +16,6 @@
       prd_clt: [prd-vm-clt-eng-0, prd-vm-oldeworld-clt-eng-0]
       prd_clt_eng: [prd-vm-clt-eng-0, prd-vm-oldeworld-clt-eng-0]
       ops_swarm_mgr: [ops-vm-swarm-mgr-1]
-      ops_o11y: []
       ops_o11y_vultr: [ops-vm-o11y-1]
       vultr_pxy: [prd-vm-pxy-2]
       vultr_clt: [prd-vm-clt-eng-0]

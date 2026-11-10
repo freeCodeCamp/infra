@@ -36,7 +36,6 @@ When a change alters an operator step, update its runbook or guide in the same c
 ## Clusters
 
 - `ops-o11y-vultr`: three Vultr VMs `ops-vm-o11y-1` to `-3`, K3s with etcd snapshots to R2. Argo CD deploys `k3s/ops-o11y-vultr/`: metrics, logs and alerts (runbook 19).
-- `ops-o11y`: retired in November 2026. `terraform/ops-o11y/` stays until the operator destroys the droplet.
 - `ops-backoffice-tools`: legacy.
 
 Check the live state before you act: `vultr-cli instance list`, `doctl compute droplet list`, `linode-cli linodes list`, or `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl get nodes`.
