@@ -406,8 +406,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count by (provider) (lag(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]) <= 120)",
-          "legendFormat": "{{provider}}",
+          "expr": "count(lag(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]) <= 120)",
+          "legendFormat": "Hosts up",
           "range": true
         }
       ],
@@ -427,38 +427,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^vultr$|^vultr .*|.* vultr$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#3274D9"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^linode$|^linode .*|.* linode$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#56A64B"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "reduceOptions": {
@@ -542,7 +511,7 @@
     {
       "id": 8,
       "type": "row",
-      "title": "Proxy hosts by provider (node metrics)",
+      "title": "Proxy hosts (node metrics)",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -556,7 +525,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Share of proxy connections",
-      "description": "Established TCP connections on the proxy hosts, as a share per provider. Shows where the traffic goes when DNS changes.",
+      "description": "Established TCP connections on the proxy hosts, as a share per host. Shows where the traffic goes when DNS changes.",
       "gridPos": {
         "x": 0,
         "y": 7,
@@ -574,8 +543,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (provider) (node_netstat_Tcp_CurrEstab{job=\"node\",env=\"$env\",role=\"pxy\"}) / scalar(sum(node_netstat_Tcp_CurrEstab{job=\"node\",env=\"$env\",role=\"pxy\"}))",
-          "legendFormat": "{{provider}}",
+          "expr": "sum by (instance) (node_netstat_Tcp_CurrEstab{job=\"node\",env=\"$env\",role=\"pxy\"}) / scalar(sum(node_netstat_Tcp_CurrEstab{job=\"node\",env=\"$env\",role=\"pxy\"}))",
+          "legendFormat": "{{instance}}",
           "range": true
         }
       ],
@@ -614,38 +583,7 @@
             }
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^vultr$|^vultr .*|.* vultr$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#3274D9"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^linode$|^linode .*|.* linode$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#56A64B"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "legend": {
@@ -683,8 +621,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (provider) (node_netstat_Tcp_CurrEstab{job=\"node\",env=\"$env\",role=\"pxy\"})",
-          "legendFormat": "{{provider}}",
+          "expr": "sum(node_netstat_Tcp_CurrEstab{job=\"node\",env=\"$env\",role=\"pxy\"})",
+          "legendFormat": "Connections",
           "range": true
         }
       ],
@@ -721,38 +659,7 @@
             }
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^vultr$|^vultr .*|.* vultr$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#3274D9"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^linode$|^linode .*|.* linode$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#56A64B"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "legend": {
@@ -772,7 +679,7 @@
     {
       "id": 11,
       "type": "timeseries",
-      "title": "Proxy egress by fleet",
+      "title": "Proxy egress",
       "gridPos": {
         "x": 0,
         "y": 15,
@@ -790,8 +697,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (provider) (rate(node_network_transmit_bytes_total{job=\"node\",env=\"$env\",role=\"pxy\",device!~\"lo|veth.*|docker.*|br-.*|tailscale.*|cni.*|flannel.*\"}[$__rate_interval]))",
-          "legendFormat": "{{provider}}",
+          "expr": "sum(rate(node_network_transmit_bytes_total{job=\"node\",env=\"$env\",role=\"pxy\",device!~\"lo|veth.*|docker.*|br-.*|tailscale.*|cni.*|flannel.*\"}[$__rate_interval]))",
+          "legendFormat": "Egress",
           "range": true
         }
       ],
@@ -828,38 +735,7 @@
             }
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^vultr$|^vultr .*|.* vultr$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#3274D9"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "^linode$|^linode .*|.* linode$"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#56A64B"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "legend": {
@@ -897,8 +773,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (provider, instance) (rate(node_network_transmit_bytes_total{job=\"node\",env=\"$env\",role=\"pxy\",device!~\"lo|veth.*|docker.*|br-.*|tailscale.*|cni.*|flannel.*\"}[$__rate_interval]))",
-          "legendFormat": "{{provider}} {{instance}}",
+          "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{job=\"node\",env=\"$env\",role=\"pxy\",device!~\"lo|veth.*|docker.*|br-.*|tailscale.*|cni.*|flannel.*\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}}",
           "range": true
         }
       ],
@@ -2170,7 +2046,7 @@
     {
       "id": 28,
       "type": "stat",
-      "title": "Hosts up by fleet and role",
+      "title": "Hosts up by role",
       "description": "Share of the hosts in each role that answer the scrape.",
       "gridPos": {
         "x": 0,
@@ -2189,8 +2065,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "count by (provider, role) (lag(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]) <= 120) / count by (provider, role) (last_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]))",
-          "legendFormat": "{{provider}} {{role}}",
+          "expr": "count by (role) (lag(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]) <= 120) / count by (role) (last_over_time(node_boot_time_seconds{job=\"node\",env=\"$env\"}[1d]))",
+          "legendFormat": "{{role}}",
           "range": true
         }
       ],
@@ -2245,7 +2121,7 @@
     {
       "id": 29,
       "type": "timeseries",
-      "title": "CPU busy by fleet and role",
+      "title": "CPU busy by role",
       "gridPos": {
         "x": 8,
         "y": 78,
@@ -2263,8 +2139,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "1 - avg by (provider, role) (rate(node_cpu_seconds_total{job=\"node\",env=\"$env\",mode=\"idle\"}[$__rate_interval]))",
-          "legendFormat": "{{provider}} {{role}}",
+          "expr": "1 - avg by (role) (rate(node_cpu_seconds_total{job=\"node\",env=\"$env\",mode=\"idle\"}[$__rate_interval]))",
+          "legendFormat": "{{role}}",
           "range": true
         }
       ],
@@ -2323,7 +2199,7 @@
     {
       "id": 30,
       "type": "timeseries",
-      "title": "Memory used by fleet and role",
+      "title": "Memory used by role",
       "gridPos": {
         "x": 16,
         "y": 78,
@@ -2341,8 +2217,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "1 - sum by (provider, role) (node_memory_MemAvailable_bytes{job=\"node\",env=\"$env\"}) / sum by (provider, role) (node_memory_MemTotal_bytes{job=\"node\",env=\"$env\"})",
-          "legendFormat": "{{provider}} {{role}}",
+          "expr": "1 - sum by (role) (node_memory_MemAvailable_bytes{job=\"node\",env=\"$env\"}) / sum by (role) (node_memory_MemTotal_bytes{job=\"node\",env=\"$env\"})",
+          "legendFormat": "{{role}}",
           "range": true
         }
       ],

@@ -1,13 +1,14 @@
 ---
 pxy_tier: "{{ vultr_label | regex_replace('-vm-.*$', '') }}"
 node_exporter_systemd_unit_include: "^(cron|docker|fail2ban|fluent-bit|nginx|node_exporter|ssh|tailscaled)[.]service"
-node_exporter_batch_max: 1
 nginx_config_dir: /etc/nginx
 nginx_upstreams_path: /etc/nginx/configs/upstreams.conf
 secrets_dir: "{{ lookup('ansible.builtin.env', 'SECRETS_DIR') | default(playbook_dir ~ '/../../infra-secrets', true) }}"
-nginx_upstreams: "{{ (lookup('community.sops.sops', secrets_dir ~ '/docker/vultr/pxy-upstreams-' ~ pxy_tier ~ '.yaml.enc',
+nginx_upstreams:
+  "{{ (lookup('community.sops.sops', secrets_dir ~ '/docker/vultr/pxy-upstreams-' ~ pxy_tier ~ '.yaml.enc',
   input_type='yaml', output_type='yaml') | from_yaml).nginx_upstreams }}"
-nginx_tls_files: "{{ (lookup('community.sops.sops', secrets_dir ~ '/docker/vultr/pxy-origin-tls.yaml.enc',
+nginx_tls_files:
+  "{{ (lookup('community.sops.sops', secrets_dir ~ '/docker/vultr/pxy-origin-tls.yaml.enc',
   input_type='yaml', output_type='yaml') | from_yaml).nginx_tls_files }}"
 nginx_org_series: "1.30"
 nginx_no_keepalive_upstreams: [api, socrates]
