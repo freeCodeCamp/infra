@@ -194,8 +194,15 @@ alertmanager:
         - matchers:
             - alertname="Watchdog"
           receiver: blackhole
+        - matchers:
+            - drill="true"
+          receiver: google_chat_drill
     receivers:
       - name: blackhole
+      - name: google_chat_drill
+        webhook_configs:
+          - url: http://calert.o11y.svc:6000/dispatch
+            send_resolved: true
       - name: google_chat
         webhook_configs:
           - url: http://calert.o11y.svc:6000/dispatch

@@ -41,7 +41,7 @@ Then open `http://127.0.0.1:9093/#/silences` and add a silence with an end time.
 
 ## Test the alert path
 
-This test proves that an alert reaches the Google Chat space. It does not prove that the rule expression is correct. People in the space see the messages, so tell them first.
+This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"`. Alertmanager sends them to the receiver `google_chat_drill`, and calert posts them to the drill space, not to the alert space. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook`. The test does not use the webhook of the alert space.
 
 1. Read the list of alerts that the test sends:
 
@@ -55,7 +55,7 @@ This test proves that an alert reaches the Google Chat space. It does not prove 
    k3s/ops-o11y-vultr/tools/alert-drill.sh --send
    ```
 
-1. In the Google Chat space, make sure that one message with `DRILL-` in its title comes for each alert in the list, in about 1 minute. About 16 minutes after you send, each alert gets a message or a thread reply with a title that ends in `Resolved`. Do not send again during this time: Alertmanager merges the alerts and posts no new messages.
+1. In the drill space, make sure that one message with `DRILL-` in its title comes for each alert in the list, in about 1 minute. About 16 minutes after you send, each alert gets a message or a thread reply with a title that ends in `Resolved`. Do not send again during this time: Alertmanager merges the alerts and posts no new messages.
 1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in. While the silence is on, each run of the CronJob fails with `Watchdog is not active; no check-in`, and the last 3 failed Jobs stay in the `o11y` namespace. This is correct.
 1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
 
