@@ -9,7 +9,7 @@ Sends one test alert for each rule through Alertmanager. Each alert is marked
 DRILL and ends by itself after 15 minutes. The Watchdog rule is left out.
 --dry-run  print the alert names and send nothing
 --send     send the alerts
-With no rule file, it reads the metric rules of the cluster.
+With no rule file, it reads every rule file of the cluster.
 EOF
   exit 2
 }
@@ -25,7 +25,7 @@ esac
 ROOT=$(git rev-parse --show-toplevel)
 KUBECONFIG=${KUBECONFIG:-$ROOT/k3s/ops-o11y-vultr/.kubeconfig.yaml}
 export KUBECONFIG
-[ $# -ge 1 ] || set -- "$ROOT/k3s/ops-o11y-vultr/cluster/victoria-metrics/vmrule-hosts.yaml"
+[ $# -ge 1 ] || set -- "$ROOT"/k3s/ops-o11y-vultr/cluster/*/vmrule-*.yaml
 
 RULES=$(yq -o=json -I=0 '[.spec.groups[].rules[] | select(.alert and .alert != "Watchdog") | {"alert": .alert, "severity": .labels.severity, "runbook_url": .annotations.runbook_url}]' "$@" | jq -cs 'add')
 if [ "$(jq length <<<"$RULES")" -eq 0 ]; then

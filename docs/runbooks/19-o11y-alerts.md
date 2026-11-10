@@ -59,7 +59,7 @@ This test proves that an alert reaches the Google Chat space. It does not prove 
 1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in. While the silence is on, each run of the CronJob fails with `Watchdog is not active; no check-in`, and the last 3 failed Jobs stay in the `o11y` namespace. This is correct.
 1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
 
-To add the names of the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`), give their file after `--dry-run` or `--send`: `k3s/ops-o11y-vultr/cluster/victoria-logs/vmrule-logs.yaml`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
+The test sends the metric alerts and the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`). To send the alerts of one rule file only, give the file after `--dry-run` or `--send`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
 
 ## HostDown
 
