@@ -50,7 +50,7 @@ This test proves that an alert reaches the Google Chat space. It does not prove 
    ```
 
 1. In the Google Chat space, make sure that one message with `Drill-` in its title comes for each alert in the list, in about 1 minute. About 16 minutes after you send, each alert gets a message or a thread reply that ends in `Resolved`. Do not send again during this time: Alertmanager merges the alerts and posts no new messages.
-1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in.
+1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in. While the silence is on, each run of the CronJob fails with `Watchdog is not active; no check-in`, and the last 3 failed Jobs stay in the `o11y` namespace. This is correct.
 1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
 
 To add the names of the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`), give their file after `--dry-run` or `--send`: `k3s/ops-o11y-vultr/cluster/victoria-logs/vmrule-logs.yaml`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
