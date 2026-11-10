@@ -10,8 +10,7 @@ admin:
   existingSecret: grafana-admin
 
 service:
-  type: NodePort
-  nodePort: 30300
+  type: ClusterIP
 
 persistence:
   enabled: false
