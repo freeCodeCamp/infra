@@ -59,8 +59,7 @@ To add the names of the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`), 
 
 A host does not send metrics for about 5 minutes. The alert does not cover the NGINX VMs; see [NginxVmDown](#nginxvmdown).
 
-- A Linode host: the scrape of its node exporter fails.
-- A Vultr host: the host has sent metrics in the last day, but not in the last 2 minutes. Fluent Bit on the host reads the node exporter and sends the metrics. If Fluent Bit stops, this alert fires.
+- The host has sent metrics in the last day, but not in the last 2 minutes. Fluent Bit on the host reads the node exporter and sends the metrics. If Fluent Bit stops, this alert fires.
 - A destroyed or rebuilt Vultr VM alerts until it sends again or until it has been gone for 1 day. Silence the alert for that `instance` before you destroy the VM.
 
 1. Connect to the host. Use the `instance` label of the alert:
@@ -105,11 +104,8 @@ An NGINX VM does not send metrics, or `nginx.service` is not active, for about 4
    ssh freecodecamp@<instance> sudo systemctl restart nginx
    ```
 
-1. If the VM does not answer or NGINX does not start, make sure that the VM gets no traffic:
-   - Linode VM: each NodeBalancer of the environment (`prd-nb-oldeworld-pxy-1` to `-3`) checks the TCP connection to each NGINX VM on ports 80 and 443 every 10 seconds. After 3 failed checks, it stops sending traffic to the VM. In Linode Cloud Manager, open each NodeBalancer and make sure that the nodes of the VM show `DOWN`.
-   - Vultr VM: add the VM to `proxies_down` ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), private repo).
-
-1. Repair or rebuild the VM. For a Vultr VM, remove it from `proxies_down`.
+1. If the VM does not answer or NGINX does not start, add the VM to `proxies_down` so that it gets no traffic ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), private repo).
+1. Repair or rebuild the VM, then remove it from `proxies_down`.
 
 ## DiskSpaceLow
 
@@ -180,20 +176,6 @@ An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minut
    ```
 
 1. A connection error shows a fault in the VPC network or the node. An HTTP 5xx status shows a fault in the log agent.
-
-## NodeTargetsAbsent
-
-The `node` scrape job has no targets for 10 minutes. The metrics of each host stop, and HostDown cannot fire.
-
-1. Examine the log of the scrape agent:
-
-   ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs deploy/vmagent-vm -c vmagent --tail=50
-   ```
-
-1. If the log shows `401` or `403` from the Linode API, replace the API token that the service discovery uses.
-
-The Vultr hosts are not in the scrape. See [VultrMetricsPushDown](#vultrmetricspushdown).
 
 ## VultrMetricsPushDown
 
