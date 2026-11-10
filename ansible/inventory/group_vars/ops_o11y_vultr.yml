@@ -4,6 +4,8 @@ k3s_init_host: ops-vm-o11y-1
 k3s_version: v1.36.4+k3s1
 k3s_vpc_cidr: "{{ vultr_vpc_cidr }}"
 fluent_bit_push_metrics: false
+grafana_service: svc:grafana
+grafana_service_target: http://10.43.85.193:80
 fluent_bit_ip_allow_extra:
   - "{{ (server_config_yaml | from_yaml)['cluster-cidr'] | default('10.42.0.0/16') }}"
 
