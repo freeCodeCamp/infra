@@ -20,12 +20,26 @@ victoria-metrics-operator:
     cleanup:
       enabled: false
 
+kubeApiServer:
+  enabled: false
 kubeEtcd:
   enabled: false
 kubeControllerManager:
   enabled: false
 kubeScheduler:
   enabled: false
+
+kubelet:
+  vmScrape:
+    spec:
+      metricRelabelConfigs:
+        - action: labeldrop
+          regex: (uid)
+        - action: labeldrop
+          regex: (id|name)
+        - action: drop
+          source_labels: [__name__]
+          regex: (apiserver|etcd|scheduler|apiextensions|aggregator|watch_cache|authentication|authorization|rest_client|workqueue|storage_operation|kubelet_runtime_operations|kubeproxy|lasso)_.+
 
 prometheus-node-exporter:
   enabled: false
