@@ -211,7 +211,7 @@ A scrape target that is not a host, such as a cluster component or an exporter, 
 
 ## ProbeFailed
 
-A public hostname fails the HTTP probe for 3 minutes. The `instance` label is the URL.
+A public URL fails the HTTP probe for 3 minutes. The `instance` label is the URL. The probes are in `k3s/ops-o11y-vultr/cluster/victoria-metrics/vmprobe-public-hostnames.yaml`. They include the News home of each language, such as `https://www.freecodecamp.org/espanol/news/`.
 
 1. Make sure that the failure is real:
 
