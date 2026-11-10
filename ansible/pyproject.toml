@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "freeCodeCamp.org infrastructure ansible configuration"
 requires-python = ">=3.12"
 dependencies = [
-  "ansible-core>=2.21,<2.22",
+  "ansible-core>=2.22,<2.23",
   "jsonpatch>=1.33",
   "kubernetes>=24.2.0",
   "linode-api4>=5.33.0",
