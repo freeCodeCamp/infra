@@ -126,7 +126,7 @@ spec:
       interval: 1m
       rules:
         - alert: FluentBitDroppedRecords
-          expr: increase(fluentbit_output_dropped_records_total{job="fluent-bit"}[15m]) > 0
+          expr: increase_pure(fluentbit_output_dropped_records_total{job="fluent-bit"}[15m]) > 0
           labels:
             severity: warning
           annotations:
