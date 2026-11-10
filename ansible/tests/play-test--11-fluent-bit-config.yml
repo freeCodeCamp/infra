@@ -29,7 +29,7 @@
           push: true
           role: pxy
           language: ""
-          token: ""
+          token: "not-a-secret#fixture: other"
         - name: ops-vm-o11y-1
           vpc_ip: 10.50.0.5
           push: false
@@ -150,7 +150,7 @@
         own: "{{ test_metric_outputs | selectattr('match', 'eq', 'metrics.fluentbit') | first }}"
       when: fluent_bit_push_metrics
 
-    - name: Check that a host with a sender token sends each output to vmauth with the token
+    - name: Check that each output goes to vmauth with the sender token
       ansible.builtin.assert:
         that:
           - test_log_outputs | map(attribute='port') | unique == [30427]
@@ -159,12 +159,9 @@
           - test_metric_outputs | map(attribute='header') | unique == ([test_header] if fluent_bit_push_metrics else [])
       vars:
         test_header: "Authorization Bearer {{ test_token }}"
-      when: test_token | length > 0
 
-    - name: Check that a host without a sender token sends to the agents with no token
+    - name: Check that the role has no intake port that skips vmauth
       ansible.builtin.assert:
         that:
-          - test_log_outputs | map(attribute='port') | unique == [30429]
-          - test_metric_outputs | map(attribute='port') | unique == ([30428] if fluent_bit_push_metrics else [])
-          - (test_log_outputs + test_metric_outputs) | selectattr('header', 'defined') | list == []
-      when: test_token | length == 0
+          - fluent_bit_vlagent_port is not defined
+          - fluent_bit_metrics_port is not defined

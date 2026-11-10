@@ -119,12 +119,11 @@ vmagent:
     serviceSpec:
       useAsDefault: true
       spec:
-        type: NodePort
+        type: ClusterIP
         ports:
           - name: http
             port: 8429
             targetPort: 8429
-            nodePort: 30428
             protocol: TCP
     affinity:
       podAntiAffinity:

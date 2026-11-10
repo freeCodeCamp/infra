@@ -152,15 +152,11 @@ Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the
 
 ### Sender token
 
-Fluent Bit sends logs and metrics to vmauth on port 30427 with a bearer token. A host with no token sends logs to port 30429 and metrics to port 30428. The token is the field `credential` of the 1Password item `o11y-fluent-bit-sender` in the vault `Infra-IaC-ESO`. Make it from letters and digits only. All hosts use the same token. The cluster reads the same item through External Secrets. `play-vultr--fluent-bit.yml` and `play-vultr--base.yml` read it with `op`, so sign in to `freecodecamp.1password.com` before you run them. vmauth refuses a wrong token with `401`. Fluent Bit then keeps the metrics and sends them again, but it does not send the logs again. It keeps a copy in `/var/lib/fluent-bit/storage/rejected`, but it does not send that copy. Thus, do the steps in this order:
-
-1. Create the item, then merge the change to the cluster. Make sure that the ExternalSecret `vmauth-fluent-bit-sender` shows `SecretSynced` and the VMUser `fluent-bit-sender` shows `operational`.
-2. Run `play-vultr--fluent-bit.yml` on one staging host with `-e variable_host=<host>`. Make sure that its Fluent Bit log shows `HTTP status=200` and no `401`. Then run it with `-e 'variable_host=stg-*'`, and make sure that the staging logs and metrics arrive.
-3. Run it with `-e 'variable_host=prd-*'`, then `-e 'variable_host=ops-*'`, then `-e variable_host=provider_vultr` for each other host.
+Fluent Bit sends logs and metrics to vmauth on port 30427 with a bearer token. vmauth is the only intake on the cluster nodes, so the role refuses a host without the token. The token is the field `credential` of the 1Password item `o11y-fluent-bit-sender` in the vault `Infra-IaC-ESO`. Make it from letters and digits only. All hosts use the same token. The cluster reads the same item through External Secrets. `play-vultr--fluent-bit.yml` and `play-vultr--base.yml` read it with `op`, so sign in to `freecodecamp.1password.com` before you run them. vmauth refuses a wrong token with `401`. Fluent Bit then keeps the metrics and sends them again, but it does not send the logs again. It keeps a copy in `/var/lib/fluent-bit/storage/rejected`, but it does not send that copy. Thus, do not change the token in place. vmauth gets the new token up to about 1 hour later, and then it refuses the logs of each host until the play runs on that host.
 
 If `op` fails during `play-vultr--base.yml`, the play stops before the later roles. Run the base play again on that host.
 
-To send a host without a token again, run the play with `-e fluent_bit_sender_token=`. The next run without this option sends the token again. Before you revert the cluster change, run the play with this option on each host: the revert deletes the VMUser, and vmauth then refuses each host that sends the token. Do not change the token in place. vmauth gets the new token up to about 1 hour later, and then it refuses the logs of each host until the play runs on that host.
+The play runs on one host at a time. To do more hosts at a time, add `-e variable_serial=<n>`.
 
 Fluent Bit does not send its own `info` journal lines to VictoriaLogs. Its warnings and errors go there. To see all its lines, run `journalctl -u fluent-bit` on the host.
 

@@ -1,6 +1,4 @@
-{% set sender_token = fluent_bit_sender_token %}
-{% set log_port = fluent_bit_vmauth_port if sender_token else fluent_bit_vlagent_port %}
-{% set metrics_port = fluent_bit_vmauth_port if sender_token else fluent_bit_metrics_port %}
+{% set sender_header = ('Authorization Bearer ' ~ fluent_bit_sender_token) | to_json %}
 service:
   flush: 1
   log_level: info
@@ -104,11 +102,9 @@ pipeline:
     - name: http
       match: {{ out.match }}
       host: {{ fluent_bit_vlagent_host }}
-      port: {{ log_port }}
+      port: {{ fluent_bit_vmauth_port }}
       uri: /insert/jsonline?_stream_fields=env,role,host,{{ out.fields }}&_msg_field={{ out.msg }}&_time_field={{ out.time }}
-{% if sender_token %}
-      header: {{ ('Authorization Bearer ' ~ sender_token) | to_json }}
-{% endif %}
+      header: {{ sender_header }}
       format: json_lines
       json_date_key: date
       json_date_format: iso8601
@@ -129,11 +125,9 @@ pipeline:
     - name: prometheus_remote_write
       match: {{ out.match }}
       host: {{ fluent_bit_vlagent_host }}
-      port: {{ metrics_port }}
+      port: {{ fluent_bit_vmauth_port }}
       uri: /api/v1/write
-{% if sender_token %}
-      header: {{ ('Authorization Bearer ' ~ sender_token) | to_json }}
-{% endif %}
+      header: {{ sender_header }}
       add_label:
 {% for label in ['job ' ~ out.job] + labels %}
         - {{ label }}

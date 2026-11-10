@@ -6,6 +6,14 @@
     fail_msg: "fluent_bit_vlagent_host must be an IPv4 address; IPAddressAllow cannot take a name."
   when: fluent_bit_vlagent_host | length > 0
 
+- name: Refuse a receiver without the sender token
+  ansible.builtin.assert:
+    that:
+      - fluent_bit_sender_token | length > 0
+    fail_msg: "fluent_bit_sender_token is empty; vmauth refuses a host without it."
+    quiet: true
+  when: fluent_bit_vlagent_host | length > 0
+
 - name: Find the VPC address that the node exporter listens on
   when: fluent_bit_push_metrics | bool and fluent_bit_vlagent_host | length > 0
   block:

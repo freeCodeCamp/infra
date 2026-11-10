@@ -5,7 +5,6 @@ fluent_bit_config: /etc/fluent-bit/fluent-bit.yaml
 fluent_bit_state_dir: /var/lib/fluent-bit
 
 fluent_bit_vlagent_host: ""
-fluent_bit_vlagent_port: 30429
 fluent_bit_vmauth_port: 30427
 fluent_bit_sender_token: ""
 fluent_bit_http_port: 2020
@@ -22,7 +21,6 @@ fluent_bit_limit_docker: 1G
 fluent_bit_push_metrics: true
 fluent_bit_vpc_cidr: ""
 fluent_bit_node_exporter_port: 9100
-fluent_bit_metrics_port: 30428
 fluent_bit_metrics_interval: 60s
 fluent_bit_limit_metrics: 256M
 fluent_bit_provider: vultr

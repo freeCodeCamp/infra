@@ -193,7 +193,7 @@ An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minut
 
 ## VultrMetricsPushDown
 
-No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxVmDown do not fire for the Vultr hosts while this alert fires. Each Vultr host sends its metrics to `fluent_bit_vlagent_host` (`ansible/inventory/group_vars/provider_vultr.yml`): to vmauth on port 30427 when the host has the sender token, or to vmagent on port 30428 when it does not. Fluent Bit keeps up to 256M of metrics on disk and sends them when the receiver is back.
+No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxVmDown do not fire for the Vultr hosts while this alert fires. Each Vultr host sends its metrics to `fluent_bit_vlagent_host` (`ansible/inventory/group_vars/provider_vultr.yml`): to vmauth on port 30427 with the sender token. vmauth sends them on to vmagent. Fluent Bit keeps up to 256M of metrics on disk and sends them when the receiver is back.
 
 1. Make sure that the o11y node at that address is `Ready`, and that vmauth and vmagent run:
 
@@ -204,7 +204,7 @@ No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxV
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l o11y.freecodecamp.org/component=vmauth
    ```
 
-   The Services must show `8427:30427/TCP` and `8429:30428/TCP`.
+   The Services must show `8427:30427/TCP` for vmauth and `8429/TCP` for vmagent.
 
 1. Examine the Fluent Bit log on one Vultr host:
 

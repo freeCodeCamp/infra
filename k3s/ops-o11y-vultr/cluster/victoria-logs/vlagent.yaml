@@ -31,12 +31,11 @@ spec:
   serviceSpec:
     useAsDefault: true
     spec:
-      type: NodePort
+      type: ClusterIP
       ports:
         - name: http
           port: 9429
           targetPort: 9429
-          nodePort: 30429
           protocol: TCP
   resources:
     requests:
