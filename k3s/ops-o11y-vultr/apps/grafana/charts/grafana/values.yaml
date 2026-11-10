@@ -10,8 +10,8 @@ admin:
   existingSecret: grafana-admin
 
 service:
-  type: NodePort
-  nodePort: 30300
+  type: ClusterIP
+  clusterIP: 10.43.85.193
 
 persistence:
   enabled: false
@@ -41,6 +41,8 @@ grafana.ini:
     allow_sign_up: false
   auth.anonymous:
     enabled: false
+  security:
+    cookie_secure: true
   unified_alerting:
     enabled: false
   dashboards:

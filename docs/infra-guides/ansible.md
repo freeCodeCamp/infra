@@ -173,7 +173,7 @@ Fluent Bit does not send its own `info` journal lines to VictoriaLogs. Its warni
 3. In **Services**, select `svc:grafana` and **Approve** the three o11y nodes.
 4. Open `https://grafana.<tailnet>.ts.net/api/health`. Grafana sends `"database": "ok"`.
 
-The target is the ClusterIP of the `grafana` Service. kube-proxy opens a NodePort only on the tailnet and VPC addresses (`nodeport-addresses`), so `127.0.0.1:30300` gets no answer. If the `grafana` Service gets a new ClusterIP, change `grafana_service_target` in `inventory/group_vars/ops_o11y_vultr.yml`, run `tailscale serve clear svc:grafana` on each node, and run the play again.
+The target is the ClusterIP of the `grafana` Service. The Grafana values pin this address (`service.clusterIP`), so the Service keeps it when Argo CD changes the Service. If Argo CD must create the Service again and another Service has the address, the sync fails. To change it, change `service.clusterIP` in `k3s/ops-o11y-vultr/apps/grafana/charts/grafana/values.yaml` and `grafana_service_target` in `inventory/group_vars/ops_o11y_vultr.yml` in the same commit, run `tailscale serve clear svc:grafana` on each node, and run the play again.
 
 ## Removed Plays
 
