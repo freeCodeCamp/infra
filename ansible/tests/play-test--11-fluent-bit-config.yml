@@ -165,3 +165,38 @@
         that:
           - fluent_bit_vlagent_port is not defined
           - fluent_bit_metrics_port is not defined
+
+- name: Test the Fluent Bit preflight
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  check_mode: false
+  vars_files:
+    - ../roles/fluent_bit/defaults/main.yml
+  tasks:
+    - name: Refuse a receiver without the sender token
+      ansible.builtin.include_tasks: fluent-bit-refused.yml
+      vars:
+        fluent_bit_vlagent_host: 10.50.0.5
+        fluent_bit_sender_token: ""
+        test_expect: fluent_bit_sender_token
+
+    - name: Refuse a receiver that is not an IPv4 address
+      ansible.builtin.include_tasks: fluent-bit-refused.yml
+      vars:
+        fluent_bit_vlagent_host: o11y.example
+        fluent_bit_sender_token: "not-a-secret#fixture: token"
+        test_expect: fluent_bit_vlagent_host
+
+    - name: Pass a host without a receiver or a token
+      ansible.builtin.include_tasks: ../roles/fluent_bit/tasks/preflight.yml
+      vars:
+        fluent_bit_vlagent_host: ""
+        fluent_bit_sender_token: ""
+
+    - name: Pass a receiver with the sender token
+      ansible.builtin.include_tasks: ../roles/fluent_bit/tasks/preflight.yml
+      vars:
+        fluent_bit_vlagent_host: 10.50.0.5
+        fluent_bit_sender_token: "not-a-secret#fixture: token"

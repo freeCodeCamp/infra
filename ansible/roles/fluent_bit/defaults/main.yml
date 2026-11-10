@@ -3,6 +3,7 @@ fluent_bit_version: "5.1.5"
 fluent_bit_binary: /opt/fluent-bit/bin/fluent-bit
 fluent_bit_config: /etc/fluent-bit/fluent-bit.yaml
 fluent_bit_state_dir: /var/lib/fluent-bit
+fluent_bit_apt_cache_valid_time: 3600
 
 fluent_bit_vlagent_host: ""
 fluent_bit_vmauth_port: 30427

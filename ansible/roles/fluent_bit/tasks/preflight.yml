@@ -1,0 +1,15 @@
+---
+- name: Refuse a receiver that is not an IPv4 address
+  ansible.builtin.assert:
+    that:
+      - fluent_bit_vlagent_host is match('^([0-9]{1,3}[.]){3}[0-9]{1,3}$')
+    fail_msg: "fluent_bit_vlagent_host must be an IPv4 address; IPAddressAllow cannot take a name."
+  when: fluent_bit_vlagent_host | length > 0
+
+- name: Refuse a receiver without the sender token
+  ansible.builtin.assert:
+    that:
+      - fluent_bit_sender_token | length > 0
+    fail_msg: "fluent_bit_sender_token is empty; vmauth refuses a host without it."
+    quiet: true
+  when: fluent_bit_vlagent_host | length > 0
