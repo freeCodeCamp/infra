@@ -19,19 +19,19 @@
         test_token: "{{ item.token }}"
       loop:
         - name: prd-vm-clt-eng-0
-          vpc_ip: 10.50.1.10
+          vpc_ip: 198.51.100.10
           push: true
           role: clt
           language: eng
           token: "not-a-secret#fixture: token"
         - name: stg-vm-pxy-1
-          vpc_ip: 10.50.1.11
+          vpc_ip: 198.51.100.11
           push: true
           role: pxy
           language: ""
           token: "not-a-secret#fixture: other"
         - name: ops-vm-o11y-1
-          vpc_ip: 10.50.0.5
+          vpc_ip: 203.0.113.5
           push: false
           role: o11y
           language: ""
@@ -54,7 +54,7 @@
 
     - name: Set the host inputs over the role defaults
       ansible.builtin.set_fact:
-        fluent_bit_vlagent_host: 10.50.0.5
+        fluent_bit_vlagent_host: 203.0.113.5
         fluent_bit_vpc_ip: "{{ test_vpc_ip }}"
         fluent_bit_push_metrics: "{{ test_push | bool }}"
         fluent_bit_sender_token: "{{ test_token }}"
@@ -138,7 +138,7 @@
         that:
           - test_metric_outputs | length == 2
           - test_metric_outputs | map(attribute='match') | sort == ['metrics.fluentbit', 'metrics.node']
-          - test_metric_outputs | map(attribute='host') | unique == ['10.50.0.5']
+          - test_metric_outputs | map(attribute='host') | unique == ['203.0.113.5']
           - test_metric_outputs | map(attribute='uri') | unique == ['/api/v1/write']
           - test_metric_outputs | map(attribute='retry_limit') | unique == ['no_limits']
           - node['storage.total_limit_size'] == '256M'
@@ -178,7 +178,7 @@
     - name: Refuse a receiver without the sender token
       ansible.builtin.include_tasks: fluent-bit-refused.yml
       vars:
-        fluent_bit_vlagent_host: 10.50.0.5
+        fluent_bit_vlagent_host: 203.0.113.5
         fluent_bit_sender_token: ""
         test_expect: fluent_bit_sender_token
 
@@ -198,5 +198,5 @@
     - name: Pass a receiver with the sender token
       ansible.builtin.include_tasks: ../roles/fluent_bit/tasks/preflight.yml
       vars:
-        fluent_bit_vlagent_host: 10.50.0.5
+        fluent_bit_vlagent_host: 203.0.113.5
         fluent_bit_sender_token: "not-a-secret#fixture: token"
