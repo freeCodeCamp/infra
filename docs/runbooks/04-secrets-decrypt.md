@@ -87,6 +87,8 @@ Platform-wide envelopes are `<scope>/.env.enc`. Cluster-local envelopes are `k3s
 
 ¹ In the private repo `freeCodeCamp/terraform-cloudflare`.
 
+`terraform/vultr-base` reads `TF_VAR_vpc_cidr` from `vultr/.env.enc`. The variable has no default, so `tofu plan` asks for it when the envelope lacks it.
+
 For the full list, run `find ../infra-secrets -name '*.enc'`.
 
 ## References
