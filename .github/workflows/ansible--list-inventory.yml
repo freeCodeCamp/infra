@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: choice
         required: true
         default: 'vultr'
         options:
-          - 'linode'
           - 'vultr'
 
 defaults:
@@ -21,7 +20,6 @@ jobs:
     name: Run Play
     runs-on: ubuntu-latest
     env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
 
     steps:
@@ -39,10 +37,9 @@ jobs:
         run: |
           source .venv/bin/activate
           case "$PROVIDER" in
-            linode) inventory=(-i inventory/linode.yml) ;;
             vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
             *)
-              echo "::error::provider must be linode or vultr"
+              echo "::error::provider must be vultr"
               exit 1
               ;;
           esac
