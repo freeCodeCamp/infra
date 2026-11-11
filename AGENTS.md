@@ -1,6 +1,6 @@
 # AGENTS.md
 
-freeCodeCamp.org infra-as-code: the Linode estate, the Vultr fleet that replaces it, and the observability clusters.
+freeCodeCamp.org infra-as-code: the Vultr fleet and the observability clusters.
 
 The Universe platform (`gxy-*` galaxies, artemis, Caddy-S3) was torn down in October 2026. Its docs live in `freeCodeCamp-Universe/Architecture` under `docs/infra/` (start at `REBUILD.md`). The last infra commit with the Universe code is `027d913d6f38`. A `gxy-*` path in a guide or RFC here exists only at that commit.
 
@@ -39,4 +39,4 @@ When a change alters an operator step, update its runbook or guide in the same c
 - `ops-o11y-vultr`: three Vultr VMs `ops-vm-o11y-1` to `-3`, K3s with etcd snapshots to R2. Argo CD deploys `k3s/ops-o11y-vultr/`: metrics, logs and alerts (runbook 19).
 - `ops-backoffice-tools`: legacy.
 
-Check the live state before you act: `vultr-cli instance list`, `doctl compute droplet list`, `linode-cli linodes list`, or `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl get nodes`.
+Check the live state before you act: `vultr-cli instance list`, `doctl compute droplet list`, or `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl get nodes`.

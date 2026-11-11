@@ -17,8 +17,6 @@ The Socrates stack provides the AI-powered hints API for freeCodeCamp coding cha
 
 Name stacks per environment (`prd-socrates`, `stg-socrates`). Deploy from the CLI. The variables are in `infra-secrets/docker/oldeworld/socrates-{prd,stg}.env.enc`. `docker/swarm/stacks/socrates/.env.sample` lists them.
 
-Do not press Update for these stacks in Portainer. Its stored copy is old, and an update replaces the live stack with that copy.
-
 Start Tailscale. Log Docker in to the registry once with a read-only token that does not expire:
 
 ```bash
@@ -38,7 +36,7 @@ cd docker/swarm/stacks/socrates
     case $line in '' | '#'*) continue ;; esac
     export "$line"
   done <<< "$secrets"
-  docker --context backoffice stack deploy --with-registry-auth \
+  docker --context vultr stack deploy --with-registry-auth \
     -c stack-socrates.yml "$env-socrates"
 )
 cd -

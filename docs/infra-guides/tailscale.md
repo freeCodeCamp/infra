@@ -2,7 +2,7 @@
 
 Tailscale devices that the repository defines in a file. Hosts also join the tailnet through `ansible/play-tailscale--1a-up.yml`. The admin console lists every device.
 
-On Linode, each host joins. On Vultr, only the 3 o11y VMs, the Swarm manager and the client VMs join. Other Vultr VMs use public SSH (key-only).
+On Vultr, only the 3 o11y VMs, the Swarm manager and the client VMs join. Other Vultr VMs use public SSH (key-only).
 
 ## Architecture
 
@@ -32,8 +32,6 @@ On Linode, each host joins. On Vultr, only the 3 o11y VMs, the Swarm manager and
 
 | Service              | Host                    | Purpose                                                              |
 | -------------------- | ----------------------- | -------------------------------------------------------------------- |
-| `svc:swarm-wh`       | `ops-vm-backoffice`     | Deploy webhook of the Linode Swarm                                   |
-| `svc:portainer`      | `ops-vm-backoffice`     | Portainer of the Linode Swarm                                        |
 | `svc:swarm-wh-vultr` | `ops-vm-swarm-mgr-1`    | Deploy webhook of the Vultr Swarm (`play-vultr--manager.yml`)        |
 | `svc:grafana`        | `ops-vm-o11y-1` to `-3` | Grafana of `ops-o11y-vultr` (`play-vultr--o11y-grafana-service.yml`) |
 

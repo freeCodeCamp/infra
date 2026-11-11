@@ -4,84 +4,37 @@
 
 ## Usage
 
-These steps are for the Linode Swarm. The Vultr Swarm has no Portainer, and `play-swarm--form.yml` forms it and applies its labels. See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment).
+The Swarm runs on Vultr. It has one manager, `ops-vm-swarm-mgr-1`. `play-swarm--form.yml` forms the Swarm, joins the workers and applies the node labels. See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment). To make the Swarm again after a manager loss, see [runbook 18](../runbooks/18-swarm-manager-rebuild.md).
 
-0. Set context as needed with:
+On a new machine, create the Docker context once:
 
-   ```shell
-   docker context use <context_name>
-   ```
+```shell
+docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
+```
 
-1. On manager node - Create docker swarm cluster (if needed).
+### Node Labels
 
-   ```shell
-   docker swarm init
-   ```
+The stack files use the node labels in their placement constraints. The play makes the labels from the host name `<env>-vm-<role>-<n>` (`ansible/vars/swarm.yml`).
 
-2. On worker nodes - Join the cluster (if needed).
+| Label                                  | Value                                                  |
+| -------------------------------------- | ------------------------------------------------------ |
+| `env`                                  | `stg`, `prd`, or `ops` on the manager                  |
+| `role`                                 | `api`, `soc`, `nws`, or `swarm-mgr` on the manager     |
+| `api.enabled`, `api.variant`           | On `api` nodes: `true`, and `dev` (stg) or `org` (prd) |
+| `socrates.enabled`, `socrates.variant` | On `soc` nodes: `true`, and `dev` (stg) or `org` (prd) |
+| `jms.enabled`, `jms.variant`           | On `nws` nodes: `true`, and `dev` (stg) or `org` (prd) |
 
-   ```shell
-   docker swarm join --token <token> <ip>:<port>
-   ```
+Read the labels on the manager:
 
-   Get the token if needed, by running `docker swarm join-token worker`
+```shell
+ssh freecodecamp@ops-vm-swarm-mgr-1 docker node ls
+ssh freecodecamp@ops-vm-swarm-mgr-1 docker node inspect --format '{{json .Spec.Labels}}' <node id>
+```
 
-3. From the manager node - Add labels to the nodes in the cluster. `docker node update` works only on a manager node.
+### Deploy the Stacks
 
-   > [!IMPORTANT]
-   > Labels are used for placement constraints in the docker stack templates.
-
-   Here are some example lables for the nodes. Adjust as needed
-   - Get the node ids using `docker node ls` on the manager node.
-
-   - Label for the manager node
-
-     ```shell
-     docker node update --label-add "portainer=true" <node id>
-     ```
-
-   - Labels for the worker nodes
-
-     JAMStack news
-
-     ```shell
-     docker node update --label-add "jms.enabled=true" <node id>
-     ```
-
-     ```shell
-     docker node update --label-add "jms.variant=dev" <node id>
-     docker node update --label-add "jms.variant=org" <node id>
-     ```
-
-     API
-
-     ```shell
-     docker node update --label-add "api.enabled=true" <node id>
-     ```
-
-     ```shell
-     docker node update --label-add "api.variant=dev" <node id>
-     docker node update --label-add "api.variant=org" <node id>
-     ```
-
-     Socrates
-
-     ```shell
-     docker node update --label-add "socrates.enabled=true" <node id>
-     ```
-
-     ```shell
-     docker node update --label-add "socrates.variant=dev" <node id>
-     docker node update --label-add "socrates.variant=org" <node id>
-     ```
-
-4. Deploy [Portainer](docker-swarm-portainer.md).
-
-5. Complete the Portainer setup wizard & add the cluster to Portainer.
-
-6. Add the container registry details to Portainer.
-
-7. Deploy the remaining stacks: [API](docker-swarm-api.md) only from Portainer, [News](docker-swarm-news.md) from Portainer or the CLI, and [Socrates](docker-swarm-socrates.md#deployment) and [oncall](docker-swarm-oncall.md#deployment) only from the CLI. Do not manage the portainer stack from within the Portainer UI.
+- [oncall](docker-swarm-oncall.md#deployment), [News](docker-swarm-news.md) and [Socrates](docker-swarm-socrates.md#deployment): from the CLI.
+- [API](docker-swarm-api.md): from the `deploy-api.yml` workflow in `freeCodeCamp/freeCodeCamp`.
 
 ## Stray Overlay Device
 

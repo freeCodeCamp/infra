@@ -72,8 +72,6 @@ on:
         options:
           - 'vultr'
 
-# The job only needs to read the repo. It holds the SSH key and the Linode
-# token, so GITHUB_TOKEN gets no write scope it cannot use.
 permissions:
   contents: read
 
