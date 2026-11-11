@@ -11,7 +11,6 @@ admin:
 
 service:
   type: ClusterIP
-  clusterIP: 10.43.85.193
 
 persistence:
   enabled: false

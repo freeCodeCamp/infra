@@ -5,6 +5,8 @@
   become: true
   become_user: root
   gather_facts: false
+  vars:
+    grafana_service_target: "http://{{ grafana_cluster_ip.stdout }}:80"
   tasks:
     - name: Read the Grafana ClusterIP
       ansible.builtin.command:
@@ -21,13 +23,12 @@
       check_mode: false
       run_once: true
 
-    - name: Refuse a target that is not the Grafana ClusterIP
+    - name: Refuse an empty Grafana ClusterIP
       ansible.builtin.assert:
         that:
-          - grafana_service_target | urlsplit('hostname') == grafana_cluster_ip.stdout
-        fail_msg: >-
-          grafana_service_target is {{ grafana_service_target }}, but the Grafana
-          ClusterIP is {{ grafana_cluster_ip.stdout }}. Update group_vars.
+          - grafana_cluster_ip.stdout | length > 0
+          - grafana_cluster_ip.stdout != 'None'
+        fail_msg: The grafana Service has no ClusterIP.
         quiet: true
       run_once: true
 

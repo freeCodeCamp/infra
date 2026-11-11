@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: o11y
 resources:
   - externalsecret-admin.yaml
+  - externalsecret-root-url.yaml
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
