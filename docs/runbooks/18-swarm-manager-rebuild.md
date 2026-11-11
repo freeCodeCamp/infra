@@ -4,7 +4,7 @@
 
 The Vultr Swarm has one manager. The manager holds the Raft state of the Swarm. When the manager goes, the Swarm goes with it: the workers cannot elect a new manager, and you cannot deploy. This runbook makes a new Swarm: a new manager, the workers join it again, and you deploy the stacks again.
 
-> **Outage.** Each worker stops its tasks when it leaves the old Swarm. The Vultr services do not run until you deploy the stacks again (step 8). Before you start, move the Cloudflare traffic to Linode one step at a time while Linode exists ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md), private repo).
+> **Outage.** Each worker stops its tasks when it leaves the old Swarm. The Vultr services do not run until you deploy the stacks again (step 8).
 
 Run every command from the repo root unless the step says otherwise.
 
@@ -107,7 +107,7 @@ The new Swarm has no stacks and no configs. If your machine has no `vultr` Docke
 docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
 ```
 
-Deploy each stack by its guide. In each guide block, use `--context vultr` in place of `--context backoffice` or `--context <context_name>`. If you do not, the stack deploys to the Linode Swarm.
+Deploy each stack by its guide.
 
 - `oncall`: [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md), section Deployment.
 - `stg-news`, `prd-news`: [docker-swarm-news.md](../infra-guides/docker-swarm-news.md).
@@ -119,8 +119,6 @@ Check that each service has its replicas:
 ```sh
 ssh freecodecamp@ops-vm-swarm-mgr-1 sudo docker service ls
 ```
-
-Move the Cloudflare traffic back to Vultr ([traffic runbook](https://github.com/freeCodeCamp/terraform-cloudflare/blob/main/cf-origin-records/README.md)).
 
 ## Practise on `tst-vultr`
 

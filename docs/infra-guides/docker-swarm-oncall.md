@@ -161,23 +161,15 @@ All services log to the local Docker `json-file` driver, rotated per node:
 
 **When:** after a change to a file in this directory. No workflow deploys this stack, so a push does not change the live stack. A first deploy and an update use the same command.
 
-| Swarm                               | Context      | Deploy command                                                                             |
-| ----------------------------------- | ------------ | ------------------------------------------------------------------------------------------ |
-| Linode                              | `backoffice` | `docker --context backoffice stack deploy -c stack-oncall.yml oncall`                      |
-| Vultr, until the production cutover | `vultr`      | `docker --context vultr stack deploy -c stack-oncall.yml -c stack-oncall.vultr.yml oncall` |
-
-`stack-oncall.vultr.yml` turns off the scheduled dispatch, watchdog and cleanup jobs, so only one Swarm runs them. At the cutover, deploy without this file on Vultr, and turn the same jobs off on the Linode Swarm.
-
 1. Start Tailscale. The manager names resolve only on the tailnet.
 2. On a new machine, create the context once:
 
    ```bash
-   docker context create backoffice --docker host=ssh://freecodecamp@ops-vm-backoffice
    docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
    ```
 
 3. If you changed a config file, increase its version first. See [Swarm Config Names](#swarm-config-names).
-4. From the repository root, run this block. Replace `<deploy command>` with the command for your Swarm. The block decrypts the 3 variables into a subshell, so they are not in your shell after the command. `sops exec-env` cannot read this file, so the loop is necessary. See runbook 04, section 3.
+4. From the repository root, run this block. The block decrypts the 3 variables into a subshell, so they are not in your shell after the command. `sops exec-env` cannot read this file, so the loop is necessary. See runbook 04, section 3.
 
    ```bash
    cd docker/swarm/stacks/oncall
@@ -189,7 +181,7 @@ All services log to the local Docker `json-file` driver, rotated per node:
        case $line in '' | '#'*) continue ;; esac
        export "$line"
      done <<< "$secrets"
-     <deploy command>
+     docker --context vultr stack deploy -c stack-oncall.yml oncall
    )
    ```
 
@@ -199,7 +191,7 @@ All services log to the local Docker `json-file` driver, rotated per node:
    docker --context vultr service ls --filter name=oncall_
    ```
 
-6. On Vultr, until the cutover, check the scheduler. Only `oncall_svc-update` has an `Add cronjob` line:
+6. Check the scheduler. Each scheduled service has an `Add cronjob` line: `svc-cleanup`, `svc-dispatch-docr-gc`, `svc-dispatch-housekeeping`, `svc-dispatch-news-eng`, `svc-update`, `svc-watchdog-news`, `svc-watchdog-swarm` and `svc-watchdog-vxlan`:
 
    ```bash
    docker --context vultr service logs --raw oncall_svc-cronjob
@@ -207,7 +199,7 @@ All services log to the local Docker `json-file` driver, rotated per node:
 
 `svc-watchdog-vxlan` and `svc-cleanup` are global and each runs once at deploy, on each node. They do not retry, so a rejected task waits for its next scheduled run.
 
-If the manager reports a permission error on `/home/freecodecamp/.docker`, run this on the manager (`ssh freecodecamp@ops-vm-backoffice`):
+If the manager reports a permission error on `/home/freecodecamp/.docker`, run this on the manager (`ssh freecodecamp@ops-vm-swarm-mgr-1`):
 
 ```bash
 sudo chown -R freecodecamp:freecodecamp /home/freecodecamp/.docker
@@ -215,8 +207,6 @@ sudo chmod -R u+w /home/freecodecamp/.docker
 ```
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
-
-**Portainer:** Portainer lists this stack, but its stored copy is old and has no config files. Deploy only with `docker stack deploy` from this directory. Do not press Update for this stack in Portainer, because that replaces the live stack with the old copy.
 
 ## GHA Integration
 
@@ -258,11 +248,11 @@ Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephem
       -d '{"GANTRY_SERVICES_FILTERS":"name=${{ env.STACK_NAME }}_${{ env.SERVICE_NAME }}"}'
 ```
 
-**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname: `swarm-wh.<tailnet>.ts.net` on Linode, `swarm-wh-vultr.<tailnet>.ts.net` on Vultr), `WEBHOOK_SECRET`
+**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname: `swarm-wh-vultr.<tailnet>.ts.net`), `WEBHOOK_SECRET`
 
 ## Testing Webhook
 
-Run from the manager node (`ssh freecodecamp@ops-vm-backoffice`). `read -rs` takes the secret without echo, so it stays out of the shell history. The secret goes to `curl` as a header file, not as an argument, and it is not in the shell after the block:
+Run from the manager node (`ssh freecodecamp@ops-vm-swarm-mgr-1`). `read -rs` takes the secret without echo, so it stays out of the shell history. The secret goes to `curl` as a header file, not as an argument, and it is not in the shell after the block:
 
 ```bash
 # Trigger update for a specific service
