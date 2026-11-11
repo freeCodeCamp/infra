@@ -60,7 +60,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { group: ops_all, provider: linode }
           - { group: ops_swarm_mgr, provider: vultr }
           - { group: stg_api, provider: vultr }
           - { group: prd_api, provider: vultr }
@@ -90,7 +89,6 @@ jobs:
       verbosity: "-v"
       provider: ${{ matrix.provider }}
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -113,7 +111,6 @@ jobs:
       provider: vultr
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -132,7 +129,6 @@ jobs:
       provider: vultr
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -152,7 +148,6 @@ jobs:
       stage: Gate NGINX (staging)
       artifact_prefix: nginx-gate
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
@@ -175,7 +170,6 @@ jobs:
       provider: vultr
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -190,7 +184,6 @@ jobs:
       verbosity: "-v"
       provider: vultr
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -201,7 +194,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { group: ops_all, provider: linode }
           - { group: ops_swarm_mgr, provider: vultr }
           - { group: prd_api, provider: vultr }
           - { group: prd_pxy, provider: vultr }
@@ -226,7 +218,6 @@ jobs:
       provider: ${{ matrix.provider }}
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -245,7 +236,6 @@ jobs:
       provider: vultr
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -265,7 +255,6 @@ jobs:
       stage: Gate NGINX (production)
       artifact_prefix: nginx-gate
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
@@ -277,7 +266,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { group: ops_all, provider: linode }
           - { group: prd_api, provider: vultr }
           - { group: prd_soc, provider: vultr }
           - { group: prd_nws, provider: vultr }
@@ -300,7 +288,6 @@ jobs:
       provider: ${{ matrix.provider }}
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -314,7 +301,6 @@ jobs:
       provider: vultr
       serial: 1
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -347,7 +333,6 @@ jobs:
       provider: ${{ matrix.provider }}
       stage: Verify NGINX
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
@@ -361,7 +346,6 @@ jobs:
       matrix:
         include:
           - { hosts: "stg_api:stg_soc:stg_nws:prd_api:prd_soc:prd_nws:ops_swarm_mgr", manager: ops_swarm_mgr, provider: vultr }
-          - { hosts: "ops_backoffice", manager: ops_backoffice, provider: linode }
     uses: ./.github/workflows/ansible--verify-swarm.yml
     with:
       hosts: ${{ matrix.hosts }}
@@ -369,7 +353,6 @@ jobs:
       verbosity: "-v"
       provider: ${{ matrix.provider }}
     secrets:
-      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 

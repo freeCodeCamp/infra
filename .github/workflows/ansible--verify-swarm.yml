@@ -14,21 +14,18 @@ on:
       manager:
         description: 'The host group of the Swarm manager'
         type: string
-        default: 'ops_backoffice'
+        default: 'ops_swarm_mgr'
       verbosity:
         description: 'The verbosity level for logs'
         type: string
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: string
         required: false
-        default: 'linode'
+        default: 'vultr'
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
-        required: true
-      LINODE_TOKEN:
-        description: 'The Linode API token'
         required: true
       VULTR_API_KEY:
         description: 'The Vultr API key'
@@ -58,12 +55,11 @@ on:
           - '-vv'
           - '-vvv'
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: choice
         required: true
         default: 'vultr'
         options:
-          - 'linode'
           - 'vultr'
 
 defaults:
@@ -77,7 +73,6 @@ jobs:
     permissions:
       contents: read
     env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
 
     steps:
@@ -128,13 +123,12 @@ jobs:
             extra_args+=("$VERBOSITY")
           fi
           case "$PROVIDER" in
-            linode) inventory=(-i inventory/linode.yml) ;;
             vultr)
               inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
               export ANSIBLE_HOST_PATTERN_MISMATCH=error
               ;;
             *)
-              echo "::error::provider must be linode or vultr"
+              echo "::error::provider must be vultr"
               exit 1
               ;;
           esac

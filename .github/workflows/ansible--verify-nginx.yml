@@ -29,16 +29,13 @@ on:
         type: string
         default: nginx-verify
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: string
         required: false
-        default: 'linode'
+        default: 'vultr'
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
-        required: true
-      LINODE_TOKEN:
-        description: 'The Linode API token'
         required: true
       VULTR_API_KEY:
         description: 'The Vultr API key'
@@ -68,12 +65,11 @@ on:
         required: false
         default: 80
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: choice
         required: true
         default: 'vultr'
         options:
-          - 'linode'
           - 'vultr'
 
 # The job only needs to read the repo. It holds the SSH key and the Linode
@@ -90,7 +86,6 @@ jobs:
     name: Verify NGINX
     runs-on: ubuntu-latest
     env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       REPORT: ${{ github.workspace }}/nginx-verify.json
 
@@ -145,13 +140,12 @@ jobs:
           fi
 
           case "$PROVIDER" in
-            linode) inventory=(-i inventory/linode.yml) ;;
             vultr)
               inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
               export ANSIBLE_HOST_PATTERN_MISMATCH=error
               ;;
             *)
-              echo "::error::provider must be linode or vultr"
+              echo "::error::provider must be vultr"
               exit 1
               ;;
           esac
