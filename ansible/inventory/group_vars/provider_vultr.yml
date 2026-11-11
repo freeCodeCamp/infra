@@ -1,5 +1,8 @@
 ---
-vultr_vpc_cidr: 10.50.0.0/20
+vultr_private_net_op: ops-vultr-private-network
+vultr_vpc_cidr:
+  "{{ lookup('community.general.onepassword', vultr_private_net_op,
+  field='vpc_cidr', vault='Infra-IaC-ESO', account_id='freecodecamp.1password.com') }}"
 vultr_internet_check_url: http://archive.ubuntu.com/ubuntu/
 vultr_internet_check_delay: 10
 vultr_first_configure_marker: /var/lib/freecodecamp-first-configure
@@ -13,7 +16,9 @@ node_exporter_vpc_cidr: "{{ vultr_vpc_cidr }}"
 node_exporter_systemd_unit_include: "^(cron|docker|fail2ban|fluent-bit|node_exporter|ssh|tailscaled)[.]service"
 
 fluent_bit_ip_allow: "{{ ['localhost', vultr_vpc_cidr] + fluent_bit_ip_allow_extra | default([]) }}"
-fluent_bit_vlagent_host: 10.50.0.5
+fluent_bit_vlagent_host:
+  "{{ lookup('community.general.onepassword', vultr_private_net_op,
+  field='vlagent_host', vault='Infra-IaC-ESO', account_id='freecodecamp.1password.com') }}"
 fluent_bit_vpc_cidr: "{{ vultr_vpc_cidr }}"
 fluent_bit_sender_token_op: o11y-fluent-bit-sender
 fluent_bit_sender_token:

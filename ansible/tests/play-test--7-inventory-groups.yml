@@ -33,7 +33,7 @@
     - name: Assert the o11y hosts get the K3s settings and the others keep the provider units
       ansible.builtin.assert:
         that:
-          - hostvars['ops-vm-o11y-1'].k3s_vpc_cidr == '10.50.0.0/20'
+          - hostvars['ops-vm-o11y-1'].k3s_vpc_cidr == '198.51.100.0/24'
           - hostvars['ops-vm-o11y-1'].node_exporter_systemd_unit_include ==
             '^(cron|docker|fail2ban|fluent-bit|k3s|node_exporter|ssh|tailscaled)[.]service'
           - hostvars['tst-vm-mgr-1'].node_exporter_systemd_unit_include ==

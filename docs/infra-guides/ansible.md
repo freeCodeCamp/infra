@@ -143,6 +143,10 @@ A re-created VM has new addresses. Render the upstream map again, encrypt it, an
 
 Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the VPC address and sends the metrics to `fluent_bit_vlagent_host`. The base play installs this, so a rebuilt VM needs no render for monitoring. To change only the Fluent Bit config, run `play-vultr--fluent-bit.yml -e variable_host=<group>`. The o11y nodes do not send metrics this way (`fluent_bit_push_metrics: false`), because the cluster scrapes them.
 
+### Private network input
+
+The VPC range and the metrics receiver address are not in this repository. `provider_vultr.yml` reads both from the 1Password item `ops-vultr-private-network` in the vault `Infra-IaC-ESO`. The field `vpc_cidr` holds the private range in CIDR form and gives `vultr_vpc_cidr`. The field `vlagent_host` holds the IPv4 address of the receiver and gives `fluent_bit_vlagent_host`. A play that reads either variable on a Vultr host needs `op` signed in to `freecodecamp.1password.com`. The CI tests give `vultr_vpc_cidr` with `-e` and need no `op`.
+
 ### Sender token
 
 Fluent Bit sends logs and metrics to vmauth on port 30427 with a bearer token. vmauth is the only intake on the cluster nodes, so the role refuses a host without the token. The token is the field `credential` of the 1Password item `o11y-fluent-bit-sender` in the vault `Infra-IaC-ESO`. Make it from letters and digits only. All hosts use the same token. The cluster reads the same item through External Secrets. `play-vultr--fluent-bit.yml` and `play-vultr--base.yml` read it with `op`, so sign in to `freecodecamp.1password.com` before you run them. vmauth refuses a wrong token with `401`. Fluent Bit then keeps the metrics and sends them again, but it does not send the logs again. It keeps a copy in `/var/lib/fluent-bit/storage/rejected`, but it does not send that copy. Thus, do not change the token in place. vmauth gets the new token up to about 1 hour later, and then it refuses the logs of each host until the play runs on that host.

@@ -78,7 +78,7 @@ jobs:
       - name: Unit Test the Constructed Inventory Groups
         run: |
           source .venv/bin/activate
-          ansible-playbook --check -i tests/inventory/fixture.yml -i inventory/constructed.yml tests/play-test--7-inventory-groups.yml
+          ansible-playbook --check -i tests/inventory/fixture.yml -i inventory/constructed.yml -e vultr_vpc_cidr=198.51.100.0/24 tests/play-test--7-inventory-groups.yml
 
       - name: Unit Test the Swarm Labels
         run: |
