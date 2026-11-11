@@ -33,6 +33,8 @@ plugins:
   - victoriametrics-logs-datasource@0.33.1
 
 grafana.ini:
+  server:
+    root_url: https://grafana.batfish-ray.ts.net/
   analytics:
     reporting_enabled: false
     check_for_updates: false
