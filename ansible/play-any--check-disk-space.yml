@@ -1,9 +1,6 @@
 ---
 # How much room is left on these hosts, right now?
 #
-#   ansible-playbook -i inventory/linode.yml play-any--check-disk-space.yml \
-#     -e variable_host=prd_oldeworld_api
-#
 # Read-only. It measures, it never frees anything.
 #
 # Tune the grade with extra-vars. Use the JSON form for the fstype list:
@@ -18,8 +15,8 @@
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
   gather_subset:
-    - '!all'
-    - '!min'
+    - "!all"
+    - "!min"
     - hardware
   become: false
   vars:

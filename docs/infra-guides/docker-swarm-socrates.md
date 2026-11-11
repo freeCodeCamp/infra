@@ -63,7 +63,7 @@ docker node update --label-add "socrates.variant=org" <node id>
 
 ## Rate limit ceilings
 
-`svc-redis` is deployed `mode: global` behind the `socrates.enabled` and `socrates.variant` placement constraints, so every node that carries both labels runs its own instance and the rate-limit bucket is per node rather than shared. nginx spreads a caller across all six containers with `least_conn` and no session affinity (`upstream socrates` in `/etc/nginx/configs/upstreams.conf` on the proxies, rendered from `pxy-upstreams-<tier>.yaml.enc` by `ansible/inventory/group_vars/oldeworld_pxy.yml:7`), so the effective per-user ceiling is `PER_USER_LIMIT` multiplied by the node count.
+`svc-redis` is deployed `mode: global` behind the `socrates.enabled` and `socrates.variant` placement constraints, so every node that carries both labels runs its own instance and the rate-limit bucket is per node rather than shared. nginx spreads a caller across all six containers with `least_conn` and no session affinity (`upstream socrates` in `/etc/nginx/configs/upstreams.conf` on the proxies, rendered from `pxy-upstreams-<tier>.yaml.enc` by `ansible/inventory/group_vars/vultr_pxy.yml:7`), so the effective per-user ceiling is `PER_USER_LIMIT` multiplied by the node count.
 
 With three nodes, `PER_USER_LIMIT=10` allows about 30 requests per minute per user, and `GLOBAL_LIMIT=1000` allows about 3000. Divide the configured values by the node count if the intent is a hard number, and re-check them whenever a node is added or removed.
 

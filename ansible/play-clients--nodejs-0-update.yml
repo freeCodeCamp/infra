@@ -1,6 +1,5 @@
 ---
-# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--nodejs-0-update.yml -e variable_host=<group>
-- name: Initialize Oldeworld Cluster - Node.js
+- name: Update Node.js on the client hosts
   hosts: '{{ variable_host | default("null") }}'
   serial: 1
   max_fail_percentage: 0
@@ -46,7 +45,7 @@
         cmd: "{{ nvm_preamble }} && pm2 install pm2-logrotate"
         chdir: /home/freecodecamp
         executable: /bin/bash
-      when: "'\"name\":\"pm2-logrotate\"' not in pm2_jlist.stdout | default('')"
+      when: '''"name":"pm2-logrotate"'' not in pm2_jlist.stdout | default('''')'
 
     - name: Refresh PM2
       ansible.builtin.include_tasks:

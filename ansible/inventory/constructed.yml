@@ -13,26 +13,12 @@ compose:
     if vultr_label | default('') is match('^ops-vm-o11y-[0-9]+$') else not_an_o11y_host"
 
 keyed_groups:
-  - key:
-      "vultr_label | regex_replace('-[0-9]+$', '') | replace('-vm-', '_')
+  - key: "vultr_label | regex_replace('-[0-9]+$', '') | replace('-vm-', '_')
       | replace('-', '_')
       if vultr_label | default('') is match('^[a-z0-9]+-vm-(?!o11y-).+-[0-9]+$') else ''"
     prefix: ""
     separator: ""
-  - key:
-      "vultr_label | regex_replace('-vm-clt-.*$', '_clt')
+  - key: "vultr_label | regex_replace('-vm-clt-.*$', '_clt')
       if vultr_label | default('') is match('^[a-z0-9]+-vm-clt-') else ''"
-    prefix: ""
-    separator: ""
-  - key:
-      "tags | default([]) | select('match', '^(stg|prd)_oldeworld_[a-z]+$')
-      | map('regex_replace', '_oldeworld_', '_') | list"
-    prefix: ""
-    separator: ""
-  - key:
-      "tags | select('in', ['eng', 'chn', 'cnt', 'esp', 'ger', 'ita', 'jpn',
-      'por', 'ukr', 'swa', 'kor', 'ara'])
-      | map('regex_replace', '^', (tags | select('in', ['stg', 'prd']) | first) ~ '_clt_')
-      | list if 'clt' in (tags | default([])) else []"
     prefix: ""
     separator: ""

@@ -36,7 +36,7 @@
           + ([] if verify_config_ok | bool else
              ['nginx -t failed -- the next restart will not come back'])
           + ([] if verify_dropin_ok | bool else
-             ['no restart policy installed -- run play-oldeworld--nginx-3-harden-unit.yml'])
+             ['no restart policy installed -- run play-vultr--nginx.yml'])
         }}
 
 - name: Flag whether this host is an anomaly

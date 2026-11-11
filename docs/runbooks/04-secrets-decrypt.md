@@ -23,7 +23,7 @@ sops decrypt --input-type dotenv --output-type dotenv \
 
 ### 2. YAML envelopes (`*.yaml.enc`)
 
-Examples: `docker/oldeworld/pxy-upstreams-prd.yaml.enc`, `k3s/ops-backoffice-tools/kubeconfig.yaml.enc`.
+Examples: `docker/vultr/pxy-upstreams-prd.yaml.enc`, `k3s/ops-backoffice-tools/kubeconfig.yaml.enc`.
 
 ```bash
 sops decrypt --input-type yaml --output-type yaml \
@@ -80,7 +80,7 @@ Platform-wide envelopes are `<scope>/.env.enc`. Cluster-local envelopes are `k3s
 | `do-primary/.env.enc`                                                       | `k3s/ops-backoffice-tools/.envrc`, `docs/infra-guides/ansible.md` (DigitalOcean plays)  |
 | `docker/oldeworld/oncall.env.enc`                                           | `docs/infra-guides/docker-swarm-oncall.md`                                              |
 | `docker/oldeworld/socrates-{prd,stg}.env.enc`                               | `docs/infra-guides/docker-swarm-socrates.md`                                            |
-| `docker/oldeworld/pxy-upstreams-prd.yaml.enc`                               | `ansible/inventory/group_vars/oldeworld_pxy.yml`                                        |
+| `docker/oldeworld/pxy-upstreams-prd.yaml.enc`                               | None. The Linode proxies are destroyed.                                                 |
 | `docker/vultr/pxy-origin-tls.yaml.enc`, `pxy-upstreams-{stg,prd}.yaml.enc`  | `ansible/inventory/group_vars/vultr_pxy.yml`                                            |
 | `k3s/ops-backoffice-tools/<app>.secrets.env.enc`, `<app>.tls.{crt,key}.enc` | `docs/infra-guides/ops-backoffice-tools.md`                                             |
 | `k3s/<cluster>/kubeconfig.yaml.enc`                                         | `docs/infra-guides/ansible.md` § Kubeconfig From an Envelope                            |

@@ -27,22 +27,9 @@ provider_vultr:
 
 provider_linode:
   hosts:
-    prd-vm-oldeworld-pxy-1:
-      tags: [prd, oldeworld, prd_oldeworld_pxy]
-    prd-vm-oldeworld-clt-eng-0:
-      tags: [prd, oldeworld, prd_oldeworld_clt, clt, eng]
     ops-vm-backoffice:
       tags: [ops, ops_backoffice]
 
-prd_oldeworld_pxy:
-  hosts:
-    prd-vm-oldeworld-pxy-1:
-prd_oldeworld_clt:
-  hosts:
-    prd-vm-oldeworld-clt-eng-0:
-prd_oldeworld_clt_eng:
-  hosts:
-    prd-vm-oldeworld-clt-eng-0:
 ops_backoffice:
   hosts:
     ops-vm-backoffice:

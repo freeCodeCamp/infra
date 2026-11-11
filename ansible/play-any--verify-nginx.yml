@@ -5,9 +5,6 @@
 # else in this fleet, so a missing unit here is a real finding rather than a
 # host that simply does not run it.
 #
-#   ansible-playbook -i inventory/linode.yml play-any--verify-nginx.yml \
-#     -e variable_host=prd_oldeworld_pxy
-#
 # This play MUTATES: it restarts NGINX once on a host where it is down, then
 # rechecks. It reports the host as an anomaly either way, including when the
 # restart worked -- a night that healed itself is something you should see,

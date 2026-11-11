@@ -42,4 +42,4 @@
       ansible.builtin.include_tasks:
         file: tasks/verify-swarm-services.yml
         apply:
-          delegate_to: "{{ groups[variable_manager | default('ops_backoffice')] | first }}"
+          delegate_to: "{{ groups[variable_manager | default('ops_swarm_mgr')] | first }}"

@@ -10,11 +10,11 @@
       tst_mgr: [tst-vm-mgr-1]
       tst_wkr: [tst-vm-wkr-1]
       stg_api: [stg-vm-api-1]
-      prd_pxy: [prd-vm-pxy-2, prd-vm-oldeworld-pxy-1]
+      prd_pxy: [prd-vm-pxy-2]
       prd_soc: [prd-vm-soc-1]
       prd_nws: [prd-vm-nws-1]
-      prd_clt: [prd-vm-clt-eng-0, prd-vm-oldeworld-clt-eng-0]
-      prd_clt_eng: [prd-vm-clt-eng-0, prd-vm-oldeworld-clt-eng-0]
+      prd_clt: [prd-vm-clt-eng-0]
+      prd_clt_eng: [prd-vm-clt-eng-0]
       ops_swarm_mgr: [ops-vm-swarm-mgr-1]
       ops_o11y_vultr: [ops-vm-o11y-1]
       vultr_pxy: [prd-vm-pxy-2]
@@ -29,13 +29,6 @@
       loop: "{{ expected_members | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
-
-    - name: Assert no Vultr host is in an oldeworld group
-      ansible.builtin.assert:
-        that:
-          - "groups | dict2items | selectattr('key', 'search', 'oldeworld')
-            | map(attribute='value') | flatten | intersect(groups['provider_vultr']) | length == 0"
-        fail_msg: A Vultr host is in an oldeworld group
 
     - name: Assert the provider groups do not overlap
       ansible.builtin.assert:
@@ -64,7 +57,7 @@
           - hostvars['prd-vm-clt-eng-0'].node_exporter_systemd_unit_include ==
             '^(cron|docker|fail2ban|fluent-bit|node_exporter|pm2-freecodecamp|ssh|tailscaled)[.]service'
           - hostvars['prd-vm-clt-eng-0'].pm2_app_ports == [50505, 52525]
-          - hostvars['prd-vm-oldeworld-pxy-1'].nginx_org_series is not defined
+          - hostvars['ops-vm-backoffice'].nginx_org_series is not defined
           - hostvars['tst-vm-pxy-1'].pxy_tier is not defined
         fail_msg: The Vultr proxy or client settings are wrong or reach other hosts
 
@@ -75,7 +68,9 @@
         fail_msg: "{{ item.key }}: {{ hostvars[item.key].group_names }}"
         quiet: true
       loop:
-        - {key: ops-vm-backoffice, value: [ops_backoffice, provider_linode]}
-        - {key: ops-vm-o11y-1, value: [ops_o11y_vultr, provider_vultr]}
+        - key: ops-vm-backoffice
+          value: [ops_backoffice, provider_linode]
+        - key: ops-vm-o11y-1
+          value: [ops_o11y_vultr, provider_vultr]
       loop_control:
         label: "{{ item.key }}"

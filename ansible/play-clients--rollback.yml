@@ -1,5 +1,4 @@
 ---
-# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--clients-rollback.yml -e variable_host=<group> -e variable_client_binaries_id=<release>
 - name: Rollback
   hosts: "{{ variable_host | default('null') }}"
   serial: 1

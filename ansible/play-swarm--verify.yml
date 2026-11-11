@@ -9,7 +9,7 @@
       ansible.builtin.include_tasks: tasks/verify-swarm-node.yml
 
 - name: Check the Swarm services
-  hosts: "{{ variable_manager | default('ops_backoffice') }}"
+  hosts: "{{ variable_manager | default('ops_swarm_mgr') }}"
   gather_facts: false
   become: true
   become_user: root

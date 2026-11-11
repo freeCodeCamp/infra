@@ -1,5 +1,4 @@
 ---
-# Usage: ansible-playbook -i inventory/linode.yml play-oldeworld--clients-restart.yml -e variable_host=<group>
 - name: Restart
   hosts: "{{ variable_host | default('null') }}"
   serial: 1
