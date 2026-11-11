@@ -24,12 +24,3 @@ provider_vultr:
       vultr_label: ops-vm-swarm-mgr-1
     ops-vm-o11y-1:
       vultr_label: ops-vm-o11y-1
-
-provider_linode:
-  hosts:
-    ops-vm-backoffice:
-      tags: [ops, ops_backoffice]
-
-ops_backoffice:
-  hosts:
-    ops-vm-backoffice:

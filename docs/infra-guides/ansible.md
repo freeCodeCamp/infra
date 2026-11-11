@@ -4,7 +4,7 @@ The plays in `ansible/` and the commands that replace the `justfile` (removed 20
 
 ## Before You Start
 
-Run the play commands from `ansible/`. Run the former `just` recipes from the repository root. direnv loads the Linode and Vultr tokens and puts `ansible/.venv/bin` on `PATH`, so `ansible-*` commands need no `uv run`.
+Run the play commands from `ansible/`. Run the former `just` recipes from the repository root. direnv loads the Vultr token and puts `ansible/.venv/bin` on `PATH`, so `ansible-*` commands need no `uv run`.
 
 ```bash
 cd ansible
@@ -19,7 +19,6 @@ Each clone and worktree has its own `.venv` and `.ansible/collections`. Run the 
 Show the groups:
 
 ```bash
-ansible-inventory -i inventory/linode.yml --graph
 ansible-inventory -i inventory/digitalocean.yml --graph
 ansible-inventory -i inventory/vultr.yml -i inventory/constructed.yml --graph
 ```
@@ -45,8 +44,6 @@ The command form:
 ```bash
 ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml <play> -e variable_host=<group> [-e <input>=<value>]
 ```
-
-For the Linode host `ops-vm-backoffice` (group `ops_backoffice`), use `-i inventory/linode.yml` in place of `-i inventory/vultr.yml -i inventory/constructed.yml`.
 
 ## Host Plays
 
@@ -84,7 +81,7 @@ Run these on the Swarm node groups. The role `docker` applies the same guard to 
 | `play-swarm--verify.yml`         | Check that each node is active with no stray overlay device. Then check the services from the manager.                                              | No            | `variable_service_prefix`, `variable_manager`, `variable_swarm_retries` |
 | `play-swarm--upgrade-docker.yml` | Upgrade the held Docker packages on one node at a time, hold them again, and run the same checks after each node. This restarts Docker on the node. | Yes           | `variable_service_prefix`, `variable_manager`, `variable_swarm_retries` |
 
-The default of `variable_manager` is `ops_swarm_mgr`. For the Swarm on `ops-vm-backoffice`, use the Linode inventory and give `-e variable_manager=ops_backoffice`.
+The default of `variable_manager` is `ops_swarm_mgr`.
 
 `play-any--update.yml` does not upgrade held packages. To upgrade Docker, run `play-swarm--upgrade-docker.yml`. Start with a staging group:
 
