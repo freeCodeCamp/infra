@@ -45,7 +45,7 @@
     - name: Add each staging host with a fake VPC address, one host left out
       ansible.builtin.add_host:
         name: "{{ item }}"
-        maps_vpc_ip: "10.50.1.{{ index + 1 }}"
+        maps_vpc_ip: "198.51.100.{{ index + 1 }}"
       loop: "{{ vultr_maps_names | difference([test_absent]) }}"
       loop_control:
         index_var: index
@@ -63,7 +63,7 @@
     - name: Add the host that was left out
       ansible.builtin.add_host:
         name: "{{ test_absent }}"
-        maps_vpc_ip: 10.50.1.200
+        maps_vpc_ip: 198.51.100.200
 
     - name: Refuse an unknown output
       ansible.builtin.include_tasks: vultr-maps-refused.yml
