@@ -34,7 +34,7 @@ k3s/
 
 Retired Universe chart trees (zot, woodpecker, the Universe Argo CD) are tracked in [`retired-stacks.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/architecture/retired-stacks.md).
 
-______________________________________________________________________
+---
 
 ## DigitalOcean Resources
 
@@ -50,7 +50,7 @@ ______________________________________________________________________
 | --------------------- | ---------- | --------------------------------- |
 | ops-lb-tools-k3s-nyc3 | tools_k3s  | 80→30080, 443→30443 (passthrough) |
 
-______________________________________________________________________
+---
 
 ## Ansible Deployment
 
@@ -59,13 +59,13 @@ ______________________________________________________________________
 cd ansible && ansible-playbook -i inventory/digitalocean.yml play-k3s--longhorn.yml -e variable_host=tools_k3s
 ```
 
-______________________________________________________________________
+---
 
 ## Tailscale Network
 
 Tailscale on nodes for SSH/kubectl access. See [`tailscale.md`](./tailscale.md) for device inventory.
 
-______________________________________________________________________
+---
 
 ## Storage
 
@@ -75,22 +75,24 @@ ______________________________________________________________________
 
 Longhorn replicas and backups: [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#storage).
 
-______________________________________________________________________
+---
 
 ## DNS (Cloudflare)
 
-| Record                    | Type | Value             | SSL Mode      |
-| ------------------------- | ---- | ----------------- | ------------- |
-| appsmith.freecodecamp.net | A    | tools LB (legacy) | Full (Strict) |
-| outline.freecodecamp.net  | A    | tools LB (legacy) | Full (Strict) |
+| Record                | Type | Value             | SSL Mode      |
+| --------------------- | ---- | ----------------- | ------------- |
+| `<appsmith-hostname>` | A    | tools LB (legacy) | Full (Strict) |
+| `<outline-hostname>`  | A    | tools LB (legacy) | Full (Strict) |
 
-______________________________________________________________________
+The hostnames are in the Cloudflare DNS dashboard. This guide does not list them.
+
+---
 
 ## Update Apps
 
 On ops-backoffice-tools, use the deployment pattern in [`ops-backoffice-tools.md`](./ops-backoffice-tools.md#deployment-pattern).
 
-______________________________________________________________________
+---
 
 ## Architecture
 
@@ -114,7 +116,7 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 | Appsmith | 1        | 10Gi        | Embedded           |
 | Outline  | 1        | 10Gi + 10Gi | PostgreSQL sidecar |
 
-______________________________________________________________________
+---
 
 ## Playbooks Reference
 

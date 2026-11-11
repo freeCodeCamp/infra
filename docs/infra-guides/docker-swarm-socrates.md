@@ -50,14 +50,7 @@ Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS
 
 ## Node Labels
 
-Nodes running Socrates services require specific labels. Run these commands against the manager:
-
-```shell
-docker node update --label-add "socrates.enabled=true" <node id>
-docker node update --label-add "socrates.variant=dev" <node id>
-# or
-docker node update --label-add "socrates.variant=org" <node id>
-```
+`ansible/play-swarm--form.yml` sets the node labels `socrates.enabled` and `socrates.variant` (`dev` or `org`). See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment).
 
 ## Rate limit ceilings
 
