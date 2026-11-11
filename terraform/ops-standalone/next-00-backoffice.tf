@@ -123,32 +123,6 @@ resource "linode_firewall" "ops_backoffice_firewall" {
     ipv6     = ["::/0"]
   }
 
-  inbound {
-    label    = "allow-all-tcp-jms"
-    ports    = "1-65535"
-    protocol = "TCP"
-    action   = "ACCEPT"
-    ipv4 = flatten([
-      [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.prd_oldeworld_jms.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.stg_oldeworld_api.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.prd_oldeworld_api.instances : "${i.private_ip_address}/32"],
-    ])
-  }
-
-  inbound {
-    label    = "allow-all-udp-jms"
-    ports    = "1-65535"
-    protocol = "UDP"
-    action   = "ACCEPT"
-    ipv4 = flatten([
-      [for i in data.linode_instances.stg_oldeworld_jms.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.prd_oldeworld_jms.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.stg_oldeworld_api.instances : "${i.private_ip_address}/32"],
-      [for i in data.linode_instances.prd_oldeworld_api.instances : "${i.private_ip_address}/32"],
-    ])
-  }
-
   # outbound { }
 
   inbound_policy  = "DROP"
