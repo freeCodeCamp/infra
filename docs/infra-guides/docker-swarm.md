@@ -12,6 +12,18 @@ On a new machine, create the Docker context once:
 docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
 ```
 
+### Deploy Branches
+
+The deploy workflows (`deploy-api.yml` and `deploy-client.yml` in `freeCodeCamp/freeCodeCamp`, `deploy-api.yml` in `freeCodeCamp/socrates`) deploy `prod-current` to production and every other branch to staging. Each GitHub environment accepts only these branches:
+
+| Environment                              | Branches                   |
+| ---------------------------------------- | -------------------------- |
+| `stg-api`, `stg-clients`, `stg-socrates` | `prod-staging`, `main`     |
+| `prd-api`, `prd-socrates`                | `prod-current`             |
+| `prd-clients`                            | `prod-current`, `hotfix-*` |
+
+A `hotfix-*` branch cannot deploy to staging. To test a hotfix on staging, merge it to `prod-staging` first. Then merge it to `prod-current` and deploy production.
+
 ### Node Labels
 
 The stack files use the node labels in their placement constraints. The play makes the labels from the host name `<env>-vm-<role>-<n>` (`ansible/vars/swarm.yml`).
