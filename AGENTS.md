@@ -32,7 +32,7 @@ When a change alters an operator step, update its runbook or guide in the same c
 - Use `tofu -chdir=<dir>` for the Vultr dirs (`terraform/vultr-base`, `terraform/*-vultr`). The Vultr state is encrypted with `TF_VAR_state_passphrase`.
 - Give `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` on each `kubectl` and `helm` call, so a runbook line pastes into a bare shell.
 - Ansible plays, inventories, inputs and setup are in `docs/infra-guides/ansible.md`. Write `ansible-playbook <play>.yml` with no `uv run` prefix. In a play, reference group variables (`ansible/inventory/group_vars/<group>.yml`), not literal values.
-- A PR to `main` needs these checks to pass: `Ansible CI Test`, `K8s -- Manifest Validation`, `OpenTofu` and `Workflow Lint`. They run on every PR.
+- A PR to `main` needs these checks to pass: `Ansible CI Test`, `K8s -- Manifest Validation`, `Leak Check`, `OpenTofu` and `Workflow Lint`. They run on every PR.
 
 ## Clusters
 
