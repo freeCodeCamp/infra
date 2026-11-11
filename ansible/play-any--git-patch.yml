@@ -1,8 +1,4 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-any--git-patch.yml \
-#     -e variable_host=<group> -e variable_patch_file=<name> -e variable_repo_dir=<path> \
-#     [-e variable_followup_script=<name> [-e variable_followup_force=true]]
 - name: Apply a patch to a Git Repository
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: false
