@@ -9,8 +9,9 @@ spec:
   remoteWrite:
     - url: http://vlsingle-vlogs-a.o11y.svc:9428/internal/insert
     - url: http://vlsingle-vlogs-b.o11y.svc:9428/internal/insert
+    - url: http://vlsingle-vlogs-c.o11y.svc:9428/internal/insert
   remoteWriteSettings:
-    maxDiskUsagePerURL: 4GiB
+    maxDiskUsagePerURL: 3GiB
   storage:
     volumeClaimTemplate:
       spec:

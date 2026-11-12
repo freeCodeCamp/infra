@@ -18,6 +18,8 @@ CronJobs in the namespace `o11y` copy data to the R2 bucket `ops-o11y-backups` e
 
 The bucket holds the metrics of the last night in `vmstorage/`. On Sunday each CronJob also makes a dated copy in `vmstorage-weekly/`. An R2 lifecycle rule must remove dated copies after 35 days: vmbackup does not prune. The operator makes this rule in Cloudflare on the bucket `ops-o11y-backups`, with the prefix `vmstorage-weekly/` and an expiry of 35 days. Without the rule, the dated copies stay. Do not put the rule on `vmstorage/`. The logs copy holds each daily partition until it is 15 days old. The Secret `o11y-r2-backups` comes from the 1Password item `o11y-r2-backups`.
 
+The 3 log stores `vlogs-a`, `vlogs-b` and `vlogs-c` run one on each o11y VM. `vlagent` writes each log to all 3, so each store is a full copy. Only `vlogs-a` is backed up. A restore of `vlogs-b` or `vlogs-c` uses this backup of `vlogs-a`.
+
 To start a backup now:
 
 ```sh
@@ -139,7 +141,7 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y scale deployment vlsingle-vlogs-a --replicas=0
    ```
 
-1. Run the restore once for each lost disk. The label is `restore-disk=<disk>`, where `<disk>` is `vmstorage-vm-0`, `vmstorage-vm-1`, `vmstorage-vm-2`, `vlogs-a` or `vlogs-b`:
+1. Run the restore once for each lost disk. The label is `restore-disk=<disk>`, where `<disk>` is `vmstorage-vm-0`, `vmstorage-vm-1`, `vmstorage-vm-2`, `vlogs-a`, `vlogs-b` or `vlogs-c`:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y apply -l restore-disk=vmstorage-vm-0 -f k3s/ops-o11y-vultr/tools/restore.yaml
@@ -176,6 +178,102 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch cronjob vmbackup-vmstorage-vm-0 --type merge -p '{"spec":{"suspend":false}}'
+   ```
+
+1. Start the Argo CD sync again. The root application restores the sync of the other applications:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd patch application root --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+   ```
+
+## Seed a new log store
+
+Use this when `vlogs-c` starts for the first time. It copies the history of `vlogs-a` from R2 to the new store. It uses the same restore Job as a restore after a loss. The nightly backup is not stopped: it reads `vlogs-a` only, and this procedure writes to `vlogs-c` only.
+
+`vlagent` holds the logs for `vlogs-c` on its disk while `vlogs-c` is down, and sends them when it is back. The history of `vlogs-c` has a gap from the time of the backup to the time that `vlagent` began to hold logs for it. Logs that arrive in this gap are in `vlogs-a` and `vlogs-b`. `vmauth` reads `vlogs-a` first, so the gap shows only when `vlogs-a` and `vlogs-b` are down. To make the gap short, do step 1.
+
+1. Before you merge the change that adds `vlogs-c`, start a backup, and wait for it to complete:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y create job --from=cronjob/vlogs-backup vlogs-backup-manual
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=condition=Complete --timeout=3h job/vlogs-backup-manual
+   ```
+
+   Make sure that `vlogs-a` and `vlogs-b` are `Running` before you merge. A store that restarts during the merge can let `vlogs-c` take its VM:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l 'app.kubernetes.io/instance in (vlogs-a,vlogs-b)' -o wide
+   ```
+
+1. Merge the change. Argo CD creates `vlogs-c`. Wait until the pod is `Running` on `ops-vm-o11y-2`. The first start makes the disk on that VM:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l app.kubernetes.io/instance=vlogs-c -o wide
+   ```
+
+1. Stop the Argo CD sync, so that it does not undo the next steps:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd patch application root --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd patch application victoria-logs --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+   ```
+
+1. Stop `vlogs-c`:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch vlsingle vlogs-c --type merge -p '{"spec":{"paused":true}}'
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y scale deployment vlsingle-vlogs-c --replicas=0
+   ```
+
+   Wait until the pod is gone, so that it does not write to the disk during the restore:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=delete pod -l app.kubernetes.io/instance=vlogs-c --timeout=5m
+   ```
+
+1. Run the restore. The restore makes the partitions of `vlogs-c` the same as the backup. It removes logs that `vlogs-c` took before step 4 and that are not in the backup. This wait does not end if the Job fails, so examine the Job in a second terminal:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y apply -l restore-disk=vlogs-c -f k3s/ops-o11y-vultr/tools/restore.yaml
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y wait --for=condition=Complete --timeout=4h -l restore-disk=vlogs-c job
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get job -l restore-disk=vlogs-c -w
+   ```
+
+1. Start `vlogs-c` again. Set `paused` to `false`, and set the replicas back to `1`:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch vlsingle vlogs-c --type merge -p '{"spec":{"paused":false}}'
+   ```
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y scale deployment vlsingle-vlogs-c --replicas=1
+   ```
+
+1. Delete the restore Job:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y delete job -l restore-disk=vlogs-c
+   ```
+
+1. Read the row count of `vlogs-c`, and compare it with `vlogs-a`. The count of `vlogs-c` must be more than 0 and near the count of `vlogs-a`. Read the pod names with `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -o wide`:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get --raw /api/v1/namespaces/o11y/pods/<VLSingle pod>:9428/proxy/metrics | grep '^vl_storage_rows'
    ```
 
 1. Start the Argo CD sync again. The root application restores the sync of the other applications:

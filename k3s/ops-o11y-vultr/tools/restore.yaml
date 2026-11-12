@@ -229,3 +229,53 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: vlsingle-vlogs-b
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: restore-vlogs-c
+  labels:
+    restore-disk: vlogs-c
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: rclone
+          image: rclone/rclone:1.75.2
+          args:
+            - sync
+            - r2:ops-o11y-backups/vlogs
+            - /victoria-logs-data/partitions
+          env:
+            - name: RCLONE_CONFIG_R2_TYPE
+              value: s3
+            - name: RCLONE_CONFIG_R2_PROVIDER
+              value: Cloudflare
+            - name: RCLONE_CONFIG_R2_REGION
+              value: auto
+            - name: RCLONE_S3_NO_CHECK_BUCKET
+              value: "true"
+            - name: RCLONE_CONFIG_R2_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: o11y-r2-backups
+                  key: access_key_id
+            - name: RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: o11y-r2-backups
+                  key: secret_access_key
+            - name: RCLONE_CONFIG_R2_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: o11y-r2-backups
+                  key: endpoint
+          volumeMounts:
+            - name: data
+              mountPath: /victoria-logs-data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vlsingle-vlogs-c

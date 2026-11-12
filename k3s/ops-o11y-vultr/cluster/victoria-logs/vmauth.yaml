@@ -56,6 +56,7 @@ spec:
         urls:
           - http://vlsingle-vlogs-a.o11y.svc:9428
           - http://vlsingle-vlogs-b.o11y.svc:9428
+          - http://vlsingle-vlogs-c.o11y.svc:9428
       paths:
         - /select/logsql/.*
         - /select/vmui.*
