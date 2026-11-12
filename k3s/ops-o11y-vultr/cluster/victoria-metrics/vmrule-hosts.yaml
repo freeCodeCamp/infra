@@ -73,7 +73,7 @@ spec:
       interval: 1m
       rules:
         - alert: TargetDown
-          expr: up{job!="node"} == 0
+          expr: up{job!="node",job!~"vlsingle-vlogs-[abc]"} == 0
           for: 5m
           labels:
             severity: warning
@@ -157,6 +157,44 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#fluentbitbufferbacklog"
+    - name: victoria-logs
+      interval: 1m
+      rules:
+        - alert: LogStoreDown
+          expr: |
+            up{job=~"vlsingle-vlogs-[abc]"} == 0
+            or absent(up{job="vlsingle-vlogs-a"})
+            or absent(up{job="vlsingle-vlogs-b"})
+            or absent(up{job="vlsingle-vlogs-c"})
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Log store {{ $labels.job }} is down."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#logstoredown"
+        - alert: LogStoreStale
+          expr: sum by (job) (rate(vl_rows_ingested_total{job=~"vlsingle-vlogs-[abc]"}[10m])) == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Log store {{ $labels.job }} is up but takes no new logs."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#logstorestale"
+        - alert: VlagentDroppedData
+          expr: |
+            increase(vlagent_remotewrite_packets_dropped_total[15m]) > 0
+            or increase(vm_persistentqueue_blocks_dropped_total{job="o11y/vlagent-vlagent"}[15m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Log agent {{ $labels.pod }} dropped log data."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#vlagentdroppeddata"
     - name: argocd
       interval: 1m
       rules:

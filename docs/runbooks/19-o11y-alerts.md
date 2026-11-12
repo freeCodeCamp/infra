@@ -198,7 +198,7 @@ No Vultr host has sent metrics for 2 minutes, for 5 minutes. HostDown and NginxV
 
 ## TargetDown
 
-A scrape target that is not a host, such as a cluster component or an exporter, is down for 5 minutes.
+A scrape target that is not a host, such as a cluster component or an exporter, is down for 5 minutes. The VictoriaLogs stores have their own alert, [LogStoreDown](#logstoredown).
 
 1. Find the pod of the target. Use the `job` and `instance` labels of the alert:
 
@@ -242,10 +242,10 @@ A vmalert pod failed to run one or more of its rules in each 10 minutes, for 5 m
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs <pod> -c vmalert --tail=100
    ```
 
-1. If the log rules fail, make sure that the VictoriaLogs pod that they read runs:
+1. If the log rules fail, make sure that a VictoriaLogs pod runs. The rules read the service `vlogs-any`, which uses each ready store:
 
    ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l app.kubernetes.io/instance=vlogs-a
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l o11y.freecodecamp.org/component=vlogs
    ```
 
 1. If a rule expression is wrong, correct the rule in git. Argo CD syncs the fix.
@@ -327,6 +327,64 @@ An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minut
    ```
 
 1. A connection error shows a fault in the VPC network or the node. An HTTP 5xx status shows a fault in vmauth or the log agent. Examine the vmauth log for the request: `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l o11y.freecodecamp.org/component=vmauth --tail=100`. An HTTP 401 status on metrics shows a wrong sender token; see [Sender token](../infra-guides/ansible.md#sender-token).
+
+## LogStoreDown
+
+A VictoriaLogs store (`vlogs-a`, `vlogs-b` or `vlogs-c`) is not up, or has no scrape target at all, for 5 minutes. The `job` label names it. A lost node removes the target, so the alert also fires when the series is missing. The log agent writes each log to all three stores, and log reads and the log rules use any store that is ready. So one store down loses no data. `VmalertExecutionErrors` may fire once while the pod is still in the service, before the node is marked not ready. A second store down leaves no spare. The agent keeps the data for the down store on its disk, up to 3GiB for each store, and sends it when the store returns. A store that returns is ready at once, but it is behind until the agent sends the backlog, so a log alert may miss events in that time.
+
+1. Find the pod of the store. Use the `job` label of the alert:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get pods -l o11y.freecodecamp.org/component=vlogs -o wide
+   ```
+
+1. Examine the events and the log of the pod that is not ready:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y describe pod <pod>
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs <pod> --tail=100
+   ```
+
+1. If the node or the disk is the cause, see [DiskSpaceLow](#diskspacelow) and [HostDown](#hostdown). If the data is lost, see [21-o11y-backup-restore.md](21-o11y-backup-restore.md).
+1. If the store is down for a long time, the buffer of its output can fill. See [VlagentDroppedData](#vlagentdroppeddata).
+
+## LogStoreStale
+
+A VictoriaLogs store is up but has taken no new logs for 10 minutes. The `job` label names it. The store answers queries, so it stays in the service `vlogs-any`. But a query that reaches it returns few or no recent rows, and a log alert that reads it can miss events. The other two stores keep the data.
+
+1. Look for send errors to that store in the log of the log agent:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l o11y.freecodecamp.org/component=vlagent --tail=100
+   ```
+
+1. Examine the log of the store pod:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs deploy/<job> --tail=100
+   ```
+
+1. If the store is full or its disk is read only, see [DiskSpaceLow](#diskspacelow). If the store hangs, delete its pod so that it starts again. The agent sends the backlog when the store accepts data.
+1. If all three stores are stale, the log agent or the senders are the cause. See [FluentBitBufferBacklog](#fluentbitbufferbacklog).
+
+## VlagentDroppedData
+
+A log agent pod dropped log data in the last 15 minutes. The rule has no `for`: it fires at the first evaluation that sees a drop, and it stays on for 15 minutes after the last drop. The `pod` label names the agent. Two counters can fire it:
+
+- `vlagent_remotewrite_packets_dropped_total` counts blocks that a store refused with an HTTP 400 or 404 status. The agent does not send them again. The `url` label starts with the number of the output.
+- `vm_persistentqueue_blocks_dropped_total` counts blocks that the agent removed because the disk buffer of an output is full (3GiB). The agent removes the oldest data first. The `name` label starts with the number of the output.
+
+The number is the order of `remoteWrite` in `vlagent.yaml`: `1` is `vlogs-a`, `2` is `vlogs-b`, `3` is `vlogs-c`. The other two stores still hold the data that one store lost.
+
+1. Find the reason in the log of the pod. Use the `pod` label of the alert:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs <pod> --tail=100
+   ```
+
+1. If the store of the output is down or stale, do the steps in [LogStoreDown](#logstoredown) or [LogStoreStale](#logstorestale). A full buffer means that the store did not take data for a long time.
+1. If the store is ready and refuses the data, read the status in the log of the agent and the log of the store.
+1. Read the lost period from the other two stores. Through `vlogs-any`, a query can reach the store that lost it, so the result can have a gap.
 
 ## ArgoCDAppUnhealthy
 

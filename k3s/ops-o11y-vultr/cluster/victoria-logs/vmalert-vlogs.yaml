@@ -11,7 +11,7 @@ spec:
     matchLabels:
       o11y.freecodecamp.org/datasource: vlogs
   datasource:
-    url: http://vlsingle-vlogs-a.o11y.svc:9428
+    url: http://vlogs-any.o11y.svc:9428
   remoteWrite:
     url: http://vminsert-vm.o11y.svc.cluster.local.:8480/insert/0/prometheus
   remoteRead:
