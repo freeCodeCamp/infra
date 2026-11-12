@@ -32,6 +32,7 @@ When a change alters an operator step, update its runbook or guide in the same c
 - Use `tofu -chdir=<dir>` for the Vultr dirs (`terraform/vultr-base`, `terraform/*-vultr`). The Vultr state is encrypted with `TF_VAR_state_passphrase`.
 - Give `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml` on each `kubectl` and `helm` call, so a runbook line pastes into a bare shell.
 - Ansible plays, inventories, inputs and setup are in `docs/infra-guides/ansible.md`. Write `ansible-playbook <play>.yml` with no `uv run` prefix. In a play, reference group variables (`ansible/inventory/group_vars/<group>.yml`), not literal values.
+- Cloudflare DNS: the `.net` zone is OpenTofu in the private `terraform-cloudflare` repo. The `.org` and `.dev` zones are set in the Cloudflare dashboard, except the proxied origin records in `terraform-cloudflare/cf-origin-records`. Do not add a `.org` or `.dev` record to code.
 - A PR to `main` needs these checks to pass: `Ansible CI Test`, `K8s -- Manifest Validation`, `Leak Check`, `OpenTofu` and `Workflow Lint`. They run on every PR.
 
 ## Clusters
