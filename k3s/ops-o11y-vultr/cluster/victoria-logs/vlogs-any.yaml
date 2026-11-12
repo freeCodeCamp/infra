@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vlogs-any
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: vlsingle
+    o11y.freecodecamp.org/component: vlogs
+  ports:
+    - name: http
+      port: 9428
+      targetPort: http
+      protocol: TCP
