@@ -4,6 +4,7 @@ metadata:
   name: vmbackup-vmstorage-vm-0
 spec:
   schedule: "0 1 * * *"
+  startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
@@ -17,11 +18,18 @@ spec:
           containers:
             - name: vmbackup
               image: victoriametrics/vmbackup:v1.154.0
+              command:
+                - /bin/sh
+                - -c
               args:
-                - -storageDataPath=/vm-data
-                - -snapshot.createURL=http://vmstorage-vm-0.vmstorage-vm.o11y.svc:8482/snapshot/create
-                - -dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-0
-                - -customS3Endpoint=$(R2_ENDPOINT)
+                - |
+                  set -eu
+                  dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-0
+                  url=http://vmstorage-vm-0.vmstorage-vm.o11y.svc:8482/snapshot/create
+                  /vmbackup-prod -storageDataPath=/vm-data -snapshot.createURL="$url" -dst="$dst" -customS3Endpoint="$R2_ENDPOINT"
+                  if [ "$(date +%u)" = 7 ]; then
+                    /vmbackup-prod -storageDataPath=/vm-data -snapshot.createURL="$url" -dst="s3://ops-o11y-backups/vmstorage-weekly/$(date +%G-W%V)/vmstorage-vm-0" -origin="$dst" -customS3Endpoint="$R2_ENDPOINT"
+                  fi
               env:
                 - name: AWS_REGION
                   value: auto
@@ -67,6 +75,7 @@ metadata:
   name: vmbackup-vmstorage-vm-1
 spec:
   schedule: "30 1 * * *"
+  startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
@@ -80,11 +89,18 @@ spec:
           containers:
             - name: vmbackup
               image: victoriametrics/vmbackup:v1.154.0
+              command:
+                - /bin/sh
+                - -c
               args:
-                - -storageDataPath=/vm-data
-                - -snapshot.createURL=http://vmstorage-vm-1.vmstorage-vm.o11y.svc:8482/snapshot/create
-                - -dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-1
-                - -customS3Endpoint=$(R2_ENDPOINT)
+                - |
+                  set -eu
+                  dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-1
+                  url=http://vmstorage-vm-1.vmstorage-vm.o11y.svc:8482/snapshot/create
+                  /vmbackup-prod -storageDataPath=/vm-data -snapshot.createURL="$url" -dst="$dst" -customS3Endpoint="$R2_ENDPOINT"
+                  if [ "$(date +%u)" = 7 ]; then
+                    /vmbackup-prod -storageDataPath=/vm-data -snapshot.createURL="$url" -dst="s3://ops-o11y-backups/vmstorage-weekly/$(date +%G-W%V)/vmstorage-vm-1" -origin="$dst" -customS3Endpoint="$R2_ENDPOINT"
+                  fi
               env:
                 - name: AWS_REGION
                   value: auto
@@ -130,6 +146,7 @@ metadata:
   name: vmbackup-vmstorage-vm-2
 spec:
   schedule: "0 2 * * *"
+  startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
@@ -143,11 +160,18 @@ spec:
           containers:
             - name: vmbackup
               image: victoriametrics/vmbackup:v1.154.0
+              command:
+                - /bin/sh
+                - -c
               args:
-                - -storageDataPath=/vm-data
-                - -snapshot.createURL=http://vmstorage-vm-2.vmstorage-vm.o11y.svc:8482/snapshot/create
-                - -dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-2
-                - -customS3Endpoint=$(R2_ENDPOINT)
+                - |
+                  set -eu
+                  dst=s3://ops-o11y-backups/vmstorage/vmstorage-vm-2
+                  url=http://vmstorage-vm-2.vmstorage-vm.o11y.svc:8482/snapshot/create
+                  /vmbackup-prod -storageDataPath=/vm-data -snapshot.createURL="$url" -dst="$dst" -customS3Endpoint="$R2_ENDPOINT"
+                  if [ "$(date +%u)" = 7 ]; then
+                    /vmbackup-prod -storageDataPath=/vm-data -snapshot.createURL="$url" -dst="s3://ops-o11y-backups/vmstorage-weekly/$(date +%G-W%V)/vmstorage-vm-2" -origin="$dst" -customS3Endpoint="$R2_ENDPOINT"
+                  fi
               env:
                 - name: AWS_REGION
                   value: auto

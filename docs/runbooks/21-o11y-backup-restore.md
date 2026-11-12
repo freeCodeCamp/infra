@@ -1,6 +1,6 @@
 # 21 — o11y backup and restore (ops-o11y-vultr)
 
-**Audience:** operator. **Trigger:** the alert `O11yBackupStale` fires, the metrics or logs disks are lost, or you practise a restore.
+**Audience:** operator. **Trigger:** the alert `O11yBackupStale` or `O11yBackupFailed` fires, the metrics or logs disks are lost, the K3s control plane is lost, or you practise a restore.
 
 Run every command from the repo root.
 
@@ -8,14 +8,15 @@ Run every command from the repo root.
 
 CronJobs in the namespace `o11y` copy data to the R2 bucket `ops-o11y-backups` each night:
 
-| CronJob                   | Time (UTC) | Source                   | Destination                 |
-| ------------------------- | ---------- | ------------------------ | --------------------------- |
-| `vmbackup-vmstorage-vm-0` | 01:00      | disk of `vmstorage-vm-0` | `vmstorage/vmstorage-vm-0/` |
-| `vmbackup-vmstorage-vm-1` | 01:30      | disk of `vmstorage-vm-1` | `vmstorage/vmstorage-vm-1/` |
-| `vmbackup-vmstorage-vm-2` | 02:00      | disk of `vmstorage-vm-2` | `vmstorage/vmstorage-vm-2/` |
-| `vlogs-backup`            | 02:30      | disk of `vlogs-a`        | `vlogs/<YYYYMMDD>/`         |
+| CronJob                   | Time (UTC)                 | Source                   | Destination                                     |
+| ------------------------- | -------------------------- | ------------------------ | ----------------------------------------------- |
+| `vmbackup-vmstorage-vm-0` | 01:00, and the Sunday copy | disk of `vmstorage-vm-0` | `vmstorage/vmstorage-vm-0/`                     |
+| `vmbackup-vmstorage-vm-1` | 01:30, and the Sunday copy | disk of `vmstorage-vm-1` | `vmstorage/vmstorage-vm-1/`                     |
+| `vmbackup-vmstorage-vm-2` | 02:00, and the Sunday copy | disk of `vmstorage-vm-2` | `vmstorage/vmstorage-vm-2/`                     |
+| the same 3 CronJobs       | Sunday                     | same disks               | `vmstorage-weekly/<YYYY>-W<WW>/vmstorage-vm-N/` |
+| `vlogs-backup`            | 02:30                      | disk of `vlogs-a`        | `vlogs/<YYYYMMDD>/`                             |
 
-The bucket holds one copy of the metrics, the state of the last night. The logs copy holds each daily partition until it is 15 days old. The Secret `o11y-r2-backups` comes from the 1Password item `o11y-r2-backups`.
+The bucket holds the metrics of the last night in `vmstorage/`. On Sunday each CronJob also makes a dated copy in `vmstorage-weekly/`. An R2 lifecycle rule must remove dated copies after 35 days: vmbackup does not prune. The operator makes this rule in Cloudflare on the bucket `ops-o11y-backups`, with the prefix `vmstorage-weekly/` and an expiry of 35 days. Without the rule, the dated copies stay. Do not put the rule on `vmstorage/`. The logs copy holds each daily partition until it is 15 days old. The Secret `o11y-r2-backups` comes from the 1Password item `o11y-r2-backups`.
 
 To start a backup now:
 
@@ -60,6 +61,8 @@ The practice uses new disks and new pods. It does not touch the running data. Th
 Restore only the lost disks. A restore rolls a disk back to its last backup, so a healthy disk loses newer samples.
 
 > **Danger.** A backup makes the bucket match its disk. If a backup runs on a new, empty disk, it deletes the only copy of that disk. Stop the backups (step 2) before you delete a disk.
+
+To restore an older copy, set `-src` in the restore Job to `s3://ops-o11y-backups/vmstorage-weekly/<YYYY>-W<WW>/vmstorage-vm-N`. Use it if the last nightly copy is empty or corrupt.
 
 A disk is on its VM, so a lost disk usually means a lost VM. If a VM is lost, do steps 1 and 2 before it joins the cluster again, and delete each Pending backup Job of that disk. Otherwise a backup can run on the new, empty disk.
 
@@ -181,6 +184,73 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd patch application root --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
    ```
 
+## Restore etcd
+
+Use this only if the K3s control plane is lost or its data is bad. K3s keeps a snapshot of etcd every 6 hours in the R2 bucket `ops-o11y-etcd` (settings: `ansible/inventory/group_vars/ops_o11y_vultr.yml`). A restore rolls the cluster state back to the time of the snapshot. Source: [K3s etcd-snapshot](https://docs.k3s.io/cli/etcd-snapshot).
+
+> **Not drilled.** Nobody has run this procedure on this cluster. The steps come from the K3s documentation. Do a drill before you need it.
+
+Prerequisites:
+
+- The server token from the first server (`/var/lib/rancher/k3s/server/token`). The cluster uses secrets encryption, so K3s does not start with a different token.
+- The R2 endpoint, key and secret from the 1Password item `R2-User-Token-Infra-O11y-etcd`. You need them to list the bucket, and for a new host.
+
+1. Find the name of the snapshot to restore. Pick the newest good one. Its name starts `etcd-snapshot-<node>-`. If the API still runs, read the names from the cluster, or from a server:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get etcdsnapshotfile
+   ```
+
+   ```sh
+   sudo k3s etcd-snapshot ls
+   ```
+
+   If the API is down, `k3s etcd-snapshot ls` does not work. Read the object list of the R2 bucket `ops-o11y-etcd` in the Cloudflare dashboard, or list the bucket with an S3 client and the etcd key.
+
+1. Stop K3s on all 3 servers:
+
+   ```sh
+   sudo systemctl stop k3s
+   ```
+
+1. On the first server (`ops-vm-o11y-1`), reset the cluster from the snapshot. Give only the snapshot file name, not a path. Replace the value in `<>`:
+
+   ```sh
+   sudo k3s server --cluster-reset --cluster-reset-restore-path=<snapshot-file-name>
+   ```
+
+   K3s reads the S3 settings from its config, which includes the files in `/etc/rancher/k3s/config.yaml.d/`.
+
+   For a new host that does not have the file `/etc/rancher/k3s/config.yaml.d/etcd-s3.yaml`, give the S3 settings as flags. First make sure that your K3s version accepts them with `sudo k3s server --help | grep etcd-s3`. Replace the values in `<>`:
+
+   ```sh
+   sudo k3s server --cluster-reset --cluster-reset-restore-path=<snapshot-file-name> --etcd-s3 --etcd-s3-endpoint=<endpoint> --etcd-s3-bucket=ops-o11y-etcd --etcd-s3-region=auto --etcd-s3-access-key=<key> --etcd-s3-secret-key=<secret>
+   ```
+
+   Wait for this line: `Managed etcd cluster membership has been reset, restart without --cluster-reset flag now.`
+
+1. Start K3s on the first server:
+
+   ```sh
+   sudo systemctl start k3s
+   ```
+
+1. On each other server (`ops-vm-o11y-2`, `ops-vm-o11y-3`), move the etcd data away, then start K3s. Do one server at a time:
+
+   ```sh
+   sudo mv /var/lib/rancher/k3s/server/db /var/lib/rancher/k3s/server/db.bak
+   sudo systemctl start k3s
+   ```
+
+1. Make sure that all 3 nodes are Ready, and that Argo CD shows its 8 applications Synced:
+
+   ```sh
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get nodes
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd get applications
+   ```
+
+To restore on a new host, add `--token=<token-of-the-old-first-server>` to the command in step 3.
+
 ## Failure modes
 
 | Symptom                                              | Cause                                       | Fix                                                                                                                              |
@@ -189,3 +259,5 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
 | `vmrestore` stops because the backup is not complete | The last backup failed part way             | Run the next backup first. If the disk is lost, add `-skipBackupCompleteCheck` to the restore Job; the restore can be incomplete |
 | The log shows `403` or `AccessDenied`                | The R2 key cannot use the bucket            | Check the key scope in the Cloudflare dashboard                                                                                  |
 | `vlogs-backup` prints `no partitions to back up`     | `vlogs-a` has no data                       | Examine the log shipper ([19-o11y-alerts.md](19-o11y-alerts.md))                                                                 |
+| The Sunday copy fails with a copy error              | R2 refused the server-side copy             | Remove `-origin` from the second vmbackup line. The copy is then a full upload.                                                  |
+| K3s fails to start after the restore                 | The token differs from the snapshot token   | Start with `--token=<old token>`                                                                                                 |

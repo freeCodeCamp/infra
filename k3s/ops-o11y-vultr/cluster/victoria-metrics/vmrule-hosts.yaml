@@ -122,6 +122,19 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#o11ybackupstale"
+        - alert: O11yBackupFailed
+          expr: |
+            (kube_cronjob_status_last_schedule_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"}
+              > kube_cronjob_status_last_successful_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"})
+            and (time() - kube_cronjob_status_last_schedule_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"} > 10800)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CronJob {{ $labels.cronjob }} started a backup more than 3 hours ago and has not succeeded since."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#o11ybackupfailed"
     - name: fluent-bit
       interval: 1m
       rules:
@@ -161,3 +174,16 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#argocdappunhealthy"
+    - name: k3s-etcd
+      interval: 5m
+      rules:
+        - alert: EtcdSnapshotMissing
+          expr: min by (node) (increase(k3s_etcd_snapshot_save_s3_duration_seconds_count{job="kubelet",status="success"}[8h])) < 1 or on(node) (max by (node) (last_over_time(k3s_etcd_snapshot_save_s3_duration_seconds_count{job="kubelet",status="success"}[1d])) unless on(node) max by (node) (last_over_time(k3s_etcd_snapshot_save_s3_duration_seconds_count{job="kubelet",status="success"}[8h])))
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "K3s server {{ $labels.node }} has saved no etcd snapshot to R2 in 8 hours."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#etcdsnapshotmissing"

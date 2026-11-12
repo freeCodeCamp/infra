@@ -258,6 +258,34 @@ A nightly backup to R2 has not succeeded for 36 hours. The `cronjob` label names
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get jobs --sort-by=.metadata.creationTimestamp
 ```
 
+## O11yBackupFailed
+
+A nightly backup started more than 3 hours ago and has not succeeded. The `cronjob` label names it. Examine the last Job and its log, then see [21-o11y-backup-restore.md](21-o11y-backup-restore.md):
+
+```sh
+kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get jobs --sort-by=.metadata.creationTimestamp
+```
+
+```sh
+kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs job/<job-name>
+```
+
+The alert clears when a backup succeeds or the next run starts. It fires again 3 hours after each failed run.
+
+## EtcdSnapshotMissing
+
+The K3s server in the `node` label has not saved an etcd snapshot to R2 in 8 hours. K3s saves one every 6 hours. On the node, list the snapshots and read the K3s log:
+
+```sh
+sudo k3s etcd-snapshot ls
+```
+
+```sh
+sudo journalctl -u k3s --since "12 hours ago" | grep -i snapshot
+```
+
+Check the R2 key for the bucket `ops-o11y-etcd` in the Cloudflare dashboard. The key is in the 1Password item `R2-User-Token-Infra-O11y-etcd`. To fix the K3s settings, see `ansible/inventory/group_vars/ops_o11y_vultr.yml`.
+
 ## FluentBitDroppedRecords
 
 Fluent Bit on a Vultr host dropped log records or metrics in the last 15 minutes. The `name` label names the output: `http.*` sends logs to the log agent, `prometheus_remote_write.*` sends metrics to vmagent. The rule has no `for`: it fires at the first evaluation that sees a drop, and it stays on for 15 minutes after the last drop. One of two causes applies:

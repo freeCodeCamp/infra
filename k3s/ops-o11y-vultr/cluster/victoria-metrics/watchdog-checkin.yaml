@@ -4,6 +4,7 @@ metadata:
   name: watchdog-checkin
 spec:
   schedule: "*/5 * * * *"
+  startingDeadlineSeconds: 240
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
