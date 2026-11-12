@@ -9,6 +9,15 @@
   vars_files:
     - roles/docker/defaults/main.yml
   tasks:
+    - name: Stop when no manager can check the services
+      ansible.builtin.assert:
+        that:
+          - groups[variable_manager | default('ops_swarm_mgr')] | default([]) | length > 0
+        fail_msg: >-
+          No manager in group {{ variable_manager | default('ops_swarm_mgr') }}.
+          Set variable_manager to a group that holds the Swarm manager.
+        quiet: true
+
     - name: Install the overlay guard
       ansible.builtin.include_role:
         name: docker
