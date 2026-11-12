@@ -98,3 +98,8 @@ jobs:
             exit 1
           fi
           grep -q 'No manager in group no_such_group' <<<"$out" || { echo "$out"; exit 1; }
+
+      - name: Unit Test the Docker Hold Retry
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--12-docker-hold.yml

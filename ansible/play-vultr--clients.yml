@@ -61,14 +61,13 @@
         mode: "0644"
       become: true
       become_user: root
-      register: clients_pm2_unit
 
     - name: Enable and start the PM2 unit before the first pm2 call, so the unit owns the daemon
       ansible.builtin.systemd_service:
         name: "{{ pm2_unit }}"
         enabled: true
         state: started
-        daemon_reload: "{{ clients_pm2_unit.changed }}"
+        daemon_reload: true
       become: true
       become_user: root
 

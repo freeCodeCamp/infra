@@ -33,11 +33,4 @@
   when: docker_guard_dropin is changed
 
 - name: Hold the Docker packages
-  ansible.builtin.dpkg_selections:
-    name: "{{ item }}"
-    selection: hold
-  loop: "{{ docker_held_packages }}"
-  register: docker_hold
-  until: docker_hold is succeeded
-  retries: 12
-  delay: 10
+  ansible.builtin.import_tasks: hold.yml

@@ -34,6 +34,7 @@ jobs:
     env:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { group: prd_clt, provider: vultr }

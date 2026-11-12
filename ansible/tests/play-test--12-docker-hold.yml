@@ -1,0 +1,26 @@
+---
+- name: Test that the Docker hold retries only on the dpkg lock
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Hold a package that does not exist
+      block:
+        - name: Run the hold tasks
+          ansible.builtin.include_role:
+            name: docker
+            tasks_from: hold.yml
+          vars:
+            docker_held_packages:
+              - no-such-package-for-the-hold-test
+        - name: Fail when the hold did not fail
+          ansible.builtin.fail:
+            msg: The hold of a missing package succeeded.
+      rescue:
+        - name: Assert that the hold stopped after one attempt
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.results[0].attempts == 1
+              - "'Failed to find package' in ansible_failed_result.results[0].msg"
+            fail_msg: "attempts: {{ ansible_failed_result.results[0].attempts | default('undefined') }}"
