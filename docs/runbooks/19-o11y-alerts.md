@@ -17,6 +17,30 @@ Run every command from the repo root unless the step says otherwise.
 - Your shell is on the tailnet.
 - `k3s/ops-o11y-vultr/.kubeconfig.yaml` exists.
 
+## Reach a host that is not on the tailnet
+
+The `pxy`, `api`, `soc` and `nws` VMs are not on the tailnet, so `ssh freecodecamp@<instance>` does not find them. Connect through the Swarm manager to the VPC address of the VM. The steps in each alert section below then work with this `ssh` command.
+
+1. Get the VPC address of the VM. Use the `instance` label of the alert. From `ansible/`, with `VULTR_API_KEY` set:
+
+   ```sh
+   ansible-inventory -i inventory/vultr.yml --host <instance> | jq -r .vultr_internal_ip
+   ```
+
+   For an `api`, `soc` or `nws` VM, the manager also has the address, with no API key:
+
+   ```sh
+   ssh freecodecamp@ops-vm-swarm-mgr-1 docker node inspect -f '{{.Status.Addr}}' <instance>
+   ```
+
+1. Connect through the manager:
+
+   ```sh
+   ssh -J freecodecamp@ops-vm-swarm-mgr-1 freecodecamp@<vpc address> uptime
+   ```
+
+   The output starts with the VM uptime. If the manager does not answer, see [runbook 18](18-swarm-manager-rebuild.md).
+
 ## See the alerts that fire
 
 Open the vmalert UI of the metric rules:
@@ -68,7 +92,7 @@ A host does not send metrics for about 5 minutes. The alert does not cover the N
 - The host has sent metrics in the last day, but not in the last 2 minutes. Fluent Bit on the host reads the node exporter and sends the metrics. If Fluent Bit stops, this alert fires.
 - A destroyed or rebuilt Vultr VM alerts until it sends again or until it has been gone for 1 day. Silence the alert for that `instance` before you destroy the VM.
 
-1. Connect to the host. Use the `instance` label of the alert:
+1. Connect to the host. Use the `instance` label of the alert. For a `pxy`, `api`, `soc` or `nws` VM, use `ssh -J` as in [Reach a host that is not on the tailnet](#reach-a-host-that-is-not-on-the-tailnet), here and in each step below:
 
    ```sh
    ssh freecodecamp@<instance> uptime
@@ -104,7 +128,7 @@ A host does not send metrics for about 5 minutes. The alert does not cover the N
 
 An NGINX VM does not send metrics, or `nginx.service` is not active, for about 4 minutes. The rule for a missing host is the same as in [HostDown](#hostdown).
 
-1. Examine NGINX on the VM:
+1. Examine NGINX on the VM. The NGINX VMs are not on the tailnet, so use `ssh -J` as in [Reach a host that is not on the tailnet](#reach-a-host-that-is-not-on-the-tailnet), here and in the next step:
 
    ```sh
    ssh freecodecamp@<instance> 'sudo nginx -t; sudo systemctl status nginx'
