@@ -1,0 +1,128 @@
+---
+- name: Reboot the K3s servers one at a time, gated on cluster health
+  hosts: "{{ variable_host | default('null') }}"
+  serial: 1
+  max_fail_percentage: 0
+  any_errors_fatal: true
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - "!min"
+    - hardware
+  become: true
+  become_user: root
+  vars:
+    k3s_gate_peer: "{{ ansible_play_hosts_all | difference([inventory_hostname]) | sort | first }}"
+    k3s_gate_nodes: "{{ ansible_play_hosts_all | length }}"
+    k3s_gate_vmstorage: 3
+    k3s_gate_post_retries: 90
+    k3s_gate_force: "{{ variable_force_reboot | default(false) }}"
+  tasks:
+    - name: Refuse a group too small to keep etcd quorum
+      run_once: true
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts_all | length >= 3
+          - k3s_init_host is defined
+        fail_msg: The group is too small to keep etcd quorum while one node is down, or k3s_init_host is not set.
+        quiet: true
+
+    - name: Check if /var/run/reboot-required exists
+      register: k3s_reboot_required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+        get_checksum: false
+
+    - name: Set Should Reboot
+      ansible.builtin.set_fact:
+        k3s_should_reboot: "{{ (k3s_gate_force | bool) or k3s_reboot_required.stat.exists or (ansible_facts.uptime_seconds > 604800) }}"
+
+    - name: Display Status
+      ansible.builtin.debug:
+        msg:
+          - "Debug info:"
+          - "  Host: {{ inventory_hostname }}"
+          - "  Force Reboot Flag: {{ k3s_gate_force }}"
+          - "  Reboot Required File Exists: {{ k3s_reboot_required.stat.exists }}"
+          - "  Uptime: {{ ansible_facts.uptime_seconds / 86400 }} days"
+          - "  Reboot: {{ k3s_should_reboot }}"
+
+    - name: Reboot behind the cluster gate
+      when: k3s_should_reboot
+      block:
+        - name: Pre-gate -- wait for a healthy cluster
+          ansible.builtin.script:
+            cmd: "{{ playbook_dir }}/tasks/k3s-o11y-gate.sh {{ k3s_gate_nodes }} {{ k3s_gate_vmstorage }} o11y"
+          delegate_to: "{{ k3s_gate_peer }}"
+          register: k3s_gate_pre
+          until: k3s_gate_pre.rc == 0
+          retries: 30
+          delay: 10
+          changed_when: false
+          check_mode: false
+
+        - name: Record that this play is about to cordon the node
+          ansible.builtin.set_fact:
+            k3s_gate_cordoned: true
+
+        - name: Drain the node
+          ansible.builtin.command: k3s kubectl drain {{ inventory_hostname }} --ignore-daemonsets --delete-emptydir-data --timeout=180s
+          delegate_to: "{{ k3s_gate_peer }}"
+          changed_when: true
+
+        - name: Reboot the node
+          ansible.builtin.reboot:
+            connect_timeout: 60
+            reboot_timeout: 600
+            pre_reboot_delay: 5
+            post_reboot_delay: 30
+            test_command: uptime
+            msg: "Reboot initiated by Ansible"
+
+        - name: Wait for the node to become reachable again
+          ansible.builtin.wait_for_connection:
+            timeout: 300
+
+        - name: Wait for the k3s unit
+          ansible.builtin.command: systemctl is-active k3s # noqa command-instead-of-module
+          register: k3s_unit
+          until: k3s_unit.rc == 0
+          retries: 30
+          delay: 10
+          changed_when: false
+
+        - name: Wait for this node's own etcd member to be ready
+          ansible.builtin.command: k3s kubectl get --raw=/readyz/etcd
+          register: k3s_own_etcd
+          until: k3s_own_etcd.stdout == "ok"
+          retries: "{{ k3s_gate_post_retries }}"
+          delay: 10
+          changed_when: false
+
+        - name: Uncordon the node
+          ansible.builtin.command: k3s kubectl uncordon {{ inventory_hostname }}
+          delegate_to: "{{ k3s_gate_peer }}"
+          changed_when: true
+
+        - name: Post-gate -- wait for a healthy cluster
+          ansible.builtin.script:
+            cmd: "{{ playbook_dir }}/tasks/k3s-o11y-gate.sh {{ k3s_gate_nodes }} {{ k3s_gate_vmstorage }} o11y"
+          delegate_to: "{{ k3s_gate_peer }}"
+          register: k3s_gate_post
+          until: k3s_gate_post.rc == 0
+          retries: "{{ k3s_gate_post_retries }}"
+          delay: 10
+          changed_when: false
+          check_mode: false
+
+      rescue:
+        - name: Uncordon the node after a failure
+          ansible.builtin.command: k3s kubectl uncordon {{ inventory_hostname }}
+          delegate_to: "{{ k3s_gate_peer }}"
+          changed_when: true
+          failed_when: false
+          when: k3s_gate_cordoned | default(false)
+
+        - name: Stop the play
+          ansible.builtin.fail:
+            msg: "K3s reboot gate failed on {{ inventory_hostname }}; later nodes were not touched"

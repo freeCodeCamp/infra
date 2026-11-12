@@ -61,6 +61,7 @@ jobs:
       matrix:
         include:
           - { group: ops_swarm_mgr, provider: vultr }
+          - { group: ops_o11y_vultr, provider: vultr }
           - { group: stg_api, provider: vultr }
           - { group: prd_api, provider: vultr }
           - { group: stg_pxy, provider: vultr }
@@ -195,6 +196,7 @@ jobs:
       matrix:
         include:
           - { group: ops_swarm_mgr, provider: vultr }
+          - { group: ops_o11y_vultr, provider: vultr }
           - { group: prd_api, provider: vultr }
           - { group: prd_pxy, provider: vultr }
           - { group: prd_soc, provider: vultr }
@@ -304,6 +306,18 @@ jobs:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
+  reboot-o11y:
+    name: Reboot (o11y K3s)
+    needs: reboot-mgr
+    uses: ./.github/workflows/ansible--reboot-k3s.yml
+    with:
+      hosts: ops_o11y_vultr
+      verbosity: "-v"
+      provider: vultr
+    secrets:
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
   # Terminal by design. Nothing runs after it, so a red verify can never stop
   # the fleet being patched -- which is the property the rest of this chain
   # does not have, since every other stage skips everything downstream when it
@@ -345,7 +359,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { hosts: "stg_api:stg_soc:stg_nws:prd_api:prd_soc:prd_nws:ops_swarm_mgr", manager: ops_swarm_mgr, provider: vultr }
+          - {
+              hosts: "stg_api:stg_soc:stg_nws:prd_api:prd_soc:prd_nws:ops_swarm_mgr",
+              manager: ops_swarm_mgr,
+              provider: vultr,
+            }
     uses: ./.github/workflows/ansible--verify-swarm.yml
     with:
       hosts: ${{ matrix.hosts }}
@@ -358,7 +376,24 @@ jobs:
 
   report:
     name: Report
-    needs: [window, uptime, update-stg, reboot-web-stg, gate-web-stg, reboot-stg, gate-swarm-stg, update-prd, reboot-web-prd, gate-web-prd, reboot-prd, reboot-mgr, verify-nginx, verify-swarm]
+    needs:
+      [
+        window,
+        uptime,
+        update-stg,
+        reboot-web-stg,
+        gate-web-stg,
+        reboot-stg,
+        gate-swarm-stg,
+        update-prd,
+        reboot-web-prd,
+        gate-web-prd,
+        reboot-prd,
+        reboot-mgr,
+        reboot-o11y,
+        verify-nginx,
+        verify-swarm,
+      ]
     # always(), not success(): the run that most needs a message is the one
     # that failed. Once this posts on every run, a Wednesday or Saturday with
     # NO message means the workflow never ran at all -- the one failure no
@@ -397,6 +432,7 @@ jobs:
           GATE_WEB_PRD: ${{ needs.gate-web-prd.result }}
           REBOOT_PRD: ${{ needs.reboot-prd.result }}
           REBOOT_MGR: ${{ needs.reboot-mgr.result }}
+          REBOOT_O11Y: ${{ needs.reboot-o11y.result }}
           VERIFY: ${{ needs.verify-nginx.result }}
           VERIFY_SWARM: ${{ needs.verify-swarm.result }}
         run: |
@@ -417,6 +453,7 @@ jobs:
               ("gate-web-prd", os.environ["GATE_WEB_PRD"]),
               ("reboot-prd", os.environ["REBOOT_PRD"]),
               ("reboot-mgr", os.environ["REBOOT_MGR"]),
+              ("reboot-o11y", os.environ["REBOOT_O11Y"]),
               ("verify", os.environ["VERIFY"]),
               ("verify-swarm", os.environ["VERIFY_SWARM"]),
           ]

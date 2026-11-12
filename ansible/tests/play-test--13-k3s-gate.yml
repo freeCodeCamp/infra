@@ -1,0 +1,210 @@
+---
+- name: Test the K3s gate script and the K3s reboot play order
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    gate_cases:
+      healthy:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        rc: 0
+        contains: gate ok
+      node_down:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 False
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        rc: 1
+        contains: nodes ready 2/3
+      already_cordoned:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True true
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        rc: 1
+        contains: "cordoned: ops-vm-o11y-2"
+      vmstorage_degraded:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 False
+          vmstorage-vm-2 True
+        rc: 1
+        contains: vmstorage ready 2/3
+      etcd_bad:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: "[-]etcd failed"
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        rc: 1
+        contains: etcd not ok
+      kubectl_get_nodes_fails:
+        nodes: ""
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        rc: 1
+        contains: "kubectl failed: get nodes"
+  tasks:
+    - name: Run the gate script against a stub k3s
+      block:
+        - name: Make the stub directory
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: k3sgate
+          check_mode: false
+          register: gate_tmp
+
+        - name: Write the stub k3s
+          ansible.builtin.copy:
+            dest: "{{ gate_tmp.path }}/k3s"
+            mode: "0755"
+            content: |
+              #!/usr/bin/env bash
+              [ "$1" = kubectl ] || exit 2
+              shift
+              case "$*" in
+                *"get nodes"*) [ -s "$K3S_STUB_DIR/nodes" ] || exit 1; cat "$K3S_STUB_DIR/nodes" ;;
+                *"--raw"*) cat "$K3S_STUB_DIR/etcd" ;;
+                *"get pods"*) cat "$K3S_STUB_DIR/vmstorage" ;;
+                *) exit 2 ;;
+              esac
+          check_mode: false
+
+        - name: Make a directory for each case
+          ansible.builtin.file:
+            path: "{{ gate_tmp.path }}/{{ item.key }}"
+            state: directory
+            mode: "0755"
+          loop: "{{ gate_cases | dict2items }}"
+          loop_control:
+            label: "{{ item.key }}"
+          check_mode: false
+
+        - name: Write the fixtures of each case
+          ansible.builtin.copy:
+            dest: "{{ gate_tmp.path }}/{{ item.0.key }}/{{ item.1 }}"
+            content: "{{ item.0.value[item.1] }}"
+            mode: "0644"
+          loop: "{{ gate_cases | dict2items | product(['nodes', 'etcd', 'vmstorage']) | list }}"
+          loop_control:
+            label: "{{ item.0.key }}/{{ item.1 }}"
+          check_mode: false
+
+        - name: Run the gate script for each case
+          ansible.builtin.command:
+            cmd: "{{ playbook_dir }}/../tasks/k3s-o11y-gate.sh 3 3 o11y"
+          environment:
+            PATH: "{{ gate_tmp.path }}:{{ lookup('ansible.builtin.env', 'PATH') }}"
+            K3S_STUB_DIR: "{{ gate_tmp.path }}/{{ item.key }}"
+          loop: "{{ gate_cases | dict2items }}"
+          loop_control:
+            label: "{{ item.key }}"
+          register: gate_runs
+          failed_when: false
+          changed_when: false
+          check_mode: false
+
+        - name: Assert the exit code and the output of each case
+          ansible.builtin.assert:
+            that:
+              - item.rc == gate_cases[item.item.key].rc
+              - gate_cases[item.item.key].contains in item.stdout
+            fail_msg: "{{ item.item.key }}: rc {{ item.rc }}, stdout {{ item.stdout }}, stderr {{ item.stderr }}"
+            quiet: true
+          loop: "{{ gate_runs.results }}"
+          loop_control:
+            label: "{{ item.item.key }}"
+
+      always:
+        - name: Remove the stub directory
+          ansible.builtin.file:
+            path: "{{ gate_tmp.path }}"
+            state: absent
+          when: gate_tmp.path is defined
+          check_mode: false
+
+    - name: Read the K3s reboot play
+      ansible.builtin.set_fact:
+        k3s_reboot_play: "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../play-k3s--reboot.yml') | from_yaml)[0] }}"
+
+    - name: List the names of the gated tasks
+      ansible.builtin.set_fact:
+        k3s_block_names: "{{ k3s_reboot_play.tasks | selectattr('block', 'defined') | map(attribute='block') | flatten | map(attribute='name') | list }}"
+
+    - name: List the tasks of the gated block and of its rescue
+      ansible.builtin.set_fact:
+        k3s_block_tasks: "{{ k3s_reboot_play.tasks | selectattr('block', 'defined') | map(attribute='block') | flatten }}"
+        k3s_rescue_tasks: "{{ k3s_reboot_play.tasks | selectattr('rescue', 'defined') | map(attribute='rescue') | flatten }}"
+
+    - name: Assert the K3s reboot play cordons only what it cordoned and delegates every kubectl action
+      vars:
+        peer_ref: "{% raw %}{{ k3s_gate_peer }}{% endraw %}"
+        gate_pattern: ^(Pre-gate|Drain|Uncordon|Post-gate)
+        pre_gate_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Pre-gate') | first) }}"
+        drain_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Drain') | first) }}"
+        block_task_text: "{{ k3s_block_tasks | map('string') | list }}"
+        cordoned_at: "{{ block_task_text.index(block_task_text | select('search', 'set_fact.*k3s_gate_cordoned.*True') | first) }}"
+        gated_tasks: "{{ (k3s_block_tasks + k3s_rescue_tasks) | selectattr('name', 'match', gate_pattern) | list }}"
+        own_node_tasks: "{{ k3s_block_tasks | selectattr('name', 'match', '^Wait for (the k3s unit|this node)') | list }}"
+        rescue_uncordon: "{{ k3s_rescue_tasks | selectattr('name', 'match', '^Uncordon') | first }}"
+      ansible.builtin.assert:
+        that:
+          - pre_gate_at | int < drain_at | int
+          - pre_gate_at | int < cordoned_at | int
+          - cordoned_at | int < drain_at | int
+          - gated_tasks | length == 5
+          - gated_tasks | map(attribute='delegate_to', default='') | unique | list == [peer_ref]
+          - own_node_tasks | length == 2
+          - own_node_tasks | selectattr('delegate_to', 'defined') | list | length == 0
+          - rescue_uncordon.when == 'k3s_gate_cordoned | default(false)'
+          - k3s_rescue_tasks | last | dict2items | map(attribute='key') | list | intersect(['ansible.builtin.fail']) | length == 1
+        fail_msg: "{{ k3s_block_names }}"
+        quiet: true
+
+    - name: Assert the K3s reboot play runs one node at a time and in order
+      vars:
+        drain_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Drain') | first) }}"
+        reboot_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Reboot') | first) }}"
+        uncordon_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Uncordon') | first) }}"
+        post_gate_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Post-gate') | first) }}"
+      ansible.builtin.assert:
+        that:
+          - k3s_reboot_play.serial == 1
+          - k3s_reboot_play.max_fail_percentage == 0
+          - k3s_reboot_play.any_errors_fatal
+          - drain_at | int < reboot_at | int
+          - reboot_at | int < uncordon_at | int
+          - uncordon_at | int < post_gate_at | int
+        fail_msg: "{{ k3s_block_names }}"
+        quiet: true

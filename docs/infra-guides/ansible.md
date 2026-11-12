@@ -35,7 +35,7 @@ The DigitalOcean inventory needs the `DO_API_TOKEN` of the main team. `ansible/.
 - `ansible--housekeeping.yml` and `ansible--cleanup-clients.yml` name a group and a provider on each job leg. An environment moves to Vultr at its traffic cutover, by a change to its legs.
 - Most plays that change hosts do one host at a time and stop at the first host that fails. Some take `-e variable_serial=<n>`. These are different:
   - `play-any--cleanup-clients.yml` does all hosts at the same time and does not stop on a failed host.
-  - `play-any--verify-nginx.yml` and the k3s plays do all hosts at the same time.
+  - `play-any--verify-nginx.yml` and the other k3s plays do all hosts at the same time. `play-k3s--reboot.yml` does one host at a time and ignores `variable_serial`. If the peer node is unreachable after the drain, it stops and leaves the node cordoned; uncordon it by hand.
 - Add `--check` to see the changes without making them. `play-any--cleanup-clients.yml`, `play-clients--restart.yml` and `play-clients--rollback.yml` also take `-e variable_dry_run=true`.
 - Each run adds its output to `ansible/.ansible/ansible.log`.
 
@@ -98,6 +98,7 @@ Use `-i inventory/digitalocean.yml` in the subshell with `../../infra-secrets/do
 | Play                     | What it does                                                           | Inputs                                                      |
 | ------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `play-k3s--servers.yml`  | Install or upgrade k3s on `ops_o11y_vultr`                             | —                                                           |
+| `play-k3s--reboot.yml`   | Reboot K3s nodes one by one. Wait for a healthy cluster each time.     | `variable_force_reboot=true`                                |
 | `play-k3s--longhorn.yml` | Install Longhorn on `tools_k3s`                                        | —                                                           |
 | `play-k3s--teardown.yml` | Remove k3s from every host in the group. Takes an etcd snapshot first. | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
 

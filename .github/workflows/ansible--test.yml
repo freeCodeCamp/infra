@@ -103,3 +103,8 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check tests/play-test--12-docker-hold.yml
+
+      - name: Unit Test the K3s Reboot Gate
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--13-k3s-gate.yml
