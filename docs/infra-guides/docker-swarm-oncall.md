@@ -242,11 +242,13 @@ Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephem
 
 - name: Trigger deployment
   run: |
-    curl -fsS -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
+    curl --fail-with-body -sS --max-time 360 -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
       -H "Content-Type: application/json" \
       -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
       -d '{"GANTRY_SERVICES_FILTERS":"name=${{ env.STACK_NAME }}_${{ env.SERVICE_NAME }}"}'
 ```
+
+The hook waits for Gantry and returns its real result. The Gantry job runs with `--restart-condition none`, and `run_gantry.sh` polls its task state every 5 s (`GANTRY_JOB_POLL`). It answers 200 when the task is `Complete`, and 500 with the Gantry log when the task is `Failed`, `Rejected` or `Shutdown`. After 330 s (`GANTRY_JOB_DEADLINE`) it answers 500 with `Gantry still running after 330 s; result unknown` and leaves the job running; the job name is in the output. A wrong secret gets 403. The curl in the deploy job waits up to 360 s, so the job needs a `timeout-minutes` above 6. Roll out the callers with `--max-time 360` first (they are harmless against the old hook), then redeploy the oncall stack with the new hook; the reverse order makes every deploy job fail with curl exit 28.
 
 **Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname: `swarm-wh-vultr.<tailnet>.ts.net`), `WEBHOOK_SECRET`
 

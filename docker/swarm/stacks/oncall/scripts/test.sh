@@ -568,6 +568,77 @@ run_watchdog_vxlan FAKE_SLEEP_RM="$work/net/vx-001008-lhno1"
 check "device in transit exits 0" "$status" 0
 check "device in transit posts nothing" "$(chat_calls)" 0
 
+mkdir -p "$work/gbin"
+cat >"$work/gbin/docker" <<'EOF'
+#!/bin/sh
+printf '%s %s\n' "$1" "$2" >> "$FAKE_LOG"
+case "$1 $2" in
+  "service create") printf '%s\n' "$*" >> "$FAKE_LOG.args"; echo "create-id"; exit "${FAKE_CREATE_RC:-0}" ;;
+  "service ps")
+    n=$(cat "$FAKE_LOG.n" 2>/dev/null || echo 0)
+    n=$((n + 1))
+    echo "$n" > "$FAKE_LOG.n"
+    state=$(echo "$FAKE_PS_STATES" | tr ',' '\n' | sed -n "${n}p")
+    [ -n "$state" ] || state=$(echo "$FAKE_PS_STATES" | tr ',' '\n' | tail -n 1)
+    echo "$state 3 seconds ago"
+    exit 0 ;;
+  "service logs") echo "gantry-log-line"; exit "${FAKE_LOGS_RC:-0}" ;;
+  "service rm") exit "${FAKE_RM_RC:-0}" ;;
+esac
+EOF
+cat >"$work/gbin/sleep" <<'EOF'
+#!/bin/sh
+printf 'sleep %s\n' "$1" >> "$FAKE_LOG"
+EOF
+chmod +x "$work/gbin/docker" "$work/gbin/sleep"
+
+run_gantry() {
+  : >"$log"
+  rm -f "$log.n" "$log.args"
+  env -i PATH="$work/gbin:/usr/bin:/bin" FAKE_LOG="$log" "$@" \
+    sh "$here/../run_gantry.sh" test-arg >"$work/out" 2>&1
+  status=$?
+}
+
+run_gantry FAKE_PS_STATES=Running,Running,Complete
+check "gantry complete exits 0" "$status" 0
+check "gantry complete polls until the state is Complete" "$(grep -c '^service ps$' "$log")" 3
+check "gantry complete sleeps between polls" "$(grep -c '^sleep 5$' "$log")" 2
+check "gantry complete prints the job logs" "$(grep -c '^gantry-log-line$' "$work/out")" 1
+check "gantry complete removes the job" "$(grep -c '^service rm$' "$log")" 1
+check "gantry job does not restart a failed task" "$(grep -c -e '--restart-condition none' "$log.args")" 1
+check "gantry job is created detached" "$(grep -c -e ' --detach ' "$log.args")" 1
+
+run_gantry FAKE_PS_STATES=Running,Failed
+check "gantry failed task exits 1" "$status" 1
+check "gantry failed task prints the job logs" "$(grep -c '^gantry-log-line$' "$work/out")" 1
+check "gantry failed task removes the job" "$(grep -c '^service rm$' "$log")" 1
+
+run_gantry FAKE_PS_STATES=Rejected
+check "gantry rejected task exits 1" "$status" 1
+check "gantry rejected task removes the job" "$(grep -c '^service rm$' "$log")" 1
+
+run_gantry FAKE_PS_STATES=Running,Shutdown
+check "gantry shutdown task exits 1" "$status" 1
+
+run_gantry FAKE_PS_STATES=Running GANTRY_JOB_DEADLINE=10 GANTRY_JOB_POLL=5
+check "gantry deadline exits 2" "$status" 2
+check "gantry deadline says the result is unknown" \
+  "$(grep -c '^Gantry still running after 10 s; result unknown$' "$work/out")" 1
+check "gantry deadline names the job it left running" "$(grep -c '^Gantry job gantry-.* left running$' "$work/out")" 1
+check "gantry deadline does not remove the job" "$(grep -c '^service rm$' "$log")" 0
+check "gantry deadline does not read the logs" "$(grep -c '^service logs$' "$log")" 0
+
+run_gantry FAKE_CREATE_RC=3 FAKE_PS_STATES=Complete
+check "gantry create failure keeps the create exit code" "$status" 3
+check "gantry create failure does not poll" "$(grep -c '^service ps$' "$log")" 0
+
+run_gantry FAKE_PS_STATES=Complete FAKE_LOGS_RC=1 FAKE_RM_RC=1
+check "log and rm failure do not hide success" "$status" 0
+
+run_gantry FAKE_PS_STATES=Failed FAKE_LOGS_RC=1 FAKE_RM_RC=1
+check "log and rm failure do not hide the failure" "$status" 1
+
 if [ "$failures" -gt 0 ]; then
   printf '%s check(s) failed\n' "$failures"
   exit 1

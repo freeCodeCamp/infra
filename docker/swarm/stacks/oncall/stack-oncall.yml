@@ -292,9 +292,10 @@ networks:
 
 configs:
   hooks_json:
+    name: oncall_hooks_json_v1
     file: ./hooks.json
   run_gantry:
-    name: oncall_run_gantry_v2
+    name: oncall_run_gantry_v3
     file: ./run_gantry.sh
   scripts_lib:
     name: oncall_scripts_lib_v1

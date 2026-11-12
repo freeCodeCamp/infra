@@ -3,10 +3,13 @@ set -eu
 
 launch_new_gantry() {
   local service_name="gantry-$(date +%s)-$$"
+  rc=0
+  elapsed=0
   docker service create \
     --name "${service_name}" \
     --mode replicated-job \
-    --detach=false \
+    --restart-condition none \
+    --detach \
     --constraint "node.role==manager" \
     --network oncall_default \
     --env "GANTRY_NODE_NAME=$(hostname)" \
@@ -27,11 +30,27 @@ launch_new_gantry() {
     --label "from-webhook=true" \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=bind,source=/home/freecodecamp/.docker,target=/root/.docker \
-    shizunge/gantry:2026.0415.1
-  local return_value=$?
-  docker service logs --raw "${service_name}"
-  docker service rm "${service_name}"
-  return "${return_value}"
+    shizunge/gantry:2026.0415.1 || return "$?"
+  while :; do
+    state=$(docker service ps "${service_name}" --format '{{.CurrentState}}' || true)
+    case "${state}" in
+    Complete*) break ;;
+    Failed* | Rejected* | Shutdown*)
+      rc=1
+      break
+      ;;
+    esac
+    if [ "${elapsed}" -ge "${GANTRY_JOB_DEADLINE:-330}" ]; then
+      echo "Gantry still running after ${GANTRY_JOB_DEADLINE:-330} s; result unknown" >&2
+      echo "Gantry job ${service_name} left running" >&2
+      return 2
+    fi
+    sleep "${GANTRY_JOB_POLL:-5}"
+    elapsed=$((elapsed + ${GANTRY_JOB_POLL:-5}))
+  done
+  docker service logs --raw "${service_name}" || true
+  docker service rm "${service_name}" || true
+  return "${rc}"
 }
 
 main() {
