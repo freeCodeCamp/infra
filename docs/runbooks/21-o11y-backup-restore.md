@@ -157,7 +157,7 @@ Each sample is on 2 of the 3 `vmstorage` VMs, so the metrics stay available afte
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get job -l restore-disk=vmstorage-vm-0 -w
    ```
 
-1. Start the workload again. Set `paused` to `false` on the same resource, and set the replicas back: `3` for `vmstorage-vm`, `1` for a VLSingle.
+1. Start the workload again. Set `paused` to `false` on the same resource. For `vmstorage-vm`, also set the replicas back to `3`. For a VLSingle, the VictoriaMetrics operator sets the replicas back to `1`.
 1. Delete the restore Jobs:
 
    ```sh
@@ -254,14 +254,10 @@ Use this when `vlogs-c` starts for the first time. It copies the history of `vlo
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get job -l restore-disk=vlogs-c -w
    ```
 
-1. Start `vlogs-c` again. Set `paused` to `false`, and set the replicas back to `1`:
+1. Start `vlogs-c` again. Set `paused` to `false`. The VictoriaMetrics operator then sets the replicas back to `1`:
 
    ```sh
    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y patch vlsingle vlogs-c --type merge -p '{"spec":{"paused":false}}'
-   ```
-
-   ```sh
-   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y scale deployment vlsingle-vlogs-c --replicas=1
    ```
 
 1. Delete the restore Job:
