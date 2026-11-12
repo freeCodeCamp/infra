@@ -286,6 +286,10 @@ services:
           - "node.role == manager"
 
 networks:
+  default:
+    driver: overlay
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
   host-namespace:
     external: true
     name: host

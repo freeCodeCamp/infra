@@ -142,5 +142,11 @@ services:
       restart_policy:
         condition: any
 
+networks:
+  default:
+    driver: overlay
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
+
 volumes:
   redis_data:

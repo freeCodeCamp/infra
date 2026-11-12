@@ -48,6 +48,8 @@ ssh freecodecamp@ops-vm-swarm-mgr-1 docker node inspect --format '{{json .Spec.L
 - [oncall](docker-swarm-oncall.md#deployment), [News](docker-swarm-news.md) and [Socrates](docker-swarm-socrates.md#deployment): from the CLI.
 - [API](docker-swarm-api.md): from the `deploy-api.yml` workflow in `freeCodeCamp/freeCodeCamp`.
 
+Each stack's default network sets the MTU option to 1450, the VPC MTU. Docker subtracts 50 bytes for VXLAN, so containers get MTU 1400. `docker stack deploy` does not change an existing network, so the new MTU takes effect only after the stack's network is re-created (`docker stack rm`, then deploy).
+
 ## Stray Overlay Device
 
 Symptom: tasks on one node stay `Rejected` with this error, and the service stays below its target:
