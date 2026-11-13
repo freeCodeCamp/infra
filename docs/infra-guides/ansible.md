@@ -127,7 +127,7 @@ Run the steps in this order. No step moves traffic. Cloudflare sends traffic to 
 4. Run `play-tailscale--0-install.yml` and `play-tailscale--1a-up.yml` on `ops_swarm_mgr`, then `play-vultr--manager.yml`. In **Services**, select the Service and **Approve** its host.
 5. Make the two envelopes of the proxies. Do step 6 for each file.
    - `pxy-origin-tls`: a YAML map `nginx_tls_files`, one key for each file in `/etc/nginx/ssl` (`dhparam.pem`, `freecodecamp.dev.crt`, `freecodecamp.dev.key`, `freecodecamp.org.crt`, `freecodecamp.org.key`). The play refuses a map that lacks a key.
-   - `pxy-upstreams-<tier>`: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams` writes the plaintext file.
+   - `pxy-upstreams-<tier>`: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams` writes the plaintext file. `ansible/vars/vultr-maps.yml` holds the routing mesh ports of each tier for API, Socrates and news. Render a tier only after the live move of its services to these ports. A render before the move points NGINX at ports with no listener.
 6. From `../infra-secrets`, encrypt the file and delete the plaintext. The command writes a temporary file and replaces the envelope only when `sops` succeeds, so a second run cannot empty the envelope:
 
    ```bash

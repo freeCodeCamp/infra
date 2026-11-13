@@ -8,7 +8,7 @@
 {% endmacro %}
 ---
 nginx_upstreams:
-{% for lang, port in vultr_maps_jms_ports.items() %}
+{% for lang, port in vultr_maps_jms_ports[maps_env].items() %}
   - name: jms-{{ lang }}
     servers:
 {{ servers('^' ~ maps_env ~ '-vm-nws-[0-9]+$', [port]) }}
@@ -16,11 +16,11 @@ nginx_upstreams:
   - name: socrates
     least_conn: true
     servers:
-{{ servers('^' ~ maps_env ~ '-vm-soc-[0-9]+$', vultr_maps_socrates_ports) }}
+{{ servers('^' ~ maps_env ~ '-vm-soc-[0-9]+$', vultr_maps_socrates_ports[maps_env]) }}
   - name: api
     least_conn: true
     servers:
-{{ servers('^' ~ maps_env ~ '-vm-api-[0-9]+$', vultr_maps_api_ports) }}
+{{ servers('^' ~ maps_env ~ '-vm-api-[0-9]+$', vultr_maps_api_ports[maps_env]) }}
 {% for lang in vultr_maps_client_langs %}
   - name: client-{{ lang }}
     least_conn: true
