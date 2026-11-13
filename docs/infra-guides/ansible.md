@@ -144,10 +144,11 @@ A re-created VM has new addresses. After the live move of its tier, render the u
 
 Before the live move of the tier is complete, do not render: the ports in `ansible/vars/vultr-maps.yml` do not match the live ports yet. Change the envelope by hand:
 
-1. From `../infra-secrets`, decrypt the envelope to the plain file: `sops decrypt --input-type yaml --output-type yaml docker/vultr/pxy-upstreams-<tier>.yaml.enc > docker/vultr/pxy-upstreams-<tier>.yaml.plaintext`.
-2. Get the new address: `docker --context vultr node inspect <host> --format '{{ .Status.Addr }}'`.
-3. In the plain file, replace the old address on each line where it occurs. A news VM is in each `jms-*` upstream. An API, Socrates or client VM has one line for each port.
-4. Do step 6, then run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
+1. From `ansible/`, render the map to a scratch file: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams -e maps_upstreams_path=/tmp/vultr-maps-<tier>/upstreams.yaml`. This file has the current addresses. Its ports are the routing mesh ports, so do not encrypt it.
+2. From `../infra-secrets`, decrypt the envelope to the plaintext file: `sops decrypt --input-type yaml --output-type yaml docker/vultr/pxy-upstreams-<tier>.yaml.enc > docker/vultr/pxy-upstreams-<tier>.yaml.plaintext`.
+3. Compare the upstream of the VM's role in the two files. The old address is in the plaintext file and not in the scratch file. The new address is in the scratch file and not in the plaintext file.
+4. In the plaintext file, replace the old address with the new address on each line where it occurs. A news VM is in each `jms-*` upstream. An API, Socrates or client VM has one line for each port.
+5. Delete the folder `/tmp/vultr-maps-<tier>`. Do step 6, then run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
 
 A re-created proxy VM is not in the upstream map. It needs only the play.
 
