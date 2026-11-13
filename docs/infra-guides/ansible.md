@@ -140,7 +140,16 @@ Run the steps in this order. No step moves traffic. Cloudflare sends traffic to 
 7. Run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
 8. Run `play-vultr--clients.yml -e variable_host=<tier>_clt`. The client hosts join the tailnet at the traffic ramp, so `deploy-client.yml` cannot reach them before that.
 
-A re-created VM has new addresses. Render the upstream map again, encrypt it, and run `play-vultr--nginx.yml`. Before the live move of the tier is complete, do not render: the ports in `ansible/vars/vultr-maps.yml` do not match the live ports yet. Change only the addresses of the re-created VM in the envelope with `sops docker/vultr/pxy-upstreams-<tier>.yaml.enc`, then run the play.
+A re-created VM has new addresses. After the live move of its tier, render the upstream map again (step 5), encrypt it (step 6), and run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
+
+Before the live move of the tier is complete, do not render: the ports in `ansible/vars/vultr-maps.yml` do not match the live ports yet. Change the envelope by hand:
+
+1. From `../infra-secrets`, decrypt the envelope to the plain file: `sops decrypt --input-type yaml --output-type yaml docker/vultr/pxy-upstreams-<tier>.yaml.enc > docker/vultr/pxy-upstreams-<tier>.yaml.plaintext`.
+2. Get the new address: `docker --context vultr node inspect <host> --format '{{ .Status.Addr }}'`.
+3. In the plain file, replace the old address on each line where it occurs. A news VM is in each `jms-*` upstream. An API, Socrates or client VM has one line for each port.
+4. Do step 6, then run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
+
+A re-created proxy VM is not in the upstream map. It needs only the play.
 
 Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the VPC address and sends the metrics to `fluent_bit_vlagent_host`. The base play installs this, so a rebuilt VM needs no render for monitoring. To change only the Fluent Bit config, run `play-vultr--fluent-bit.yml -e variable_host=<group>`. The o11y nodes do not send metrics this way (`fluent_bit_push_metrics: false`), because the cluster scrapes them.
 
