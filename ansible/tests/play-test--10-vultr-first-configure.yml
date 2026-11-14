@@ -11,11 +11,11 @@
     test_dir: "{{ [lookup('ansible.builtin.env', 'TMPDIR') | default('/tmp', true), 'vultr-first-configure-test'] | path_join }}"
     test_play: "{{ lookup('ansible.builtin.file', '../play-vultr--base.yml') | from_yaml | first }}"
   tasks:
-    - name: Assert the base play runs the step in its pre-tasks, before the docker role
+    - name: Assert the base play turns off unattended upgrades, then runs the step, before the docker role
       ansible.builtin.assert:
         that:
           - test_play.pre_tasks | map('dict2items') | flatten | selectattr('key', 'eq', 'ansible.builtin.import_tasks')
-            | map(attribute='value') | list == ['tasks/vultr-first-configure.yml']
+            | map(attribute='value') | list == ['tasks/apt-no-unattended.yml', 'tasks/vultr-first-configure.yml']
           - "'docker' in test_play.roles"
         fail_msg: "pre_tasks: {{ test_play.pre_tasks | map(attribute='name') | list }}"
 
