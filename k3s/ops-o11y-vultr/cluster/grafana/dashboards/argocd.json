@@ -1,66 +1,14 @@
 {
   "uid": "fcc-argocd",
   "title": "Argo CD apps",
-  "description": "Sync and health of each Argo CD Application, from the metrics of the Argo CD application controller. The cluster is the prometheus label that its vmagent adds.",
-  "tags": ["kubernetes", "argocd"],
-  "schemaVersion": 41,
-  "refresh": "1m",
-  "time": { "from": "now-24h", "to": "now" },
+  "description": "Which apps are not Synced and Healthy, since when, and what synced.",
+  "tags": ["kubernetes", "argocd", "ops"],
   "editable": false,
   "graphTooltip": 1,
-  "links": [
-    {
-      "title": "Home",
-      "type": "link",
-      "url": "/d/fcc-home",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Traffic",
-      "type": "link",
-      "url": "/d/fcc-traffic",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Fleet",
-      "type": "link",
-      "url": "/d/fcc-fleet",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Alert history",
-      "type": "link",
-      "url": "/d/fcc-alerts",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Pods",
-      "type": "link",
-      "url": "/d/fcc-k8s-pods",
-      "icon": "dashboard",
-      "keepTime": true,
-      "includeVars": true
-    },
-    {
-      "title": "Argo CD apps",
-      "type": "link",
-      "url": "/d/fcc-argocd",
-      "icon": "dashboard",
-      "keepTime": true,
-      "includeVars": true
-    },
-    {
-      "title": "Logs (Explore)",
-      "type": "link",
-      "url": "/explore",
-      "icon": "external link",
-      "targetBlank": true
-    }
-  ],
+  "schemaVersion": 41,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "timezone": "browser",
   "annotations": { "list": [] },
   "templating": {
     "list": [
@@ -80,202 +28,480 @@
       }
     ]
   },
+  "links": [
+    {
+      "title": "Home",
+      "type": "link",
+      "url": "/d/fcc-home",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Alert history",
+      "type": "link",
+      "url": "/d/fcc-alerts",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Pods",
+      "type": "link",
+      "url": "/d/fcc-k8s-pods",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "Argo CD (ops-vm-o11y-1:30081)",
+      "type": "link",
+      "url": "http://ops-vm-o11y-1:30081",
+      "icon": "external link",
+      "targetBlank": true
+    }
+  ],
   "panels": [
     {
-      "type": "table",
-      "title": "Applications now",
+      "id": 1,
+      "type": "stat",
+      "title": "Apps",
+      "description": "Applications that Argo CD manages in this cluster.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 9 },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (name, project, dest_namespace, sync_status, health_status, autosync_enabled) (argocd_app_info{prometheus=\"$cluster\"})",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "health_status" },
-            "properties": [
-              { "id": "displayName", "value": "Health" },
-              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "Healthy": { "color": "green" },
-                      "Progressing": { "color": "blue" },
-                      "Degraded": { "color": "red" },
-                      "Missing": { "color": "red" },
-                      "Unknown": { "color": "orange" },
-                      "Suspended": { "color": "orange" }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "sync_status" },
-            "properties": [
-              { "id": "displayName", "value": "Sync" },
-              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "Synced": { "color": "green" },
-                      "OutOfSync": { "color": "orange" },
-                      "Unknown": { "color": "red" }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "name" },
-            "properties": [{ "id": "displayName", "value": "Application" }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "dest_namespace" },
-            "properties": [{ "id": "displayName", "value": "Namespace" }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "autosync_enabled" },
-            "properties": [{ "id": "displayName", "value": "Auto-sync" }]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [{ "displayName": "Application", "desc": false }]
-      },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": { "excludeByName": { "Time": true, "Value": true } }
-        }
-      ]
-    },
-    {
-      "type": "state-timeline",
-      "title": "Health over time",
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 10 },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (name) ((argocd_app_info{prometheus=\"$cluster\", health_status=\"Healthy\"} * 0) or (argocd_app_info{prometheus=\"$cluster\", health_status=\"Progressing\"} * 0 + 1) or (argocd_app_info{prometheus=\"$cluster\", health_status!~\"Healthy|Progressing\"} * 0 + 2))",
-          "legendFormat": "{{name}}",
-          "interval": "1m"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": { "text": "Healthy", "color": "green" },
-                "1": { "text": "Progressing", "color": "blue" },
-                "2": { "text": "Degraded or other", "color": "red" }
-              }
-            }
-          ],
-          "custom": { "fillOpacity": 80, "lineWidth": 0 }
-        },
-        "overrides": []
-      },
-      "options": {
-        "showValue": "never",
-        "mergeValues": true,
-        "rowHeight": 0.8,
-        "legend": {
-          "showLegend": true,
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": { "mode": "single" }
-      }
-    },
-    {
-      "type": "state-timeline",
-      "title": "Sync over time",
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 10 },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (name) ((argocd_app_info{prometheus=\"$cluster\", sync_status=\"Synced\"} * 0) or (argocd_app_info{prometheus=\"$cluster\", sync_status=\"OutOfSync\"} * 0 + 1) or (argocd_app_info{prometheus=\"$cluster\", sync_status!~\"Synced|OutOfSync\"} * 0 + 2))",
-          "legendFormat": "{{name}}",
-          "interval": "1m"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": { "text": "Synced", "color": "green" },
-                "1": { "text": "OutOfSync", "color": "orange" },
-                "2": { "text": "Unknown", "color": "red" }
-              }
-            }
-          ],
-          "custom": { "fillOpacity": 80, "lineWidth": 0 }
-        },
-        "overrides": []
-      },
-      "options": {
-        "showValue": "never",
-        "mergeValues": true,
-        "rowHeight": 0.8,
-        "legend": {
-          "showLegend": true,
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": { "mode": "single" }
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Syncs per hour, by result",
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 19, "w": 24, "h": 8 },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sum by (name, phase) (increase(argocd_app_sync_total{prometheus=\"$cluster\"}[1h])) > 0",
-          "legendFormat": "{{name}} {{phase}}"
+          "expr": "count(count by (name) (last_over_time(argocd_app_info{prometheus=\"$cluster\"}[5m])))",
+          "legendFormat": "Apps"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 0,
-          "custom": { "drawStyle": "bars", "fillOpacity": 60 }
+          "color": { "mode": "fixed", "fixedColor": "text" }
         },
         "overrides": []
       },
       "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Not Healthy",
+      "description": "Apps whose health is not Healthy now.",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (name) (last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status!=\"Healthy\"}[5m]))) or vector(0)",
+          "legendFormat": "Not Healthy"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Out of sync",
+      "description": "Apps whose live state differs from Git now.",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(count by (name) (last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status!=\"Synced\"}[5m]))) or vector(0)",
+          "legendFormat": "Out of sync"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Syncs in the time range",
+      "description": "Sync operations in the time range, for all apps.",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "round(sum(increase(argocd_app_sync_total{prometheus=\"$cluster\"}[$__range]))) or vector(0)",
+          "legendFormat": "Syncs",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "text" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Applications now",
+      "description": "Every app, worst first.",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (name, dest_namespace, health_status, sync_status, autosync_enabled) (argocd_app_info{prometheus=\"$cluster\"})",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true },
+            "indexByName": {
+              "name": 0,
+              "health_status": 1,
+              "sync_status": 2,
+              "dest_namespace": 3,
+              "autosync_enabled": 4
+            },
+            "renameByName": {
+              "name": "Application",
+              "health_status": "Health",
+              "sync_status": "Sync",
+              "dest_namespace": "Namespace",
+              "autosync_enabled": "Auto-sync"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Health" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Healthy": { "color": "green", "index": 0 },
+                      "Progressing": { "color": "blue", "index": 1 },
+                      "Degraded": { "color": "red", "index": 2 },
+                      "Missing": { "color": "orange", "index": 3 },
+                      "Suspended": { "color": "purple", "index": 4 },
+                      "Unknown": { "color": "text", "index": 5 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Sync" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Synced": { "color": "green", "index": 0 },
+                      "OutOfSync": { "color": "orange", "index": 1 },
+                      "Unknown": { "color": "text", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Auto-sync" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": { "text": "On", "index": 0 },
+                      "false": { "text": "Off", "color": "orange", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [{ "displayName": "Health", "desc": false }],
+        "footer": { "show": false }
+      }
+    },
+    {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "Health over time",
+      "description": "Green is Healthy, blue is Progressing, red is Degraded or worse. Short gaps under 5 minutes in the metrics are joined.",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (name) ((last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status=\"Healthy\"}[5m]) * 0) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status=\"Progressing\"}[5m]) * 0 + 1) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status!~\"Healthy|Progressing\"}[5m]) * 0 + 2))",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "blue", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Healthy", "color": "green", "index": 0 },
+                "1": { "text": "Progressing", "color": "blue", "index": 1 },
+                "2": { "text": "Degraded", "color": "red", "index": 2 }
+              }
+            }
+          ],
+          "custom": { "fillOpacity": 75, "lineWidth": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
         "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "state-timeline",
+      "title": "Sync over time",
+      "description": "Green is Synced, orange is OutOfSync, grey is Unknown. Short gaps under 5 minutes in the metrics are joined.",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (name) ((last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status=\"Synced\"}[5m]) * 0) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status=\"OutOfSync\"}[5m]) * 0 + 1) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status!~\"Synced|OutOfSync\"}[5m]) * 0 + 2))",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "text", "value": 2 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Synced", "color": "green", "index": 0 },
+                "1": { "text": "OutOfSync", "color": "orange", "index": 1 },
+                "2": { "text": "Unknown", "color": "text", "index": 2 }
+              }
+            }
+          ],
+          "custom": { "fillOpacity": 75, "lineWidth": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Syncs per hour",
+      "description": "Sync operations per hour, by app and result. A Failed or Error bar needs a look in Argo CD.",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "interval": "1h",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "round(sum by (name, phase) (increase(argocd_app_sync_total{prometheus=\"$cluster\"}[1h]))) > 0",
+          "legendFormat": "{{name}} · {{phase}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": { "mode": "normal", "group": "A" },
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*(Failed|Error).*" },
+            "properties": [
+              {
+                "id": "color",
+                "value": { "mode": "fixed", "fixedColor": "red" }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["sum"]
+          "calcs": ["sum"],
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": { "mode": "multi", "sort": "desc" }
       }

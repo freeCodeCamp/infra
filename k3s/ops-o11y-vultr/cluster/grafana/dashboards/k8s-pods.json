@@ -1,66 +1,14 @@
 {
   "uid": "fcc-k8s-pods",
   "title": "Pods",
-  "description": "Kubernetes containers: restarts, why they stopped, readiness and memory against the limit. The cluster is the prometheus label that its vmagent adds.",
-  "tags": ["kubernetes", "pods"],
-  "schemaVersion": 41,
-  "refresh": "1m",
-  "time": { "from": "now-24h", "to": "now" },
+  "description": "Which containers restart, why they stop, and how close they run to their memory limit.",
+  "tags": ["kubernetes", "ops"],
   "editable": false,
   "graphTooltip": 1,
-  "links": [
-    {
-      "title": "Home",
-      "type": "link",
-      "url": "/d/fcc-home",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Traffic",
-      "type": "link",
-      "url": "/d/fcc-traffic",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Fleet",
-      "type": "link",
-      "url": "/d/fcc-fleet",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Alert history",
-      "type": "link",
-      "url": "/d/fcc-alerts",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Pods",
-      "type": "link",
-      "url": "/d/fcc-k8s-pods",
-      "icon": "dashboard",
-      "keepTime": true,
-      "includeVars": true
-    },
-    {
-      "title": "Argo CD apps",
-      "type": "link",
-      "url": "/d/fcc-argocd",
-      "icon": "dashboard",
-      "keepTime": true,
-      "includeVars": true
-    },
-    {
-      "title": "Logs (Explore)",
-      "type": "link",
-      "url": "/explore",
-      "icon": "external link",
-      "targetBlank": true
-    }
-  ],
+  "schemaVersion": 41,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "timezone": "browser",
   "annotations": { "list": [] },
   "templating": {
     "list": [
@@ -95,146 +43,193 @@
       }
     ]
   },
+  "links": [
+    {
+      "title": "Home",
+      "type": "link",
+      "url": "/d/fcc-home",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Alert history",
+      "type": "link",
+      "url": "/d/fcc-alerts",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Argo CD apps",
+      "type": "link",
+      "url": "/d/fcc-argocd",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "Logs (Explore)",
+      "type": "link",
+      "url": "/explore",
+      "icon": "external link",
+      "targetBlank": true
+    }
+  ],
   "panels": [
     {
-      "type": "table",
-      "title": "Restarts in the time range",
+      "id": 1,
+      "type": "stat",
+      "title": "Containers restarting",
+      "description": "Containers that restarted in the last hour.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 9 },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sort_desc(round(sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[$__range]))) > 0)",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Value" },
-            "properties": [{ "id": "displayName", "value": "Restarts" }]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [{ "displayName": "Restarts", "desc": true }]
-      },
-      "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true } } }
-      ]
-    },
-    {
-      "type": "table",
-      "title": "Why the container last stopped",
-      "description": "The reason of the last stop of each container that has stopped at least once, such as OOMKilled or Error.",
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 9 },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (namespace, pod, container, reason) (kube_pod_container_status_last_terminated_reason{prometheus=\"$cluster\", namespace=~\"$namespace\"} == 1)",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "options": { "showHeader": true },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": { "excludeByName": { "Time": true, "Value": true } }
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Restarts per 5 minutes, by container",
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 9 },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sum by (namespace, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[5m])) > 0",
-          "legendFormat": "{{namespace}}/{{container}}"
+          "expr": "count(sum by (namespace, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[1h])) > 0) or vector(0)",
+          "legendFormat": "Restarting"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 0,
-          "custom": { "drawStyle": "bars", "fillOpacity": 60 }
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": ["sum"]
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
         },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
       }
     },
     {
-      "type": "state-timeline",
-      "title": "Containers not ready",
+      "id": 2,
+      "type": "stat",
+      "title": "Last stopped by OOM kill",
+      "description": "Containers whose last stop was OOMKilled: they ran out of memory at their limit.",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 9 },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (namespace, pod, container) (kube_pod_container_status_ready{prometheus=\"$cluster\", namespace=~\"$namespace\"} == 0) + 1",
-          "legendFormat": "{{namespace}}/{{pod}}/{{container}}",
-          "interval": "1m"
+          "expr": "count(max by (namespace, container) (kube_pod_container_status_last_terminated_reason{prometheus=\"$cluster\", namespace=~\"$namespace\", reason=\"OOMKilled\"})) or vector(0)",
+          "legendFormat": "OOM killed"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "orange" },
-          "mappings": [
-            {
-              "type": "value",
-              "options": { "1": { "text": "not ready", "color": "orange" } }
-            }
-          ],
-          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "showValue": "never",
-        "mergeValues": true,
-        "rowHeight": 0.8,
-        "legend": { "showLegend": false },
-        "tooltip": { "mode": "single" }
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
       }
     },
     {
-      "type": "timeseries",
-      "title": "Memory against the limit",
-      "description": "Working set memory of each container as a share of its memory limit. The kernel kills a container at 100%.",
+      "id": 3,
+      "type": "stat",
+      "title": "Containers not ready",
+      "description": "Running containers that do not pass their readiness check now. Finished job containers are not counted.",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 18, "w": 24, "h": 10 },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (namespace, pod, container) (container_memory_working_set_bytes{prometheus=\"$cluster\", namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{prometheus=\"$cluster\", namespace=~\"$namespace\", resource=\"memory\"})",
-          "legendFormat": "{{namespace}}/{{pod}}/{{container}}"
+          "expr": "count(max by (namespace, container) ((kube_pod_container_status_ready{prometheus=\"$cluster\", namespace=~\"$namespace\"} == 0) unless on (namespace, pod, container) (kube_pod_container_status_terminated{prometheus=\"$cluster\"} == 1))) or vector(0)",
+          "legendFormat": "Not ready"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Highest memory against limit",
+      "description": "The container closest to its memory limit now. At 100% the kernel kills it.",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max(max by (namespace, container) (container_memory_working_set_bytes{prometheus=\"$cluster\", namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}) / on (namespace, container) max by (namespace, container) (kube_pod_container_resource_limits{prometheus=\"$cluster\", resource=\"memory\"}))",
+          "legendFormat": "Highest"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "min": 0,
-          "max": 1,
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -242,13 +237,313 @@
               { "color": "orange", "value": 0.8 },
               { "color": "red", "value": 0.95 }
             ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Restarts in the time range",
+      "description": "Grouped by container, so a pod that is replaced stays on one row. Last stop is why the container last stopped.",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "round(sum by (namespace, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[$__range]))) > 0",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (namespace, container, reason) (kube_pod_container_status_last_terminated_reason{prometheus=\"$cluster\", namespace=~\"$namespace\"}) and on (namespace, container) (sum by (namespace, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[$__range])) > 0)",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value #B": true },
+            "indexByName": {
+              "namespace": 0,
+              "container": 1,
+              "Value #A": 2,
+              "reason": 3
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "container": "Container",
+              "Value #A": "Restarts",
+              "reason": "Last stop"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Restarts" },
+            "properties": [
+              { "id": "custom.width", "value": 100 },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "text"
+                }
+              },
+              {
+                "id": "color",
+                "value": { "mode": "fixed", "fixedColor": "orange" }
+              }
+            ]
           },
-          "custom": { "thresholdsStyle": { "mode": "line" } }
+          {
+            "matcher": { "id": "byName", "options": "Last stop" },
+            "properties": [
+              { "id": "custom.width", "value": 120 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "OOMKilled": { "color": "red", "index": 0 },
+                      "Error": { "color": "orange", "index": 1 },
+                      "Completed": { "color": "text", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [{ "displayName": "Restarts", "desc": true }],
+        "footer": { "show": false }
+      }
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "Memory now, against the limit",
+      "description": "Working memory against the memory limit, for the 10 containers nearest their limit. Orange from 80%, red from 95%.",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sort_desc(topk(10, max by (namespace, container) (container_memory_working_set_bytes{prometheus=\"$cluster\", namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}) / on (namespace, container) max by (namespace, container) (kube_pod_container_resource_limits{prometheus=\"$cluster\", resource=\"memory\"})))",
+          "legendFormat": "{{namespace}}/{{container}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.8 },
+              { "color": "red", "value": 0.95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "namePlacement": "left",
+        "showUnfilled": true,
+        "sizing": "auto",
+        "minVizHeight": 16,
+        "maxVizHeight": 24
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Restarts per 15 minutes",
+      "description": "Restarts per container, in 15-minute buckets.",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "interval": "15m",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "round(sum by (namespace, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[15m]))) > 0",
+          "legendFormat": "{{namespace}}/{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "barAlignment": 0,
+            "stacking": { "mode": "normal", "group": "A" },
+            "axisSoftMin": 0,
+            "showPoints": "never"
+          }
         },
         "overrides": []
       },
       "options": {
         "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"],
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "state-timeline",
+      "title": "When containers were not ready",
+      "description": "Only containers that were not ready at some point in the time range get a row. Red means not ready. Finished job containers are not shown.",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (namespace, container) ((kube_pod_container_status_ready{prometheus=\"$cluster\", namespace=~\"$namespace\"} == 0) unless on (namespace, pod, container) (kube_pod_container_status_terminated{prometheus=\"$cluster\"} == 1)) * 0 + 1",
+          "legendFormat": "{{namespace}}/{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": { "text": "Not ready", "color": "red", "index": 0 }
+              }
+            }
+          ],
+          "custom": { "fillOpacity": 85, "lineWidth": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
+        "legend": { "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Memory against the limit, over time",
+      "description": "The 8 containers that came closest to their memory limit in the time range. One line per container, so a replaced pod continues the same line.",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "topk_max(8, max by (namespace, container) (container_memory_working_set_bytes{prometheus=\"$cluster\", namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}) / on (namespace, container) max by (namespace, container) (kube_pod_container_resource_limits{prometheus=\"$cluster\", resource=\"memory\"}))",
+          "legendFormat": "{{namespace}}/{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "orange", "value": 0.8 },
+              { "color": "red", "value": 0.95 }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": 300000,
+            "thresholdsStyle": { "mode": "dashed" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
           "displayMode": "table",
           "placement": "right",
           "calcs": ["max", "lastNotNull"],

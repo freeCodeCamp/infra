@@ -1,64 +1,14 @@
 {
   "uid": "fcc-alerts",
   "title": "Alert history",
-  "description": "When each alert fired, from the ALERTS series that vmalert writes. A gap means vmalert did not evaluate.",
+  "description": "What fires now, since when, and when each alert fired in the time range.",
   "tags": ["alerts", "ops"],
-  "schemaVersion": 41,
-  "refresh": "1m",
-  "time": { "from": "now-24h", "to": "now" },
   "editable": false,
   "graphTooltip": 1,
-  "links": [
-    {
-      "title": "Home",
-      "type": "link",
-      "url": "/d/fcc-home",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Traffic",
-      "type": "link",
-      "url": "/d/fcc-traffic",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Fleet",
-      "type": "link",
-      "url": "/d/fcc-fleet",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Alert history",
-      "type": "link",
-      "url": "/d/fcc-alerts",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Pods",
-      "type": "link",
-      "url": "/d/fcc-k8s-pods",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Argo CD apps",
-      "type": "link",
-      "url": "/d/fcc-argocd",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Logs (Explore)",
-      "type": "link",
-      "url": "/explore",
-      "icon": "external link",
-      "targetBlank": true
-    }
-  ],
+  "schemaVersion": 41,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "timezone": "browser",
   "annotations": { "list": [] },
   "templating": {
     "list": [
@@ -68,7 +18,7 @@
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "victoriametrics" },
         "query": {
-          "query": "label_values(ALERTS, alertname)",
+          "query": "label_values(ALERTS{alertname!=\"Watchdog\"}, alertname)",
           "refId": "alertname"
         },
         "refresh": 2,
@@ -94,108 +44,381 @@
       }
     ]
   },
+  "links": [
+    {
+      "title": "Home",
+      "type": "link",
+      "url": "/d/fcc-home",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Pods",
+      "type": "link",
+      "url": "/d/fcc-k8s-pods",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Argo CD apps",
+      "type": "link",
+      "url": "/d/fcc-argocd",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Active notifications",
+      "type": "link",
+      "url": "/alerting/groups?alertmanager=Alertmanager",
+      "icon": "bolt"
+    },
+    {
+      "title": "Silences",
+      "type": "link",
+      "url": "/alerting/silences?alertmanager=Alertmanager",
+      "icon": "bolt"
+    },
+    {
+      "title": "Runbook 19",
+      "type": "link",
+      "url": "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/19-o11y-alerts.md",
+      "icon": "doc",
+      "targetBlank": true
+    }
+  ],
   "panels": [
     {
-      "type": "state-timeline",
-      "title": "Firing, by alert",
+      "id": 1,
+      "type": "table",
+      "title": "Firing now",
+      "description": "One row per alert. Targets is how many series fire. Since is when the oldest series started. Empty means no alert fires.",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 6 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 10 },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (alertname) (ALERTS{alertstate=\"firing\", alertname=~\"$alertname\", severity=~\"$severity\"})",
+          "expr": "count by (alertname, severity) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\"})",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "min by (alertname, severity) (ALERTS_FOR_STATE{alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\"}) * 1000 and on (alertname, severity) count by (alertname, severity) (ALERTS{alertstate=\"firing\"})",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": {
+              "alertname": 0,
+              "severity": 1,
+              "Value #A": 2,
+              "Value #B": 3
+            },
+            "renameByName": {
+              "alertname": "Alert",
+              "severity": "Severity",
+              "Value #A": "Targets",
+              "Value #B": "Since"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Severity" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": {
+                        "text": "Critical",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "warning": {
+                        "text": "Warning",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "info": { "text": "Info", "color": "blue", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Targets" },
+            "properties": [{ "id": "custom.width", "value": 90 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Since" },
+            "properties": [
+              { "id": "unit", "value": "dateTimeFromNow" },
+              { "id": "custom.width", "value": 160 }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [{ "displayName": "Severity", "desc": false }],
+        "footer": { "show": false }
+      }
+    },
+    {
+      "id": 2,
+      "type": "state-timeline",
+      "title": "When each alert fired",
+      "description": "One row per alert, coloured by severity: red is critical, orange is warning, blue is info. A gap means the alert did not fire, or vmalert was down.",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 11 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (alertname) ((ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\", severity=\"critical\"} * 3) or (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\", severity=\"warning\"} * 2) or ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\", severity!~\"critical|warning\"})",
           "legendFormat": "{{alertname}}",
           "interval": "1m"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "red" },
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "blue", "value": 1 },
+              { "color": "orange", "value": 2 },
+              { "color": "red", "value": 3 }
+            ]
+          },
           "mappings": [
             {
               "type": "value",
-              "options": { "1": { "text": "firing", "color": "red" } }
+              "options": {
+                "1": { "text": "Info", "color": "blue", "index": 0 },
+                "2": { "text": "Warning", "color": "orange", "index": 1 },
+                "3": { "text": "Critical", "color": "red", "index": 2 }
+              }
             }
           ],
-          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+          "custom": { "fillOpacity": 85, "lineWidth": 0 }
         },
         "overrides": []
       },
       "options": {
-        "showValue": "never",
         "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
         "rowHeight": 0.8,
-        "legend": { "showLegend": false },
-        "tooltip": { "mode": "single" }
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": { "mode": "single", "sort": "none" }
       }
     },
     {
-      "type": "state-timeline",
-      "title": "Firing, by alert and target",
-      "description": "One row for each firing series. The row names the alert, then the instance, name or job label.",
+      "id": 3,
+      "type": "table",
+      "title": "Time firing in the range",
+      "description": "Minutes each alert fired in the time range, at 1-minute steps. Sorted by the longest.",
+      "gridPos": { "x": 0, "y": 17, "w": 9, "h": 12 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 14 },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (alertname, instance, name, job) (ALERTS{alertstate=\"firing\", alertname=~\"$alertname\", severity=~\"$severity\"})",
-          "legendFormat": "{{alertname}} {{instance}}{{name}} {{job}}",
-          "interval": "1m"
+          "expr": "count_over_time((max by (alertname, severity) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\"}))[$__range:1m]) * 60",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "alertname": 0, "severity": 1, "Value": 2 },
+            "renameByName": {
+              "alertname": "Alert",
+              "severity": "Severity",
+              "Value": "Time firing"
+            }
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "red" },
-          "mappings": [
-            {
-              "type": "value",
-              "options": { "1": { "text": "firing", "color": "red" } }
-            }
-          ],
-          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" } }
         },
-        "overrides": []
-      },
-      "options": {
-        "showValue": "never",
-        "mergeValues": true,
-        "rowHeight": 0.8,
-        "legend": { "showLegend": false },
-        "tooltip": { "mode": "single" }
-      }
-    },
-    {
-      "type": "table",
-      "title": "Series that fired in the time range",
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "sort_desc(count by (alertname, severity) (max_over_time(ALERTS{alertstate=\"firing\", alertname=~\"$alertname\", severity=~\"$severity\"}[$__range])))",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Value" },
-            "properties": [{ "id": "displayName", "value": "Series" }]
+            "matcher": { "id": "byName", "options": "Severity" },
+            "properties": [
+              { "id": "custom.width", "value": 100 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": {
+                        "text": "Critical",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "warning": {
+                        "text": "Warning",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "info": { "text": "Info", "color": "blue", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Time firing" },
+            "properties": [
+              { "id": "unit", "value": "s" },
+              { "id": "decimals", "value": 0 },
+              { "id": "custom.width", "value": 120 }
+            ]
           }
         ]
       },
       "options": {
         "showHeader": true,
-        "sortBy": [{ "displayName": "Series", "desc": true }]
-      },
+        "cellHeight": "sm",
+        "sortBy": [{ "displayName": "Time firing", "desc": true }],
+        "footer": { "show": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Firing now, by target",
+      "description": "Every series that fires now, with its labels. Use the column filters to find one target.",
+      "gridPos": { "x": 9, "y": 17, "w": 15, "h": 12 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (alertname, severity, instance, job, namespace, pod, name) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\"})",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true } } }
-      ]
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true },
+            "indexByName": {
+              "alertname": 0,
+              "severity": 1,
+              "name": 2,
+              "instance": 3,
+              "job": 4,
+              "namespace": 5,
+              "pod": 6
+            },
+            "renameByName": {
+              "alertname": "Alert",
+              "severity": "Severity",
+              "name": "Name",
+              "instance": "Instance",
+              "job": "Job",
+              "namespace": "Namespace",
+              "pod": "Pod"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Severity" },
+            "properties": [
+              { "id": "custom.width", "value": 100 },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-text" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": {
+                        "text": "Critical",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "warning": {
+                        "text": "Warning",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "info": { "text": "Info", "color": "blue", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [{ "displayName": "Alert", "desc": false }],
+        "footer": { "show": false }
+      }
     }
   ]
 }

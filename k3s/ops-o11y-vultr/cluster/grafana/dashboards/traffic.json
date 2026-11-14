@@ -20,13 +20,6 @@
   "liveNow": false,
   "links": [
     {
-      "title": "Home",
-      "type": "link",
-      "url": "/d/fcc-home",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
       "title": "Traffic",
       "type": "link",
       "url": "/d/fcc-traffic",
@@ -41,27 +34,6 @@
       "icon": "dashboard",
       "keepTime": true,
       "includeVars": true
-    },
-    {
-      "title": "Alert history",
-      "type": "link",
-      "url": "/d/fcc-alerts",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Pods",
-      "type": "link",
-      "url": "/d/fcc-k8s-pods",
-      "icon": "dashboard",
-      "keepTime": true
-    },
-    {
-      "title": "Argo CD apps",
-      "type": "link",
-      "url": "/d/fcc-argocd",
-      "icon": "dashboard",
-      "keepTime": true
     },
     {
       "title": "Logs (Explore)",
