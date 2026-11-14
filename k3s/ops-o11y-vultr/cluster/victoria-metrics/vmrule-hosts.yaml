@@ -135,6 +135,18 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#o11ybackupfailed"
+        - alert: O11yPodRestarting
+          expr: |
+            (increase(kube_pod_container_status_restarts_total{namespace="o11y"}[30m]) > 2)
+            * on(namespace, pod, container) group_left(reason)
+            kube_pod_container_status_last_terminated_reason{namespace="o11y"}
+          labels:
+            severity: warning
+          annotations:
+            summary: "o11y container {{ $labels.pod }}/{{ $labels.container }} restarted more than 2 times in 30 minutes. Last stop: {{ $labels.reason }}."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#o11ypodrestarting"
     - name: fluent-bit
       interval: 1m
       rules:

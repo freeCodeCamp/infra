@@ -4,7 +4,7 @@
 
 Each alert has one section here. The section name is the alert name. The alert links to its section in the `runbook_url` annotation.
 
-Each Chat message has a title with the severity, the alert name and the state (`Firing` or `Resolved`). Then it shows the start time in UTC. It also shows each of these when the alert has it: the host (the `host` label, or the `instance` label), the `env` and `role` labels, the summary, the description and the runbook link. The template is `message.tmpl` in `k3s/ops-o11y-vultr/cluster/victoria-metrics/calert.yaml`. calert reads its config and template only when it starts. After a change to `calert-config` alone, wait until Argo CD shows `calert-config` synced, then restart calert:
+calert sends one Chat card for each Alertmanager group (one alert name and job), with up to 10 alerts in it. Later changes to the group go to the same Chat thread. Google Chat takes 1 message per second for each space, so one card for each group keeps a burst of alerts from being dropped. calert uses its built-in group template. calert reads its config only when it starts. After a change to `calert-config` alone, wait until Argo CD shows `calert-config` synced, then restart calert:
 
 ```sh
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y rollout restart deploy/calert
@@ -286,6 +286,23 @@ kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs job/<job-n
 ```
 
 The alert clears when a backup succeeds or the next run starts. It fires again 3 hours after each failed run.
+
+## O11yPodRestarting
+
+An o11y container restarted more than 2 times in 30 minutes. The `reason` label shows why it last stopped.
+
+- `OOMKilled`: the container used all of its memory limit. Read its memory use and raise the limit in its manifest, inside the node budget (keep 25% of each node free).
+- `Error`: read the log of the stopped container:
+
+  ```sh
+  kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs <pod> -c <container> --previous --tail=50
+  ```
+
+  On 2026-11-14, `vmalert`, `vmagent` and `vmauth` stopped with `Error` after a kernel update, because containers could not signal themselves. `ansible/tasks/k3s-apparmor-sysctl.yml` fixes this. Make sure that the AppArmor sysctl is `0` on each node:
+
+  ```sh
+  kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y exec vmalertmanager-vm-0 -c alertmanager -- cat /proc/sys/kernel/apparmor_restrict_unprivileged_unconfined
+  ```
 
 ## EtcdSnapshotMissing
 
