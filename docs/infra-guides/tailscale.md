@@ -30,10 +30,13 @@ On Vultr, only the 3 o11y VMs, the Swarm manager and the client VMs join. Other 
 
 ## Services
 
-| Service              | Host                    | Purpose                                                              |
-| -------------------- | ----------------------- | -------------------------------------------------------------------- |
-| `svc:swarm-wh-vultr` | `ops-vm-swarm-mgr-1`    | Deploy webhook of the Vultr Swarm (`play-vultr--manager.yml`)        |
-| `svc:grafana`        | `ops-vm-o11y-1` to `-3` | Grafana of `ops-o11y-vultr` (`play-vultr--o11y-grafana-service.yml`) |
+| Service              | Host                    | Purpose                                                               |
+| -------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `svc:swarm-wh-vultr` | `ops-vm-swarm-mgr-1`    | Deploy webhook of the Vultr Swarm (`play-vultr--manager.yml`)         |
+| `svc:grafana`        | `ops-vm-o11y-1` to `-3` | Grafana of `ops-o11y-vultr` (`play-vultr--o11y-tailnet-services.yml`) |
+| `svc:argocd-o11y`    | `ops-vm-o11y-1` to `-3` | Argo CD of `ops-o11y-vultr` (`play-vultr--o11y-tailnet-services.yml`) |
+
+Name the Service of a tool that each cluster can run with the cluster, such as `svc:argocd-o11y`.
 
 ## Naming Convention
 

@@ -1,0 +1,97 @@
+---
+- name: Serve the o11y web UIs on the tailnet from the o11y nodes
+  hosts: "{{ variable_host | default('null') }}:&ops_o11y_vultr"
+  max_fail_percentage: 0
+  become: true
+  become_user: root
+  gather_facts: false
+  tasks:
+    - name: Read the ClusterIP of each served Service
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - --namespace={{ item.namespace }}
+          - get
+          - service
+          - "{{ item.service }}"
+          - --output=jsonpath={.spec.clusterIP}
+      loop: "{{ o11y_tailnet_services }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: tailnet_cluster_ips
+      changed_when: false
+      check_mode: false
+      run_once: true
+
+    - name: Refuse an empty ClusterIP
+      ansible.builtin.assert:
+        that:
+          - item.stdout | length > 0
+          - item.stdout != 'None'
+        fail_msg: The {{ item.item.service }} Service has no ClusterIP.
+        quiet: true
+      loop: "{{ tailnet_cluster_ips.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      run_once: true
+
+    - name: Read the Tailscale Services this host serves
+      ansible.builtin.command: tailscale serve status --json
+      register: tailnet_serve_status
+      changed_when: false
+      check_mode: false
+
+    - name: Read the Tailscale Services this host advertises
+      ansible.builtin.command: tailscale debug prefs
+      register: tailnet_prefs
+      changed_when: false
+      check_mode: false
+
+    - name: Keep the served and advertised Services
+      ansible.builtin.set_fact:
+        tailnet_serving: "{{ (tailnet_serve_status.stdout | from_json).Services | default({}) | list }}"
+        tailnet_advertised: "{{ (tailnet_prefs.stdout | from_json).AdvertiseServices | default([], true) }}"
+
+    - name: Refuse a Service that points at another target
+      ansible.builtin.assert:
+        that:
+          - tailnet_found_target == tailnet_target
+        fail_msg: "{{ inventory_hostname }} serves {{ item.item.name }} to {{ tailnet_found_target }}, not to {{ tailnet_target }}."
+        quiet: true
+      loop: "{{ tailnet_cluster_ips.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: item.item.name in tailnet_serving
+      vars:
+        tailnet_target: "http://{{ item.stdout }}:{{ item.item.port }}"
+        tailnet_found_web: "{{ (tailnet_serve_status.stdout | from_json).Services[item.item.name].Web | default({}) }}"
+        tailnet_found_target: "{{ (tailnet_found_web | dict2items | first | default({'value': {}})).value.Handlers['/'].Proxy | default('none') }}"
+
+    - name: Serve each Service on the tailnet
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - serve
+          - --service={{ item.item.name }}
+          - --https=443
+          - --yes
+          - http://{{ item.stdout }}:{{ item.item.port }}
+      loop: "{{ tailnet_cluster_ips.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      changed_when: true
+      when: item.item.name not in tailnet_serving
+
+    - name: Advertise a Service again after a Tailscale reset
+      ansible.builtin.command:
+        argv:
+          - tailscale
+          - serve
+          - advertise
+          - "{{ item.item.name }}"
+      loop: "{{ tailnet_cluster_ips.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      changed_when: true
+      when: item.item.name in tailnet_serving and item.item.name not in tailnet_advertised

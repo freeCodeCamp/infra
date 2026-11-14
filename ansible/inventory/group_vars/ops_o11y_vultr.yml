@@ -4,7 +4,15 @@ k3s_init_host: ops-vm-o11y-1
 k3s_version: v1.36.4+k3s1
 k3s_vpc_cidr: "{{ vultr_vpc_cidr }}"
 fluent_bit_push_metrics: false
-grafana_service: svc:grafana
+o11y_tailnet_services:
+  - name: svc:grafana
+    namespace: o11y
+    service: grafana
+    port: 80
+  - name: svc:argocd-o11y
+    namespace: argocd
+    service: argocd-server
+    port: 80
 fluent_bit_ip_allow_extra:
   - "{{ (server_config_yaml | from_yaml)['cluster-cidr'] | default('10.42.0.0/16') }}"
 
