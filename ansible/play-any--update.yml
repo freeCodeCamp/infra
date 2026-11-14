@@ -13,6 +13,9 @@
         sleep: 5
         timeout: 300
 
+    - name: Turn off unattended upgrades
+      ansible.builtin.import_tasks: tasks/apt-no-unattended.yml
+
     - name: Update apt repo and cache
       block:
         - name: Update apt cache

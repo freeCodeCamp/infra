@@ -23,6 +23,9 @@
           ansible.builtin.fail:
             msg: "{{ inventory_hostname }} failed the internet check: {{ ansible_failed_result.msg | default('no error text') }}"
 
+    - name: Turn off unattended upgrades
+      ansible.builtin.import_tasks: tasks/apt-no-unattended.yml
+
     - name: Upgrade a new host and reboot it once
       ansible.builtin.import_tasks: tasks/vultr-first-configure.yml
 

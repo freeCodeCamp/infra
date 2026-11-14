@@ -83,7 +83,7 @@ Run these on the Swarm node groups. The role `docker` applies the same guard to 
 
 The default of `variable_manager` is `ops_swarm_mgr`.
 
-`play-any--update.yml` does not upgrade held packages. To upgrade Docker, run `play-swarm--upgrade-docker.yml`. Start with a staging group:
+`play-any--update.yml` and `play-vultr--base.yml` turn off unattended upgrades with `/etc/apt/apt.conf.d/99-no-unattended-upgrades`, so OS changes come only from housekeeping. `play-any--update.yml` does not upgrade held packages. To upgrade Docker, run `play-swarm--upgrade-docker.yml`. Start with a staging group:
 
 ```bash
 ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
