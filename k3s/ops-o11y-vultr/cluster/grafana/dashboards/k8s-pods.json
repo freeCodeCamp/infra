@@ -69,7 +69,7 @@
     {
       "title": "Logs (Explore)",
       "type": "link",
-      "url": "/explore",
+      "url": "/explore?schemaVersion=1&orgId=1&panes=%7B%22a%22%3A%7B%22datasource%22%3A%22victorialogs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22victoriametrics-logs-datasource%22%2C%22uid%22%3A%22victorialogs%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D",
       "icon": "external link",
       "targetBlank": true
     }
@@ -260,7 +260,7 @@
       "id": 5,
       "type": "table",
       "title": "Restarts in the time range",
-      "description": "Grouped by container, so a pod that is replaced stays on one row. Last stop is why the container last stopped.",
+      "description": "Grouped by container, so a pod that is replaced stays on one row. Last stop is why the container last stopped. If its pods stopped for different reasons, the container has one row for each reason.",
       "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [

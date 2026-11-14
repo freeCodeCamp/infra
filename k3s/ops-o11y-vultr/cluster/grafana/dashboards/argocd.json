@@ -71,7 +71,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (name) (last_over_time(argocd_app_info{prometheus=\"$cluster\"}[5m])))",
+          "expr": "count(count by (name) (argocd_app_info{prometheus=\"$cluster\"}))",
           "legendFormat": "Apps"
         }
       ],
@@ -109,7 +109,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (name) (last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status!=\"Healthy\"}[5m]))) or vector(0)",
+          "expr": "count(count by (name) (argocd_app_info{prometheus=\"$cluster\", health_status!=\"Healthy\"})) or vector(0)",
           "legendFormat": "Not Healthy"
         }
       ],
@@ -154,7 +154,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (name) (last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status!=\"Synced\"}[5m]))) or vector(0)",
+          "expr": "count(count by (name) (argocd_app_info{prometheus=\"$cluster\", sync_status!=\"Synced\"})) or vector(0)",
           "legendFormat": "Out of sync"
         }
       ],
@@ -232,7 +232,7 @@
       "id": 5,
       "type": "table",
       "title": "Applications now",
-      "description": "Every app, worst first.",
+      "description": "Every app, sorted by health.",
       "gridPos": { "x": 0, "y": 4, "w": 24, "h": 9 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [
@@ -345,7 +345,7 @@
                     "type": "value",
                     "options": {
                       "true": { "text": "On", "index": 0 },
-                      "false": { "text": "Off", "color": "orange", "index": 1 }
+                      "false": { "text": "Off", "index": 1 }
                     }
                   }
                 ]
@@ -365,14 +365,14 @@
       "id": 6,
       "type": "state-timeline",
       "title": "Health over time",
-      "description": "Green is Healthy, blue is Progressing, red is Degraded or worse. Short gaps under 5 minutes in the metrics are joined.",
+      "description": "Green is Healthy, blue is Progressing, red is Degraded or worse. A gap means no metrics came in.",
       "gridPos": { "x": 0, "y": 13, "w": 12, "h": 9 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (name) ((last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status=\"Healthy\"}[5m]) * 0) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status=\"Progressing\"}[5m]) * 0 + 1) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", health_status!~\"Healthy|Progressing\"}[5m]) * 0 + 2))",
+          "expr": "max by (name) ((argocd_app_info{prometheus=\"$cluster\", health_status=\"Healthy\"} * 0) or (argocd_app_info{prometheus=\"$cluster\", health_status=\"Progressing\"} * 0 + 1) or (argocd_app_info{prometheus=\"$cluster\", health_status!~\"Healthy|Progressing\"} * 0 + 2))",
           "legendFormat": "{{name}}"
         }
       ],
@@ -393,7 +393,7 @@
               "options": {
                 "0": { "text": "Healthy", "color": "green", "index": 0 },
                 "1": { "text": "Progressing", "color": "blue", "index": 1 },
-                "2": { "text": "Degraded", "color": "red", "index": 2 }
+                "2": { "text": "Degraded or other", "color": "red", "index": 2 }
               }
             }
           ],
@@ -418,14 +418,14 @@
       "id": 7,
       "type": "state-timeline",
       "title": "Sync over time",
-      "description": "Green is Synced, orange is OutOfSync, grey is Unknown. Short gaps under 5 minutes in the metrics are joined.",
+      "description": "Green is Synced, orange is OutOfSync, grey is Unknown. A gap means no metrics came in.",
       "gridPos": { "x": 12, "y": 13, "w": 12, "h": 9 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (name) ((last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status=\"Synced\"}[5m]) * 0) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status=\"OutOfSync\"}[5m]) * 0 + 1) or (last_over_time(argocd_app_info{prometheus=\"$cluster\", sync_status!~\"Synced|OutOfSync\"}[5m]) * 0 + 2))",
+          "expr": "max by (name) ((argocd_app_info{prometheus=\"$cluster\", sync_status=\"Synced\"} * 0) or (argocd_app_info{prometheus=\"$cluster\", sync_status=\"OutOfSync\"} * 0 + 1) or (argocd_app_info{prometheus=\"$cluster\", sync_status!~\"Synced|OutOfSync\"} * 0 + 2))",
           "legendFormat": "{{name}}"
         }
       ],

@@ -56,7 +56,7 @@
     {
       "title": "Logs (Explore)",
       "type": "link",
-      "url": "/explore",
+      "url": "/explore?schemaVersion=1&orgId=1&panes=%7B%22a%22%3A%7B%22datasource%22%3A%22victorialogs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22victoriametrics-logs-datasource%22%2C%22uid%22%3A%22victorialogs%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D",
       "icon": "external link",
       "targetBlank": true
     }
@@ -116,8 +116,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Silenced alerts",
-      "description": "Alerts that Alertmanager holds back because of a silence. Click to see the silences.",
+      "title": "Muted alerts",
+      "description": "Alerts that Alertmanager holds back, because of a silence or an inhibit rule. Click to see the silences.",
       "gridPos": { "x": 5, "y": 0, "w": 5, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [
@@ -226,7 +226,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "count(count by (prometheus, name) (last_over_time(argocd_app_info{health_status!=\"Healthy\"}[5m]) or last_over_time(argocd_app_info{sync_status!=\"Synced\"}[5m]))) or vector(0)",
+          "expr": "count(count by (prometheus, name) (argocd_app_info{health_status!=\"Healthy\"} or argocd_app_info{sync_status!=\"Synced\"})) or vector(0)",
           "legendFormat": "Not OK"
         }
       ],
@@ -437,7 +437,7 @@
       "id": 7,
       "type": "table",
       "title": "Containers that restarted in the last hour",
-      "description": "Grouped by container, so a pod that is replaced stays on one row. Last stop is why the container last stopped. Empty means no restarts.",
+      "description": "Grouped by container, so a pod that is replaced stays on one row. Last stop is why the container last stopped. If its pods stopped for different reasons, the container has one row for each reason. Empty means no restarts.",
       "gridPos": { "x": 12, "y": 5, "w": 12, "h": 9 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [

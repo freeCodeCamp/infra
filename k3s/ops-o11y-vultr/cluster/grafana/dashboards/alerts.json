@@ -248,7 +248,7 @@
       "id": 3,
       "type": "table",
       "title": "Time firing in the range",
-      "description": "Minutes each alert fired in the time range, at 1-minute steps. Sorted by the longest.",
+      "description": "How long each alert fired in the time range, at 1-minute steps. Sorted by the longest.",
       "gridPos": { "x": 0, "y": 17, "w": 9, "h": 12 },
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
       "targets": [
@@ -339,7 +339,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-          "expr": "max by (alertname, severity, instance, job, namespace, pod, name) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\"})",
+          "expr": "max by (alertname, severity, env, server_name, host, instance, job, namespace, pod, container, name, cronjob, node) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\", alertname=~\"$alertname\", severity=~\"$severity\"})",
           "format": "table",
           "instant": true,
           "range": false
@@ -353,20 +353,32 @@
             "indexByName": {
               "alertname": 0,
               "severity": 1,
-              "name": 2,
-              "instance": 3,
-              "job": 4,
-              "namespace": 5,
-              "pod": 6
+              "env": 2,
+              "server_name": 3,
+              "host": 4,
+              "name": 5,
+              "instance": 6,
+              "job": 7,
+              "namespace": 8,
+              "pod": 9,
+              "container": 10,
+              "cronjob": 11,
+              "node": 12
             },
             "renameByName": {
               "alertname": "Alert",
               "severity": "Severity",
+              "env": "Env",
+              "server_name": "Site",
+              "host": "Host",
               "name": "Name",
               "instance": "Instance",
               "job": "Job",
               "namespace": "Namespace",
-              "pod": "Pod"
+              "pod": "Pod",
+              "container": "Container",
+              "cronjob": "CronJob",
+              "node": "Node"
             }
           }
         }
