@@ -41,7 +41,8 @@ done < <(awk -F'|' '
     if (ready + 0 != desired + 0) print $1 "/" $2 " " ready + 0 "/" desired + 0
   }' <<<"$workloads_out")
 
-cutoff=$(date -u -d '-15 min' +%Y-%m-%dT%H:%M:%SZ)
+cutoff=$(date -u -d '-15 min' +%Y-%m-%dT%H:%M:%SZ) ||
+  reasons+=("date failed")
 pods_out=$(k3s kubectl -n "$namespace" get pods -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.metadata.ownerReferences[*].kind}{"|"}{range .status.containerStatuses[*]}{.lastState.terminated.finishedAt}{","}{end}{"\n"}{end}') ||
   reasons+=("kubectl failed: get pods")
 while read -r pod; do

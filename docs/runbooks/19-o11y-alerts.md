@@ -10,13 +10,13 @@ calert sends one Chat card for each Alertmanager group (one alert name and job),
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y rollout restart deploy/calert
 ```
 
-The alerts have two layers. Alertmanager inhibit rules (`inhibit_rules` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`) mute the fleet layer while the o11y layer reports that o11y itself is broken:
+The alerts have two layers. An Alertmanager inhibit rule (`inhibit_rules` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`) mutes part of the fleet layer while no Vultr host can send metrics:
 
 - o11y layer, never muted: `O11yPodRestarting`, `VultrMetricsPushDown`, `TargetDown`, `LogStoreDown`, `LogStoreStale`, `VlagentDroppedData`, `ScrapeConfigReloadFailed`, `VmalertExecutionErrors`, `O11yBackupStale`, `O11yBackupFailed`, `ArgoCDAppUnhealthy`, `EtcdSnapshotMissing`.
-- Fleet layer, made from the data that each host sends: `HostDown`, `NginxVmDown`, `DiskSpaceLow`, `MemoryHigh`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. These are muted while `VultrMetricsPushDown` fires, or while `O11yPodRestarting` fires for `vmauth`, `vlagent`, `vmagent`, `vmalert`, `vminsert`, `vmstorage` or `vlsingle`.
-- `ProbeFailed` checks the public sites from outside the hosts, so it is never muted.
+- Fleet layer, muted while `VultrMetricsPushDown` fires: `HostDown`, `NginxVmDown`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. Missing data can make these fire.
+- Never muted: `DiskSpaceLow` and `MemoryHigh` (they fire only on data that arrives, and they also cover the o11y nodes), and `ProbeFailed` (it checks the public sites from outside the hosts).
 
-While the fleet layer is muted, a real host fault does not notify. Fix o11y first. The muted alerts stay visible in Alertmanager with the state `suppressed`.
+`O11yPodRestarting` mutes nothing: each o11y component has more than one replica, so one restarting container does not stop the data. While `VultrMetricsPushDown` fires, a real host fault does not notify. Fix o11y first. The muted alerts stay visible in Alertmanager with the state `suppressed`.
 
 Run every command from the repo root unless the step says otherwise.
 
@@ -299,17 +299,23 @@ The alert clears when a backup succeeds or the next run starts. It fires again 3
 
 An o11y container restarted more than 2 times in 30 minutes. The `reason` label shows why it last stopped.
 
-- `OOMKilled`: the container used all of its memory limit. Read its memory use and raise the limit in its manifest, inside the node budget (keep 25% of each node free).
+- `OOMKilled`: the container used all of its memory limit. Read its memory use and raise the limit in its manifest. The nodes keep no memory reserve; keep the three nodes equally loaded.
 - `Error`: read the log of the stopped container:
 
   ```sh
   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs <pod> -c <container> --previous --tail=50
   ```
 
-  On 2026-11-14, `vmalert`, `vmagent` and `vmauth` stopped with `Error` after a kernel update, because containers could not signal themselves. `ansible/tasks/k3s-apparmor-sysctl.yml` fixes this. Make sure that the AppArmor sysctl is `0` on each node:
+  On 2026-11-14, `vmalert`, `vmagent` and `vmauth` stopped with `Error` after a kernel update, because containers could not signal themselves. `ansible/tasks/k3s-apparmor-sysctl.yml` fixes this. Make sure that the AppArmor sysctl is `0` on each node. The 3 Alertmanager pods run on different nodes, so read it in each:
 
   ```sh
-  kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y exec vmalertmanager-vm-0 -c alertmanager -- cat /proc/sys/kernel/apparmor_restrict_unprivileged_unconfined
+  for p in vmalertmanager-vm-0 vmalertmanager-vm-1 vmalertmanager-vm-2; do
+    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y \
+      get pod "$p" -o jsonpath='{.spec.nodeName}{" "}'
+    kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y \
+      exec "$p" -c alertmanager -- \
+      cat /proc/sys/kernel/apparmor_restrict_unprivileged_unconfined
+  done
   ```
 
 ## EtcdSnapshotMissing

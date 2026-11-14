@@ -99,15 +99,15 @@ Use `-i inventory/digitalocean.yml` in the subshell with `../../infra-secrets/do
 | --------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `play-k3s--servers.yml`     | Install or upgrade k3s on `ops_o11y_vultr`, and set the AppArmor sysctl | —                                                           |
 | `play-k3s--reboot.yml`      | Reboot K3s nodes one by one, with a node probe and the gate after each  | `variable_force_reboot=true`                                |
-| `play-k3s--verify-o11y.yml` | Run the gate once, then the node probe on each node. Changes nothing.   | —                                                           |
+| `play-k3s--verify-o11y.yml` | Run the gate once, then a short-lived probe pod on each node            | —                                                           |
 | `play-k3s--longhorn.yml`    | Install Longhorn on `tools_k3s`                                         | —                                                           |
 | `play-k3s--teardown.yml`    | Remove k3s from every host in the group. Takes an etcd snapshot first.  | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
 
 ### The o11y Gate and Node Probe
 
 - The AppArmor sysctl is `kernel.apparmor_restrict_unprivileged_unconfined=0` in `/etc/sysctl.d/20-apparmor.conf`. Without it, containers on kernel 7.0.0-43 cannot signal themselves (Launchpad 2172746). Remove it when Ubuntu ships a fix.
-- The node probe runs pod `k3s-node-probe-<node>` on the node. The pod sends itself `SIGHUP` and must end in phase `Succeeded`.
-- The gate (`tasks/k3s-o11y-gate.sh`) needs every o11y Deployment, StatefulSet and DaemonSet ready, and no o11y container, apart from Job pods, terminated in the last 15 min. After a reboot, the play waits up to 120 x 10 s for it.
+- The node probe runs pod `k3s-node-probe-<node>` on the node. The pod sends itself `SIGHUP` and must end in phase `Succeeded`. With `--check`, the probe does not run.
+- The gate (`tasks/k3s-o11y-gate.sh`) needs every o11y Deployment, StatefulSet and DaemonSet ready, and no o11y container, apart from Job pods, terminated in the last 15 min. The play waits up to 120 x 10 s for it before a reboot, and up to 180 x 10 s after a reboot.
 - To check the cluster by hand, run `ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-k3s--verify-o11y.yml -e variable_host=ops_o11y_vultr` from `ansible/`.
 - `ansible--reboot-k3s.yml` has no force input. To force a gated reboot, add `-e variable_force_reboot=true` to a local run of `play-k3s--reboot.yml`.
 

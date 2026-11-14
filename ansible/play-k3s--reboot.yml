@@ -15,7 +15,7 @@
     k3s_gate_peer: "{{ ansible_play_hosts_all | difference([inventory_hostname]) | sort | first }}"
     k3s_gate_nodes: "{{ ansible_play_hosts_all | length }}"
     k3s_gate_vmstorage: 3
-    k3s_gate_post_retries: 120
+    k3s_gate_post_retries: 180
     k3s_gate_force: "{{ variable_force_reboot | default(false) }}"
   tasks:
     - name: Refuse a group too small to keep etcd quorum
@@ -56,7 +56,7 @@
           delegate_to: "{{ k3s_gate_peer }}"
           register: k3s_gate_pre
           until: k3s_gate_pre.rc == 0
-          retries: 30
+          retries: 120
           delay: 10
           changed_when: false
           check_mode: false

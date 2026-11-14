@@ -143,6 +143,89 @@
           vmalert-vm-0|ReplicaSet|{{ time_format | strftime(gate_now | float - 7200, utc=true) }},
         rc: 0
         contains: gate ok
+      daemonset_not_ready:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        workloads: |
+          DaemonSet|vmagent-node|||3|2
+        rc: 1
+        contains: "not ready: DaemonSet/vmagent-node 2/3"
+      kubectl_get_workloads_fails:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        workloads: ""
+        rc: 1
+        contains: "kubectl failed: get workloads"
+      kubectl_get_pods_fails:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        pods: ""
+        rc: 1
+        contains: "kubectl failed: get pods"
+      second_container_restart:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        pods: |
+          vlagent-0|StatefulSet|,{{ time_format | strftime(gate_now | float - 300, utc=true) }},
+        rc: 1
+        contains: "restarted: vlagent-0"
+      real_date_recent_restart:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        pods: |
+          vmalert-vm-0|ReplicaSet|{{ time_format | strftime(gate_now | float - 7200, utc=true) }},
+          vmauth-0|ReplicaSet|{{ time_format | strftime(gate_now | float - 300, utc=true) }},
+        cutoff: ""
+        rc: 1
+        contains: "restarted: vmauth-0"
+      date_fails:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        cutoff: fail
+        rc: 1
+        contains: date failed
   tasks:
     - name: Run the gate script against a stub k3s
       block:
@@ -164,9 +247,9 @@
               case "$*" in
                 *"get nodes"*) [ -s "$K3S_STUB_DIR/nodes" ] || exit 1; cat "$K3S_STUB_DIR/nodes" ;;
                 *"--raw"*) cat "$K3S_STUB_DIR/etcd" ;;
-                *"deployments,statefulsets,daemonsets"*) cat "$K3S_STUB_DIR/workloads" ;;
+                *"deployments,statefulsets,daemonsets"*) [ -s "$K3S_STUB_DIR/workloads" ] || exit 1; cat "$K3S_STUB_DIR/workloads" ;;
                 *"-l app.kubernetes.io/name=vmstorage"*) cat "$K3S_STUB_DIR/vmstorage" ;;
-                *"get pods"*) cat "$K3S_STUB_DIR/pods" ;;
+                *"get pods"*) [ -s "$K3S_STUB_DIR/pods" ] || exit 1; cat "$K3S_STUB_DIR/pods" ;;
                 *) exit 2 ;;
               esac
           check_mode: false
@@ -177,7 +260,12 @@
             mode: "0755"
             content: |
               #!/usr/bin/env bash
-              cat "$K3S_STUB_DIR/cutoff"
+              cutoff=$(cat "$K3S_STUB_DIR/cutoff")
+              [ "$cutoff" = fail ] && exit 1
+              if [ -z "$cutoff" ]; then
+                PATH=${PATH#*:} exec date "$@"
+              fi
+              printf '%s\n' "$cutoff"
           check_mode: false
 
         - name: Make a directory for each case
@@ -303,8 +391,21 @@
           - probe_at | int < post_gate_at | int
           - probe_task.delegate_to == peer_ref
           - probe_task.vars.k3s_probe_node is search('inventory_hostname')
-          - k3s_reboot_play.vars.k3s_gate_post_retries == 120
         fail_msg: "{{ k3s_block_names }}"
+        quiet: true
+
+    - name: Assert each gate waits longer than the 15-minute restart window
+      vars:
+        restart_window_seconds: 900
+        pre_gate_task: "{{ k3s_block_tasks | selectattr('name', 'match', '^Pre-gate') | first }}"
+        post_gate_task: "{{ k3s_block_tasks | selectattr('name', 'match', '^Post-gate') | first }}"
+        post_gate_seconds: "{{ (k3s_reboot_play.vars.k3s_gate_post_retries | int) * (post_gate_task.delay | int) }}"
+      ansible.builtin.assert:
+        that:
+          - (pre_gate_task.retries | int) * (pre_gate_task.delay | int) > restart_window_seconds
+          - post_gate_task.retries is search('k3s_gate_post_retries')
+          - post_gate_seconds | int > restart_window_seconds + 600
+        fail_msg: "pre {{ pre_gate_task.retries }} x {{ pre_gate_task.delay }} s, post {{ post_gate_seconds }} s"
         quiet: true
 
     - name: Assert the probe file requires Succeeded, names the pod after the node and always cleans up
@@ -315,7 +416,8 @@
         that:
           - probe_text is search("k3s_probe_phase.stdout == .Succeeded.")
           - probe_text is search('k3s-node-probe-[{][{] k3s_probe_node [}][}]')
-          - "'curlimages/curl:8.22.0' in probe_text"
           - probe_block.always | length == 1
+          - probe_block.when == 'not ansible_check_mode'
+          - probe_text is not search('"check_mode":')
         fail_msg: "{{ probe_block | to_json }}"
         quiet: true
