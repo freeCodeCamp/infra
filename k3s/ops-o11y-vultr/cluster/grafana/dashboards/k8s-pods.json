@@ -1,0 +1,262 @@
+{
+  "uid": "fcc-k8s-pods",
+  "title": "Pods",
+  "description": "Kubernetes containers: restarts, why they stopped, readiness and memory against the limit. The cluster is the prometheus label that its vmagent adds.",
+  "tags": ["kubernetes", "pods"],
+  "schemaVersion": 41,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "editable": false,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Home",
+      "type": "link",
+      "url": "/d/fcc-home",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Traffic",
+      "type": "link",
+      "url": "/d/fcc-traffic",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Fleet",
+      "type": "link",
+      "url": "/d/fcc-fleet",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Alert history",
+      "type": "link",
+      "url": "/d/fcc-alerts",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Pods",
+      "type": "link",
+      "url": "/d/fcc-k8s-pods",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "Argo CD apps",
+      "type": "link",
+      "url": "/d/fcc-argocd",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "Logs (Explore)",
+      "type": "link",
+      "url": "/explore",
+      "icon": "external link",
+      "targetBlank": true
+    }
+  ],
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "cluster",
+        "label": "Cluster",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "query": {
+          "query": "label_values(kube_pod_info, prometheus)",
+          "refId": "cluster"
+        },
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "query": {
+          "query": "label_values(kube_pod_info{prometheus=\"$cluster\"}, namespace)",
+          "refId": "namespace"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "table",
+      "title": "Restarts in the time range",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sort_desc(round(sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[$__range]))) > 0)",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [{ "id": "displayName", "value": "Restarts" }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Restarts", "desc": true }]
+      },
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true } } }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Why the container last stopped",
+      "description": "The reason of the last stop of each container that has stopped at least once, such as OOMKilled or Error.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (namespace, pod, container, reason) (kube_pod_container_status_last_terminated_reason{prometheus=\"$cluster\", namespace=~\"$namespace\"} == 1)",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": { "excludeByName": { "Time": true, "Value": true } }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Restarts per 5 minutes, by container",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (namespace, container) (increase(kube_pod_container_status_restarts_total{prometheus=\"$cluster\", namespace=~\"$namespace\"}[5m])) > 0",
+          "legendFormat": "{{namespace}}/{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": { "drawStyle": "bars", "fillOpacity": 60 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "state-timeline",
+      "title": "Containers not ready",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (namespace, pod, container) (kube_pod_container_status_ready{prometheus=\"$cluster\", namespace=~\"$namespace\"} == 0) + 1",
+          "legendFormat": "{{namespace}}/{{pod}}/{{container}}",
+          "interval": "1m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "1": { "text": "not ready", "color": "orange" } }
+            }
+          ],
+          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "legend": { "showLegend": false },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory against the limit",
+      "description": "Working set memory of each container as a share of its memory limit. The kernel kills a container at 100%.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 18, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (namespace, pod, container) (container_memory_working_set_bytes{prometheus=\"$cluster\", namespace=~\"$namespace\", container!=\"\", container!=\"POD\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{prometheus=\"$cluster\", namespace=~\"$namespace\", resource=\"memory\"})",
+          "legendFormat": "{{namespace}}/{{pod}}/{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.8 },
+              { "color": "red", "value": 0.95 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["max", "lastNotNull"],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ]
+}

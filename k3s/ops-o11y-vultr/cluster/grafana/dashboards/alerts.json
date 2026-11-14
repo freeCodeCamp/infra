@@ -1,0 +1,201 @@
+{
+  "uid": "fcc-alerts",
+  "title": "Alert history",
+  "description": "When each alert fired, from the ALERTS series that vmalert writes. A gap means vmalert did not evaluate.",
+  "tags": ["alerts", "ops"],
+  "schemaVersion": 41,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "editable": false,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Home",
+      "type": "link",
+      "url": "/d/fcc-home",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Traffic",
+      "type": "link",
+      "url": "/d/fcc-traffic",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Fleet",
+      "type": "link",
+      "url": "/d/fcc-fleet",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Alert history",
+      "type": "link",
+      "url": "/d/fcc-alerts",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Pods",
+      "type": "link",
+      "url": "/d/fcc-k8s-pods",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Argo CD apps",
+      "type": "link",
+      "url": "/d/fcc-argocd",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Logs (Explore)",
+      "type": "link",
+      "url": "/explore",
+      "icon": "external link",
+      "targetBlank": true
+    }
+  ],
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "alertname",
+        "label": "Alert",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "query": {
+          "query": "label_values(ALERTS, alertname)",
+          "refId": "alertname"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      },
+      {
+        "name": "severity",
+        "label": "Severity",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "query": {
+          "query": "label_values(ALERTS, severity)",
+          "refId": "severity"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "state-timeline",
+      "title": "Firing, by alert",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (alertname) (ALERTS{alertstate=\"firing\", alertname=~\"$alertname\", severity=~\"$severity\"})",
+          "legendFormat": "{{alertname}}",
+          "interval": "1m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "1": { "text": "firing", "color": "red" } }
+            }
+          ],
+          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "legend": { "showLegend": false },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "type": "state-timeline",
+      "title": "Firing, by alert and target",
+      "description": "One row for each firing series. The row names the alert, then the instance, name or job label.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max by (alertname, instance, name, job) (ALERTS{alertstate=\"firing\", alertname=~\"$alertname\", severity=~\"$severity\"})",
+          "legendFormat": "{{alertname}} {{instance}}{{name}} {{job}}",
+          "interval": "1m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "1": { "text": "firing", "color": "red" } }
+            }
+          ],
+          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "legend": { "showLegend": false },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Series that fired in the time range",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sort_desc(count by (alertname, severity) (max_over_time(ALERTS{alertstate=\"firing\", alertname=~\"$alertname\", severity=~\"$severity\"}[$__range])))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [{ "id": "displayName", "value": "Series" }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Series", "desc": true }]
+      },
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true } } }
+      ]
+    }
+  ]
+}

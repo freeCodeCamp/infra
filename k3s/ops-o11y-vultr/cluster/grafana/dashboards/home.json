@@ -1,0 +1,317 @@
+{
+  "uid": "fcc-home",
+  "title": "Operator home",
+  "description": "Start here: what needs attention now, and links to every operator UI.",
+  "tags": ["home", "ops"],
+  "schemaVersion": 41,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "editable": false,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Home",
+      "type": "link",
+      "url": "/d/fcc-home",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Traffic",
+      "type": "link",
+      "url": "/d/fcc-traffic",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Fleet",
+      "type": "link",
+      "url": "/d/fcc-fleet",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Alert history",
+      "type": "link",
+      "url": "/d/fcc-alerts",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Pods",
+      "type": "link",
+      "url": "/d/fcc-k8s-pods",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Argo CD apps",
+      "type": "link",
+      "url": "/d/fcc-argocd",
+      "icon": "dashboard",
+      "keepTime": true
+    },
+    {
+      "title": "Logs (Explore)",
+      "type": "link",
+      "url": "/explore",
+      "icon": "external link",
+      "targetBlank": true
+    }
+  ],
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Needs attention now",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Firing alerts",
+      "description": "Alerts that vmalert reports as firing now, without Watchdog. Select to open the Alertmanager view.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 0, "y": 1, "w": 5, "h": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "links": [
+            {
+              "title": "Active notifications",
+              "url": "/alerting/groups?alertmanager=Alertmanager"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Silenced alerts",
+      "description": "Alerts that a silence holds back in Alertmanager now. Select to open Silences.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 5, "y": 1, "w": 5, "h": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "max(alertmanager_alerts{state=\"suppressed\"}) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "links": [
+            {
+              "title": "Silences",
+              "url": "/alerting/silences?alertmanager=Alertmanager"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Argo CD apps not Synced and Healthy",
+      "description": "Argo CD Applications that are not Synced, or not Healthy. Select to open the Argo CD apps dashboard.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 10, "y": 1, "w": 5, "h": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(max by (prometheus, name) (argocd_app_info{health_status!=\"Healthy\"} or argocd_app_info{sync_status!=\"Synced\"})) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "links": [{ "title": "Argo CD apps", "url": "/d/fcc-argocd" }]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Containers restarted (1h)",
+      "description": "Kubernetes containers that restarted in the last hour. Select to open the Pods dashboard.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 15, "y": 1, "w": 5, "h": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(increase(kube_pod_container_status_restarts_total[1h]) > 0) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "links": [{ "title": "Pods", "url": "/d/fcc-k8s-pods" }]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Failing probes",
+      "description": "Public URLs whose last blackbox probe failed. Select to open Traffic and health.",
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(probe_success == 0) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "links": [{ "title": "Traffic and health", "url": "/d/fcc-traffic" }]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "type": "row",
+      "title": "Go to",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "type": "text",
+      "title": "Alerts",
+      "gridPos": { "x": 0, "y": 7, "w": 8, "h": 9 },
+      "options": {
+        "mode": "markdown",
+        "content": "- [Active notifications](/alerting/groups?alertmanager=Alertmanager): what Alertmanager holds now\n- [Silences](/alerting/silences?alertmanager=Alertmanager): add or end a silence\n- [Notification configuration](/alerting/routes?alertmanager=Alertmanager): routes and receivers, read-only\n- [Alert rules](/alerting/list): metric rules of vmalert\n- [Alert history](/d/fcc-alerts): when each alert fired\n- [Runbook 19](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/19-o11y-alerts.md): one section per alert\n\nRoutes and receivers are in Git: `alertmanager.config` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`."
+      }
+    },
+    {
+      "type": "text",
+      "title": "Clusters",
+      "gridPos": { "x": 8, "y": 7, "w": 8, "h": 9 },
+      "options": {
+        "mode": "markdown",
+        "content": "**ops-o11y-vultr**\n\n- Argo CD: the Tailscale Service `svc:argocd-o11y` (HTTPS), or [http://ops-vm-o11y-1:30081](http://ops-vm-o11y-1:30081)\n- [Argo CD apps](/d/fcc-argocd): sync and health over time\n- [Pods](/d/fcc-k8s-pods): restarts, kill reasons, memory against limits\n- [VictoriaMetrics components](/dashboards?tag=victoriametrics) and [Node Exporter Full](/d/rYdddlPWk): component and node dashboards"
+      }
+    },
+    {
+      "type": "text",
+      "title": "Logs and traffic",
+      "gridPos": { "x": 16, "y": 7, "w": 8, "h": 9 },
+      "options": {
+        "mode": "markdown",
+        "content": "- [Traffic and health](/d/fcc-traffic): requests, errors, latency, probes\n- [Fleet capacity and stability](/d/fcc-fleet): availability, capacity, reboots, OOM kills\n- [Logs in Explore](/explore): datasource `VictoriaLogs` goes through vmauth; `VictoriaLogs vlogs-a`, `-b` and `-c` read one store each\n\nWhen vmauth is down, use the per-store datasources."
+      }
+    }
+  ]
+}

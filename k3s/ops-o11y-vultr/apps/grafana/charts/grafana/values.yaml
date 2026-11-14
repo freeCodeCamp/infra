@@ -49,7 +49,7 @@ grafana.ini:
   unified_alerting:
     enabled: true
   dashboards:
-    default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/traffic.json
+    default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/home.json
 
 datasources:
   datasources.yaml:
@@ -115,6 +115,14 @@ dashboardProviders:
         allowUiUpdates: false
         options:
           path: /var/lib/grafana/dashboards/freecodecamp
+      - name: kubernetes
+        orgId: 1
+        folder: Kubernetes
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/kubernetes
       - name: victoriametrics-cluster
         orgId: 1
         folder: VictoriaMetrics
@@ -182,6 +190,7 @@ dashboardProviders:
 
 dashboardsConfigMaps:
   freecodecamp: grafana-dashboards-freecodecamp
+  kubernetes: grafana-dashboards-kubernetes
   victoriametrics-cluster: grafana-dashboard-victoriametrics-cluster
   vmagent: grafana-dashboard-vmagent
   vmalert: grafana-dashboard-vmalert

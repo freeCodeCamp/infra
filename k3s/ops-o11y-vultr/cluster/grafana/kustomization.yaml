@@ -9,8 +9,14 @@ generatorOptions:
 configMapGenerator:
   - name: grafana-dashboards-freecodecamp
     files:
+      - dashboards/home.json
       - dashboards/traffic.json
       - dashboards/fleet.json
+      - dashboards/alerts.json
+  - name: grafana-dashboards-kubernetes
+    files:
+      - dashboards/k8s-pods.json
+      - dashboards/argocd.json
   - name: grafana-dashboard-victoriametrics-cluster
     files:
       - dashboards/victoriametrics-cluster.json
