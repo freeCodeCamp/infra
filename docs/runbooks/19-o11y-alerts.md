@@ -10,6 +10,14 @@ calert sends one Chat card for each Alertmanager group (one alert name and job),
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y rollout restart deploy/calert
 ```
 
+The alerts have two layers. Alertmanager inhibit rules (`inhibit_rules` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`) mute the fleet layer while the o11y layer reports that o11y itself is broken:
+
+- o11y layer, never muted: `O11yPodRestarting`, `VultrMetricsPushDown`, `TargetDown`, `LogStoreDown`, `LogStoreStale`, `VlagentDroppedData`, `ScrapeConfigReloadFailed`, `VmalertExecutionErrors`, `O11yBackupStale`, `O11yBackupFailed`, `ArgoCDAppUnhealthy`, `EtcdSnapshotMissing`.
+- Fleet layer, made from the data that each host sends: `HostDown`, `NginxVmDown`, `DiskSpaceLow`, `MemoryHigh`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. These are muted while `VultrMetricsPushDown` fires, or while `O11yPodRestarting` fires for `vmauth`, `vlagent`, `vmagent`, `vmalert`, `vminsert`, `vmstorage` or `vlsingle`.
+- `ProbeFailed` checks the public sites from outside the hosts, so it is never muted.
+
+While the fleet layer is muted, a real host fault does not notify. Fix o11y first. The muted alerts stay visible in Alertmanager with the state `suppressed`.
+
 Run every command from the repo root unless the step says otherwise.
 
 ## Preconditions

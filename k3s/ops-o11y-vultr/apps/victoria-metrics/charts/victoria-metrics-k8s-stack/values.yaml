@@ -197,6 +197,16 @@ alertmanager:
             - drill="true"
             - alertname=~"DRILL-.+"
           receiver: google_chat_drill
+    inhibit_rules:
+      - source_matchers:
+          - alertname="O11yPodRestarting"
+          - container=~"vmauth|vlagent|vmagent|vmalert|vminsert|vmstorage|vlsingle"
+        target_matchers:
+          - alertname=~"HostDown|NginxVmDown|DiskSpaceLow|MemoryHigh|NginxHigh5xxRate|NginxUpstreamErrors|FluentBitDroppedRecords|FluentBitBufferBacklog"
+      - source_matchers:
+          - alertname="VultrMetricsPushDown"
+        target_matchers:
+          - alertname=~"HostDown|NginxVmDown|DiskSpaceLow|MemoryHigh|NginxHigh5xxRate|NginxUpstreamErrors|FluentBitDroppedRecords|FluentBitBufferBacklog"
     receivers:
       - name: blackhole
       - name: google_chat_drill
