@@ -35,7 +35,7 @@ The DigitalOcean inventory needs the `DO_API_TOKEN` of the main team. `ansible/.
 - `ansible--housekeeping.yml` and `ansible--cleanup-clients.yml` name a group and a provider on each job leg. An environment moves to Vultr at its traffic cutover, by a change to its legs.
 - Most plays that change hosts do one host at a time and stop at the first host that fails. Some take `-e variable_serial=<n>`. These are different:
   - `play-any--cleanup-clients.yml` does all hosts at the same time and does not stop on a failed host.
-  - `play-any--verify-nginx.yml` and the other k3s plays do all hosts at the same time. `play-k3s--reboot.yml` does one host at a time and ignores `variable_serial`. If the peer node is unreachable after the drain, it stops and leaves the node cordoned; uncordon it by hand.
+  - `play-any--verify-nginx.yml` and the other k3s plays do all hosts at the same time. `play-k3s--reboot.yml` and the node probe in `play-k3s--verify-o11y.yml` do one host at a time and ignore `variable_serial`. If the peer node is unreachable after the drain, it stops and leaves the node cordoned; uncordon it by hand.
 - Add `--check` to see the changes without making them. `play-any--cleanup-clients.yml`, `play-clients--restart.yml` and `play-clients--rollback.yml` also take `-e variable_dry_run=true`.
 - Each run adds its output to `ansible/.ansible/ansible.log`.
 
@@ -95,12 +95,29 @@ ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
 
 Use `-i inventory/digitalocean.yml` in the subshell with `../../infra-secrets/do-primary/.env.enc` (see the inventory note above). For the Vultr o11y cluster, run `play-k3s--servers.yml` with `-i inventory/vultr.yml -i inventory/constructed.yml -e variable_host=ops_o11y_vultr`.
 
-| Play                     | What it does                                                           | Inputs                                                      |
-| ------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `play-k3s--servers.yml`  | Install or upgrade k3s on `ops_o11y_vultr`                             | —                                                           |
-| `play-k3s--reboot.yml`   | Reboot K3s nodes one by one. Wait for a healthy cluster each time.     | `variable_force_reboot=true`                                |
-| `play-k3s--longhorn.yml` | Install Longhorn on `tools_k3s`                                        | —                                                           |
-| `play-k3s--teardown.yml` | Remove k3s from every host in the group. Takes an etcd snapshot first. | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
+| Play                        | What it does                                                                                                        | Inputs                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `play-k3s--servers.yml`     | Install or upgrade k3s on `ops_o11y_vultr`                                                                          | —                                                           |
+| `play-k3s--reboot.yml`      | Set the AppArmor sysctl on every node. Then reboot K3s nodes one by one, with a node probe and the gate after each. | `variable_force_reboot=true`, `--tags sysctl`               |
+| `play-k3s--verify-o11y.yml` | Run the gate once, then the node probe on each node. Changes nothing.                                               | —                                                           |
+| `play-k3s--longhorn.yml`    | Install Longhorn on `tools_k3s`                                                                                     | —                                                           |
+| `play-k3s--teardown.yml`    | Remove k3s from every host in the group. Takes an etcd snapshot first.                                              | `confirm_teardown=<group>` (required), `skip_snapshot=true` |
+
+### The o11y Gate and Node Probe
+
+- The AppArmor sysctl is `kernel.apparmor_restrict_unprivileged_unconfined=0` in `/etc/sysctl.d/20-apparmor.conf`. Without it, containers on kernel 7.0.0-43 cannot signal themselves (Launchpad 2172746). Remove it when Ubuntu ships a fix.
+- The node probe runs pod `k3s-node-probe-<node>` on the node. The pod sends itself `SIGHUP` and must end in phase `Succeeded`.
+- The gate (`tasks/k3s-o11y-gate.sh`) needs every o11y Deployment, StatefulSet and DaemonSet ready, and no o11y container, apart from Job pods, terminated in the last 15 min. After a reboot, the play waits up to 120 x 10 s for it.
+- The housekeeping job `verify-o11y` runs `play-k3s--verify-o11y.yml` after `reboot-o11y`.
+
+### Force a Gated Reboot of the o11y Cluster
+
+`ansible--reboot-k3s.yml` has no force input. The operator runs these steps from `ansible/` in a local checkout of `main`.
+
+1. `ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-k3s--reboot.yml -e variable_host=ops_o11y_vultr --tags sysctl`. Every node gets the sysctl. The crash-looping pods recover on their next restart.
+2. Argo CD syncs the vlagent and vmauth limits from `main`.
+3. `ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-k3s--verify-o11y.yml -e variable_host=ops_o11y_vultr`. Run it until it passes (about 15-20 min after step 1). If step 3 does not pass, stop and do not run step 4.
+4. `ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml play-k3s--reboot.yml -e variable_host=ops_o11y_vultr -e variable_force_reboot=true`.
 
 `play-k3s--servers.yml` saves a `play-` etcd snapshot, then keeps only the newest `k3s_etcd_play_snapshot_retention` of them, on the host and in R2. K3s retention does not remove a manual snapshot. To keep only the newest 3 manual snapshots, run `sudo k3s etcd-snapshot prune --name on-demand --etcd-snapshot-retention 3 --etcd-s3-retention 3` on the node that saved them. It prunes the local `on-demand` files of that node, and every `on-demand` object in R2 from any node. Give both flags: without `--etcd-s3-retention`, R2 keeps the `etcd-s3-retention` count from the group vars (60).
 

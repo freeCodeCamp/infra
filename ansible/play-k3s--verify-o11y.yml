@@ -1,0 +1,43 @@
+---
+- name: Check the K3s cluster health once
+  hosts: "{{ variable_host | default('null') }}"
+  gather_facts: false
+  become: true
+  become_user: root
+  vars:
+    k3s_gate_nodes: "{{ ansible_play_hosts_all | length }}"
+    k3s_gate_vmstorage: 3
+  tasks:
+    - name: Run the cluster gate
+      run_once: true
+      ansible.builtin.script:
+        cmd: "{{ playbook_dir }}/tasks/k3s-o11y-gate.sh {{ k3s_gate_nodes }} {{ k3s_gate_vmstorage }} o11y"
+      register: k3s_gate_result
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Print the gate output
+      run_once: true
+      ansible.builtin.debug:
+        msg: "{{ k3s_gate_result.stdout_lines | default([]) + k3s_gate_result.stderr_lines | default([]) }}"
+
+    - name: Fail when the gate reports reasons
+      run_once: true
+      ansible.builtin.assert:
+        that:
+          - k3s_gate_result.rc == 0
+        fail_msg: "K3s cluster gate failed with rc {{ k3s_gate_result.rc }}"
+        quiet: true
+
+- name: Probe every K3s node one at a time
+  hosts: "{{ variable_host | default('null') }}"
+  serial: 1
+  gather_facts: false
+  become: true
+  become_user: root
+  tasks:
+    - name: Probe the node
+      vars:
+        k3s_probe_node: "{{ inventory_hostname }}"
+      ansible.builtin.import_tasks: tasks/k3s-node-probe.yml
