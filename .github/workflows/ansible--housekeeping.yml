@@ -374,21 +374,6 @@ jobs:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-  verify-o11y:
-    name: Verify o11y K3s
-    needs:
-      - window
-      - reboot-o11y
-    if: ${{ !cancelled() && needs.window.outputs.allowed == 'true' }}
-    uses: ./.github/workflows/ansible--verify-o11y.yml
-    with:
-      hosts: ops_o11y_vultr
-      verbosity: "-v"
-      provider: vultr
-    secrets:
-      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-
   report:
     name: Report
     needs:
@@ -408,7 +393,6 @@ jobs:
         reboot-o11y,
         verify-nginx,
         verify-swarm,
-        verify-o11y,
       ]
     # always(), not success(): the run that most needs a message is the one
     # that failed. Once this posts on every run, a Wednesday or Saturday with
@@ -451,7 +435,6 @@ jobs:
           REBOOT_O11Y: ${{ needs.reboot-o11y.result }}
           VERIFY: ${{ needs.verify-nginx.result }}
           VERIFY_SWARM: ${{ needs.verify-swarm.result }}
-          VERIFY_O11Y: ${{ needs.verify-o11y.result }}
         run: |
           python3 - <<'PYEOF'
           import glob, json, os
@@ -473,7 +456,6 @@ jobs:
               ("reboot-o11y", os.environ["REBOOT_O11Y"]),
               ("verify", os.environ["VERIFY"]),
               ("verify-swarm", os.environ["VERIFY_SWARM"]),
-              ("verify-o11y", os.environ["VERIFY_O11Y"]),
           ]
 
           checked, bad = 0, []

@@ -235,12 +235,8 @@
 
     - name: Read the K3s reboot play
       ansible.builtin.set_fact:
-        k3s_reboot_plays: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../play-k3s--reboot.yml') | from_yaml }}"
+        k3s_reboot_play: "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../play-k3s--reboot.yml') | from_yaml)[0] }}"
         k3s_probe_tasks: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../tasks/k3s-node-probe.yml') | from_yaml }}"
-
-    - name: Pick the reboot play by name
-      ansible.builtin.set_fact:
-        k3s_reboot_play: "{{ k3s_reboot_plays | selectattr('name', 'match', '^Reboot the K3s') | first }}"
 
     - name: List the names of the gated tasks
       ansible.builtin.set_fact:
@@ -291,24 +287,6 @@
           - reboot_at | int < uncordon_at | int
           - uncordon_at | int < post_gate_at | int
         fail_msg: "{{ k3s_block_names }}"
-        quiet: true
-
-    - name: Assert the sysctl play comes first and the reboot play second
-      vars:
-        sysctl_play: "{{ k3s_reboot_plays[0] }}"
-      ansible.builtin.assert:
-        that:
-          - k3s_reboot_plays | length == 2
-          - sysctl_play.name == 'Apply the AppArmor sysctl to every K3s server'
-          - sysctl_play.tags == ['sysctl']
-          - sysctl_play.any_errors_fatal
-          - sysctl_play.max_fail_percentage == 0
-          - sysctl_play.become
-          - sysctl_play.serial is not defined
-          - sysctl_play.tasks | map('string') | select('search', 'k3s-apparmor-sysctl.yml') | list | length == 1
-          - k3s_reboot_plays[1].name == k3s_reboot_play.name
-          - k3s_reboot_play.serial == 1
-        fail_msg: "{{ k3s_reboot_plays | map(attribute='name') | list }}"
         quiet: true
 
     - name: Assert the probe sits between Uncordon and Post-gate and runs on the peer

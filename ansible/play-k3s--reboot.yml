@@ -1,16 +1,4 @@
 ---
-- name: Apply the AppArmor sysctl to every K3s server
-  hosts: "{{ variable_host | default('null') }}"
-  max_fail_percentage: 0
-  any_errors_fatal: true
-  gather_facts: false
-  become: true
-  tags:
-    - sysctl
-  tasks:
-    - name: Apply the AppArmor sysctl
-      ansible.builtin.import_tasks: tasks/k3s-apparmor-sysctl.yml
-
 - name: Reboot the K3s servers one at a time, gated on cluster health
   hosts: "{{ variable_host | default('null') }}"
   serial: 1
