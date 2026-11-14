@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: vmbackup-vmstorage-vm-0
 spec:
-  schedule: "0 1 * * *"
+  schedule: "0 7 * * *"
   startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
@@ -74,7 +74,7 @@ kind: CronJob
 metadata:
   name: vmbackup-vmstorage-vm-1
 spec:
-  schedule: "30 1 * * *"
+  schedule: "15 7 * * *"
   startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
@@ -145,7 +145,7 @@ kind: CronJob
 metadata:
   name: vmbackup-vmstorage-vm-2
 spec:
-  schedule: "0 2 * * *"
+  schedule: "30 7 * * *"
   startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1

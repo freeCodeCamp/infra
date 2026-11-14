@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: vlogs-backup
 spec:
-  schedule: "30 2 * * *"
+  schedule: "45 7 * * *"
   startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1

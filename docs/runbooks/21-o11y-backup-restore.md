@@ -10,11 +10,13 @@ CronJobs in the namespace `o11y` copy data to the R2 bucket `ops-o11y-backups` e
 
 | CronJob                   | Time (UTC)                 | Source                   | Destination                                     |
 | ------------------------- | -------------------------- | ------------------------ | ----------------------------------------------- |
-| `vmbackup-vmstorage-vm-0` | 01:00, and the Sunday copy | disk of `vmstorage-vm-0` | `vmstorage/vmstorage-vm-0/`                     |
-| `vmbackup-vmstorage-vm-1` | 01:30, and the Sunday copy | disk of `vmstorage-vm-1` | `vmstorage/vmstorage-vm-1/`                     |
-| `vmbackup-vmstorage-vm-2` | 02:00, and the Sunday copy | disk of `vmstorage-vm-2` | `vmstorage/vmstorage-vm-2/`                     |
+| `vmbackup-vmstorage-vm-0` | 07:00, and the Sunday copy | disk of `vmstorage-vm-0` | `vmstorage/vmstorage-vm-0/`                     |
+| `vmbackup-vmstorage-vm-1` | 07:15, and the Sunday copy | disk of `vmstorage-vm-1` | `vmstorage/vmstorage-vm-1/`                     |
+| `vmbackup-vmstorage-vm-2` | 07:30, and the Sunday copy | disk of `vmstorage-vm-2` | `vmstorage/vmstorage-vm-2/`                     |
 | the same 3 CronJobs       | Sunday                     | same disks               | `vmstorage-weekly/<YYYY>-W<WW>/vmstorage-vm-N/` |
-| `vlogs-backup`            | 02:30                      | disk of `vlogs-a`        | `vlogs/<YYYYMMDD>/`                             |
+| `vlogs-backup`            | 07:45                      | disk of `vlogs-a`        | `vlogs/<YYYYMMDD>/`                             |
+
+The backups run after the housekeeping window (00:00-06:00 UTC on Wednesday and Saturday), so a node reboot does not stop them.
 
 The bucket holds the metrics of the last night in `vmstorage/`. On Sunday each CronJob also makes a dated copy in `vmstorage-weekly/`. An R2 lifecycle rule must remove dated copies after 35 days: vmbackup does not prune. The operator makes this rule in Cloudflare on the bucket `ops-o11y-backups`, with the prefix `vmstorage-weekly/` and an expiry of 35 days. Without the rule, the dated copies stay. Do not put the rule on `vmstorage/`. The logs copy holds each daily partition until it is 15 days old. The Secret `o11y-r2-backups` comes from the 1Password item `o11y-r2-backups`.
 
