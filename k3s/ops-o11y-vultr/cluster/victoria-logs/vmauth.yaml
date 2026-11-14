@@ -6,6 +6,8 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   replicaCount: 2
+  extraArgs:
+    maxConcurrentRequests: "100"
   selectAllByDefault: false
   userSelector:
     matchLabels:
