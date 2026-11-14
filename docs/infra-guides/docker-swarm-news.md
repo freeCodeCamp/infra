@@ -34,11 +34,4 @@ docker --context vultr stack deploy -c docker/swarm/stacks/news/stack-news.yml s
 
 Do not add `--prune` to a batch. It removes the services of the other batch.
 
-`stack-news.yml` also reads optional variables for the published ports. Leave them unset for production. After a staging deploy, `unset` them before a production deploy from the same shell. The defaults are today's values:
-
-| Variable                                                                                                                                                                                    | Default       | Staging value |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------- |
-| `NEWS_PUBLISH_MODE`                                                                                                                                                                         | `host`        | `ingress`     |
-| `NEWS_CHN_PUBLISHED_PORT`, `NEWS_ESP_PUBLISHED_PORT`, `NEWS_ITA_PUBLISHED_PORT`, `NEWS_JPN_PUBLISHED_PORT`, `NEWS_KOR_PUBLISHED_PORT`, `NEWS_POR_PUBLISHED_PORT`, `NEWS_UKR_PUBLISHED_PORT` | `4002`-`4008` | `4102`-`4108` |
-
-The services have a health check (`wget` against port 3000 in the container). With ingress mode (staging), the routing mesh sends traffic to a task only after it passes. With host mode (production), NGINX can reach a task as soon as its container starts. In both modes, a rolling update goes to the next task only after the new task passes, and Swarm replaces a task that fails the check.
+The services have a health check (`wget` against port 3000 in the container). The services publish their ports in host mode, so NGINX can reach a task as soon as its container starts. A rolling update goes to the next task only after the new task passes, and Swarm replaces a task that fails the check.

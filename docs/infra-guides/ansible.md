@@ -140,7 +140,7 @@ Run the steps in this order. No step moves traffic. Cloudflare sends traffic to 
 7. Run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
 8. Run `play-vultr--clients.yml -e variable_host=<tier>_clt`. The client hosts join the tailnet at the traffic ramp, so `deploy-client.yml` cannot reach them before that.
 
-A re-created VM has new addresses. Render the upstream map again, encrypt it, and run `play-vultr--nginx.yml`.
+A re-created VM has new addresses. Render the upstream map again (step 5), encrypt it (step 6), and run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`. A re-created proxy VM needs only the play.
 
 Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the VPC address and sends the metrics to `fluent_bit_vlagent_host`. The base play installs this, so a rebuilt VM needs no render for monitoring. To change only the Fluent Bit config, run `play-vultr--fluent-bit.yml -e variable_host=<group>`. The o11y nodes do not send metrics this way (`fluent_bit_push_metrics: false`), because the cluster scrapes them.
 
