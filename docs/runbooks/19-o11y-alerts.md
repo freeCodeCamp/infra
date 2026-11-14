@@ -43,7 +43,16 @@ The `pxy`, `api`, `soc` and `nws` VMs are not on the tailnet, so `ssh freecodeca
 
 ## See the alerts that fire
 
-Open the vmalert UI of the metric rules:
+Grafana evaluates no rules and sends no notification. All alerts come from vmalert through Alertmanager. The **Alerting** menu of Grafana shows them:
+
+- **Active notifications**, Alertmanager `Alertmanager`: the alerts that Alertmanager holds now, in groups, with the receiver of each group.
+- **Silences**: add or expire a silence in Alertmanager.
+- **Notification configuration**: the routes and receivers of Alertmanager, read-only. To change them, change `alertmanager.config` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`. Argo CD applies the change.
+- **Alert rules**, source `VictoriaMetrics`: the metric rules of `vmalert-vm` and their state, read through vmselect. When `vmalert-vm` is down, the source shows an error. The log rules of `vmalert-vlogs` are not in this list.
+
+Do not add a Grafana-managed rule. Its only contact point, `empty`, sends nothing, and Grafana loses the rule when its pod starts again.
+
+To see the log rules, or the metric rules when Grafana is down, open the vmalert UI:
 
 ```sh
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y port-forward svc/vmalert-vm 8880:8080
@@ -51,11 +60,17 @@ kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y port-forward sv
 
 Then open `http://127.0.0.1:8880/vmalert/alerts`. For the log rules, use `svc/vmalert-vlogs` in place of `svc/vmalert-vm`.
 
-To read logs, open the VictoriaLogs UI at `http://<o11y node>:30427/select/vmui` and log in.
+To read logs, use **Explore** in Grafana. The datasource `VictoriaLogs` goes through vmauth. The datasources `VictoriaLogs vlogs-a`, `VictoriaLogs vlogs-b` and `VictoriaLogs vlogs-c` each read one store directly. Use them when vmauth is down, or to compare the stores. The VictoriaLogs UI is at `http://<o11y node>:30427/select/vmui`, through vmauth. Log in as `ops`.
 
-To see traffic, errors, probes and host health, open Grafana at `https://<grafana-host>`. This is the MagicDNS name of the Tailscale Service, shown in the Tailscale admin console under **Services**. The three o11y nodes serve it as the Tailscale Service `svc:grafana` (`play-vultr--o11y-grafana-service.yml`). Grafana has no NodePort, and the browser sends its login cookie only over HTTPS. Log in with the 1Password item `o11y-grafana-admin` (vault `Infra-IaC-ESO`, fields `username` and `password`). Grafana does not start without this item. The home page is the dashboard **Traffic and health**. The folder **freeCodeCamp** also has **Fleet capacity and stability**. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards. These are files in `k3s/ops-o11y-vultr/cluster/grafana/dashboards/`, so Grafana starts without GitHub. They come from `VictoriaMetrics/VictoriaMetrics` at `29c43cd2`, `VictoriaMetrics/VictoriaLogs` at `915d9190` and `rfmoz/grafana-dashboards` at `b07d8a90`, with the panels removed whose metrics we do not collect. Grafana alerting is off; all alerts come from vmalert through Alertmanager.
+To see the sync state, resources, events and pod logs of each Argo CD Application, open Argo CD at `http://ops-vm-o11y-1:30081` and log in as `admin`. Get the password:
 
-To silence an alert during planned work, open the Alertmanager UI:
+```sh
+kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+```
+
+To see traffic, errors, probes and host health, open Grafana at `https://<grafana-host>`. This is the MagicDNS name of the Tailscale Service, shown in the Tailscale admin console under **Services**. The three o11y nodes serve it as the Tailscale Service `svc:grafana` (`play-vultr--o11y-grafana-service.yml`). Grafana has no NodePort, and the browser sends its login cookie only over HTTPS. Log in with the 1Password item `o11y-grafana-admin` (vault `Infra-IaC-ESO`, fields `username` and `password`). Grafana does not start without this item. The home page is the dashboard **Traffic and health**. The folder **freeCodeCamp** also has **Fleet capacity and stability**. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards. These are files in `k3s/ops-o11y-vultr/cluster/grafana/dashboards/`, so Grafana starts without GitHub. They come from `VictoriaMetrics/VictoriaMetrics` at `29c43cd2`, `VictoriaMetrics/VictoriaLogs` at `915d9190` and `rfmoz/grafana-dashboards` at `b07d8a90`, with the panels removed whose metrics we do not collect.
+
+To silence an alert during planned work, open **Alerting > Silences** in Grafana, select the Alertmanager `Alertmanager`, and add a silence with an end time. If Grafana is down, open the Alertmanager UI:
 
 ```sh
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y port-forward svc/vmalertmanager-vm 9093:9093

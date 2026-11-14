@@ -47,7 +47,7 @@ grafana.ini:
   security:
     cookie_secure: true
   unified_alerting:
-    enabled: false
+    enabled: true
   dashboards:
     default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/traffic.json
 
@@ -75,6 +75,33 @@ datasources:
         basicAuthUser: ops
         secureJsonData:
           basicAuthPassword: $VMAUTH_LOGS_PASSWORD
+      - name: VictoriaLogs vlogs-a
+        type: victoriametrics-logs-datasource
+        uid: victorialogs-a
+        access: proxy
+        url: http://vlsingle-vlogs-a.o11y.svc:9428
+        editable: false
+      - name: VictoriaLogs vlogs-b
+        type: victoriametrics-logs-datasource
+        uid: victorialogs-b
+        access: proxy
+        url: http://vlsingle-vlogs-b.o11y.svc:9428
+        editable: false
+      - name: VictoriaLogs vlogs-c
+        type: victoriametrics-logs-datasource
+        uid: victorialogs-c
+        access: proxy
+        url: http://vlsingle-vlogs-c.o11y.svc:9428
+        editable: false
+      - name: Alertmanager
+        type: alertmanager
+        uid: alertmanager
+        access: proxy
+        url: http://vmalertmanager-vm.o11y.svc:9093
+        editable: false
+        jsonData:
+          implementation: prometheus
+          handleGrafanaManagedAlerts: false
 
 dashboardProviders:
   dashboardproviders.yaml:
