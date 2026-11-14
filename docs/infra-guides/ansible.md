@@ -127,7 +127,7 @@ Run the steps in this order. No step moves traffic. Cloudflare sends traffic to 
 4. Run `play-tailscale--0-install.yml` and `play-tailscale--1a-up.yml` on `ops_swarm_mgr`, then `play-vultr--manager.yml`. In **Services**, select the Service and **Approve** its host.
 5. Make the two envelopes of the proxies. Do step 6 for each file.
    - `pxy-origin-tls`: a YAML map `nginx_tls_files`, one key for each file in `/etc/nginx/ssl` (`dhparam.pem`, `freecodecamp.dev.crt`, `freecodecamp.dev.key`, `freecodecamp.org.crt`, `freecodecamp.org.key`). The play refuses a map that lacks a key.
-   - `pxy-upstreams-<tier>`: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams` writes the plaintext file. `ansible/vars/vultr-maps.yml` holds the routing mesh ports of each tier for API, Socrates and news. Render a tier only after the live move of its services to these ports ([API](docker-swarm-api.md), [news](docker-swarm-news.md), [Socrates](docker-swarm-socrates.md)). A render before the move points NGINX at ports with no listener.
+   - `pxy-upstreams-<tier>`: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams` writes the plaintext file.
 6. From `../infra-secrets`, encrypt the file and delete the plaintext. The command writes a temporary file and replaces the envelope only when `sops` succeeds, so a second run cannot empty the envelope:
 
    ```bash
@@ -140,17 +140,7 @@ Run the steps in this order. No step moves traffic. Cloudflare sends traffic to 
 7. Run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
 8. Run `play-vultr--clients.yml -e variable_host=<tier>_clt`. The client hosts join the tailnet at the traffic ramp, so `deploy-client.yml` cannot reach them before that.
 
-A re-created VM has new addresses. After the live move of its tier, render the upstream map again (step 5), encrypt it (step 6), and run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
-
-Before the live move of the tier is complete, do not render: the ports in `ansible/vars/vultr-maps.yml` do not match the live ports yet. Change the envelope by hand:
-
-1. From `ansible/`, render the map to a scratch file: `play-vultr--render-maps.yml -e maps_env=<tier> -e maps_write=upstreams -e maps_upstreams_path=/tmp/vultr-maps-<tier>/upstreams.yaml`. This file has the current addresses. Its ports are the routing mesh ports, so do not encrypt it.
-2. From `../infra-secrets`, decrypt the envelope to the plaintext file: `sops decrypt --input-type yaml --output-type yaml docker/vultr/pxy-upstreams-<tier>.yaml.enc > docker/vultr/pxy-upstreams-<tier>.yaml.plaintext`.
-3. Compare the upstream of the VM's role in the two files. The old address is in the plaintext file and not in the scratch file. The new address is in the scratch file and not in the plaintext file.
-4. In the plaintext file, replace the old address with the new address on each line where it occurs. A news VM is in each `jms-*` upstream. An API, Socrates or client VM has one line for each port.
-5. Delete the folder `/tmp/vultr-maps-<tier>`. Do step 6, then run `play-vultr--nginx.yml -e variable_host=<tier>_pxy`.
-
-A re-created proxy VM is not in the upstream map. It needs only the play.
+A re-created VM has new addresses. Render the upstream map again, encrypt it, and run `play-vultr--nginx.yml`.
 
 Each Vultr host sends its own metrics. Fluent Bit reads the node exporter on the VPC address and sends the metrics to `fluent_bit_vlagent_host`. The base play installs this, so a rebuilt VM needs no render for monitoring. To change only the Fluent Bit config, run `play-vultr--fluent-bit.yml -e variable_host=<group>`. The o11y nodes do not send metrics this way (`fluent_bit_push_metrics: false`), because the cluster scrapes them.
 

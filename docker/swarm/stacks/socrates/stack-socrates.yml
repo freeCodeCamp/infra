@@ -78,20 +78,20 @@ x-deploy-config: &deploy-config
 x-port-config: &port-config
   target: 3001
   protocol: tcp
-  mode: ${SOCRATES_PUBLISH_MODE:-host}
+  mode: host
 
 services:
   svc-socrates-alpha:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:latest
     ports:
-      - published: ${SOCRATES_ALPHA_PUBLISHED_PORT:-4010}
+      - published: 4010
         <<: *port-config
     <<: *deploy-config
 
   svc-socrates-bravo:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/socrates:latest
     ports:
-      - published: ${SOCRATES_BRAVO_PUBLISHED_PORT:-4011}
+      - published: 4011
         <<: *port-config
     <<: *deploy-config
 

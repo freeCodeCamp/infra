@@ -1,29 +1,15 @@
 ---
 vultr_maps_jms_ports:
-  stg:
-    eng: 4001
-    chn: 4102
-    esp: 4103
-    ita: 4104
-    jpn: 4105
-    kor: 4106
-    por: 4107
-    ukr: 4108
-  prd:
-    eng: 4201
-    chn: 4202
-    esp: 4203
-    ita: 4204
-    jpn: 4205
-    kor: 4206
-    por: 4207
-    ukr: 4208
-vultr_maps_api_ports:
-  stg: [2445, 2446]
-  prd: [2545, 2546]
-vultr_maps_socrates_ports:
-  stg: [4110, 4111]
-  prd: [4210, 4211]
+  eng: 4001
+  chn: 4002
+  esp: 4003
+  ita: 4004
+  jpn: 4005
+  kor: 4006
+  por: 4007
+  ukr: 4008
+vultr_maps_api_ports: [2345, 2346]
+vultr_maps_socrates_ports: [4010, 4011]
 vultr_maps_client_ports: [50505, 52525]
 vultr_maps_client_langs:
   - eng

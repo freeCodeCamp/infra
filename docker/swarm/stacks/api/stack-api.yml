@@ -1,7 +1,7 @@
 x-port-config: &port-config
   target: 3000
   protocol: tcp
-  mode: ${API_PUBLISH_MODE:-host}
+  mode: host
 x-deploy-config: &deploy-config
   stop_grace_period: 30s
   deploy:
@@ -108,14 +108,14 @@ services:
   svc-api-alpha:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_TLD}/learn-api:${DEPLOYMENT_VERSION}
     ports:
-      - published: ${API_ALPHA_PUBLISHED_PORT:-2345}
+      - published: 2345
         <<: *port-config
     <<: *deploy-config
 
   svc-api-bravo:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_TLD}/learn-api:${DEPLOYMENT_VERSION}
     ports:
-      - published: ${API_BRAVO_PUBLISHED_PORT:-2346}
+      - published: 2346
         <<: *port-config
     <<: *deploy-config
 
