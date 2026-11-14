@@ -35,7 +35,7 @@ spec:
       cpu: 50m
       memory: 64Mi
     limits:
-      memory: 256Mi
+      memory: 1Gi
 ---
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMUser
