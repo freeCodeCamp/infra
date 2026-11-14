@@ -27,7 +27,7 @@ x-health-config: &health-config
 x-port-config: &port-config
   target: 3000
   protocol: tcp
-  mode: host
+  mode: ${NEWS_PUBLISH_MODE:-host}
 
 services:
   # The following services are the news services for various languages.
@@ -35,43 +35,43 @@ services:
   svc-chn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-chinese:latest
     ports:
-      - published: 4002
+      - published: ${NEWS_CHN_PUBLISHED_PORT:-4002}
         <<: *port-config
     <<: [*deploy-config, *health-config]
   svc-esp:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-espanol:latest
     ports:
-      - published: 4003
+      - published: ${NEWS_ESP_PUBLISHED_PORT:-4003}
         <<: *port-config
     <<: [*deploy-config, *health-config]
   svc-ita:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-italian:latest
     ports:
-      - published: 4004
+      - published: ${NEWS_ITA_PUBLISHED_PORT:-4004}
         <<: *port-config
     <<: [*deploy-config, *health-config]
   svc-jpn:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-japanese:latest
     ports:
-      - published: 4005
+      - published: ${NEWS_JPN_PUBLISHED_PORT:-4005}
         <<: *port-config
     <<: [*deploy-config, *health-config]
   svc-kor:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-korean:latest
     ports:
-      - published: 4006
+      - published: ${NEWS_KOR_PUBLISHED_PORT:-4006}
         <<: *port-config
     <<: [*deploy-config, *health-config]
   svc-por:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-portuguese:latest
     ports:
-      - published: 4007
+      - published: ${NEWS_POR_PUBLISHED_PORT:-4007}
         <<: *port-config
     <<: [*deploy-config, *health-config]
   svc-ukr:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-ukrainian:latest
     ports:
-      - published: 4008
+      - published: ${NEWS_UKR_PUBLISHED_PORT:-4008}
         <<: *port-config
     <<: [*deploy-config, *health-config]
 
