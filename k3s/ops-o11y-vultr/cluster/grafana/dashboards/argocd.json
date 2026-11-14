@@ -273,6 +273,21 @@
         },
         "overrides": [
           {
+            "matcher": { "id": "byName", "options": "Application" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open ${__value.raw} in Argo CD",
+                    "url": "http://ops-vm-o11y-1:30081/applications/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "matcher": { "id": "byName", "options": "Health" },
             "properties": [
               {
