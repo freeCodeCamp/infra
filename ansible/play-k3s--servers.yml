@@ -137,6 +137,9 @@
         mode: "0600"
       no_log: true
       when: k3s_etcd_s3_config is defined
+
+    - name: Apply the AppArmor sysctl
+      ansible.builtin.import_tasks: tasks/k3s-apparmor-sysctl.yml
   roles:
     - role: k3s.orchestration.prereq
     - role: k3s.orchestration.k3s_server

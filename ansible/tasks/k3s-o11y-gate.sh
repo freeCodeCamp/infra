@@ -30,6 +30,33 @@ if [ "$ready_vmstorage" -ne "$expected_vmstorage" ]; then
   reasons+=("vmstorage ready $ready_vmstorage/$expected_vmstorage")
 fi
 
+workloads_out=$(k3s kubectl -n "$namespace" get deployments,statefulsets,daemonsets -o jsonpath='{range .items[*]}{.kind}{"|"}{.metadata.name}{"|"}{.spec.replicas}{"|"}{.status.readyReplicas}{"|"}{.status.desiredNumberScheduled}{"|"}{.status.numberReady}{"\n"}{end}') ||
+  reasons+=("kubectl failed: get workloads")
+while read -r workload; do
+  [ -n "$workload" ] && reasons+=("not ready: $workload")
+done < <(awk -F'|' '
+  NF >= 6 {
+    desired = ($1 == "DaemonSet") ? $5 : $3
+    ready = ($1 == "DaemonSet") ? $6 : $4
+    if (ready + 0 != desired + 0) print $1 "/" $2 " " ready + 0 "/" desired + 0
+  }' <<<"$workloads_out")
+
+cutoff=$(date -u -d '-15 min' +%Y-%m-%dT%H:%M:%SZ)
+pods_out=$(k3s kubectl -n "$namespace" get pods -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.metadata.ownerReferences[*].kind}{"|"}{range .status.containerStatuses[*]}{.lastState.terminated.finishedAt}{","}{end}{"\n"}{end}') ||
+  reasons+=("kubectl failed: get pods")
+while read -r pod; do
+  [ -n "$pod" ] && reasons+=("restarted: $pod")
+done < <(awk -F'|' -v cutoff="$cutoff" '
+  $2 !~ /Job/ {
+    n = split($3, times, ",")
+    for (i = 1; i <= n; i++) {
+      if (times[i] != "" && times[i] >= cutoff) {
+        print $1
+        break
+      }
+    }
+  }' <<<"$pods_out")
+
 if [ "${#reasons[@]}" -eq 0 ]; then
   echo "gate ok"
   exit 0

@@ -5,6 +5,17 @@
   gather_facts: false
   become: false
   vars:
+    time_format: "%Y-%m-%dT%H:%M:%SZ"
+    gate_now: "{{ now().timestamp() }}"
+    gate_defaults:
+      workloads: |
+        Deployment|vmalert-vm|1|1||
+        StatefulSet|vmstorage-vm|3|3||
+        DaemonSet|vmagent-node|||2|2
+      pods: |
+        vmalert-vm-0|ReplicaSet|,
+        vmstorage-vm-0|StatefulSet|,
+      cutoff: "{{ time_format | strftime(gate_now | float - 900, utc=true) }}"
     gate_cases:
       healthy:
         nodes: |
@@ -75,6 +86,63 @@
           vmstorage-vm-2 True
         rc: 1
         contains: "kubectl failed: get nodes"
+      workload_not_ready:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        workloads: |
+          Deployment|vmalert-vm|1||||
+          StatefulSet|vmstorage-vm|3|3||
+        rc: 1
+        contains: not ready
+      recent_restart:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        pods: |
+          vmalert-vm-0|ReplicaSet|{{ time_format | strftime(gate_now | float - 300, utc=true) }},
+        rc: 1
+        contains: "restarted: vmalert-vm-0"
+      job_restart_ignored:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        pods: |
+          verify-job-abc|Job|{{ time_format | strftime(gate_now | float - 60, utc=true) }},
+        rc: 0
+        contains: gate ok
+      old_restart_ok:
+        nodes: |
+          ops-vm-o11y-1 True
+          ops-vm-o11y-2 True
+          ops-vm-o11y-3 True
+        etcd: ok
+        vmstorage: |
+          vmstorage-vm-0 True
+          vmstorage-vm-1 True
+          vmstorage-vm-2 True
+        pods: |
+          vmalert-vm-0|ReplicaSet|{{ time_format | strftime(gate_now | float - 7200, utc=true) }},
+        rc: 0
+        contains: gate ok
   tasks:
     - name: Run the gate script against a stub k3s
       block:
@@ -96,9 +164,20 @@
               case "$*" in
                 *"get nodes"*) [ -s "$K3S_STUB_DIR/nodes" ] || exit 1; cat "$K3S_STUB_DIR/nodes" ;;
                 *"--raw"*) cat "$K3S_STUB_DIR/etcd" ;;
-                *"get pods"*) cat "$K3S_STUB_DIR/vmstorage" ;;
+                *"deployments,statefulsets,daemonsets"*) cat "$K3S_STUB_DIR/workloads" ;;
+                *"-l app.kubernetes.io/name=vmstorage"*) cat "$K3S_STUB_DIR/vmstorage" ;;
+                *"get pods"*) cat "$K3S_STUB_DIR/pods" ;;
                 *) exit 2 ;;
               esac
+          check_mode: false
+
+        - name: Write the date shim
+          ansible.builtin.copy:
+            dest: "{{ gate_tmp.path }}/date"
+            mode: "0755"
+            content: |
+              #!/usr/bin/env bash
+              cat "$K3S_STUB_DIR/cutoff"
           check_mode: false
 
         - name: Make a directory for each case
@@ -114,9 +193,9 @@
         - name: Write the fixtures of each case
           ansible.builtin.copy:
             dest: "{{ gate_tmp.path }}/{{ item.0.key }}/{{ item.1 }}"
-            content: "{{ item.0.value[item.1] }}"
+            content: "{{ item.0.value[item.1] | default(gate_defaults[item.1]) }}"
             mode: "0644"
-          loop: "{{ gate_cases | dict2items | product(['nodes', 'etcd', 'vmstorage']) | list }}"
+          loop: "{{ gate_cases | dict2items | product(['nodes', 'etcd', 'vmstorage', 'workloads', 'pods', 'cutoff']) | list }}"
           loop_control:
             label: "{{ item.0.key }}/{{ item.1 }}"
           check_mode: false
@@ -156,7 +235,12 @@
 
     - name: Read the K3s reboot play
       ansible.builtin.set_fact:
-        k3s_reboot_play: "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../play-k3s--reboot.yml') | from_yaml)[0] }}"
+        k3s_reboot_plays: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../play-k3s--reboot.yml') | from_yaml }}"
+        k3s_probe_tasks: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../tasks/k3s-node-probe.yml') | from_yaml }}"
+
+    - name: Pick the reboot play by name
+      ansible.builtin.set_fact:
+        k3s_reboot_play: "{{ k3s_reboot_plays | selectattr('name', 'match', '^Reboot the K3s') | first }}"
 
     - name: List the names of the gated tasks
       ansible.builtin.set_fact:
@@ -207,4 +291,53 @@
           - reboot_at | int < uncordon_at | int
           - uncordon_at | int < post_gate_at | int
         fail_msg: "{{ k3s_block_names }}"
+        quiet: true
+
+    - name: Assert the sysctl play comes first and the reboot play second
+      vars:
+        sysctl_play: "{{ k3s_reboot_plays[0] }}"
+      ansible.builtin.assert:
+        that:
+          - k3s_reboot_plays | length == 2
+          - sysctl_play.name == 'Apply the AppArmor sysctl to every K3s server'
+          - sysctl_play.tags == ['sysctl']
+          - sysctl_play.any_errors_fatal
+          - sysctl_play.max_fail_percentage == 0
+          - sysctl_play.become
+          - sysctl_play.serial is not defined
+          - sysctl_play.tasks | map('string') | select('search', 'k3s-apparmor-sysctl.yml') | list | length == 1
+          - k3s_reboot_plays[1].name == k3s_reboot_play.name
+          - k3s_reboot_play.serial == 1
+        fail_msg: "{{ k3s_reboot_plays | map(attribute='name') | list }}"
+        quiet: true
+
+    - name: Assert the probe sits between Uncordon and Post-gate and runs on the peer
+      vars:
+        peer_ref: "{% raw %}{{ k3s_gate_peer }}{% endraw %}"
+        block_text: "{{ k3s_block_tasks | map('string') | list }}"
+        probe_at: "{{ block_text.index(block_text | select('search', 'k3s-node-probe.yml') | first) }}"
+        uncordon_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Uncordon') | first) }}"
+        post_gate_at: "{{ k3s_block_names.index(k3s_block_names | select('match', '^Post-gate') | first) }}"
+        probe_task: "{{ k3s_block_tasks[probe_at | int] }}"
+      ansible.builtin.assert:
+        that:
+          - uncordon_at | int < probe_at | int
+          - probe_at | int < post_gate_at | int
+          - probe_task.delegate_to == peer_ref
+          - probe_task.vars.k3s_probe_node is search('inventory_hostname')
+          - k3s_reboot_play.vars.k3s_gate_post_retries == 120
+        fail_msg: "{{ k3s_block_names }}"
+        quiet: true
+
+    - name: Assert the probe file requires Succeeded, names the pod after the node and always cleans up
+      vars:
+        probe_block: "{{ k3s_probe_tasks | selectattr('block', 'defined') | first }}"
+        probe_text: "{{ k3s_probe_tasks | to_json }}"
+      ansible.builtin.assert:
+        that:
+          - probe_text is search("k3s_probe_phase.stdout == .Succeeded.")
+          - probe_text is search('k3s-node-probe-[{][{] k3s_probe_node [}][}]')
+          - "'curlimages/curl:8.22.0' in probe_text"
+          - probe_block.always | length == 1
+        fail_msg: "{{ probe_block | to_json }}"
         quiet: true

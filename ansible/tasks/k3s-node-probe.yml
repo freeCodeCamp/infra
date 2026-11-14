@@ -1,0 +1,54 @@
+---
+- name: Name the probe pod
+  ansible.builtin.set_fact:
+    k3s_probe_pod: "k3s-node-probe-{{ k3s_probe_node }}"
+
+- name: Probe a pod on the node
+  block:
+    - name: Delete a stale probe pod
+      ansible.builtin.command: k3s kubectl -n default delete pod {{ k3s_probe_pod }} --ignore-not-found --wait=true
+      changed_when: false
+      check_mode: false
+
+    - name: Run the probe pod on the node
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - -n
+          - default
+          - run
+          - "{{ k3s_probe_pod }}"
+          - --image=curlimages/curl:8.22.0
+          - --restart=Never
+          - "--overrides={{ {'apiVersion': 'v1', 'spec': {'nodeName': k3s_probe_node}} | to_json }}"
+          - --command
+          - --
+          - sh
+          - -c
+          - '{{ k3s_probe_command | default(''trap "exit 0" HUP; kill -HUP 1; sleep 5; exit 1'') }}'
+      changed_when: true
+      check_mode: false
+
+    - name: Wait for the probe pod to finish
+      ansible.builtin.command: k3s kubectl -n default get pod {{ k3s_probe_pod }} -o jsonpath={.status.phase}
+      register: k3s_probe_phase
+      until: k3s_probe_phase.stdout in ['Succeeded', 'Failed']
+      retries: 36
+      delay: 5
+      changed_when: false
+      check_mode: false
+
+    - name: Assert the probe pod Succeeded
+      ansible.builtin.assert:
+        that:
+          - k3s_probe_phase.stdout == 'Succeeded'
+        fail_msg: "{{ k3s_probe_pod }} ended in phase {{ k3s_probe_phase.stdout }}; containers on {{ k3s_probe_node }} cannot signal themselves"
+        quiet: true
+
+  always:
+    - name: Delete the probe pod
+      ansible.builtin.command: k3s kubectl -n default delete pod {{ k3s_probe_pod }} --ignore-not-found --wait=true
+      changed_when: false
+      failed_when: false
+      check_mode: false

@@ -1,4 +1,16 @@
 ---
+- name: Apply the AppArmor sysctl to every K3s server
+  hosts: "{{ variable_host | default('null') }}"
+  max_fail_percentage: 0
+  any_errors_fatal: true
+  gather_facts: false
+  become: true
+  tags:
+    - sysctl
+  tasks:
+    - name: Apply the AppArmor sysctl
+      ansible.builtin.import_tasks: tasks/k3s-apparmor-sysctl.yml
+
 - name: Reboot the K3s servers one at a time, gated on cluster health
   hosts: "{{ variable_host | default('null') }}"
   serial: 1
@@ -15,7 +27,7 @@
     k3s_gate_peer: "{{ ansible_play_hosts_all | difference([inventory_hostname]) | sort | first }}"
     k3s_gate_nodes: "{{ ansible_play_hosts_all | length }}"
     k3s_gate_vmstorage: 3
-    k3s_gate_post_retries: 90
+    k3s_gate_post_retries: 120
     k3s_gate_force: "{{ variable_force_reboot | default(false) }}"
   tasks:
     - name: Refuse a group too small to keep etcd quorum
@@ -103,6 +115,12 @@
           ansible.builtin.command: k3s kubectl uncordon {{ inventory_hostname }}
           delegate_to: "{{ k3s_gate_peer }}"
           changed_when: true
+
+        - name: Run the node signal probe
+          ansible.builtin.import_tasks: tasks/k3s-node-probe.yml
+          vars:
+            k3s_probe_node: "{{ inventory_hostname }}"
+          delegate_to: "{{ k3s_gate_peer }}"
 
         - name: Post-gate -- wait for a healthy cluster
           ansible.builtin.script:
