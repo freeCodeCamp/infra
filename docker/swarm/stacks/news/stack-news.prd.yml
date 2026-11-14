@@ -2,17 +2,10 @@ services:
   svc-eng:
     image: ${DOCKER_REGISTRY}/${DEPLOYMENT_ENV}/news-english:latest
     ports:
-      - published: ${NEWS_ENG_PUBLISHED_PORT:-4001}
+      - published: 4001
         target: 3000
         protocol: tcp
-        mode: ${NEWS_PUBLISH_MODE:-host}
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 15s
-      start_interval: 2s
+        mode: host
     deploy:
       replicas: 3
       placement:
