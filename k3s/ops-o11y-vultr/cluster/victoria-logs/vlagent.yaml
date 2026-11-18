@@ -9,8 +9,9 @@ spec:
   remoteWrite:
     - url: http://vlsingle-vlogs-a.o11y.svc:9428/internal/insert
     - url: http://vlsingle-vlogs-b.o11y.svc:9428/internal/insert
+    - url: http://vlsingle-vlogs-c.o11y.svc:9428/internal/insert
   remoteWriteSettings:
-    maxDiskUsagePerURL: 4GiB
+    maxDiskUsagePerURL: 3GiB
   storage:
     volumeClaimTemplate:
       spec:
@@ -31,16 +32,15 @@ spec:
   serviceSpec:
     useAsDefault: true
     spec:
-      type: NodePort
+      type: ClusterIP
       ports:
         - name: http
           port: 9429
           targetPort: 9429
-          nodePort: 30429
           protocol: TCP
   resources:
     requests:
       cpu: 100m
       memory: 128Mi
     limits:
-      memory: 512Mi
+      memory: 3Gi

@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana-community.github.io/helm-charts
+      chart: grafana
+      targetRevision: "14.4.0"
+      helm:
+        releaseName: grafana
+        valueFiles:
+          - $values/k3s/ops-o11y-vultr/apps/grafana/charts/grafana/values.yaml
+    - repoURL: https://github.com/freeCodeCamp/infra.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/freeCodeCamp/infra.git
+      targetRevision: main
+      path: k3s/ops-o11y-vultr/cluster/grafana
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: o11y
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

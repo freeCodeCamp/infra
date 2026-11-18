@@ -1,0 +1,9 @@
+---
+- name: Let containers signal themselves (Launchpad 2172746; remove when fixed)
+  ansible.posix.sysctl:
+    name: kernel.apparmor_restrict_unprivileged_unconfined
+    value: "0"
+    sysctl_file: /etc/sysctl.d/20-apparmor.conf
+    sysctl_set: true
+    state: present
+    reload: true

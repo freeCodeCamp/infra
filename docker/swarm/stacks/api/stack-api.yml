@@ -118,3 +118,9 @@ services:
       - published: 2346
         <<: *port-config
     <<: *deploy-config
+
+networks:
+  default:
+    driver: overlay
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"

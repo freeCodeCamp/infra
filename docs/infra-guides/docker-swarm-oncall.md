@@ -8,17 +8,20 @@ The Oncall stack provides automated maintenance and monitoring services includin
 
 ## Components
 
-| Service                       | Purpose                                                       |
-| ----------------------------- | ------------------------------------------------------------- |
-| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)             |
-| **svc-update**                | Gantry service updater (auto-updates tagged services)         |
-| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)   |
-| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)   |
-| **svc-chat-relay**            | Converts Gantry notices to the standard chat line             |
-| **svc-chat-proxy**            | Forwards actionable notices and digests successful heartbeats |
-| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours       |
-| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat |
-| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale      |
+| Service                       | Purpose                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| **svc-cronjob**               | Swarm cronjob scheduler (manages scheduled tasks)                |
+| **svc-update**                | Gantry service updater (auto-updates tagged services)            |
+| **svc-cleanup**               | Docker system cleanup (prunes old images/containers weekly)      |
+| **svc-webhook**               | Webhook receiver (triggers instant Gantry updates via HTTP)      |
+| **svc-chat-relay**            | Converts Gantry notices to the standard chat line                |
+| **svc-chat-proxy**            | Forwards actionable notices and digests successful heartbeats    |
+| **svc-dispatch-news-eng**     | Starts the news `deploy-eng.yml` workflow every 3 hours          |
+| **svc-dispatch-housekeeping** | Starts the infra `ansible--housekeeping.yml` workflow Wed/Sat    |
+| **svc-dispatch-docr-gc**      | Starts the infra `docr--garbage-collection.yml` workflow Wed/Sat |
+| **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale         |
+| **svc-watchdog-swarm**        | Posts to Google Chat when a service or a node is not healthy     |
+| **svc-watchdog-vxlan**        | Posts to Google Chat when a node has a stray overlay device      |
 
 ## Architecture
 
@@ -61,10 +64,11 @@ All services → json-file logging (local, rotated)
 
 Export these two variables before `docker stack deploy`. Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed. The Chat destination and GitHub ingress HMAC are external Swarm secrets, not service environment values.
 
-| Variable                | Used by                      | Value                                                                               |
-| ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
-| `WEBHOOK_SECRET`        | svc-webhook                  | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
-| `GITHUB_DISPATCH_TOKEN` | dispatchers                  | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
+| Variable                | Used by                       | Value                                                                               |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------------- |
+| `WEBHOOK_SECRET`        | svc-webhook                   | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
+| `GITHUB_DISPATCH_TOKEN` | dispatchers                   | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
+| `GOOGLE_CHAT_WEBHOOK`   | transitional fallback         | Google Chat destination; proxy migration retains it for rollback.                  |
 
 Anyone with Docker access on the manager can read these environment values. Docker administrators can also read mounted Swarm secrets from a task. Rotate affected credentials after removing such access.
 
@@ -97,6 +101,19 @@ Every accepted dispatch or intentional maintenance-window skip emits an ok heart
 - Quiet hours: Wed/Sat 00:00–08:00 UTC. The first check after quiet hours posts if the feed is stale.
 - The watchdog also posts when it cannot read the feed or the date.
 - Every scheduled invocation emits one observable result. Healthy, quiet-hour, and between-reminder heartbeats are held by the proxy; stale/unreadable alerts are forwarded immediately.
+
+### Swarm Watchdogs
+
+`svc-watchdog-swarm` runs on the manager every 30 minutes. It runs `scripts/swarm-check.sh`, reads again after 60 seconds, and posts each finding that stays.
+
+- It finds services below their target, and nodes with 3 or more rejected tasks in the last 15 minutes.
+- It does not check cron services or jobs.
+- It posts on each run while the finding stays.
+- Quiet hours: Wed/Sat 00:00–06:00 UTC. Housekeeping restarts nodes in this window, and its [Swarm checks](ansible.md#housekeeping-workflow) report on the run.
+
+`svc-watchdog-vxlan` runs on each node at minutes 5 and 35, on the host network. It posts when the node has a [stray overlay device](docker-swarm.md#stray-overlay-device) on two reads, 5 seconds apart. A stray device on `ingress` does not reduce the task count, so `svc-watchdog-swarm` does not find it.
+
+`ansible/play-swarm--verify.yml` also uses `scripts/swarm-check.sh`.
 
 ### Google Chat Notifications
 
@@ -170,6 +187,50 @@ All services log to the local Docker `json-file` driver, rotated per node:
 - **History**: previously shipped to Loki on the o11y cluster (tenant `fCC-o11y-oncall-v20250113-0001`); o11y decommissioned 2026-07-14
 
 ## Deployment
+
+**Who:** an operator with the `infra-secrets` age key and Tailscale access to the manager. The command needs `sops`, so an agent cannot run it.
+
+**When:** after a change to a file in this directory. No workflow deploys this stack, so a push does not change the live stack. A first deploy and an update use the same command.
+
+1. Start Tailscale. The manager names resolve only on the tailnet.
+2. On a new machine, create the context once:
+
+   ```bash
+   docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
+   ```
+
+3. If you changed a config file, increase its version first. See [Swarm Config Names](#swarm-config-names).
+4. From the repository root, run this block. The block decrypts the 3 variables into a subshell, so they are not in your shell after the command. `sops exec-env` cannot read this file, so the loop is necessary. See runbook 04, section 3.
+
+   ```bash
+   cd docker/swarm/stacks/oncall
+   (
+     set -eu
+     secrets=$(sops decrypt --input-type dotenv --output-type dotenv \
+       ../../../../../infra-secrets/docker/oldeworld/oncall.env.enc)
+     while IFS= read -r line; do
+       case $line in '' | '#'*) continue ;; esac
+       export "$line"
+     done <<< "$secrets"
+     docker --context vultr stack deploy -c stack-oncall.yml oncall
+   )
+   ```
+
+5. Check the services. `svc-webhook`, `svc-chat-relay` and `svc-cronjob` show `1/1`:
+
+   ```bash
+   docker --context vultr service ls --filter name=oncall_
+   ```
+
+6. Check the scheduler. Each scheduled service has an `Add cronjob` line: `svc-cleanup`, `svc-dispatch-docr-gc`, `svc-dispatch-housekeeping`, `svc-dispatch-news-eng`, `svc-update`, `svc-watchdog-news`, `svc-watchdog-swarm` and `svc-watchdog-vxlan`:
+
+   ```bash
+   docker --context vultr service logs --raw oncall_svc-cronjob
+   ```
+
+`svc-watchdog-vxlan` and `svc-cleanup` are global and each runs once at deploy, on each node. They do not retry, so a rejected task waits for its next scheduled run.
+
+If the manager reports a permission error on `/home/freecodecamp/.docker`, run this on the manager (`ssh freecodecamp@ops-vm-swarm-mgr-1`):
 
 ```bash
 # Ensure correct ownership and permissions
@@ -325,17 +386,19 @@ Trigger an on-demand Gantry update from a GitHub Actions workflow using an ephem
 
 - name: Trigger deployment
   run: |
-    curl -fsS -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
+    curl --fail-with-body -sS --max-time 360 -X POST https://${{ secrets.WEBHOOK_HOST }}/hooks/run-gantry \
       -H "Content-Type: application/json" \
       -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
       -d '{"GANTRY_SERVICES_FILTERS":"name=${{ env.STACK_NAME }}_${{ env.SERVICE_NAME }}"}'
 ```
 
-**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname), `WEBHOOK_SECRET`
+The hook waits for Gantry and returns its real result. The Gantry job runs with `--restart-condition none`, and `run_gantry.sh` polls its task state every 5 s (`GANTRY_JOB_POLL`). It answers 200 when the task is `Complete`, and 500 with the Gantry log when the task is `Failed`, `Rejected` or `Shutdown`. After 330 s (`GANTRY_JOB_DEADLINE`) it answers 500 with `Gantry still running after 330 s; result unknown` and leaves the job running; the job name is in the output. A wrong secret gets 403. The curl in the deploy job waits up to 360 s, so the job needs a `timeout-minutes` above 6. Roll out the callers with `--max-time 360` first (they are harmless against the old hook), then redeploy the oncall stack with the new hook; the reverse order makes every deploy job fail with curl exit 28.
+
+**Required GHA secrets:** `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `WEBHOOK_HOST` (Tailscale hostname: `swarm-wh-vultr.<tailnet>.ts.net`), `WEBHOOK_SECRET`
 
 ## Testing Webhook
 
-Run from the manager node (`ssh freecodecamp@ops-vm-backoffice`):
+Run from the manager node (`ssh freecodecamp@ops-vm-swarm-mgr-1`). `read -rs` takes the secret without echo, so it stays out of the shell history. The secret goes to `curl` as a header file, not as an argument, and it is not in the shell after the block:
 
 ```bash
 # Trigger update for a specific service

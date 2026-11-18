@@ -23,7 +23,7 @@ sops decrypt --input-type dotenv --output-type dotenv \
 
 ### 2. YAML envelopes (`*.yaml.enc`)
 
-Examples: `docker/oldeworld/pxy-upstreams-prd.yaml.enc`, `k3s/ops-backoffice-tools/kubeconfig.yaml.enc`.
+Examples: `docker/vultr/pxy-upstreams-prd.yaml.enc`, `k3s/ops-backoffice-tools/kubeconfig.yaml.enc`.
 
 ```bash
 sops decrypt --input-type yaml --output-type yaml \
@@ -71,18 +71,23 @@ Read-only operation. Nothing to roll back.
 
 Platform-wide envelopes are `<scope>/.env.enc`. Cluster-local envelopes are `k3s/<cluster>/<app>.<kind>.enc` and `docker/<cluster>/<name>.<kind>.enc`.
 
-| Envelope                                                                    | Consumer                                                               |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `global/.env.enc`, `r2-read/.env.enc`                                       | root `.envrc`                                                          |
-| `do-universe/.env.enc`                                                      | `ansible/.envrc`, `terraform/ops-o11y/.envrc`                          |
-| `tfstate/.env.enc`                                                          | `terraform/ops-o11y/.envrc`, `terraform/{vultr-base,tst-vultr}/.envrc` |
-| `vultr/.env.enc`                                                            | `terraform/{vultr-base,tst-vultr}/.envrc`                              |
-| `do-primary/.env.enc`                                                       | `k3s/ops-backoffice-tools/.envrc`                                      |
-| `docker/oldeworld/oncall.env.enc`                                           | `docs/infra-guides/docker-swarm-oncall.md`                             |
-| `docker/oldeworld/socrates-{prd,stg}.env.enc`                               | `docs/infra-guides/docker-swarm-socrates.md`                           |
-| `docker/oldeworld/pxy-upstreams-{prd,stg}.yaml.enc`                         | `ansible/inventory/group_vars/oldeworld_pxy.yml`                       |
-| `k3s/ops-backoffice-tools/<app>.secrets.env.enc`, `<app>.tls.{crt,key}.enc` | `docs/infra-guides/ops-backoffice-tools.md`                            |
-| `k3s/<cluster>/kubeconfig.yaml.enc`                                         | `docs/infra-guides/ansible.md` § Kubeconfig From an Envelope           |
+| Envelope                                                                    | Consumer                                                                                |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `global/.env.enc`, `r2-read/.env.enc`                                       | root `.envrc`                                                                           |
+| `tfstate/.env.enc`                                                          | `terraform/{vultr-base,*-vultr}/.envrc`, `cf-origin-records/.envrc` ¹                   |
+| `vultr/.env.enc`                                                            | `ansible/.envrc`, `terraform/{vultr-base,*-vultr}/.envrc`, `cf-origin-records/.envrc` ¹ |
+| `cloudflare/.env.enc`                                                       | `cf-origin-records/.envrc` ¹                                                            |
+| `do-primary/.env.enc`                                                       | `k3s/ops-backoffice-tools/.envrc`, `docs/infra-guides/ansible.md` (DigitalOcean plays)  |
+| `docker/oldeworld/oncall.env.enc`                                           | `docs/infra-guides/docker-swarm-oncall.md`                                              |
+| `docker/oldeworld/socrates-{prd,stg}.env.enc`                               | `docs/infra-guides/docker-swarm-socrates.md`                                            |
+| `docker/oldeworld/pxy-upstreams-prd.yaml.enc`                               | None. The Linode proxies are destroyed.                                                 |
+| `docker/vultr/pxy-origin-tls.yaml.enc`, `pxy-upstreams-{stg,prd}.yaml.enc`  | `ansible/inventory/group_vars/vultr_pxy.yml`                                            |
+| `k3s/ops-backoffice-tools/<app>.secrets.env.enc`, `<app>.tls.{crt,key}.enc` | `docs/infra-guides/ops-backoffice-tools.md`                                             |
+| `k3s/<cluster>/kubeconfig.yaml.enc`                                         | `docs/infra-guides/ansible.md` § Kubeconfig From an Envelope                            |
+
+¹ In the private repo `freeCodeCamp/terraform-cloudflare`.
+
+`terraform/vultr-base` reads `TF_VAR_vpc_cidr` from `vultr/.env.enc`. The variable has no default, so `tofu plan` asks for it when the envelope lacks it.
 
 For the full list, run `find ../infra-secrets -name '*.enc'`.
 

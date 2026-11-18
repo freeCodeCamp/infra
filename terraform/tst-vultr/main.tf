@@ -55,4 +55,10 @@ resource "vultr_instance" "tst" {
   user_data         = module.cloud_init[each.key].user_data
   backups           = "disabled"
   tags              = ["tst", each.value.role]
+
+  provisioner "local-exec" {
+    when        = destroy
+    interpreter = ["bash", "${abspath(path.module)}/../modules/vultr-fleet/tailscale-device-delete.sh"]
+    command     = self.hostname
+  }
 }

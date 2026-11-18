@@ -1,14 +1,10 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-any--uptime.yml \
-#     -e variable_host=prd_oldeworld_api
-
 - name: Check uptime on virtual machines
   hosts: '{{ variable_host | default("null") }}'
   gather_facts: true
   gather_subset:
-    - '!all'
-    - '!min'
+    - "!all"
+    - "!min"
     - hardware
   become_user: root
   tasks:

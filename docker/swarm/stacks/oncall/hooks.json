@@ -3,6 +3,9 @@
     "id": "run-gantry",
     "execute-command": "/run_gantry.sh",
     "command-working-directory": "/",
+    "include-command-output-in-response": true,
+    "include-command-output-in-response-on-error": true,
+    "trigger-rule-mismatch-http-response-code": 403,
     "trigger-rule": {
       "match": {
         "type": "value",

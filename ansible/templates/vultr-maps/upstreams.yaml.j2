@@ -1,0 +1,29 @@
+{% set hosts = maps_addr | dict2items | sort(attribute='key') %}
+{% macro servers(pattern, ports) %}
+{% for host in hosts | selectattr('key', 'match', pattern) %}
+{% for port in ports %}
+      - {{ host.value }}:{{ port }}
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+---
+nginx_upstreams:
+{% for lang, port in vultr_maps_jms_ports.items() %}
+  - name: jms-{{ lang }}
+    servers:
+{{ servers('^' ~ maps_env ~ '-vm-nws-[0-9]+$', [port]) }}
+{% endfor %}
+  - name: socrates
+    least_conn: true
+    servers:
+{{ servers('^' ~ maps_env ~ '-vm-soc-[0-9]+$', vultr_maps_socrates_ports) }}
+  - name: api
+    least_conn: true
+    servers:
+{{ servers('^' ~ maps_env ~ '-vm-api-[0-9]+$', vultr_maps_api_ports) }}
+{% for lang in vultr_maps_client_langs %}
+  - name: client-{{ lang }}
+    least_conn: true
+    servers:
+{{ servers('^' ~ maps_env ~ '-vm-clt-' ~ lang ~ '-[0-9]+$', vultr_maps_client_ports) }}
+{% endfor %}

@@ -4,79 +4,73 @@
 
 ## Usage
 
-0. Set context as needed with:
+The Swarm runs on Vultr. It has one manager, `ops-vm-swarm-mgr-1`. `play-swarm--form.yml` forms the Swarm, joins the workers and applies the node labels. See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment). To make the Swarm again after a manager loss, see [runbook 18](../runbooks/18-swarm-manager-rebuild.md).
 
-   ```shell
-   docker context use <context_name>
-   ```
+On a new machine, create the Docker context once:
 
-1. On manager node - Create docker swarm cluster (if needed).
+```shell
+docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
+```
 
-   ```shell
-   docker swarm init
-   ```
+### Deploy Branches
 
-2. On worker nodes - Join the cluster (if needed).
+The deploy workflows (`deploy-api.yml` and `deploy-client.yml` in `freeCodeCamp/freeCodeCamp`, `deploy-api.yml` in `freeCodeCamp/socrates`) deploy `prod-current` to production and every other branch to staging. Each GitHub environment accepts only these branches:
 
-   ```shell
-   docker swarm join --token <token> <ip>:<port>
-   ```
+| Environment                              | Branches                   |
+| ---------------------------------------- | -------------------------- |
+| `stg-api`, `stg-clients`, `stg-socrates` | `prod-staging`, `main`     |
+| `prd-api`, `prd-socrates`                | `prod-current`             |
+| `prd-clients`                            | `prod-current`, `hotfix-*` |
 
-   Get the token if needed, by running `docker swarm join-token worker`
+A `hotfix-*` branch cannot deploy to staging. To test a hotfix on staging, merge it to `prod-staging` first. Then merge it to `prod-current` and deploy production.
 
-3. From the manager node - Add labels to the nodes in the cluster. `docker node update` works only on a manager node.
+### Node Labels
 
-   > [!IMPORTANT]
-   > Labels are used for placement constraints in the docker stack templates.
+The stack files use the node labels in their placement constraints. The play makes the labels from the host name `<env>-vm-<role>-<n>` (`ansible/vars/swarm.yml`).
 
-   Here are some example lables for the nodes. Adjust as needed
-   - Get the node ids using `docker node ls` on the manager node.
+| Label                                  | Value                                                  |
+| -------------------------------------- | ------------------------------------------------------ |
+| `env`                                  | `stg`, `prd`, or `ops` on the manager                  |
+| `role`                                 | `api`, `soc`, `nws`, or `swarm-mgr` on the manager     |
+| `api.enabled`, `api.variant`           | On `api` nodes: `true`, and `dev` (stg) or `org` (prd) |
+| `socrates.enabled`, `socrates.variant` | On `soc` nodes: `true`, and `dev` (stg) or `org` (prd) |
+| `jms.enabled`, `jms.variant`           | On `nws` nodes: `true`, and `dev` (stg) or `org` (prd) |
 
-   - Label for the manager node
+Read the labels on the manager:
 
-     ```shell
-     docker node update --label-add "portainer=true" <node id>
-     ```
+```shell
+ssh freecodecamp@ops-vm-swarm-mgr-1 docker node ls
+ssh freecodecamp@ops-vm-swarm-mgr-1 docker node inspect --format '{{json .Spec.Labels}}' <node id>
+```
 
-   - Labels for the worker nodes
+### Deploy the Stacks
 
-     JAMStack news
+- [oncall](docker-swarm-oncall.md#deployment), [News](docker-swarm-news.md) and [Socrates](docker-swarm-socrates.md#deployment): from the CLI.
+- [API](docker-swarm-api.md): from the `deploy-api.yml` workflow in `freeCodeCamp/freeCodeCamp`.
 
-     ```shell
-     docker node update --label-add "jms.enabled=true" <node id>
-     ```
+Each stack's default network sets the MTU option to 1450, the VPC MTU. Docker subtracts 50 bytes for VXLAN, so containers get MTU 1400. `docker stack deploy` does not change an existing network, so the new MTU takes effect only after the stack's network is re-created (`docker stack rm`, then deploy).
 
-     ```shell
-     docker node update --label-add "jms.variant=dev" <node id>
-     docker node update --label-add "jms.variant=org" <node id>
-     ```
+## Stray Overlay Device
 
-     API
+Symptom: tasks on one node stay `Rejected` with this error, and the service stays below its target:
 
-     ```shell
-     docker node update --label-add "api.enabled=true" <node id>
-     ```
+```text
+network sandbox join failed: subnet sandbox join failed for "<subnet>": error creating vxlan interface: file exists
+```
 
-     ```shell
-     docker node update --label-add "api.variant=dev" <node id>
-     docker node update --label-add "api.variant=org" <node id>
-     ```
+Cause: at shutdown, Docker moves each overlay device to the host namespace, then deletes it. If the daemon exits between these two steps, the device stays. The next daemon does not remove it. Upstream issue: [moby#49555](https://github.com/moby/moby/issues/49555).
 
-     Socrates
+A stray device on `ingress` shows a different symptom. The tasks stay at their target, and the Docker journal shows `Failed creating ingress network: ... file exists`.
 
-     ```shell
-     docker node update --label-add "socrates.enabled=true" <node id>
-     ```
+Fix: on the node, find the device and delete it. On a node without the guard below, a Docker restart does not clear the device. Swarm starts the tasks at its next attempt.
 
-     ```shell
-     docker node update --label-add "socrates.variant=dev" <node id>
-     docker node update --label-add "socrates.variant=org" <node id>
-     ```
+```shell
+ip -o link show type vxlan
+sudo ip link delete <vx-device>
+```
 
-4. Deploy [Portainer](docker-swarm-portainer.md).
+Three controls guard against this fault:
 
-5. Complete the Portainer setup wizard & add the cluster to Portainer.
-
-6. Add the container registry details to Portainer.
-
-7. Deploy the remaining stacks: [API](docker-swarm-api.md) only from Portainer, [News](docker-swarm-news.md) from Portainer or the CLI, and [Socrates](docker-swarm-socrates.md#deployment) and [oncall](docker-swarm-oncall.md#deployment) only from the CLI. Do not manage the portainer stack from within the Portainer UI.
+- `play-swarm--docker-guard.yml` deletes stray devices each time Docker starts, and holds the Docker packages. See [Ansible Plays](ansible.md#swarm-docker-plays).
+- `svc-watchdog-swarm` and `svc-watchdog-vxlan` post to Google Chat. See [Swarm Watchdogs](docker-swarm-oncall.md#swarm-watchdogs).
+- The housekeeping workflow checks the staging Swarm before it updates production. See [Housekeeping Workflow](ansible.md#housekeeping-workflow).

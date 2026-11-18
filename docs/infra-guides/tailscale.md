@@ -1,6 +1,8 @@
 # Tailscale Infrastructure Inventory
 
-Tailscale devices that the repository defines in a file. Hosts also join the tailnet through `ansible/play-tailscale--1a-up.yml` (the Linode fleet), and the `ops-o11y` nodes use it for the API and NodePorts (`ansible/inventory/group_vars/ops_o11y.yml:6`). The admin console lists every device.
+Tailscale devices that the repository defines in a file. Hosts also join the tailnet through `ansible/play-tailscale--1a-up.yml`. The admin console lists every device.
+
+On Vultr, only the 3 o11y VMs, the Swarm manager and the client VMs join. Other Vultr VMs use public SSH (key-only).
 
 ## Architecture
 
@@ -25,6 +27,16 @@ Tailscale devices that the repository defines in a file. Hosts also join the tai
 | `ops-k3s-backoffice-operator` | backoffice-tools | Operator | -    |
 
 **Defined in the repository: 1 device**
+
+## Services
+
+| Service              | Host                    | Purpose                                                               |
+| -------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `svc:swarm-wh-vultr` | `ops-vm-swarm-mgr-1`    | Deploy webhook of the Vultr Swarm (`play-vultr--manager.yml`)         |
+| `svc:grafana`        | `ops-vm-o11y-1` to `-3` | Grafana of `ops-o11y-vultr` (`play-vultr--o11y-tailnet-services.yml`) |
+| `svc:argocd-o11y`    | `ops-vm-o11y-1` to `-3` | Argo CD of `ops-o11y-vultr` (`play-vultr--o11y-tailnet-services.yml`) |
+
+Name the Service of a tool that each cluster can run with the cluster, such as `svc:argocd-o11y`.
 
 ## Naming Convention
 

@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: o11y
+resources:
+  - externalsecret-admin.yaml
+  - externalsecret-root-url.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: grafana-dashboards-freecodecamp
+    files:
+      - dashboards/traffic.json
+      - dashboards/fleet.json
+  - name: grafana-dashboard-victoriametrics-cluster
+    files:
+      - dashboards/victoriametrics-cluster.json
+  - name: grafana-dashboard-vmagent
+    files:
+      - dashboards/vmagent.json
+  - name: grafana-dashboard-vmalert
+    files:
+      - dashboards/vmalert.json
+  - name: grafana-dashboard-vmauth
+    files:
+      - dashboards/vmauth.json
+  - name: grafana-dashboard-operator
+    files:
+      - dashboards/operator.json
+  - name: grafana-dashboard-victorialogs
+    files:
+      - dashboards/victorialogs.json
+  - name: grafana-dashboard-vlagent
+    files:
+      - dashboards/vlagent.json
+  - name: grafana-dashboard-node-exporter-full
+    files:
+      - dashboards/node-exporter-full.json

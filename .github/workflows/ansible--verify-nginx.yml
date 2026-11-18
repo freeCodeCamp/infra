@@ -29,27 +29,22 @@ on:
         type: string
         default: nginx-verify
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: string
         required: false
-        default: 'linode'
+        default: 'vultr'
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
-        required: true
-      LINODE_TOKEN:
-        description: 'The Linode API token'
         required: true
       DEVOPS_ALERTS_PROXY_URL:
         description: 'Versioned DevOps Alerts proxy endpoint; notifications are skipped when unset'
         required: false
       DEVOPS_ALERTS_GITHUB_HMAC:
         description: 'GitHub-only HMAC credential for the DevOps Alerts proxy'
+        required: false
       VULTR_API_KEY:
         description: 'The Vultr API key'
-        required: false
-      GOOGLE_CHAT_WEBHOOK:
-        description: 'Google Chat webhook URL; alerts are skipped when unset'
         required: false
   workflow_dispatch:
     inputs:
@@ -57,7 +52,7 @@ on:
         description: 'Host group to verify; NGINX is expected on every host in it'
         type: string
         required: true
-        default: 'prd_oldeworld_pxy'
+        default: 'prd_pxy'
       verbosity:
         description: 'The verbosity level for logs'
         type: choice
@@ -73,16 +68,13 @@ on:
         required: false
         default: 80
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: choice
         required: true
-        default: 'linode'
+        default: 'vultr'
         options:
-          - 'linode'
           - 'vultr'
 
-# The job only needs to read the repo. It holds the SSH key and the Linode
-# token, so GITHUB_TOKEN gets no write scope it cannot use.
 permissions:
   contents: read
 
@@ -95,7 +87,6 @@ jobs:
     name: Verify NGINX
     runs-on: ubuntu-latest
     env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
       REPORT: ${{ github.workspace }}/nginx-verify.json
 
@@ -150,10 +141,12 @@ jobs:
           fi
 
           case "$PROVIDER" in
-            linode) inventory=(-i inventory/linode.yml) ;;
-            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            vultr)
+              inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
+              export ANSIBLE_HOST_PATTERN_MISMATCH=error
+              ;;
             *)
-              echo "::error::provider must be linode or vultr"
+              echo "::error::provider must be vultr"
               exit 1
               ;;
           esac

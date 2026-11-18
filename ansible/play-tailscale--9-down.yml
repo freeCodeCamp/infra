@@ -1,5 +1,4 @@
 ---
-# Usage: ansible-playbook -i inventory/linode.yml play-tailscale--9-down.yml -e variable_host=<group>
 - name: Tailscale - Disconnect from Tailscale Network
   hosts: '{{ variable_host | default("null") }}'
   serial: "{{ variable_serial | default(1) }}"

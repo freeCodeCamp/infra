@@ -6,8 +6,8 @@
   gather_facts: false
   become: false
   vars:
-    verify_ne_address: 100.64.0.1
-    verify_ne_listeners_seen: ["LISTEN 0 4096 100.64.0.1:9100 0.0.0.0:*"]
+    verify_ne_address: 192.0.2.1
+    verify_ne_listeners_seen: ["LISTEN 0 4096 192.0.2.1:9100 0.0.0.0:*"]
   tasks:
     - name: Healthy host
       ansible.builtin.include_role:
@@ -48,7 +48,7 @@
         that:
           - verify_anomaly | bool
           - "'not running (failed)' in verify_finding.reasons"
-          - "'not answering on 100.64.0.1:9100' in verify_finding.reasons"
+          - "'not answering on 192.0.2.1:9100' in verify_finding.reasons"
         success_msg: "A dead unit is reported"
 
     - name: Bound to every address

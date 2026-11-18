@@ -38,6 +38,10 @@ resource "vultr_vpc" "base" {
   description    = local.vpc_description
   v4_subnet      = local.vpc_subnet
   v4_subnet_mask = local.vpc_mask
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vultr_ssh_key" "team" {
@@ -49,10 +53,18 @@ resource "vultr_ssh_key" "team" {
 
 resource "vultr_firewall_group" "base" {
   description = "vultr-base"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vultr_firewall_group" "pxy" {
   description = "vultr-pxy"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 locals {

@@ -1,8 +1,4 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-any--update.yml \
-#     -e variable_host=stg_oldeworld_clt
-
 - name: Update virtual machines
   hosts: "{{ variable_host | default('null') }}"
   serial: "{{ variable_serial | default(1) }}"
@@ -16,6 +12,9 @@
         connect_timeout: 60
         sleep: 5
         timeout: 300
+
+    - name: Turn off unattended upgrades
+      ansible.builtin.import_tasks: tasks/apt-no-unattended.yml
 
     - name: Update apt repo and cache
       block:

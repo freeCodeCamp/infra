@@ -53,4 +53,10 @@ resource "vultr_instance" "this" {
   lifecycle {
     ignore_changes = [snapshot_id, ssh_key_ids, user_data]
   }
+
+  provisioner "local-exec" {
+    when        = destroy
+    interpreter = ["bash", "${abspath(path.module)}/tailscale-device-delete.sh"]
+    command     = self.hostname
+  }
 }

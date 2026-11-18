@@ -1,7 +1,4 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-tailscale--1a-up.yml \
-#     -e variable_host=<group>
 - name: Tailscale - Read the auth key
   hosts: localhost
   gather_facts: false

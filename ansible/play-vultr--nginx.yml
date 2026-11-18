@@ -1,0 +1,148 @@
+---
+- name: Configure NGINX on a Vultr proxy
+  hosts: "{{ variable_host | default('null') }}:&vultr_pxy"
+  serial: 1
+  max_fail_percentage: 0
+  become: true
+  become_user: root
+  gather_facts: false
+  vars:
+    nginx_ssl_from_files: false
+    nginx_ssl_dir: "{{ nginx_config_dir }}/ssl"
+    nginx_tls_required:
+      - dhparam.pem
+      - freecodecamp.dev.crt
+      - freecodecamp.dev.key
+      - freecodecamp.org.crt
+      - freecodecamp.org.key
+  pre_tasks:
+    - name: Decrypt the Origin CA files once for this host
+      ansible.builtin.set_fact:
+        nginx_tls_to_write: "{{ nginx_tls_files }}"
+      no_log: true
+
+    - name: Refuse an envelope without each file the sites read
+      ansible.builtin.assert:
+        that:
+          - nginx_tls_required | difference(nginx_tls_to_write | list) | length == 0
+        fail_msg: "The Origin CA envelope lacks {{ nginx_tls_required | difference(nginx_tls_to_write | list) }}"
+        quiet: true
+
+    - name: Remove the sysctl file of the old probe listener
+      ansible.builtin.file:
+        path: /etc/sysctl.d/60-nginx-probe.conf
+        state: absent
+
+  roles:
+    - nginx
+
+  tasks:
+    - name: Clone the NGINX config and the error pages
+      ansible.builtin.include_tasks: roles/nginx/tasks/config-nginx.yml
+
+    - name: Create the directories the repository ignores
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - path: "{{ nginx_ssl_dir }}"
+          mode: "0750"
+        - path: "{{ nginx_upstreams_path | dirname }}"
+          mode: "0755"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Write the Origin CA files
+      ansible.builtin.copy:
+        content: "{{ item.value }}"
+        dest: "{{ nginx_ssl_dir }}/{{ item.key }}"
+        owner: root
+        group: root
+        mode: "0640"
+      loop: "{{ nginx_tls_to_write | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      no_log: true
+      register: nginx_tls_written
+
+    - name: Remove the old probe listener
+      ansible.builtin.file:
+        path: "{{ nginx_config_dir }}/conf.d/vultr-origin.conf"
+        state: absent
+      register: nginx_origin_removed
+
+    - name: Read the upstreams file on the host
+      ansible.builtin.slurp:
+        src: "{{ nginx_upstreams_path }}"
+      register: nginx_seed_read
+      failed_when: false
+
+    - name: Decrypt the upstream names once for this host
+      ansible.builtin.set_fact:
+        nginx_seed_names: "{{ nginx_upstreams | map(attribute='name') | list }}"
+      no_log: true
+
+    - name: Find the upstream names that the file lacks
+      ansible.builtin.set_fact:
+        nginx_seed_current: "{{ nginx_seed_text }}{{ '\n' if nginx_seed_text and not nginx_seed_text.endswith('\n') else '' }}"
+        nginx_seed_missing: "{{ nginx_seed_names | difference(nginx_seed_text | regex_findall('^upstream (\\S+) \\{', multiline=true)) }}"
+      vars:
+        nginx_seed_text: "{{ nginx_seed_read.content | default('') | b64decode }}"
+
+    - name: Add the upstream names that the file lacks
+      ansible.builtin.copy:
+        content: |
+          {{ nginx_seed_current }}{% for upstream in nginx_seed_missing %}
+          upstream {{ upstream }} {
+            server 0.0.0.0:32323;
+          }
+          {% endfor %}
+        dest: "{{ nginx_upstreams_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      when: nginx_seed_missing | length > 0
+      register: nginx_upstreams_seeded
+
+    - name: Write the listed upstream blocks
+      ansible.builtin.include_tasks: roles/nginx/tasks/render-upstreams.yml
+
+    - name: Check the NGINX config and restore the previous commit when it fails
+      block:
+        - name: Check the NGINX config
+          ansible.builtin.command:
+            chdir: "{{ nginx_config_dir }}"
+            cmd: nginx -t
+          changed_when: false
+          check_mode: false
+
+      rescue:
+        - name: Restore the previous config
+          ansible.builtin.include_tasks: tasks/restore-nginx-config.yml
+          when: git_update.before is truthy
+
+        - name: Stop the run before any reload
+          ansible.builtin.fail:
+            msg: "nginx -t failed on {{ inventory_hostname }}: {{ ansible_failed_result.stderr | default('') }} {{ nginx_restore_summary | default('') }}"
+
+    - name: Start NGINX
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Reload NGINX
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+      when: nginx_reload_triggers | select('changed') | list | length > 0
+      vars:
+        nginx_reload_triggers:
+          - "{{ nginx_tls_written }}"
+          - "{{ nginx_origin_removed }}"
+          - "{{ nginx_upstreams_seeded }}"
+          - "{{ git_update }}"
+          - "{{ nginx_upstreams_written }}"

@@ -159,7 +159,6 @@ Hitting "missing managed-by" on a CRD?
 ## Cross-refs
 
 - [`docs/infra-guides/chart-pre-merge-checklist.md`](../2026-10-15/chart-pre-merge-checklist.md) point 5 — CF zone SSL mode gate.
-- [`docs/infra-guides/cilium-cnp.md`](./cilium-cnp.md) — when adding a CNP to a chart that uses Traefik hostNetwork, ingress must allow `fromEntities: [host]` (Cilium identifies hostNetwork pods as the `host` entity).
 - [`Architecture/docs/infra/flight-manuals/UNIVERSE.md`](https://github.com/freeCodeCamp-Universe/Architecture/blob/main/docs/infra/flight-manuals/UNIVERSE.md) §3.2 — new-galaxy pre-flight file list.
 - ADR-009 §Ingress — DaemonSet-over-LB rationale.
 - `Universe/.archive/infra/2026-04-20-pitfalls-reference.md` + `Universe/.archive/infra/2026-04-20-woodpecker-live.md` — historical record of the four hostNetwork gotchas (T32 Woodpecker stamp 2, 2026-04-20).

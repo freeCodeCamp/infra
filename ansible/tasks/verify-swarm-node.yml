@@ -1,0 +1,20 @@
+---
+- name: Wait for the node to be active in the Swarm
+  ansible.builtin.command: docker info --format {% raw %}'{{ .Swarm.LocalNodeState }}'{% endraw %}
+  register: swarm_node_state
+  until: swarm_node_state.stdout == 'active'
+  retries: 12
+  delay: 5
+  changed_when: false
+  check_mode: false
+
+- name: Find stray overlay devices in the host namespace
+  ansible.builtin.find:
+    paths: /sys/class/net
+    patterns: '^vx-[0-9a-f]{6}-[a-z0-9]{5}$'
+    use_regex: true
+    file_type: any
+  register: swarm_stray_devices
+  until: swarm_stray_devices.matched == 0
+  retries: 3
+  delay: 5

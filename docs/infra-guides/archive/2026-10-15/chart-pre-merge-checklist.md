@@ -48,8 +48,6 @@ grep -A 5 'fromEntities' <chart-path>/templates/*.yaml
 
 **Reviewer rule.** On a Cilium cluster, vanilla NP under `k3s/<cluster>/apps/` is a reject. The single non-CNP exception on Universe was `valkey` (vanilla NP, ingress plus DNS-only egress, no L7).
 
-Read [`cilium-cnp.md`](../2026-10-14/cilium-cnp.md) before adding **any** CNP — the DNS L7 trap is a separate gate.
-
 ### 3. Service env contract = read source + sample
 
 Chart `env:` values must match the consumer service's config-loader keys **AND** validation rules character-for-character. Inference from ADR / RFC prose is unsafe.
@@ -125,7 +123,6 @@ Use these verbatim in PR review when rejecting:
 ## Cross-refs
 
 - [`docs/GUIDELINES.md`](../../../GUIDELINES.md) — broader doc/format conventions; this checklist is the §Chart pre-merge specialisation.
-- [`docs/infra-guides/archive/2026-10-14/cilium-cnp.md`](../2026-10-14/cilium-cnp.md) — CNP patterns and the DNS L7 trap (point 2 dovetails with this).
 - `Universe/.archive/artemis/2026-04-27-chart-side-pattern.md` — source incident (T34 chart-side pattern study, 2026-04-27).
 - Reference charts (historical, commit `027d913d6f38`):
   - `k3s/gxy-cassiopeia/apps/caddy/charts/caddy` — CNP Pattern A + Flexible-SSL Gateway shape.

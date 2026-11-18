@@ -30,6 +30,7 @@ spec:
         - alert: NginxUpstreamErrors
           expr: |
             _time:5m _stream:{level=~"error|crit|alert|emerg"} upstream
+              !~"upstream: \"https?://\\["
             | stats by (env, host) count() as errors
             | filter errors:>10
           for: 5m

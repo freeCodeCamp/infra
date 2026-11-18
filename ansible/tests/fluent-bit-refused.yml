@@ -1,0 +1,23 @@
+---
+- name: Reset the result
+  ansible.builtin.set_fact:
+    test_refused: ""
+
+- name: Try a preflight that must be refused
+  block:
+    - name: Run the preflight
+      ansible.builtin.include_tasks: ../roles/fluent_bit/tasks/preflight.yml
+    - name: Fail because the preflight passed
+      ansible.builtin.fail:
+        msg: "PASSED: {{ fluent_bit_vlagent_host }}"
+  rescue:
+    - name: Keep the refusal
+      ansible.builtin.set_fact:
+        test_refused: "{{ (ansible_failed_result | default({})).msg | default('no failed result') }}"
+
+- name: Assert the preflight was refused for the right reason
+  ansible.builtin.assert:
+    that:
+      - test_expect in test_refused
+      - "'PASSED' not in test_refused"
+    fail_msg: "{{ test_refused }}"

@@ -7,3 +7,9 @@
     group: root
     mode: "0440"
     validate: /usr/sbin/visudo -cf %s
+
+- name: Set the login shell of {{ sudo_user_name }}
+  ansible.builtin.user:
+    name: "{{ sudo_user_name }}"
+    shell: /bin/bash
+  tags: [login_user]

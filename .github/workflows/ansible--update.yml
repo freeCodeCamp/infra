@@ -14,16 +14,17 @@ on:
         description: 'The value for the variable_serial argument'
         type: number
       provider:
-        description: 'The inventory to use: linode or vultr'
+        description: 'The inventory to use: vultr'
         type: string
+        required: true
+      check:
+        description: 'Run in check mode, so no host changes'
+        type: boolean
         required: false
-        default: 'linode'
+        default: false
     secrets:
       SSH_PRIVATE_KEY:
         description: 'The SSH private key for the Ansible user'
-        required: true
-      LINODE_TOKEN:
-        description: 'The Linode API token'
         required: true
       VULTR_API_KEY:
         description: 'The Vultr API key'
@@ -50,13 +51,14 @@ on:
         required: true
         default: 1
       provider:
-        description: 'The inventory to use: linode or vultr'
-        type: choice
+        description: 'The inventory to use: type vultr; there is no default, so each run names its fleet'
+        type: string
         required: true
-        default: 'linode'
-        options:
-          - 'linode'
-          - 'vultr'
+      check:
+        description: 'Run in check mode, so no host changes'
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -67,7 +69,6 @@ jobs:
     name: Run Play
     runs-on: ubuntu-latest
     env:
-      LINODE_API_TOKEN: ${{ secrets.LINODE_TOKEN }}
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
 
     steps:
@@ -85,6 +86,7 @@ jobs:
           VERBOSITY: ${{ inputs.verbosity }}
           SERIAL: ${{ inputs.serial }}
           PROVIDER: ${{ inputs.provider }}
+          CHECK: ${{ inputs.check }}
         run: |
           source .venv/bin/activate
           case "$HOSTS" in
@@ -104,6 +106,9 @@ jobs:
           if [ -n "$VERBOSITY" ]; then
             extra_args+=("$VERBOSITY")
           fi
+          if [ "$CHECK" = "true" ]; then
+            extra_args+=(--check)
+          fi
           case "$SERIAL" in
             '') ;;
             *[!0-9]*)
@@ -113,10 +118,12 @@ jobs:
             *) extra_args+=(-e "variable_serial=$SERIAL") ;;
           esac
           case "$PROVIDER" in
-            linode) inventory=(-i inventory/linode.yml) ;;
-            vultr) inventory=(-i inventory/vultr.yml -i inventory/constructed.yml) ;;
+            vultr)
+              inventory=(-i inventory/vultr.yml -i inventory/constructed.yml)
+              export ANSIBLE_HOST_PATTERN_MISMATCH=error
+              ;;
             *)
-              echo "::error::provider must be linode or vultr"
+              echo "::error::provider must be vultr"
               exit 1
               ;;
           esac

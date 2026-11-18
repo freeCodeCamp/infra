@@ -1,0 +1,10 @@
+---
+- name: Turn off unattended upgrades, so OS changes come only from housekeeping
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/99-no-unattended-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "0";
+      APT::Periodic::Unattended-Upgrade "0";
+    owner: root
+    group: root
+    mode: "0644"

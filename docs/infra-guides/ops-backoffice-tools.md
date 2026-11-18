@@ -12,17 +12,19 @@ KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
 
 ## Applications
 
-| App      | Namespace | URL                               |
-| -------- | --------- | --------------------------------- |
-| Appsmith | appsmith  | https://appsmith.freecodecamp.net |
-| Outline  | outline   | https://outline.freecodecamp.net  |
+| App      | Namespace | URL                       |
+| -------- | --------- | ------------------------- |
+| Appsmith | appsmith  | `https://<appsmith-host>` |
+| Outline  | outline   | `https://<outline-host>`  |
+
+The hostnames are in the Cloudflare DNS dashboard.
 
 ## Storage
 
 - **Longhorn**: Replicas=2, daily backups to DO Spaces
 - **Backup Target**: `s3://net.freecodecamp.ops-k3s-backups@nyc3/`
 
-______________________________________________________________________
+---
 
 ## Tailscale Operator
 
@@ -44,7 +46,7 @@ helm repo update
 )
 ```
 
-______________________________________________________________________
+---
 
 ## Deployment Pattern
 
@@ -78,7 +80,7 @@ apps/<app>/manifests/base/secrets/
 └── tls.key              # Private key (gitignored)
 ```
 
-______________________________________________________________________
+---
 
 ## Troubleshooting
 

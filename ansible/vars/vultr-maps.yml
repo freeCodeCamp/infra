@@ -1,0 +1,29 @@
+---
+vultr_maps_jms_ports:
+  eng: 4001
+  chn: 4002
+  esp: 4003
+  ita: 4004
+  jpn: 4005
+  kor: 4006
+  por: 4007
+  ukr: 4008
+vultr_maps_api_ports: [2345, 2346]
+vultr_maps_socrates_ports: [4010, 4011]
+vultr_maps_client_ports: [50505, 52525]
+vultr_maps_client_langs:
+  - eng
+  - chn
+  - cnt
+  - esp
+  - ger
+  - ita
+  - jpn
+  - por
+  - ukr
+  - swa
+  - kor
+  - ara
+vultr_maps_role_names: "{{ ['pxy', 'api', 'soc', 'nws'] | product(['1', '2', '3']) | map('join', '-') | map('regex_replace', '^', maps_env ~ '-vm-') | list }}"
+vultr_maps_client_names: "{{ vultr_maps_client_langs | product(['0', '1']) | map('join', '-') | map('regex_replace', '^', maps_env ~ '-vm-clt-') | list }}"
+vultr_maps_names: "{{ vultr_maps_role_names + vultr_maps_client_names }}"

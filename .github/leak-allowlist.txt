@@ -1,0 +1,6 @@
+ansible/inventory/group_vars/ops_o11y_vultr.yml|10\.42\.0\.0/16|K3s default cluster-cidr fallback
+ansible/play-swarm--form.yml|10\.60\.0\.0/16|Docker Swarm overlay address pool, inside each host only, not the VPC range
+ansible/inventory/group_vars/all.yml|100\.64\.0\.0/10|Tailscale CGNAT range, generic
+ansible/roles/node-exporter/defaults/main.yml|100\.64\.0\.0/10|Tailscale CGNAT range, generic
+ansible/roles/node-exporter/tasks/configure.yml|100\.64\.0\.0/10|Tailscale CGNAT range guard, generic
+k3s/ops-o11y-vultr/cluster/coredns/coredns-custom.yaml|100\.100\.100\.100|Tailscale MagicDNS resolver, same on every tailnet

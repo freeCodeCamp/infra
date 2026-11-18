@@ -31,7 +31,7 @@
 
     - name: Delete the build state
       ansible.builtin.shell: |
-        rm -rf /var/lib/docker/engine-id /var/lib/fail2ban/fail2ban.sqlite3
+        rm -rf /var/lib/docker/engine-id /var/lib/fail2ban/fail2ban.sqlite3 {{ vultr_first_configure_marker | quote }}
         rm -rf /var/log/journal/*
       changed_when: true
 

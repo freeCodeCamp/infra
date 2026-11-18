@@ -1,0 +1,67 @@
+---
+- name: Update Node.js on the client hosts
+  hosts: '{{ variable_host | default("null") }}'
+  serial: 1
+  max_fail_percentage: 0
+  become: true
+  become_user: freecodecamp
+  gather_facts: false
+  vars:
+    nodejs_global_packages: [pm2@7]
+  tasks:
+    - name: Fail on a global package version other than a major or an exact version
+      ansible.builtin.assert:
+        that: item.rsplit('@', 1)[1] is match('^([0-9]+|[0-9]+[.][0-9]+[.][0-9]+)$') if '@' in item[1:] else true
+        fail_msg: "{{ item }}: give no version, a major version or an exact version"
+        quiet: true
+      loop: "{{ nodejs_global_packages + nodejs_extra_global_packages | default([]) }}"
+
+    - name: Check that the app ports listen before any change
+      ansible.builtin.wait_for:
+        port: "{{ item }}"
+        timeout: 5
+      loop: "{{ pm2_app_ports }}"
+
+    - name: Install or Update Node.js
+      ansible.builtin.include_role:
+        name: nodejs
+      vars:
+        nodejs_version: '{{ variable_nodejs_version | default("v24") }}'
+
+    - name: Install the global packages
+      ansible.builtin.include_tasks:
+        file: tasks/nodejs-globals.yml
+
+    - name: Read the PM2 modules
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && pm2 jlist"
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      register: pm2_jlist
+      changed_when: false
+
+    - name: Install pm2-logrotate
+      ansible.builtin.shell:
+        cmd: "{{ nvm_preamble }} && pm2 install pm2-logrotate"
+        chdir: /home/freecodecamp
+        executable: /bin/bash
+      when: '''"name":"pm2-logrotate"'' not in pm2_jlist.stdout | default('''')'
+
+    - name: Refresh PM2
+      ansible.builtin.include_tasks:
+        file: tasks/pm2-refresh.yml
+
+    - name: Remove Node.js versions other than the default
+      ansible.builtin.shell:
+        cmd: |
+          {{ nvm_preamble }}
+          default=$(nvm version default)
+          [[ "$default" == v* ]] || exit 1
+          for version in $(ls "$NVM_DIR/versions/node"); do
+            [[ "$version" == "$default" ]] && continue
+            nvm uninstall "$version" > /dev/null || exit 1
+            echo "$version"
+          done
+        executable: /bin/bash
+      register: removed_node_versions
+      changed_when: removed_node_versions.stdout | length > 0

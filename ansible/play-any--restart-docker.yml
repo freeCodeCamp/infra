@@ -1,5 +1,4 @@
 ---
-# Usage: ansible-playbook -i inventory/linode.yml play-any--restart-docker.yml -e variable_host=<group>
 - name: Restart Docker daemon and wait for it to come back
   hosts: "{{ variable_host | default('null') }}"
   serial: "{{ variable_serial | default(1) }}"

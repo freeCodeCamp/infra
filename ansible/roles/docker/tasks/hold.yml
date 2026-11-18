@@ -1,0 +1,10 @@
+---
+- name: Hold the Docker packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ docker_held_packages }}"
+  register: docker_hold
+  until: docker_hold is succeeded or 'lock' not in (docker_hold.msg | default(''))
+  retries: 12
+  delay: 10

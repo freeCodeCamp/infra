@@ -3,9 +3,11 @@ fluent_bit_version: "5.1.5"
 fluent_bit_binary: /opt/fluent-bit/bin/fluent-bit
 fluent_bit_config: /etc/fluent-bit/fluent-bit.yaml
 fluent_bit_state_dir: /var/lib/fluent-bit
+fluent_bit_apt_cache_valid_time: 3600
 
 fluent_bit_vlagent_host: ""
-fluent_bit_vlagent_port: 30429
+fluent_bit_vmauth_port: 30427
+fluent_bit_sender_token: ""
 fluent_bit_http_port: 2020
 fluent_bit_ip_allow: [localhost]
 
@@ -16,3 +18,13 @@ fluent_bit_limit_journal: 1G
 fluent_bit_limit_nginx_access: 4G
 fluent_bit_limit_nginx_error: 256M
 fluent_bit_limit_docker: 1G
+
+fluent_bit_push_metrics: true
+fluent_bit_vpc_cidr: ""
+fluent_bit_node_exporter_port: 9100
+fluent_bit_metrics_interval: 60s
+fluent_bit_limit_metrics: 256M
+fluent_bit_provider: vultr
+fluent_bit_region: ewr
+fluent_bit_metrics_role: "{{ 'clt' if fluent_bit_role.startswith('clt-') else fluent_bit_role }}"
+fluent_bit_metrics_language: "{{ fluent_bit_role | regex_replace('^clt-', '') if fluent_bit_role.startswith('clt-') else '' }}"

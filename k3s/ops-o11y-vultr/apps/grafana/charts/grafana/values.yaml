@@ -1,0 +1,192 @@
+rbac:
+  create: false
+
+automountServiceAccountToken: false
+
+testFramework:
+  enabled: false
+
+admin:
+  existingSecret: grafana-admin
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+envValueFrom:
+  VMAUTH_LOGS_PASSWORD:
+    secretKeyRef:
+      name: vmauth-logs-reader
+      key: password
+  GF_SERVER_ROOT_URL:
+    secretKeyRef:
+      name: grafana-root-url
+      key: GF_SERVER_ROOT_URL
+
+plugins:
+  - victoriametrics-logs-datasource@0.33.1
+
+grafana.ini:
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+    check_for_plugin_updates: false
+  users:
+    allow_sign_up: false
+  auth.anonymous:
+    enabled: false
+  security:
+    cookie_secure: true
+  unified_alerting:
+    enabled: true
+  dashboards:
+    default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/traffic.json
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: VictoriaMetrics
+        type: prometheus
+        uid: victoriametrics
+        access: proxy
+        url: http://vmselect-vm.o11y.svc:8481/select/0/prometheus
+        isDefault: true
+        editable: false
+        jsonData:
+          httpMethod: POST
+          timeInterval: 30s
+      - name: VictoriaLogs
+        type: victoriametrics-logs-datasource
+        uid: victorialogs
+        access: proxy
+        url: http://vmauth-o11y.o11y.svc:8427
+        editable: false
+        basicAuth: true
+        basicAuthUser: ops
+        secureJsonData:
+          basicAuthPassword: $VMAUTH_LOGS_PASSWORD
+      - name: VictoriaLogs vlogs-a
+        type: victoriametrics-logs-datasource
+        uid: victorialogs-a
+        access: proxy
+        url: http://vlsingle-vlogs-a.o11y.svc:9428
+        editable: false
+      - name: VictoriaLogs vlogs-b
+        type: victoriametrics-logs-datasource
+        uid: victorialogs-b
+        access: proxy
+        url: http://vlsingle-vlogs-b.o11y.svc:9428
+        editable: false
+      - name: VictoriaLogs vlogs-c
+        type: victoriametrics-logs-datasource
+        uid: victorialogs-c
+        access: proxy
+        url: http://vlsingle-vlogs-c.o11y.svc:9428
+        editable: false
+      - name: Alertmanager
+        type: alertmanager
+        uid: alertmanager
+        access: proxy
+        url: http://vmalertmanager-vm.o11y.svc:9093
+        editable: false
+        jsonData:
+          implementation: prometheus
+          handleGrafanaManagedAlerts: false
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: freecodecamp
+        orgId: 1
+        folder: freeCodeCamp
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/freecodecamp
+      - name: victoriametrics-cluster
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/victoriametrics-cluster
+      - name: vmagent
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vmagent
+      - name: vmalert
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vmalert
+      - name: vmauth
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vmauth
+      - name: operator
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/operator
+      - name: victorialogs
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/victorialogs
+      - name: vlagent
+        orgId: 1
+        folder: VictoriaMetrics
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vlagent
+      - name: node-exporter-full
+        orgId: 1
+        folder: Hosts
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/node-exporter-full
+
+dashboardsConfigMaps:
+  freecodecamp: grafana-dashboards-freecodecamp
+  victoriametrics-cluster: grafana-dashboard-victoriametrics-cluster
+  vmagent: grafana-dashboard-vmagent
+  vmalert: grafana-dashboard-vmalert
+  vmauth: grafana-dashboard-vmauth
+  operator: grafana-dashboard-operator
+  victorialogs: grafana-dashboard-victorialogs
+  vlagent: grafana-dashboard-vlagent
+  node-exporter-full: grafana-dashboard-node-exporter-full

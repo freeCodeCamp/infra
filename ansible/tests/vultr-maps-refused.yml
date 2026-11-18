@@ -1,0 +1,24 @@
+---
+- name: Reset the result
+  ansible.builtin.set_fact:
+    test_refused: ""
+
+- name: Try a render that must be refused
+  block:
+    - name: Render
+      ansible.builtin.include_tasks: ../tasks/vultr-maps.yml
+    - name: Fail because the render passed
+      ansible.builtin.fail:
+        msg: "PASSED: {{ maps_write }} for {{ maps_env }}"
+  rescue:
+    - name: Keep the refusal
+      ansible.builtin.set_fact:
+        test_refused: "{{ ansible_failed_result.msg }}"
+
+- name: Assert the render was refused for the right reason and wrote nothing
+  ansible.builtin.assert:
+    that:
+      - test_expect in test_refused
+      - "'PASSED' not in test_refused"
+      - query('ansible.builtin.fileglob', test_dir ~ '/refused-*') | length == 0
+    fail_msg: "{{ test_refused }}"

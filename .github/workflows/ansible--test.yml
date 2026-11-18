@@ -64,3 +64,47 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check tests/play-test--6-verify-node-exporter.yml
+
+      - name: Unit Test the Vultr Map Generator
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--9-vultr-maps.yml
+
+      - name: Unit Test the Fluent Bit Config
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--11-fluent-bit-config.yml
+
+      - name: Unit Test the Constructed Inventory Groups
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check -i tests/inventory/fixture.yml -i inventory/constructed.yml -e vultr_vpc_cidr=198.51.100.0/24 tests/play-test--7-inventory-groups.yml
+
+      - name: Unit Test the Swarm Labels
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--8-swarm-labels.yml
+
+      - name: Unit Test the Vultr First Configure
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--10-vultr-first-configure.yml
+
+      - name: Unit Test the Docker Upgrade Manager Guard
+        run: |
+          source .venv/bin/activate
+          if out=$(ansible-playbook --check -i tests/inventory/fixture.yml -c local -e variable_host=tst-vm-wkr-1 -e variable_manager=no_such_group play-swarm--upgrade-docker.yml 2>&1); then
+            echo "$out"
+            exit 1
+          fi
+          grep -q 'No manager in group no_such_group' <<<"$out" || { echo "$out"; exit 1; }
+
+      - name: Unit Test the Docker Hold Retry
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--12-docker-hold.yml
+
+      - name: Unit Test the K3s Reboot Gate
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--13-k3s-gate.yml

@@ -41,4 +41,5 @@ jobs:
             -ignore-filename-pattern '\.kubeconfig\.yaml' \
             -ignore-filename-pattern 'values([.-][^/]+)?\.yaml' \
             -ignore-filename-pattern '\.sample' \
+            -ignore-filename-pattern '/dashboards/[^/]+\.json$' \
             k3s/

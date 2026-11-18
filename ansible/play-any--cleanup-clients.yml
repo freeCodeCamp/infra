@@ -1,8 +1,4 @@
 ---
-# Usage:
-#   ansible-playbook -i inventory/linode.yml play-any--cleanup-clients.yml \
-#     -e variable_host=prd_oldeworld_clt
-
 - name: Remove old releases
   hosts: "{{ variable_host | default('null') }}"
   serial: "{{ variable_serial | default(0) }}"
@@ -49,7 +45,8 @@
         that:
           - live_release_ids | length > 0
           - live_release_ids | difference(sorted_releases | map(attribute='path') | map('basename') | list) | length == 0
-        fail_msg: "Start scripts name {{ live_release_ids }}, but {{ client_root }}/releases holds {{ sorted_releases | map(attribute='path') | map('basename') |
+        fail_msg:
+          "Start scripts name {{ live_release_ids }}, but {{ client_root }}/releases holds {{ sorted_releases | map(attribute='path') | map('basename') |
           list }}"
 
     - name: Get releases to delete (excluding last 2 and the live releases)

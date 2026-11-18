@@ -96,7 +96,7 @@ services:
     <<: *deploy-config
 
   svc-redis:
-    image: redis:8.0-alpine
+    image: redis:8.10-alpine
     ports:
       - published: 6379
         target: 6379
@@ -141,6 +141,12 @@ services:
           memory: 128M
       restart_policy:
         condition: any
+
+networks:
+  default:
+    driver: overlay
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
 
 volumes:
   redis_data:

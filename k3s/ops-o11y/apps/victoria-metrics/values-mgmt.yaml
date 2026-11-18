@@ -1,3 +1,0 @@
-server:
-  persistentVolume:
-    storageClassName: do-block-storage

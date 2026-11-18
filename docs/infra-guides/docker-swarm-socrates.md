@@ -17,8 +17,6 @@ The Socrates stack provides the AI-powered hints API for freeCodeCamp coding cha
 
 Name stacks per environment (`prd-socrates`, `stg-socrates`). Deploy from the CLI. The variables are in `infra-secrets/docker/oldeworld/socrates-{prd,stg}.env.enc`. `docker/swarm/stacks/socrates/.env.sample` lists them.
 
-Do not press Update for these stacks in Portainer. Its stored copy is old, and an update replaces the live stack with that copy.
-
 Start Tailscale. Log Docker in to the registry once with a read-only token that does not expire:
 
 ```bash
@@ -38,7 +36,7 @@ cd docker/swarm/stacks/socrates
     case $line in '' | '#'*) continue ;; esac
     export "$line"
   done <<< "$secrets"
-  docker --context backoffice stack deploy --with-registry-auth \
+  docker --context vultr stack deploy --with-registry-auth \
     -c stack-socrates.yml "$env-socrates"
 )
 cd -
@@ -52,18 +50,11 @@ Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS
 
 ## Node Labels
 
-Nodes running Socrates services require specific labels. Run these commands against the manager:
-
-```shell
-docker node update --label-add "socrates.enabled=true" <node id>
-docker node update --label-add "socrates.variant=dev" <node id>
-# or
-docker node update --label-add "socrates.variant=org" <node id>
-```
+`ansible/play-swarm--form.yml` sets the node labels `socrates.enabled` and `socrates.variant` (`dev` or `org`). See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment).
 
 ## Rate limit ceilings
 
-`svc-redis` is deployed `mode: global` behind the `socrates.enabled` and `socrates.variant` placement constraints, so every node that carries both labels runs its own instance and the rate-limit bucket is per node rather than shared. nginx spreads a caller across all six containers with `least_conn` and no session affinity (`upstream socrates` in `/etc/nginx/configs/upstreams.conf` on the proxies, rendered from `pxy-upstreams-<tier>.yaml.enc` by `ansible/inventory/group_vars/oldeworld_pxy.yml:7`), so the effective per-user ceiling is `PER_USER_LIMIT` multiplied by the node count.
+`svc-redis` is deployed `mode: global` behind the `socrates.enabled` and `socrates.variant` placement constraints, so every node that carries both labels runs its own instance and the rate-limit bucket is per node rather than shared. nginx spreads a caller across all six containers with `least_conn` and no session affinity (`upstream socrates` in `/etc/nginx/configs/upstreams.conf` on the proxies, rendered from `pxy-upstreams-<tier>.yaml.enc` by `ansible/inventory/group_vars/vultr_pxy.yml:7`), so the effective per-user ceiling is `PER_USER_LIMIT` multiplied by the node count.
 
 With three nodes, `PER_USER_LIMIT=10` allows about 30 requests per minute per user, and `GLOBAL_LIMIT=1000` allows about 3000. Divide the configured values by the node count if the intent is a hard number, and re-check them whenever a node is added or removed.
 

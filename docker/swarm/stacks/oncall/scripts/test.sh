@@ -434,6 +434,226 @@ env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://prox
 check "CHAT_PROXY_URL takes precedence over the Google webhook" "$(chat_calls)" 1
 check "proxy routing keeps the Google webhook secret out of output" \
   "$(cat "$work/out" "$log" | grep -c 'chat.test/secret')" 0
+cat >"$work/bin/docker" <<'EOF'
+#!/bin/sh
+printf 'DOCKER %s\n' "$*" >> "$FAKE_LOG"
+[ -z "${FAKE_DOCKER_FAIL:-}" ] || exit 1
+case "$*" in
+  *label=swarm.cronjob.enable=true*) printf '%s\n' "${FAKE_CRON:-}" ;;
+  "service ls"*)
+    if [ -n "${FAKE_RECOVER:-}" ] && [ "$(grep -c '^DOCKER service ls --format' "$FAKE_LOG")" -gt 1 ]; then
+      printf '%s\n' "$FAKE_RECOVER"
+    else
+      printf '%s\n' "${FAKE_SERVICES:-}"
+    fi
+    ;;
+  "service ps"*) printf '%s\n' "${FAKE_TASKS:-}" ;;
+esac
+EOF
+chmod +x "$work/bin/docker"
+
+cat >"$work/bin/sleep" <<'EOF'
+#!/bin/sh
+printf 'SLEEP %s\n' "$1" >> "$FAKE_LOG"
+if [ -n "${FAKE_SLEEP_RM:-}" ]; then rm -f "$FAKE_SLEEP_RM"; fi
+EOF
+chmod +x "$work/bin/sleep"
+
+run_swarm_check() {
+  prefix=$1
+  shift
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" "$@" \
+    sh "$here/swarm-check.sh" $prefix >"$work/out" 2>&1
+  status=$?
+}
+
+run_watchdog_swarm() {
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
+    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" "$@" \
+    sh "$here/watchdog-swarm.sh" >"$work/out" 2>&1
+  status=$?
+}
+
+run_watchdog_vxlan() {
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
+    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" WATCHDOG_NET_DIR="$work/net" \
+    NODE_NAME=api-1.stg "$@" \
+    sh "$here/watchdog-vxlan.sh" >"$work/out" 2>&1
+  status=$?
+}
+
+HEALTHY='stg-socrates_svc-socrates-bravo|replicated|3/3 (max 1 per node)
+stg-socrates_svc-redis|global|3/3
+oncall_svc-cleanup|global|0/0'
+
+run_swarm_check "" FAKE_SERVICES="$HEALTHY"
+check "healthy swarm exits 0" "$status" 0
+check "healthy swarm prints nothing" "$(cat "$work/out")" ""
+
+run_swarm_check "" FAKE_SERVICES='stg-socrates_svc-socrates-bravo|replicated|2/3 (max 1 per node)'
+check "replicated service below target exits 1" "$status" 1
+check "replicated service below target is named" "$(cat "$work/out")" \
+  "below target: stg-socrates_svc-socrates-bravo 2/3"
+
+run_swarm_check "" FAKE_SERVICES='prd-socrates_svc-redis|global|2/3'
+check "global service below target is named" "$(cat "$work/out")" \
+  "below target: prd-socrates_svc-redis 2/3"
+
+run_swarm_check "" FAKE_CRON='cron|oncall_svc-update' FAKE_SERVICES='oncall_svc-update|replicated|0/1'
+check "cron service at 0/1 is not a finding" "$status" 0
+
+run_swarm_check "" FAKE_SERVICES='gantry-1-13|replicated job|0/1 (1/1 completed)'
+check "job service is not a finding" "$status" 0
+
+run_swarm_check stg- FAKE_SERVICES='prd-api_svc-api-alpha|replicated|1/3
+stg-api_svc-api-alpha|replicated|3/3'
+check "prefix ignores other services" "$status" 0
+check "prefix limits the task read" "$(grep -c '^DOCKER service ps .*prd-api' "$log")" 0
+check "prefix keeps its own services in the task read" \
+  "$(grep -c '^DOCKER service ps .*stg-api_svc-api-alpha' "$log")" 1
+
+run_swarm_check "" FAKE_SERVICES="$HEALTHY" FAKE_TASKS='api-1|Rejected 5 seconds ago
+api-1|Rejected less than a second ago
+api-1|Rejected About a minute ago
+api-2|Running 2 hours ago'
+check "repeated rejections exit 1" "$status" 1
+check "repeated rejections name the node" "$(cat "$work/out")" \
+  "rejecting tasks: api-1 (3 in the last 15 min)"
+
+run_swarm_check "" FAKE_SERVICES="$HEALTHY" FAKE_TASKS='api-1|Rejected 14 minutes ago
+api-1|Rejected 14 minutes ago
+api-2|Rejected 1 second ago'
+check "two rejections are not repeated" "$status" 0
+
+run_swarm_check "" FAKE_SERVICES="$HEALTHY" FAKE_TASKS='api-1|Rejected 15 minutes ago
+api-1|Rejected 3 hours ago
+api-1|Rejected About an hour ago
+api-1|Rejected 2 days ago'
+check "old rejections are not a finding" "$status" 0
+
+run_swarm_check "" FAKE_DOCKER_FAIL=1
+check "unreadable swarm exits 2" "$status" 2
+check "unreadable swarm says so" "$(cat "$work/out")" "could not read the Swarm"
+
+run_watchdog_swarm WATCHDOG_NOW=$SAT_0130 FAKE_SERVICES='a|replicated|1/3'
+check "swarm watchdog is quiet in the window" "$status" 0
+check "swarm watchdog reads nothing in the window" "$(grep -c '^DOCKER ' "$log")" 0
+
+run_watchdog_swarm WATCHDOG_NOW=$THU_0605 FAKE_SERVICES="$HEALTHY"
+check "healthy swarm watchdog exits 0" "$status" 0
+check "healthy swarm watchdog posts nothing" "$(chat_calls)" 0
+check "healthy swarm watchdog does not wait" "$(grep -c '^SLEEP ' "$log")" 0
+
+run_watchdog_swarm WATCHDOG_NOW=$THU_0605 FAKE_SERVICES='a|replicated|1/3' FAKE_RECOVER='a|replicated|3/3'
+check "recovered swarm watchdog exits 0" "$status" 0
+check "recovered swarm watchdog posts nothing" "$(chat_calls)" 0
+check "swarm watchdog waits before its second read" "$(grep -c '^SLEEP 60$' "$log")" 1
+
+run_watchdog_swarm WATCHDOG_NOW=$THU_0605 FAKE_SERVICES='a|replicated|1/3
+b|global|2/3'
+check "broken swarm watchdog exits 1" "$status" 1
+check "broken swarm watchdog posts once" "$(chat_calls)" 1
+check "broken swarm watchdog is a standard fail line" \
+  "$(chat_text_has '🔴 *watchdog* · swarm · below target: a 1/3; below target: b 2/3')" 1
+check "broken swarm watchdog post is one line" "$(chat_lines)" 1
+
+run_watchdog_swarm WATCHDOG_NOW=$THU_0605 FAKE_DOCKER_FAIL=1
+check "unreadable swarm watchdog posts" "$(chat_text_has 'could not read the Swarm')" 1
+
+mkdir -p "$work/net"
+: >"$work/net/eth0"
+: >"$work/net/docker_gwbridge"
+: >"$work/net/vx-nothex-lhno1"
+: >"$work/net/vx-001008-lhno1x"
+
+run_watchdog_vxlan
+check "no stray device exits 0" "$status" 0
+check "no stray device posts nothing" "$(chat_calls)" 0
+
+: >"$work/net/vx-001008-lhno1"
+run_watchdog_vxlan
+check "stray device exits 1" "$status" 1
+check "stray device waits before its second read" "$(grep -c '^SLEEP 5$' "$log")" 1
+check "stray device post names the node and device" \
+  "$(chat_text_has '🔴 *watchdog* · api-1.stg · stray overlay device vx-001008-lhno1')" 1
+
+run_watchdog_vxlan FAKE_SLEEP_RM="$work/net/vx-001008-lhno1"
+check "device in transit exits 0" "$status" 0
+check "device in transit posts nothing" "$(chat_calls)" 0
+
+mkdir -p "$work/gbin"
+cat >"$work/gbin/docker" <<'EOF'
+#!/bin/sh
+printf '%s %s\n' "$1" "$2" >> "$FAKE_LOG"
+case "$1 $2" in
+  "service create") printf '%s\n' "$*" >> "$FAKE_LOG.args"; echo "create-id"; exit "${FAKE_CREATE_RC:-0}" ;;
+  "service ps")
+    n=$(cat "$FAKE_LOG.n" 2>/dev/null || echo 0)
+    n=$((n + 1))
+    echo "$n" > "$FAKE_LOG.n"
+    state=$(echo "$FAKE_PS_STATES" | tr ',' '\n' | sed -n "${n}p")
+    [ -n "$state" ] || state=$(echo "$FAKE_PS_STATES" | tr ',' '\n' | tail -n 1)
+    echo "$state 3 seconds ago"
+    exit 0 ;;
+  "service logs") echo "gantry-log-line"; exit "${FAKE_LOGS_RC:-0}" ;;
+  "service rm") exit "${FAKE_RM_RC:-0}" ;;
+esac
+EOF
+cat >"$work/gbin/sleep" <<'EOF'
+#!/bin/sh
+printf 'sleep %s\n' "$1" >> "$FAKE_LOG"
+EOF
+chmod +x "$work/gbin/docker" "$work/gbin/sleep"
+
+run_gantry() {
+  : >"$log"
+  rm -f "$log.n" "$log.args"
+  env -i PATH="$work/gbin:/usr/bin:/bin" FAKE_LOG="$log" "$@" \
+    sh "$here/../run_gantry.sh" test-arg >"$work/out" 2>&1
+  status=$?
+}
+
+run_gantry FAKE_PS_STATES=Running,Running,Complete
+check "gantry complete exits 0" "$status" 0
+check "gantry complete polls until the state is Complete" "$(grep -c '^service ps$' "$log")" 3
+check "gantry complete sleeps between polls" "$(grep -c '^sleep 5$' "$log")" 2
+check "gantry complete prints the job logs" "$(grep -c '^gantry-log-line$' "$work/out")" 1
+check "gantry complete removes the job" "$(grep -c '^service rm$' "$log")" 1
+check "gantry job does not restart a failed task" "$(grep -c -e '--restart-condition none' "$log.args")" 1
+check "gantry job is created detached" "$(grep -c -e ' --detach ' "$log.args")" 1
+
+run_gantry FAKE_PS_STATES=Running,Failed
+check "gantry failed task exits 1" "$status" 1
+check "gantry failed task prints the job logs" "$(grep -c '^gantry-log-line$' "$work/out")" 1
+check "gantry failed task removes the job" "$(grep -c '^service rm$' "$log")" 1
+
+run_gantry FAKE_PS_STATES=Rejected
+check "gantry rejected task exits 1" "$status" 1
+check "gantry rejected task removes the job" "$(grep -c '^service rm$' "$log")" 1
+
+run_gantry FAKE_PS_STATES=Running,Shutdown
+check "gantry shutdown task exits 1" "$status" 1
+
+run_gantry FAKE_PS_STATES=Running GANTRY_JOB_DEADLINE=10 GANTRY_JOB_POLL=5
+check "gantry deadline exits 2" "$status" 2
+check "gantry deadline says the result is unknown" \
+  "$(grep -c '^Gantry still running after 10 s; result unknown$' "$work/out")" 1
+check "gantry deadline names the job it left running" "$(grep -c '^Gantry job gantry-.* left running$' "$work/out")" 1
+check "gantry deadline does not remove the job" "$(grep -c '^service rm$' "$log")" 0
+check "gantry deadline does not read the logs" "$(grep -c '^service logs$' "$log")" 0
+
+run_gantry FAKE_CREATE_RC=3 FAKE_PS_STATES=Complete
+check "gantry create failure keeps the create exit code" "$status" 3
+check "gantry create failure does not poll" "$(grep -c '^service ps$' "$log")" 0
+
+run_gantry FAKE_PS_STATES=Complete FAKE_LOGS_RC=1 FAKE_RM_RC=1
+check "log and rm failure do not hide success" "$status" 0
+
+run_gantry FAKE_PS_STATES=Failed FAKE_LOGS_RC=1 FAKE_RM_RC=1
+check "log and rm failure do not hide the failure" "$status" 1
 
 if [ "$failures" -gt 0 ]; then
   printf '%s check(s) failed\n' "$failures"

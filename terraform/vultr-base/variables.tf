@@ -15,12 +15,8 @@ variable "region" {
 }
 
 variable "vpc_cidr" {
-  description = <<-EOT
-    Clear of 10.0.0.0/24 (Linode VLAN), 10.1-10.7, 10.10.x, 10.11-10.17,
-    10.19.0.0/16, 10.42.0.0/16, 10.43.0.0/16, 10.110.0.0/20 and 100.64.0.0/10.
-  EOT
+  description = "Private VPC range of the Vultr fleet. Set it with TF_VAR_vpc_cidr from the sops envelope."
   type        = string
-  default     = "10.50.0.0/20"
 
   validation {
     condition     = can(cidrhost(var.vpc_cidr, 0))

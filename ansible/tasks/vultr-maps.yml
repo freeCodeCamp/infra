@@ -1,0 +1,31 @@
+---
+- name: Refuse an unknown output
+  ansible.builtin.assert:
+    that:
+      - maps_write == 'upstreams'
+    fail_msg: "maps_write must be upstreams: {{ maps_write }}"
+
+- name: Refuse an unknown environment
+  ansible.builtin.assert:
+    that:
+      - maps_env in ['stg', 'prd']
+    fail_msg: "maps_env {{ maps_env }} has no {{ maps_write }} output"
+
+- name: Keep the VPC addresses that were read
+  ansible.builtin.set_fact:
+    maps_addr:
+      "{{ groups['all'] | intersect(vultr_maps_names) | map('extract', hostvars)
+      | selectattr('maps_vpc_ip', 'defined') | items2dict(key_name='inventory_hostname', value_name='maps_vpc_ip') }}"
+
+- name: Refuse a host with no VPC address
+  ansible.builtin.assert:
+    that:
+      - vultr_maps_names | difference(maps_addr.keys() | list) | length == 0
+    fail_msg: "No VPC address for {{ vultr_maps_names | difference(maps_addr.keys() | list) }}"
+
+- name: Write the plain upstream map
+  ansible.builtin.template:
+    src: ../templates/vultr-maps/upstreams.yaml.j2
+    dest: "{{ maps_upstreams_path }}"
+    mode: "0600"
+  when: maps_write == 'upstreams'

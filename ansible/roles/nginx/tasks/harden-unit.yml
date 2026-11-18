@@ -40,11 +40,6 @@
       Restart=on-failure
       RestartSec=20s
 
-# enabled: true unconditionally, and not only here. Boot behaviour must not
-# depend on remembering to run play-oldeworld--nginx-2-startup.yml, nor on
-# the apt package happening to enable the unit for us. A unit that is not
-# enabled does not come back after a reboot, and no restart policy changes
-# that -- Restart= only applies to a unit systemd already started.
 - name: Make sure nginx starts at boot
   ansible.builtin.systemd:
     name: nginx

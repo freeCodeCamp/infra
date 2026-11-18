@@ -27,6 +27,14 @@ spec:
         - https://medium.freecodecamp.org/
         - https://meeting.freecodecamp.org/
         - https://news.freecodecamp.org/
+        - https://www.freecodecamp.org/news/
+        - https://www.freecodecamp.org/chinese/news/
+        - https://www.freecodecamp.org/espanol/news/
+        - https://www.freecodecamp.org/italian/news/
+        - https://www.freecodecamp.org/portuguese/news/
+        - https://www.freecodecamp.org/japanese/news/
+        - https://www.freecodecamp.org/ukrainian/news/
+        - https://www.freecodecamp.org/korean/news/
 ---
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMProbe

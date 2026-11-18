@@ -1,0 +1,44 @@
+---
+- name: Read the first-configure marker
+  ansible.builtin.stat:
+    path: "{{ vultr_first_configure_marker }}"
+    get_checksum: false
+  register: first_configure_marker
+
+- name: Upgrade a new host and reboot it once
+  when: not first_configure_marker.stat.exists
+  block:
+    - name: Upgrade the packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: safe
+        autoremove: true
+        lock_timeout: "{{ vultr_first_configure_lock_timeout }}"
+      register: first_configure_upgrade
+
+    - name: Clean the package cache
+      ansible.builtin.apt:
+        clean: true
+        lock_timeout: "{{ vultr_first_configure_lock_timeout }}"
+      register: first_configure_clean
+
+    - name: Read the reboot flag
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+        get_checksum: false
+      register: first_configure_reboot_flag
+
+    - name: Reboot and wait for the host
+      ansible.builtin.reboot:
+        reboot_timeout: "{{ vultr_first_configure_reboot_timeout }}"
+      register: first_configure_reboot
+      when: first_configure_reboot_flag.stat.exists
+
+    - name: Write the first-configure marker
+      ansible.builtin.copy:
+        content: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}\n"
+        dest: "{{ vultr_first_configure_marker }}"
+        owner: root
+        group: root
+        mode: "0644"
+      register: first_configure_done

@@ -10,7 +10,9 @@ spec:
       interval: 1m
       rules:
         - alert: HostDown
-          expr: up{job="node",role!="pxy"} == 0
+          expr: |
+            lag(node_boot_time_seconds{job="node",provider="vultr",role!="pxy"}[1d]) > 120
+            and on() (count(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120) > 0)
           for: 3m
           labels:
             severity: critical
@@ -21,7 +23,8 @@ spec:
               19-o11y-alerts.md#hostdown"
         - alert: NginxVmDown
           expr: |
-            up{job="node",role="pxy"} == 0
+            lag(node_boot_time_seconds{job="node",provider="vultr",role="pxy"}[1d]) > 120
+            and on() (count(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120) > 0)
             or node_systemd_unit_state{job="node",role="pxy",name="nginx.service",state="active"}
             == 0
           for: 2m
@@ -56,21 +59,21 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#memoryhigh"
-        - alert: NodeTargetsAbsent
-          expr: absent(up{job="node"})
-          for: 10m
+        - alert: VultrMetricsPushDown
+          expr: absent(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120)
+          for: 5m
           labels:
             severity: critical
           annotations:
-            summary: No host in the node job reports a scrape result.
+            summary: No Vultr host has sent metrics for 2 minutes.
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
-              19-o11y-alerts.md#nodetargetsabsent"
+              19-o11y-alerts.md#vultrmetricspushdown"
     - name: scrape
       interval: 1m
       rules:
         - alert: TargetDown
-          expr: up{job!="node"} == 0
+          expr: up{job!="node",job!~"vlsingle-vlogs-[abc]"} == 0
           for: 5m
           labels:
             severity: warning
@@ -109,3 +112,128 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#vmalertexecutionerrors"
+        - alert: O11yBackupStale
+          expr: time() - (kube_cronjob_status_last_successful_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"} or kube_cronjob_created{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"}) > 129600
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CronJob {{ $labels.cronjob }} has had no successful backup for 36 hours."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#o11ybackupstale"
+        - alert: O11yBackupFailed
+          expr: |
+            (kube_cronjob_status_last_schedule_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"}
+              > kube_cronjob_status_last_successful_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"})
+            and (time() - kube_cronjob_status_last_schedule_time{namespace="o11y",cronjob=~"vmbackup-.*|vlogs-backup"} > 10800)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CronJob {{ $labels.cronjob }} started a backup more than 3 hours ago and has not succeeded since."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#o11ybackupfailed"
+        - alert: O11yPodRestarting
+          expr: |
+            (increase(kube_pod_container_status_restarts_total{namespace="o11y"}[30m]) > 2)
+            * on(namespace, pod, container) group_left(reason)
+            kube_pod_container_status_last_terminated_reason{namespace="o11y"}
+          labels:
+            severity: warning
+          annotations:
+            summary: "o11y container {{ $labels.pod }}/{{ $labels.container }} restarted more than 2 times in 30 minutes. Last stop: {{ $labels.reason }}."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#o11ypodrestarting"
+    - name: fluent-bit
+      interval: 1m
+      rules:
+        - alert: FluentBitDroppedRecords
+          expr: increase_pure(fluentbit_output_dropped_records_total{job="fluent-bit"}[15m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Fluent Bit output {{ $labels.name }} on {{ $labels.instance }} dropped records."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#fluentbitdroppedrecords"
+        - alert: FluentBitBufferBacklog
+          expr: fluentbit_output_chunk_available_capacity_percent{job="fluent-bit"} < 50
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Fluent Bit output {{ $labels.name }} on {{ $labels.instance }} has used half of its buffer."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#fluentbitbufferbacklog"
+    - name: victoria-logs
+      interval: 1m
+      rules:
+        - alert: LogStoreDown
+          expr: |
+            up{job=~"vlsingle-vlogs-[abc]"} == 0
+            or absent(up{job="vlsingle-vlogs-a"})
+            or absent(up{job="vlsingle-vlogs-b"})
+            or absent(up{job="vlsingle-vlogs-c"})
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Log store {{ $labels.job }} is down."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#logstoredown"
+        - alert: LogStoreStale
+          expr: sum by (job) (rate(vl_rows_ingested_total{job=~"vlsingle-vlogs-[abc]"}[10m])) == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Log store {{ $labels.job }} is up but takes no new logs."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#logstorestale"
+        - alert: VlagentDroppedData
+          expr: |
+            increase(vlagent_remotewrite_packets_dropped_total[15m]) > 0
+            or increase(vm_persistentqueue_blocks_dropped_total{job="o11y/vlagent-vlagent"}[15m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Log agent {{ $labels.pod }} dropped log data."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#vlagentdroppeddata"
+    - name: argocd
+      interval: 1m
+      rules:
+        - alert: ArgoCDAppUnhealthy
+          expr: |
+            max by (name) (
+              argocd_app_info{health_status!="Healthy"}
+              or argocd_app_info{sync_status!="Synced"}
+            )
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Argo CD app {{ $labels.name }} is not Healthy and Synced for 15 minutes."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#argocdappunhealthy"
+    - name: k3s-etcd
+      interval: 5m
+      rules:
+        - alert: EtcdSnapshotMissing
+          expr: min by (node) (increase(k3s_etcd_snapshot_save_s3_duration_seconds_count{job="kubelet",status="success"}[8h])) < 1 or on(node) (max by (node) (last_over_time(k3s_etcd_snapshot_save_s3_duration_seconds_count{job="kubelet",status="success"}[1d])) unless on(node) max by (node) (last_over_time(k3s_etcd_snapshot_save_s3_duration_seconds_count{job="kubelet",status="success"}[8h])))
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "K3s server {{ $labels.node }} has saved no etcd snapshot to R2 in 8 hours."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#etcdsnapshotmissing"
