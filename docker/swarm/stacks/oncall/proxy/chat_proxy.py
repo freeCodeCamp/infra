@@ -37,6 +37,7 @@ LINK_SUFFIX = re.compile(r"\s*·\s*<([^>|]+)\|([^>]+)>\s*$")
 RETRY_OFFSETS = (0, 30, 120, 600, 1800, 7200, 21600, 43200, 86400)
 REMINDER_OFFSETS = (("1h", 3600), ("6h", 21600), ("24h", 86400))
 EVENT_LIMITS = {"subject_key": 200, "subject_label": 300, "summary": 500, "details": 8192, "link": 2048}
+MAX_JSON_DEPTH = 100
 GITHUB_EVENT_SCHEMA = "fcc.github-actions-event/v1"
 GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 GITHUB_NOTIFICATION_KEY = re.compile(r"^[a-z0-9_.:/-]{1,200}$")
@@ -149,12 +150,25 @@ def strict_json_loads(raw_body):
         return result
 
     text = raw_body.decode("utf-8")
-    return json.loads(
+    payload = json.loads(
         text,
         object_pairs_hook=object_from_pairs,
         parse_constant=reject_constant,
         parse_float=finite_float,
     )
+
+    def check_depth(value, depth=0):
+        if depth > MAX_JSON_DEPTH:
+            raise ValueError("JSON nesting is too deep")
+        if isinstance(value, dict):
+            for child in value.values():
+                check_depth(child, depth + 1)
+        elif isinstance(value, list):
+            for child in value:
+                check_depth(child, depth + 1)
+
+    check_depth(payload)
+    return payload
 
 
 def sanitize_text_urls(text):
