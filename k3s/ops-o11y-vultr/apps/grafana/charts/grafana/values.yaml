@@ -49,7 +49,7 @@ grafana.ini:
   unified_alerting:
     enabled: true
   dashboards:
-    default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/traffic.json
+    default_home_dashboard_path: /var/lib/grafana/dashboards/freecodecamp/home.json
 
 datasources:
   datasources.yaml:

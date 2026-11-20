@@ -3053,7 +3053,7 @@
   "preload": false,
   "refresh": "30s",
   "schemaVersion": 42,
-  "tags": [],
+  "tags": ["victoriametrics"],
   "templating": {
     "list": [
       {

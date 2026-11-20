@@ -76,7 +76,7 @@ To see the sync state, resources, events and pod logs of each Argo CD Applicatio
 kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 ```
 
-To see traffic, errors, probes and host health, open Grafana at `https://<grafana-host>`. This is the MagicDNS name of the Tailscale Service, shown in the Tailscale admin console under **Services**. The three o11y nodes serve it as the Tailscale Service `svc:grafana` (`play-vultr--o11y-tailnet-services.yml`). Grafana has no NodePort, and the browser sends its login cookie only over HTTPS. Log in with the 1Password item `o11y-grafana-admin` (vault `Infra-IaC-ESO`, fields `username` and `password`). Grafana does not start without this item. The home page is the dashboard **Traffic and health**. The folder **freeCodeCamp** also has **Fleet capacity and stability**. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards. These are files in `k3s/ops-o11y-vultr/cluster/grafana/dashboards/`, so Grafana starts without GitHub. They come from `VictoriaMetrics/VictoriaMetrics` at `29c43cd2`, `VictoriaMetrics/VictoriaLogs` at `915d9190` and `rfmoz/grafana-dashboards` at `b07d8a90`, with the panels removed whose metrics we do not collect.
+To see traffic, errors, probes and host health, open Grafana at `https://<grafana-host>`. This is the MagicDNS name of the Tailscale Service, shown in the Tailscale admin console under **Services**. The three o11y nodes serve it as the Tailscale Service `svc:grafana` (`play-vultr--o11y-tailnet-services.yml`). Grafana has no NodePort, and the browser sends its login cookie only over HTTPS. Log in with the 1Password item `o11y-grafana-admin` (vault `Infra-IaC-ESO`, fields `username` and `password`). Grafana does not start without this item. The home page is the dashboard **Operator home**: what needs attention now, and links to each operator UI. The folder **freeCodeCamp** also has **Traffic and health**, **Fleet capacity and stability**, **Alert history**, **Pods** and **Argo CD apps**. On **Pods** and **Argo CD apps**, the **Cluster** list at the top has one item, `o11y/vm`. It is there for clusters that we add later. The folders **VictoriaMetrics** and **Hosts** have the upstream dashboards. These are files in `k3s/ops-o11y-vultr/cluster/grafana/dashboards/`, so Grafana starts without GitHub. They come from `VictoriaMetrics/VictoriaMetrics` at `29c43cd2`, `VictoriaMetrics/VictoriaLogs` at `915d9190` and `rfmoz/grafana-dashboards` at `b07d8a90`, with the panels removed whose metrics we do not collect.
 
 To silence an alert during planned work, open **Alerting > Silences** in Grafana, select the Alertmanager `Alertmanager`, and add a silence with an end time. If Grafana is down, open the Alertmanager UI:
 
@@ -85,6 +85,17 @@ kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y port-forward sv
 ```
 
 Then open `http://127.0.0.1:9093/#/silences` and add a silence with an end time.
+
+## Change a Grafana dashboard
+
+Each dashboard in the folders **freeCodeCamp**, **VictoriaMetrics** and **Hosts** is a file in `k3s/ops-o11y-vultr/cluster/grafana/dashboards/`. Grafana does not save a change to these dashboards. Grafana keeps no data, so a Grafana restart deletes each dashboard that you make in the UI.
+
+1. Save a copy of the dashboard in the folder `Scratch`. If the folder does not exist, make it. An agent with the Grafana MCP server can also make the copy.
+1. Change the copy until it is correct.
+1. Put the JSON of the copy in the file of the original dashboard. Keep the `uid` of the original. Remove `id` and `version`. Keep the `editable` value of the original. An agent with the Grafana MCP server can read the JSON of the copy.
+1. For a new dashboard, give it the `uid` `fcc-<name>`, and add the file to `grafana-dashboards-freecodecamp` in `k3s/ops-o11y-vultr/cluster/grafana/kustomization.yaml`.
+1. Run `npx prettier@3 --write` on the file, and open a PR. After the merge, Argo CD updates the ConfigMap, and Grafana loads the file within a few minutes.
+1. Delete the copy in `Scratch`.
 
 ## Test the alert path
 
