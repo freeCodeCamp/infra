@@ -1,25 +1,32 @@
 # k3s Clusters
 
-Self-hosted k3s clusters on DigitalOcean.
+Self-hosted k3s clusters: one on Vultr and one on DigitalOcean.
 
 ## Clusters
 
-| Cluster              | Purpose                 | Apps              | Guide                                                  |
-| -------------------- | ----------------------- | ----------------- | ------------------------------------------------------ |
-| ops-backoffice-tools | Internal tools (legacy) | Appsmith, Outline | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md) |
+| Cluster              | Provider     | Purpose                 | Apps                                                                                                        | Guide                                                                                            |
+| -------------------- | ------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| ops-o11y-vultr       | Vultr        | Observability           | VictoriaMetrics, VictoriaLogs, Grafana, Argo CD, External Secrets, blackbox exporter, CoreDNS (cluster-dns) | [runbook 19](../runbooks/19-o11y-alerts.md), [runbook 21](../runbooks/21-o11y-backup-restore.md) |
+| ops-backoffice-tools | DigitalOcean | Internal tools (legacy) | Appsmith, Outline                                                                                           | [`ops-backoffice-tools.md`](./ops-backoffice-tools.md)                                           |
 
-The `ops-o11y` cluster was retired in November 2026. Its replacement, `ops-o11y-vultr`, runs on Vultr ([runbook 19](../runbooks/19-o11y-alerts.md)).
+The `ops-o11y` cluster on DigitalOcean was retired in November 2026. `ops-o11y-vultr` replaced it.
 
 ## Quick Access
 
 ```bash
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
+kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml get nodes
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml get nodes
 ```
 
 ## Structure
 
 ```
 k3s/
+├── ops-o11y-vultr/
+│   ├── apps/                         # one Argo CD Application each
+│   ├── argocd/root.yaml
+│   ├── cluster/                      # manifests the apps sync
+│   └── tools/                        # drills, restore, sizing
 ├── ops-backoffice-tools/             # legacy
 │   ├── apps/
 │   │   ├── appsmith/
@@ -120,4 +127,4 @@ Internet → Cloudflare → DO LB → Traefik (NodePort) → Gateway API → App
 
 ## Playbooks Reference
 
-See [`ansible.md`](./ansible.md#digitalocean-k3s-plays).
+See [`ansible.md`](./ansible.md#k3s-plays).
