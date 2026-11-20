@@ -11,28 +11,106 @@
     test_dir: "{{ [lookup('ansible.builtin.env', 'TMPDIR') | default('/tmp', true), 'vultr-maps-test'] | path_join }}"
     test_absent: stg-vm-nws-2
     test_blocks:
-      - {name: jms-eng, role: nws, ports: [4001]}
-      - {name: jms-chn, role: nws, ports: [4002]}
-      - {name: jms-esp, role: nws, ports: [4003]}
-      - {name: jms-ita, role: nws, ports: [4004]}
-      - {name: jms-jpn, role: nws, ports: [4005]}
-      - {name: jms-kor, role: nws, ports: [4006]}
-      - {name: jms-por, role: nws, ports: [4007]}
-      - {name: jms-ukr, role: nws, ports: [4008]}
-      - {name: socrates, role: soc, ports: [4010, 4011], least_conn: true}
-      - {name: api, role: api, ports: [2345, 2346], least_conn: true}
-      - {name: client-eng, role: clt-eng, ports: [50505, 52525], least_conn: true}
-      - {name: client-chn, role: clt-chn, ports: [50505, 52525], least_conn: true}
-      - {name: client-cnt, role: clt-cnt, ports: [50505, 52525], least_conn: true}
-      - {name: client-esp, role: clt-esp, ports: [50505, 52525], least_conn: true}
-      - {name: client-ger, role: clt-ger, ports: [50505, 52525], least_conn: true}
-      - {name: client-ita, role: clt-ita, ports: [50505, 52525], least_conn: true}
-      - {name: client-jpn, role: clt-jpn, ports: [50505, 52525], least_conn: true}
-      - {name: client-por, role: clt-por, ports: [50505, 52525], least_conn: true}
-      - {name: client-ukr, role: clt-ukr, ports: [50505, 52525], least_conn: true}
-      - {name: client-swa, role: clt-swa, ports: [50505, 52525], least_conn: true}
-      - {name: client-kor, role: clt-kor, ports: [50505, 52525], least_conn: true}
-      - {name: client-ara, role: clt-ara, ports: [50505, 52525], least_conn: true}
+      - name: jms-eng
+        role: nws
+        ports:
+          stg: [4001]
+          prd: [4201]
+      - name: jms-chn
+        role: nws
+        ports:
+          stg: [4102]
+          prd: [4202]
+      - name: jms-esp
+        role: nws
+        ports:
+          stg: [4103]
+          prd: [4203]
+      - name: jms-ita
+        role: nws
+        ports:
+          stg: [4104]
+          prd: [4204]
+      - name: jms-jpn
+        role: nws
+        ports:
+          stg: [4105]
+          prd: [4205]
+      - name: jms-kor
+        role: nws
+        ports:
+          stg: [4106]
+          prd: [4206]
+      - name: jms-por
+        role: nws
+        ports:
+          stg: [4107]
+          prd: [4207]
+      - name: jms-ukr
+        role: nws
+        ports:
+          stg: [4108]
+          prd: [4208]
+      - name: socrates
+        role: soc
+        ports:
+          stg: [4110, 4111]
+          prd: [4210, 4211]
+        least_conn: true
+      - name: api
+        role: api
+        ports:
+          stg: [2445, 2446]
+          prd: [2545, 2546]
+        least_conn: true
+      - name: client-eng
+        role: clt-eng
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-chn
+        role: clt-chn
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-cnt
+        role: clt-cnt
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-esp
+        role: clt-esp
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-ger
+        role: clt-ger
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-ita
+        role: clt-ita
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-jpn
+        role: clt-jpn
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-por
+        role: clt-por
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-ukr
+        role: clt-ukr
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-swa
+        role: clt-swa
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-kor
+        role: clt-kor
+        ports: [50505, 52525]
+        least_conn: true
+      - name: client-ara
+        role: clt-ara
+        ports: [50505, 52525]
+        least_conn: true
     maps_upstreams_path: "{{ test_dir }}/upstreams.yaml"
   tasks:
     - name: Make an empty output directory
@@ -87,35 +165,18 @@
         maps_upstreams_path: "{{ test_dir }}/refused-upstreams.yaml"
         test_expect: maps_env
 
-    - name: Render the upstream map
-      ansible.builtin.include_tasks: ../tasks/vultr-maps.yml
-      vars:
-        maps_write: upstreams
-        maps_env: stg
-
-    - name: Read the upstream map
-      ansible.builtin.set_fact:
-        test_upstreams: "{{ (lookup('ansible.builtin.file', maps_upstreams_path) | from_yaml).nginx_upstreams }}"
-      vars:
-        maps_env: stg
-
-    - name: Assert the upstream map holds only the expected blocks
-      ansible.builtin.assert:
-        that:
-          - test_upstreams | map(attribute='name') | sort == test_blocks | map(attribute='name') | sort
-
-    - name: Assert each block holds each host on each port
-      ansible.builtin.assert:
-        that:
-          - got.servers == want
-          - got.least_conn | default(false) == item.least_conn | default(false)
-        fail_msg: "{{ item.name }}: {{ got }} != {{ want }}"
-        quiet: true
-      vars:
-        got: "{{ test_upstreams | selectattr('name', 'eq', item.name) | first }}"
-        pattern: "^stg-vm-{{ item.role }}-[0-9]+$"
-        want_ips: "{{ groups['all'] | select('match', pattern) | sort | map('extract', hostvars, 'maps_vpc_ip') | list }}"
-        want: "{{ want_ips | product(item.ports) | map('join', ':') | list }}"
-      loop: "{{ test_blocks }}"
+    - name: Add each production host with a fake VPC address
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        maps_vpc_ip: "203.0.113.{{ index + 1 }}"
+      loop: "{{ vultr_maps_names }}"
       loop_control:
-        label: "{{ item.name }}"
+        index_var: index
+      vars:
+        maps_env: prd
+
+    - name: Render and check the upstream map of each environment
+      ansible.builtin.include_tasks: vultr-maps-rendered.yml
+      loop: [stg, prd]
+      loop_control:
+        loop_var: test_env
