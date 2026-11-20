@@ -7,7 +7,7 @@ Run every command on this page from the repository root.
 ## Access
 
 ```bash
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get nodes
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml get nodes
 ```
 
 ## Applications
@@ -38,7 +38,7 @@ helm repo update
 (
   printf 'OAuth client secret: '
   read -rs TS_OAUTH_CLIENT_SECRET; echo
-  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml helm upgrade tailscale-operator tailscale/tailscale-operator \
+  helm --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml upgrade tailscale-operator tailscale/tailscale-operator \
     --namespace tailscale --create-namespace --install \
     -f k3s/ops-backoffice-tools/cluster/tailscale/operator-values.yaml \
     --set oauth.clientId=<CLIENT_ID> \
@@ -60,14 +60,14 @@ SEC=k3s/ops-backoffice-tools/apps/$APP/manifests/base/secrets
 sops decrypt --input-type dotenv --output-type dotenv "$ENC/$APP.secrets.env.enc" > "$SEC/.secrets.env" &&
   sops decrypt "$ENC/$APP.tls.crt.enc" > "$SEC/tls.crt" &&
   sops decrypt "$ENC/$APP.tls.key.enc" > "$SEC/tls.key" &&
-  KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl apply -k "k3s/ops-backoffice-tools/apps/$APP/manifests/base/"
+  kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml apply -k "k3s/ops-backoffice-tools/apps/$APP/manifests/base/"
 rm -f "$SEC/.secrets.env" "$SEC/tls.crt" "$SEC/tls.key"
 
 # Check
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get all -n <app>
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml get all -n <app>
 
 # Logs
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl logs -n <app> deploy/<app>
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml logs -n <app> deploy/<app>
 ```
 
 ### Secrets Structure
@@ -87,18 +87,18 @@ apps/<app>/manifests/base/secrets/
 ### Tailscale Connectivity
 
 ```bash
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl logs -n tailscale deploy/operator
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml logs -n tailscale deploy/operator
 ```
 
 ### PVC Stuck Pending
 
 ```bash
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl get volumes.longhorn.io -n longhorn-system
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl describe pvc -n <namespace> <pvc-name>
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml get volumes.longhorn.io -n longhorn-system
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml describe pvc -n <namespace> <pvc-name>
 ```
 
 ### Longhorn UI
 
 ```bash
-KUBECONFIG=k3s/ops-backoffice-tools/.kubeconfig.yaml kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
+kubectl --kubeconfig k3s/ops-backoffice-tools/.kubeconfig.yaml port-forward -n longhorn-system svc/longhorn-frontend 8080:80
 ```

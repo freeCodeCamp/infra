@@ -93,4 +93,4 @@ For the full list, run `find ../infra-secrets -name '*.enc'`.
 
 ## References
 
-- `infra/CLAUDE.md` §infra-secrets coupling.
+- `AGENTS.md` (`CLAUDE.md` links to it), section "Secrets".

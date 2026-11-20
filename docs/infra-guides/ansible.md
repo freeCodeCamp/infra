@@ -31,8 +31,8 @@ The DigitalOcean inventory needs the `DO_API_TOKEN` of the main team. `ansible/.
 
 - Give the target group with `-e variable_host=<group>`. `play-swarm--form.yml` is different: it takes `swarm_manager_group` and `swarm_worker_group`.
 - A group name that does not exist stops the play with `Could not match supplied host pattern`. If you forget `-e variable_host`, the name in the message is `null`.
-- In GitHub Actions, a group with no hosts gives a warning and the play does nothing. With the `vultr` provider, the run fails on a group with no hosts or a group name that does not exist, because a Vultr group exists only when a host matches it. The `update` and `reboot` workflows take `check: true` to run with `--check`.
-- `ansible--housekeeping.yml` and `ansible--cleanup-clients.yml` name a group and a provider on each job leg. An environment moves to Vultr at its traffic cutover, by a change to its legs.
+- In GitHub Actions, the only provider is `vultr`. The run fails on a group with no hosts or a group name that does not exist, because a Vultr group exists only when a host matches it. The `update` and `reboot` workflows take `check: true` to run with `--check`.
+- `ansible--housekeeping.yml` and `ansible--cleanup-clients.yml` name a group and a provider on each job leg.
 - Most plays that change hosts do one host at a time and stop at the first host that fails. Some take `-e variable_serial=<n>`. These are different:
   - `play-any--cleanup-clients.yml` does all hosts at the same time and does not stop on a failed host.
   - `play-any--verify-nginx.yml` and the other k3s plays do all hosts at the same time. `play-k3s--reboot.yml` and the node probe in `play-k3s--verify-o11y.yml` do one host at a time and ignore `variable_serial`. If the peer node is unreachable after the drain, it stops and leaves the node cordoned; uncordon it by hand.
@@ -91,7 +91,7 @@ ansible-playbook -i inventory/vultr.yml -i inventory/constructed.yml \
   -e variable_manager=ops_swarm_mgr -e variable_service_prefix=stg-
 ```
 
-## DigitalOcean k3s Plays
+## k3s Plays
 
 Use `-i inventory/digitalocean.yml` in the subshell with `../../infra-secrets/do-primary/.env.enc` (see the inventory note above). For the Vultr o11y cluster, run `play-k3s--servers.yml` with `-i inventory/vultr.yml -i inventory/constructed.yml -e variable_host=ops_o11y_vultr`.
 
@@ -224,8 +224,8 @@ Run these from the repository root.
 | `just configure-secret <name>`            | `sops edit --input-type dotenv --output-type dotenv ../infra-secrets/<name>/.env.enc`                                        |
 | `just configure-policy <cluster>`         | No replacement. No cluster has a `cluster/policy` folder.                                                                    |
 | `just inspect-secret <name>`              | [Runbook 04](../runbooks/04-secrets-decrypt.md)                                                                              |
-| `just verify-app <cluster> <app>`         | `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl -n <app> get deploy,sts,pods,svc,secrets -o wide`                         |
-| `just inspect-crds <cluster> <filter>`    | `KUBECONFIG=k3s/<cluster>/.kubeconfig.yaml kubectl get crd \| grep -i <filter>`                                              |
+| `just verify-app <cluster> <app>`         | `kubectl --kubeconfig k3s/<cluster>/.kubeconfig.yaml -n <app> get deploy,sts,pods,svc,secrets -o wide`                       |
+| `just inspect-crds <cluster> <filter>`    | `kubectl --kubeconfig k3s/<cluster>/.kubeconfig.yaml get crd \| grep -i <filter>`                                            |
 | `just verify-manifests`                   | The `kubeconform` command in `.github/workflows/k8s--validate.yml`                                                           |
 | `just verify-secrets`                     | No replacement. Decrypt one envelope with runbook 04 to test the key.                                                        |
 
