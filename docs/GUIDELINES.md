@@ -12,9 +12,3 @@ Conventions for docs maintained by this repo.
 - Imperative verbs. Cite exact commands, exact filenames, exact env vars.
 - Cross-link to other runbooks rather than duplicating steps.
 - Failure modes get their own section: symptom → cause → fix.
-
-## RFC format (architecture/)
-
-- One RFC per non-trivial work item. Title: `rfc-<topic>.md`.
-- Status block at the top: Draft / Accepted / Superseded.
-- Superseded RFCs get a single-line pointer to the successor and stay only as long as that pointer earns its keep. Otherwise, delete.
