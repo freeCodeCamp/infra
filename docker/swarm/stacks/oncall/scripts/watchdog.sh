@@ -37,6 +37,7 @@ unreadable() {
 }
 
 if in_window "$now" "$quiet_until"; then
+  chat_notify ok watchdog "news English" "heartbeat: quiet hours, feed check skipped"
   printf 'watchdog: quiet hours, nothing checked\n'
   exit 0
 fi
@@ -54,14 +55,20 @@ age=$((now - built))
 [ "$age" -ge $((-tick)) ] || unreadable "lastBuildDate '$stamp' is in the future"
 
 if [ "$age" -le "$limit" ]; then
+  chat_notify ok watchdog "news English" "feed healthy: last build $stamp"
   printf 'watchdog: fresh, last build %s\n' "$stamp"
   exit 0
 fi
 
+alerted=false
 if [ $(((age - limit - 1) % remind)) -lt "$tick" ] || in_window $((now - tick)) "$quiet_until"; then
   ago="$((age / 3600))h $((age % 3600 / 60))m"
   chat_notify fail watchdog "news English" \
     "stale: last build $stamp, $ago ago (limit $((limit / 3600))h)" "$runs" runs
+  alerted=true
+fi
+if [ "$alerted" = false ]; then
+  chat_notify ok watchdog "news English" "heartbeat: feed remains stale, reminder not due"
 fi
 printf 'watchdog: stale, last build %s\n' "$stamp" >&2
 exit 1

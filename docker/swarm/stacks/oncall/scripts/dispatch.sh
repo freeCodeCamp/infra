@@ -31,22 +31,27 @@ warn_if_last_run_bad() {
     --max-time 30 \
     "$api/repos/$DISPATCH_REPO/actions/workflows/$DISPATCH_WORKFLOW/runs?branch=${ref#refs/heads/}&status=completed&per_page=1" ||
     true)
-  [ "$code" = 200 ] || return 0
+  [ "$code" = 200 ] || return 1
   last=$(grep -o '"conclusion": *"[a-z_]*"' "$body" | head -n 1 | sed 's/.*"\([a-z_]*\)"$/\1/')
   case "$last" in
   failure | cancelled | timed_out | startup_failure) ;;
-  *) return 0 ;;
+  *) return 1 ;;
   esac
   link=$(grep -o '"html_url": *"[^"]*"' "$body" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')
   chat_notify warn dispatch "$target" \
     "skipped: inside the maintenance window, the last run is $last" "${link:-$runs}" "last run"
+  return 0
 }
 
 case "${WINDOW_POLICY:-none}" in
 avoid)
   if in_window "$now"; then
     printf 'dispatch: skip %s, inside the maintenance window\n' "$target"
-    in_window "$now" 3 && warn_if_last_run_bad
+    if in_window "$now" 3 && warn_if_last_run_bad; then
+      :
+    else
+      chat_notify ok dispatch "$target" "heartbeat: scheduled dispatch skipped inside the maintenance window"
+    fi
     exit 0
   fi
   ;;
@@ -73,6 +78,7 @@ code=$(curl -s -o "$body" -w '%{http_code}' -X POST \
 
 case "$code" in
 2??)
+  chat_notify ok dispatch "$target" "dispatch accepted (HTTP $code)" "$runs" runs
   printf 'dispatch: %s accepted (HTTP %s)\n' "$target" "$code"
   exit 0
   ;;
