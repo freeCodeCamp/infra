@@ -91,6 +91,8 @@ The dispatcher posts to Google Chat when the API refuses the request or when a v
 
 The DOCR garbage collection workflow makes the registry read-only while it runs. It starts only on Wed/Sat 00:00–05:10 UTC. This leaves at least 55 minutes before the 06:05 news deploy. Past runs took 5–26 minutes. It waits up to 60 minutes for DOCR push and cleanup runs in other repos to finish, then skips. It posts each result to Google Chat. To start it outside the window, use `window_check=false`.
 
+The workflow does not wait for `exam-platform` releases. That repo is private, and the workflow token cannot read its runs. If an `exam-platform` release fails to push during a collection, run the release again after the collection ends.
+
 ### Freshness Watchdog
 
 `svc-watchdog-news` runs every hour at minute 50. It reads `<lastBuildDate>` from `https://www.freecodecamp.org/news/rss.xml`.
