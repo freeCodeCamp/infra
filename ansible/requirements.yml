@@ -3,7 +3,7 @@ collections:
   - name: community.general
     version: "13.5.1"
   - name: community.sops
-    version: "2.5.0"
+    version: "2.5.1"
   - name: community.digitalocean
     version: "1.27.0"
   - name: ansible.posix
