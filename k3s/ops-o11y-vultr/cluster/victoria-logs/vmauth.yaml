@@ -99,6 +99,7 @@ spec:
   tokenRef:
     name: vmauth-fluent-bit-sender
     key: token
+  max_concurrent_requests: 60
   targetRefs:
     - static:
         url: http://vlagent-vlagent.o11y.svc:9429
