@@ -14,7 +14,7 @@ The alerts have two layers. An Alertmanager inhibit rule (`inhibit_rules` in `k3
 
 - o11y layer, never muted: `O11yPodRestarting`, `VultrMetricsPushDown`, `TargetDown`, `LogStoreDown`, `LogStoreStale`, `VlagentDroppedData`, `ScrapeConfigReloadFailed`, `VmalertExecutionErrors`, `O11yBackupStale`, `O11yBackupFailed`, `ArgoCDAppUnhealthy`, `EtcdSnapshotMissing`.
 - Fleet layer, muted while `VultrMetricsPushDown` fires: `HostDown`, `NginxVmDown`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `NginxUpstreamDown`, `NginxGatewayErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. Missing data can make these fire.
-- Never muted: `DiskSpaceLow` and `MemoryHigh` (they fire only on data that arrives, and they also cover the o11y nodes), and `ProbeFailed` (it checks the public sites from outside the hosts).
+- Never muted: `DiskSpaceLow`, `MemoryHigh` and `HousekeepingStale` (they fire only on data that arrives, and the first two also cover the o11y nodes), and `ProbeFailed` (it checks the public sites from outside the hosts).
 
 `O11yPodRestarting` mutes nothing: each o11y component has more than one replica, so one restarting container does not stop the data. While `VultrMetricsPushDown` fires, a real host fault does not notify. Fix o11y first. The muted alerts stay visible in Alertmanager with the state `suppressed`.
 
@@ -208,6 +208,19 @@ A host uses more than 90% of its memory for 15 minutes.
    ```
 
 1. Restart the service that leaks memory. If the use is normal for the role, resize the VM.
+
+## HousekeepingStale
+
+A host has had no good run of `ansible/play-any--update.yml` for more than 8 days, so it missed 2 housekeeping runs (Wed and Sat). Unattended upgrades are off, so the host gets no package updates. After each good update, the play writes the time to `/var/lib/node_exporter/textfile_collector/housekeeping.prom`, and node exporter sends it as `housekeeping_last_update_timestamp_seconds`. A host with no textfile folder has no such metric, so this alert does not cover it.
+
+1. Find the last housekeeping runs and their results:
+
+   ```sh
+   gh run list -R freeCodeCamp/infra -w ansible--housekeeping.yml -L 5
+   ```
+
+1. If the runs failed, read the log of the update step for the host. Fix the cause, then start the workflow again.
+1. If the runs did not start, read the logs of the dispatcher, as in [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md#querying-logs).
 
 ## VultrMetricsPushDown
 

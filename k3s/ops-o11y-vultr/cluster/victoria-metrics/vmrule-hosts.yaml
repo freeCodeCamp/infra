@@ -59,6 +59,16 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#memoryhigh"
+        - alert: HousekeepingStale
+          expr: time() - housekeeping_last_update_timestamp_seconds > 8 * 86400
+          labels:
+            severity: warning
+            drill: "true"
+          annotations:
+            summary: "{{ $labels.instance }} has had no housekeeping update for over 8 days."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#housekeepingstale"
         - alert: VultrMetricsPushDown
           expr: absent(lag(node_boot_time_seconds{job="node",provider="vultr"}[1d]) <= 120)
           for: 5m

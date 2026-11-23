@@ -45,3 +45,17 @@
       ansible.builtin.apt:
         autoremove: true
         force_apt_get: true
+
+    - name: Find the node exporter textfile folder
+      ansible.builtin.stat:
+        path: "{{ housekeeping_textfile_dir }}"
+      register: housekeeping_textfile
+
+    - name: Write the time of this update for node exporter
+      ansible.builtin.copy:
+        dest: "{{ housekeeping_textfile_dir }}/housekeeping.prom"
+        content: "housekeeping_last_update_timestamp_seconds {{ now().timestamp() | int }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+      when: housekeeping_textfile.stat.isdir | default(false)
