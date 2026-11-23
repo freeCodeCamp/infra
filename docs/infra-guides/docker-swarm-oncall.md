@@ -58,15 +58,29 @@ All services → json-file logging (local, rotated)
 
 ### Environment Variables
 
-Export these 3 variables before `docker stack deploy`. Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
+Export these 2 variables before `docker stack deploy`. Container logs use the local `json-file` driver (rotated 10m × 3, compressed) — no logging credentials needed.
 
-| Variable                | Used by                       | Value                                                                               |
-| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------------- |
-| `WEBHOOK_SECRET`        | svc-webhook                   | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
-| `GITHUB_DISPATCH_TOKEN` | dispatchers                   | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
-| `GOOGLE_CHAT_WEBHOOK`   | dispatchers, watchdogs, relay | Google Chat incoming webhook URL. Same space as the housekeeping reports.           |
+| Variable                | Used by     | Value                                                                               |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| `WEBHOOK_SECRET`        | svc-webhook | Shared secret for `/hooks/run-gantry`. Same value as the GHA secret.                |
+| `GITHUB_DISPATCH_TOKEN` | dispatchers | Fine-grained PAT of the bot account. Actions read/write on `news` and `infra` only. |
 
 Anyone with Docker access on the manager can read these values with `docker service inspect`. Rotate a value after you remove such access.
+
+### Chat Webhook Secrets
+
+The Google Chat webhooks are external Docker secrets, not variables. Create them before the first deploy, as in [Deployment](#deployment) step 4.
+
+| Secret               | Swarm name                     | Used by                       | Value                                                                             |
+| -------------------- | ------------------------------ | ----------------------------- | --------------------------------------------------------------------------------- |
+| `chat_webhook`       | `oncall_chat_webhook_v1`       | dispatchers, watchdogs, relay | Google Chat webhook URL. Same space as the housekeeping reports.                  |
+| `chat_webhook_drill` | `oncall_chat_webhook_drill_v1` | none yet                      | Webhook URL of the drill space (1Password item `o11y-google-chat-drill-webhook`). |
+
+`scripts/lib.sh` reads the URL from `/run/secrets/chat_webhook`. If the file is missing or empty, the script logs `chat: no webhook in /run/secrets/chat_webhook, message not sent` and posts nothing. `curl` gets the URL on stdin. `svc-watchdog-swarm` and `svc-chat-relay` have no `curl`, so they post with `wget`, and the URL is a `wget` argument while it runs. Anyone who can see the processes on the manager can see it; such a person can also read the secret.
+
+`docker service inspect` does not show a secret value. A service that had `GOOGLE_CHAT_WEBHOOK` before can still show the old value under `PreviousSpec` until its next update.
+
+A Docker secret cannot change. To change a value, see [Rotate a Chat Webhook](#rotate-a-chat-webhook).
 
 ### Swarm Config Names
 
@@ -128,7 +142,7 @@ Every message from this stack and from the GitHub workflow notifiers is one line
 - A warn or fail message from a GitHub workflow can add detail lines below the line.
 - `scripts/lib.sh` (`chat_notify`) and `.github/actions/notify-chat` make the line. Do not post to Google Chat in a different format.
 
-Gantry sends its notifications to `svc-chat-relay` (`http://svc-chat-relay:9000/hooks/gantry`). The relay makes the standard line and posts it to `GOOGLE_CHAT_WEBHOOK`. The subject is `hourly` for the cron run and `webhook` for a run from `/hooks/run-gantry`. Gantry posts only when it updates a service or when an update fails (`GANTRY_NOTIFICATION_CONDITION=on-change`).
+Gantry sends its notifications to `svc-chat-relay` (`http://svc-chat-relay:9000/hooks/gantry`). The relay makes the standard line and posts it to the webhook in the secret `chat_webhook`. The subject is `hourly` for the cron run and `webhook` for a run from `/hooks/run-gantry`. Gantry posts only when it updates a service or when an update fails (`GANTRY_NOTIFICATION_CONDITION=on-change`).
 
 ```text
 ✅ *gantry* · webhook · 1 service(s) updated: prd-news_svc-eng
@@ -159,7 +173,7 @@ All services log to the local Docker `json-file` driver, rotated per node:
 
 ## Deployment
 
-**Who:** an operator with the `infra-secrets` age key and Tailscale access to the manager. The command needs `sops`, so an agent cannot run it.
+**Who:** an operator with the `infra-secrets` age key, 1Password access and Tailscale access to the manager. The commands need `sops` and `op`, so an agent cannot run them.
 
 **When:** after a change to a file in this directory. No workflow deploys this stack, so a push does not change the live stack. A first deploy and an update use the same command.
 
@@ -171,7 +185,26 @@ All services log to the local Docker `json-file` driver, rotated per node:
    ```
 
 3. If you changed a config file, increase its version first. See [Swarm Config Names](#swarm-config-names).
-4. From the repository root, run this block. The block decrypts the 3 variables into a subshell, so they are not in your shell after the command. `sops exec-env` cannot read this file, so the loop is necessary. See runbook 04, section 3.
+4. Create the Chat webhook secrets. From the repository root, run this block. It creates each secret only when it does not exist, so you can run it before each deploy. The values go from `sops` and `op` straight into `docker secret create`, and the block shows no value. `op` reads the drill webhook from the `freecodecamp.1password.com` account and asks you to approve the read in 1Password.
+
+   ```bash
+   (
+     set -euo pipefail
+     if ! docker --context vultr secret inspect oncall_chat_webhook_v1 >/dev/null 2>&1; then
+       sops decrypt --input-type dotenv --output-type dotenv \
+         ../infra-secrets/docker/oldeworld/oncall.env.enc |
+         sed -n 's/^GOOGLE_CHAT_WEBHOOK=//p' |
+         docker --context vultr secret create oncall_chat_webhook_v1 -
+     fi
+     if ! docker --context vultr secret inspect oncall_chat_webhook_drill_v1 >/dev/null 2>&1; then
+       op read --account freecodecamp.1password.com \
+         op://Infra-IaC-ESO/o11y-google-chat-drill-webhook/credential |
+         docker --context vultr secret create oncall_chat_webhook_drill_v1 -
+     fi
+   )
+   ```
+
+5. From the repository root, run this block. The block decrypts the variables into a subshell, so they are not in your shell after the command. `sops exec-env` cannot read this file, so the loop is necessary. See runbook 04, section 3.
 
    ```bash
    cd docker/swarm/stacks/oncall
@@ -187,13 +220,13 @@ All services log to the local Docker `json-file` driver, rotated per node:
    )
    ```
 
-5. Check the services. `svc-webhook`, `svc-chat-relay` and `svc-cronjob` show `1/1`:
+6. Check the services. `svc-webhook`, `svc-chat-relay` and `svc-cronjob` show `1/1`:
 
    ```bash
    docker --context vultr service ls --filter name=oncall_
    ```
 
-6. Check the scheduler. Each scheduled service has an `Add cronjob` line: `svc-cleanup`, `svc-dispatch-docr-gc`, `svc-dispatch-housekeeping`, `svc-dispatch-news-eng`, `svc-update`, `svc-watchdog-news`, `svc-watchdog-swarm` and `svc-watchdog-vxlan`:
+7. Check the scheduler. Each scheduled service has an `Add cronjob` line: `svc-cleanup`, `svc-dispatch-docr-gc`, `svc-dispatch-housekeeping`, `svc-dispatch-news-eng`, `svc-update`, `svc-watchdog-news`, `svc-watchdog-swarm` and `svc-watchdog-vxlan`:
 
    ```bash
    docker --context vultr service logs --raw oncall_svc-cronjob
@@ -209,6 +242,22 @@ sudo chmod -R u+w /home/freecodecamp/.docker
 ```
 
 **Note:** The update service runs on the manager node via cronjob scheduling (managed by `svc-cronjob`).
+
+### Rotate a Chat Webhook
+
+1. In the Google Chat space, add a new incoming webhook. Keep the old webhook until the last step.
+2. Put the new URL in each place that holds the old one:
+   - `chat_webhook`: `GOOGLE_CHAT_WEBHOOK` in `oncall.env.enc`, and the GitHub Actions secret `GOOGLE_CHAT_WEBHOOK` of this repository, which posts to the same space. The GitHub workflows stop posting when you delete the old webhook, so change the secret too: run `gh secret set GOOGLE_CHAT_WEBHOOK -R freeCodeCamp/infra` and paste the URL at its prompt.
+   - `chat_webhook_drill`: the 1Password item `o11y-google-chat-drill-webhook` (account `freecodecamp.1password.com`, vault `Infra-IaC-ESO`). calert also reads this item. External Secrets gets the new value within 1 hour; then restart calert, as in runbook 19.
+3. In `stack-oncall.yml`, increase the version suffix of the secret `name:` (for example `oncall_chat_webhook_v1` → `oncall_chat_webhook_v2`). Use the same name in the block of [Deployment](#deployment) step 4.
+4. Run steps 4 and 5 of [Deployment](#deployment).
+5. Remove the old secret:
+
+   ```bash
+   docker --context vultr secret rm oncall_chat_webhook_v1
+   ```
+
+6. In the Google Chat space, delete the old webhook. The old URL stops working.
 
 ## GHA Integration
 

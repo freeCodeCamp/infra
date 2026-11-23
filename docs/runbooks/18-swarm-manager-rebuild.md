@@ -101,7 +101,7 @@ cd ..
 
 ## 8. Deploy the stacks again
 
-The new Swarm has no stacks and no configs. If your machine has no `vultr` Docker context, create it:
+The new Swarm has no stacks, no configs and no secrets. If your machine has no `vultr` Docker context, create it:
 
 ```sh
 docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
@@ -109,7 +109,7 @@ docker context create vultr --docker host=ssh://freecodecamp@ops-vm-swarm-mgr-1
 
 Deploy each stack by its guide.
 
-- `oncall`: [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md), section Deployment.
+- `oncall`: [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md), section Deployment. Do step 4 (the Chat webhook secrets) before the deploy.
 - `stg-news`, `prd-news`: [docker-swarm-news.md](../infra-guides/docker-swarm-news.md).
 - `stg-socrates`, `prd-socrates`: [docker-swarm-socrates.md](../infra-guides/docker-swarm-socrates.md).
 - `stg-api`, `prd-api`: in `freeCodeCamp/freeCodeCamp`, run the workflow `deploy-api.yml` for each environment. Its `TS_MACHINE_NAME` secret must name `ops-vm-swarm-mgr-1`.

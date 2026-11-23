@@ -8,12 +8,13 @@ x-logging-config: &logging-config
 
 x-dispatch-env: &dispatch-env
   GITHUB_DISPATCH_TOKEN: ${GITHUB_DISPATCH_TOKEN:?}
-  GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
 
 x-dispatch: &dispatch
   <<: *logging-config
   image: curlimages/curl:8.23.0
   entrypoint: ["/scripts/dispatch.sh"]
+  secrets:
+    - source: chat_webhook
   configs:
     - source: scripts_lib
       target: /scripts/lib.sh
@@ -81,8 +82,8 @@ services:
     <<: *logging-config
     image: curlimages/curl:8.23.0
     entrypoint: ["/scripts/watchdog.sh"]
-    environment:
-      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
+    secrets:
+      - source: chat_webhook
     configs:
       - source: scripts_lib
         target: /scripts/lib.sh
@@ -102,8 +103,8 @@ services:
     <<: *logging-config
     image: docker:29.9.3
     entrypoint: ["/scripts/watchdog-swarm.sh"]
-    environment:
-      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
+    secrets:
+      - source: chat_webhook
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     configs:
@@ -129,8 +130,9 @@ services:
     image: curlimages/curl:8.23.0
     entrypoint: ["/scripts/watchdog-vxlan.sh"]
     environment:
-      GOOGLE_CHAT_WEBHOOK: ${GOOGLE_CHAT_WEBHOOK:?}
       NODE_NAME: "{{.Node.Hostname}}"
+    secrets:
+      - source: chat_webhook
     networks:
       - host-namespace
     configs:
@@ -233,8 +235,8 @@ services:
     command:
       - "-verbose"
       - "-hooks=/hooks.json"
-    environment:
-      - "GOOGLE_CHAT_WEBHOOK=${GOOGLE_CHAT_WEBHOOK:?}"
+    secrets:
+      - source: chat_webhook
     configs:
       - source: hooks_relay
         target: /hooks.json
@@ -294,6 +296,14 @@ networks:
     external: true
     name: host
 
+secrets:
+  chat_webhook:
+    name: oncall_chat_webhook_v1
+    external: true
+  chat_webhook_drill:
+    name: oncall_chat_webhook_drill_v1
+    external: true
+
 configs:
   hooks_json:
     name: oncall_hooks_json_v1
@@ -302,7 +312,7 @@ configs:
     name: oncall_run_gantry_v3
     file: ./run_gantry.sh
   scripts_lib:
-    name: oncall_scripts_lib_v1
+    name: oncall_scripts_lib_v2
     file: ./scripts/lib.sh
   scripts_dispatch:
     name: oncall_scripts_dispatch_v2

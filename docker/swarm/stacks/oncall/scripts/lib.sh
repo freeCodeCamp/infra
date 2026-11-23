@@ -21,24 +21,33 @@ json_string() {
     awk 'BEGIN { ORS = ""; print "\"" } NR > 1 { print "\\n" } { print } END { print "\"" }'
 }
 
+read_chat_url() {
+  chat_file="${CHAT_SECRET_DIR:-/run/secrets}/chat_webhook"
+  chat_url=
+  [ -r "$chat_file" ] || return 0
+  read -r chat_url <"$chat_file" || :
+}
+
 chat_post() {
-  if [ -z "${GOOGLE_CHAT_WEBHOOK:-}" ]; then
-    printf 'chat: GOOGLE_CHAT_WEBHOOK is empty, message not sent\n' >&2
+  read_chat_url
+  if [ -z "$chat_url" ]; then
+    printf 'chat: no webhook in %s, message not sent\n' "$chat_file" >&2
     return 0
   fi
   chat_json="{\"text\":$(json_string "$1")}"
   if ! command -v curl >/dev/null 2>&1; then
     wget -q -O /dev/null -T 30 \
       --header 'Content-Type: application/json; charset=UTF-8' \
-      --post-data "$chat_json" "$GOOGLE_CHAT_WEBHOOK" 2>/dev/null ||
+      --post-data "$chat_json" "$chat_url" 2>/dev/null ||
       printf 'chat: Google Chat rejected the message (wget exit %s)\n' "$?" >&2
     return 0
   fi
-  chat_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
-    -H 'Content-Type: application/json; charset=UTF-8' \
-    --max-time 30 --retry 2 \
-    -d "$chat_json" \
-    "$GOOGLE_CHAT_WEBHOOK" || true)
+  chat_code=$(printf 'url = "%s"\n' "$chat_url" |
+    curl -s -o /dev/null -w '%{http_code}' -X POST \
+      -H 'Content-Type: application/json; charset=UTF-8' \
+      --max-time 30 --retry 2 \
+      -d "$chat_json" \
+      -K - || true)
   case "$chat_code" in
   2??) return 0 ;;
   esac
