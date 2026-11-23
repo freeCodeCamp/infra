@@ -1,5 +1,6 @@
 ---
 tailnet_cidr: 100.64.0.0/10
+housekeeping_textfile_dir: /var/lib/node_exporter/textfile_collector
 pm2_user: freecodecamp
 pm2_home: /home/freecodecamp/.pm2
 pm2_required_bins: [pm2]

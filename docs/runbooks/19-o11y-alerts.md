@@ -13,8 +13,8 @@ kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y rollout restart
 The alerts have two layers. An Alertmanager inhibit rule (`inhibit_rules` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`) mutes part of the fleet layer while no Vultr host can send metrics:
 
 - o11y layer, never muted: `O11yPodRestarting`, `VultrMetricsPushDown`, `TargetDown`, `LogStoreDown`, `LogStoreStale`, `VlagentDroppedData`, `ScrapeConfigReloadFailed`, `VmalertExecutionErrors`, `O11yBackupStale`, `O11yBackupFailed`, `ArgoCDAppUnhealthy`, `EtcdSnapshotMissing`.
-- Fleet layer, muted while `VultrMetricsPushDown` fires: `HostDown`, `NginxVmDown`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. Missing data can make these fire.
-- Never muted: `DiskSpaceLow` and `MemoryHigh` (they fire only on data that arrives, and they also cover the o11y nodes), and `ProbeFailed` (it checks the public sites from outside the hosts).
+- Fleet layer, muted while `VultrMetricsPushDown` fires: `HostDown`, `NginxVmDown`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `NginxUpstreamDown`, `NginxGatewayErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. Missing data can make these fire.
+- Never muted: `DiskSpaceLow`, `MemoryHigh` and `HousekeepingStale` (they fire only on data that arrives, and the first two also cover the o11y nodes), and `ProbeFailed` (it checks the public sites from outside the hosts).
 
 `O11yPodRestarting` mutes nothing: each o11y component has more than one replica, so one restarting container does not stop the data. While `VultrMetricsPushDown` fires, a real host fault does not notify. Fix o11y first. The muted alerts stay visible in Alertmanager with the state `suppressed`.
 
@@ -99,7 +99,9 @@ Each dashboard in the folders **freeCodeCamp**, **VictoriaMetrics** and **Hosts*
 
 ## Test the alert path
 
-This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"` and a name that starts with `DRILL-`. Alertmanager sends them to the receiver `google_chat_drill`, and calert posts them to the drill space, not to the alert space. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook` in the vault `Infra-IaC-ESO`. The test does not use the webhook of the alert space.
+This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"` and a name that starts with `DRILL-`. Alertmanager sends each alert with the label `drill="true"` to the receiver `google_chat_drill`, and calert posts it to the drill space, not to the alert space.
+
+A new rule starts with the label `drill: "true"` (a string, in quotes), so its alerts go to the drill space only. To make it a production alert, remove the label in a PR. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook` in the vault `Infra-IaC-ESO`. The test does not use the webhook of the alert space.
 
 1. Read the list of alerts that the test sends:
 
@@ -117,7 +119,7 @@ This test proves that an alert goes through Alertmanager and calert to Google Ch
 1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in. While the silence is on, each run of the CronJob fails with `Watchdog is not active; no check-in`, and the last 3 failed Jobs stay in the `o11y` namespace. This is correct.
 1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
 
-The test sends the metric alerts and the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`). To send the alerts of one rule file only, give the file after `--dry-run` or `--send`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
+The test sends the metric alerts and the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`, `NginxUpstreamDown`, `NginxGatewayErrors`). To send the alerts of one rule file only, give the file after `--dry-run` or `--send`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
 
 ## HostDown
 
@@ -206,6 +208,19 @@ A host uses more than 90% of its memory for 15 minutes.
    ```
 
 1. Restart the service that leaks memory. If the use is normal for the role, resize the VM.
+
+## HousekeepingStale
+
+A host has had no good run of `ansible/play-any--update.yml` for more than 8 days, so it missed 2 housekeeping runs (Wed and Sat). Unattended upgrades are off, so the host gets no package updates. After each good update, the play writes the time to `/var/lib/node_exporter/textfile_collector/housekeeping.prom`, and node exporter sends it as `housekeeping_last_update_timestamp_seconds`. A host with no textfile folder has no such metric, so this alert does not cover it.
+
+1. Find the last housekeeping runs and their results:
+
+   ```sh
+   gh run list -R freeCodeCamp/infra -w ansible--housekeeping.yml -L 5
+   ```
+
+1. If the runs failed, read the log of the update step for the host. Fix the cause, then start the workflow again.
+1. If the runs did not start, read the logs of the dispatcher, as in [docker-swarm-oncall.md](../infra-guides/docker-swarm-oncall.md#querying-logs).
 
 ## VultrMetricsPushDown
 
@@ -487,6 +502,37 @@ An NGINX VM logs more than 10 upstream errors in 5 minutes for 5 minutes. The al
    ```
 
 1. If one upstream fails, examine that service. If all upstreams fail, examine the network of the VM.
+
+## NginxUpstreamDown
+
+An NGINX VM cannot connect to one upstream address (`connection refused`) in 4 or more of the last 5 minutes. A planned rollout refuses for less than 1 minute on each address, so this alert shows a task that does not start again. The `up` label is the address and port.
+
+1. Read the errors in the VictoriaLogs UI. Use the `host` and `up` labels of the alert:
+
+   ```text
+   _time:15m _stream:{level=~"error|crit|alert|emerg",host="<host>"} "connect() failed (111" "<up>"
+   ```
+
+1. Find the service that publishes the port, and examine its tasks:
+
+   ```sh
+   docker --context vultr service ls --format '{{.Name}} {{.Ports}}' | grep '<port>'
+   docker --context vultr service ps <service> --no-trunc
+   ```
+
+1. Restart or roll back the service.
+
+## NginxGatewayErrors
+
+One `server_name` returns 5 or more responses with the status 502, 503 or 504 in 5 minutes. NGINX returns these when no upstream of the site answers. A planned rollout causes none, because NGINX sends the request to the next upstream.
+
+1. Read the failing requests in the VictoriaLogs UI. Use the `env` and `server_name` labels of the alert:
+
+   ```text
+   _time:15m env:<env> server_name:"<server_name>" status:~"^50[234]$" | stats by (host, status) count()
+   ```
+
+1. Find the failing upstream as in [NginxUpstreamDown](#nginxupstreamdown), and examine that service.
 
 ## Watchdog
 

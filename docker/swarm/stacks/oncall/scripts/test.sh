@@ -11,17 +11,20 @@ cat >"$work/bin/curl" <<'EOF'
 out=""
 url=""
 data=""
+config=""
 while [ $# -gt 0 ]; do
   case "$1" in
+    -K) config=$2; shift 2 ;;
     -o) out=$2; shift 2 ;;
     -d) data=$2; shift 2 ;;
     -H) printf 'H %s\n' "$2" >> "$FAKE_LOG"; shift 2 ;;
     --retry) printf 'RETRY %s\n' "$2" >> "$FAKE_LOG"; shift 2 ;;
     -w | -X | --max-time) shift 2 ;;
-    http*) url=$1; shift ;;
+    http*) url=$1; printf 'URLARG %s\n' "$1" >> "$FAKE_LOG"; shift ;;
     *) shift ;;
   esac
 done
+if [ "$config" = - ]; then url=$(sed -n 's/^url = "\(.*\)"$/\1/p'); fi
 case "$url" in
   "$FAKE_CHAT_URL") kind=CHAT; code=200 ;;
   *) kind=API; code=${FAKE_CODE:-204} ;;
@@ -33,6 +36,14 @@ printf '%s' "$code"
 if [ "$code" = 000 ]; then exit 7; fi
 EOF
 chmod +x "$work/bin/curl"
+
+for dir in secrets nosecret secret-nonl secret-empty secret-alt; do
+  mkdir -p "$work/$dir"
+done
+printf 'http://chat.test/hook\n' >"$work/secrets/chat_webhook"
+printf 'http://chat.test/hook' >"$work/secret-nonl/chat_webhook"
+: >"$work/secret-empty/chat_webhook"
+printf 'http://chat.test/hook-secret\n' >"$work/secret-alt/chat_webhook"
 
 WED_0100=1790730000
 WED_0559=1790747940
@@ -56,7 +67,7 @@ run_dispatch() {
     FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
     GITHUB_DISPATCH_TOKEN=tok DISPATCH_REPO=freeCodeCamp/news \
     DISPATCH_WORKFLOW=deploy-eng.yml GITHUB_API_URL="http://api.test" \
-    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+    CHAT_SECRET_DIR="$work/secrets" \
     "$@" sh "$here/dispatch.sh" >"$work/out" 2>&1
   status=$?
 }
@@ -113,7 +124,7 @@ run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$((WED_0100 + 2 * 3600 + 5 * 60)) 
 check "second window skip after a failed run posts no chat" "$(chat_calls)" 0
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 DISPATCH_REF=refs/heads/main FAKE_CODE=200 FAKE_BODY="$LAST_FAILED"
-check "full ref reads runs by branch name" "$(grep -c 'runs?branch=main&' "$log")" 1
+check "full ref reads runs by branch name" "$(grep -c '^API .*runs?branch=main&' "$log")" 1
 
 run_dispatch WINDOW_POLICY=avoid DISPATCH_NOW=$WED_0100 FAKE_CODE=200 \
   FAKE_BODY='{"workflow_runs":[{"conclusion":"cancelled","html_url":"https://x.test/3"}]}'
@@ -193,9 +204,17 @@ run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=502 FAKE_BODY="$(printf 'bad\ngate
 check "multi-line API body still gives one line" "$(chat_lines)" 1
 check "angle brackets are dropped from the excerpt" "$(chat_text_has 'bad gateway html')" 1
 
-run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=401 GOOGLE_CHAT_WEBHOOK=
+run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=401 CHAT_SECRET_DIR="$work/nosecret"
 check "empty webhook still exits 1" "$status" 1
 check "empty webhook posts no chat" "$(chat_calls)" 0
+
+run_dispatch DISPATCH_NOW=$THU_0605 FAKE_CODE=401 CHAT_SECRET_DIR="$work/secret-empty"
+check "empty webhook secret still exits 1" "$status" 1
+check "empty webhook secret is logged" \
+  "$(grep -c "^chat: no webhook in $work/secret-empty/chat_webhook, message not sent$" "$work/out")" 1
+
+run_dispatch DISPATCH_NOW=$THU_0605 GITHUB_DISPATCH_TOKEN= CHAT_SECRET_DIR="$work/secret-empty"
+check "missing token with an empty webhook secret still exits 2" "$status" 2
 
 run_dispatch DISPATCH_NOW=$THU_0605 GITHUB_DISPATCH_TOKEN=
 check "missing token exits 2" "$status" 2
@@ -229,7 +248,7 @@ run_watchdog() {
   env -i PATH="$work/bin:/usr/bin:/bin" \
     FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" FAKE_CODE=200 \
     FAKE_BODY="$(feed_xml "$BUILT")" \
-    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+    CHAT_SECRET_DIR="$work/secrets" \
     "$@" sh "$here/watchdog.sh" >"$work/out" 2>&1
   status=$?
 }
@@ -318,7 +337,7 @@ run_watchdog WATCHDOG_NOW=$((BUILT_AT + HOUR)) \
   FAKE_BODY="$(feed_xml 'Thu, 01 Foo 2026 13:24:51 +0000')"
 check "unknown month posts chat" "$(chat_calls)" 1
 
-run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 30 * 60)) GOOGLE_CHAT_WEBHOOK=
+run_watchdog WATCHDOG_NOW=$((BUILT_AT + 5 * HOUR + 30 * 60)) CHAT_SECRET_DIR="$work/nosecret"
 check "stale with empty webhook exits 1" "$status" 1
 check "stale with empty webhook posts no chat" "$(chat_calls)" 0
 
@@ -359,7 +378,7 @@ run_relay() {
   : >"$log"
   env -i PATH="$work/bin:/usr/bin:/bin" \
     FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
-    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+    CHAT_SECRET_DIR="$work/secrets" \
     "$@" sh "$here/relay.sh" >"$work/out" 2>&1
   status=$?
 }
@@ -388,12 +407,24 @@ check "relay falls back to the title" "$(chat_text_is \
 run_relay RELAY_TYPE=warning RELAY_TRIGGER=hourly RELAY_BODY="$UPDATED"
 check "relay warning is a warn line" "$(chat_text_has '⚠️ *gantry* · hourly · ')" 1
 
-run_relay RELAY_TYPE=success RELAY_BODY="$UPDATED" GOOGLE_CHAT_WEBHOOK=
+run_relay RELAY_TYPE=success RELAY_BODY="$UPDATED" CHAT_SECRET_DIR="$work/nosecret"
 check "relay with empty webhook exits 0" "$status" 0
 check "relay with empty webhook posts no chat" "$(chat_calls)" 0
+check "missing webhook secret is logged" \
+  "$(grep -c "^chat: no webhook in $work/nosecret/chat_webhook, message not sent$" "$work/out")" 1
+
+run_relay RELAY_TYPE=success RELAY_BODY="$UPDATED" CHAT_SECRET_DIR="$work/secret-empty"
+check "empty webhook secret posts no chat" "$(chat_calls)" 0
+
+run_relay RELAY_TYPE=success RELAY_BODY="$UPDATED" CHAT_SECRET_DIR="$work/secret-nonl"
+check "webhook secret with no final newline posts chat" "$(grep -c '^CHAT http://chat.test/hook$' "$log")" 1
+
+run_relay RELAY_TYPE=success RELAY_BODY="$UPDATED"
+check "curl reads the webhook from its config on stdin" "$(grep -c '^CHAT http://chat.test/hook$' "$log")" 1
+check "webhook is not a curl argument" "$(grep -c '^URLARG .*chat\.test' "$log")" 0
 
 : >"$log"
-env -i PATH="$work/nocurl" FAKE_LOG="$log" GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+env -i PATH="$work/nocurl" FAKE_LOG="$log" CHAT_SECRET_DIR="$work/secrets" \
   RELAY_TYPE=success RELAY_TRIGGER=webhook RELAY_BODY="$UPDATED" \
   sh "$here/relay.sh" >"$work/out" 2>&1
 check "relay without curl exits 0" "$?" 0
@@ -405,7 +436,7 @@ check "wget post is a standard ok line" \
 
 : >"$log"
 env -i PATH="$work/nocurl" FAKE_LOG="$log" FAKE_WGET_FAIL=1 \
-  GOOGLE_CHAT_WEBHOOK="http://chat.test/hook-secret" RELAY_TYPE=failure RELAY_BODY="$FAILED" \
+  CHAT_SECRET_DIR="$work/secret-alt" RELAY_TYPE=failure RELAY_BODY="$FAILED" \
   sh "$here/relay.sh" >"$work/out" 2>&1
 check "relay with failed wget exits 0" "$?" 0
 check "failed wget is logged" \
@@ -414,7 +445,7 @@ check "failed wget keeps the webhook out of the output" "$(grep -c 'hook-secret'
 
 : >"$log"
 env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
-  GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" \
+  CHAT_SECRET_DIR="$work/secrets" \
   sh -c ". '$here/lib.sh' && chat_notify ok '<b>src' subject summary" >"$work/out" 2>&1
 check "source loses its angle brackets" "$(chat_text_is '✅ *bsrc* · subject · summary')" 1
 
@@ -432,6 +463,7 @@ case "$*" in
     fi
     ;;
   "service ps"*) printf '%s\n' "${FAKE_TASKS:-}" ;;
+  "service inspect"*) printf '%s\n' "${FAKE_INSPECT:-}" ;;
 esac
 EOF
 chmod +x "$work/bin/docker"
@@ -455,7 +487,7 @@ run_swarm_check() {
 run_watchdog_swarm() {
   : >"$log"
   env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
-    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" "$@" \
+    CHAT_SECRET_DIR="$work/secrets" "$@" \
     sh "$here/watchdog-swarm.sh" >"$work/out" 2>&1
   status=$?
 }
@@ -463,7 +495,7 @@ run_watchdog_swarm() {
 run_watchdog_vxlan() {
   : >"$log"
   env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" FAKE_CHAT_URL="http://chat.test/hook" \
-    GOOGLE_CHAT_WEBHOOK="http://chat.test/hook" WATCHDOG_NET_DIR="$work/net" \
+    CHAT_SECRET_DIR="$work/secrets" WATCHDOG_NET_DIR="$work/net" \
     NODE_NAME=api-1.stg "$@" \
     sh "$here/watchdog-vxlan.sh" >"$work/out" 2>&1
   status=$?
@@ -521,6 +553,51 @@ check "old rejections are not a finding" "$status" 0
 run_swarm_check "" FAKE_DOCKER_FAIL=1
 check "unreadable swarm exits 2" "$status" 2
 check "unreadable swarm says so" "$(cat "$work/out")" "could not read the Swarm"
+
+run_swarm_check_next() {
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" SWARM_CHECK_NOW=$THU_0605 "$@" \
+    sh "$here/swarm-check-next.sh" >"$work/out" 2>"$work/err"
+  status=$?
+}
+
+BELOW='a|replicated|1/3'
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|updating|$((THU_0605 - 14 * 60))"
+check "next: updating under 15 min is silent" "$status" 0
+check "next: updating under 15 min prints nothing" "$(cat "$work/out")" ""
+check "next: logs how many services it checked" "$(cat "$work/err")" \
+  "swarm-check-next: checked 1 services"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|rollback_started|$((THU_0605 - 60))"
+check "next: rollback under 15 min is silent" "$status" 0
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|updating|$((THU_0605 - 16 * 60))"
+check "next: updating over 15 min exits 1" "$status" 1
+check "next: updating over 15 min is named" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|paused|$((THU_0605 - 60))"
+check "next: paused update is reported" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|rollback_completed|$((THU_0605 - 60))"
+check "next: completed rollback is reported" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|"
+check "next: service never updated is reported" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$HEALTHY" FAKE_INSPECT="u|stg-socrates_svc-redis|paused|$((THU_0605 - 60))"
+check "next: full replicas with a paused update is silent" "$status" 0
+check "next: full replicas are not inspected" "$(grep -c '^DOCKER service inspect' "$log")" 0
+
+run_swarm_check_next FAKE_SERVICES='a|replicated|1/3
+b|replicated|2/3' FAKE_INSPECT="u|a|updating|$((THU_0605 - 60))
+u|b|paused|$((THU_0605 - 60))"
+check "next: one service updating, one paused names only the paused one" \
+  "$(cat "$work/out")" "below target: b 2/3"
+check "next: inspects only services below target" \
+  "$(grep -c '^DOCKER service inspect .* a b$' "$log")" 1
+
+run_swarm_check_next FAKE_DOCKER_FAIL=1
+check "next: unreadable swarm exits 2" "$status" 2
 
 run_watchdog_swarm WATCHDOG_NOW=$SAT_0130 FAKE_SERVICES='a|replicated|1/3'
 check "swarm watchdog is quiet in the window" "$status" 0

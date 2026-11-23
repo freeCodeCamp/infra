@@ -41,3 +41,31 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#nginxupstreamerrors"
+        - alert: NginxUpstreamDown
+          expr: |
+            _time:5m role:pxy _stream:{level=~"error|crit|alert|emerg"} "connect() failed (111"
+            | extract_regexp "upstream: \"http://(?P<up>[0-9.]+:[0-9]+)" from _msg
+            | stats by (env, host, up, _time:1m) count() as n
+            | stats by (env, host, up) count() as minutes
+            | filter minutes:>=4
+          labels:
+            severity: warning
+            drill: "true"
+          annotations:
+            summary: "{{ $labels.env }} NGINX on {{ $labels.host }} cannot connect to {{ $labels.up }}."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#nginxupstreamdown"
+        - alert: NginxGatewayErrors
+          expr: |
+            _time:5m role:pxy status:~"^50[234]$"
+            | stats by (env, server_name) count() as errors
+            | filter errors:>=5
+          labels:
+            severity: critical
+            drill: "true"
+          annotations:
+            summary: "{{ $labels.env }} {{ $labels.server_name }} returns {{ $value }} 502, 503 or 504 responses in 5 minutes."
+            runbook_url:
+              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
+              19-o11y-alerts.md#nginxgatewayerrors"

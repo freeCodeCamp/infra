@@ -195,13 +195,12 @@ alertmanager:
           receiver: blackhole
         - matchers:
             - drill="true"
-            - alertname=~"DRILL-.+"
           receiver: google_chat_drill
     inhibit_rules:
       - source_matchers:
           - alertname="VultrMetricsPushDown"
         target_matchers:
-          - alertname=~"HostDown|NginxVmDown|NginxHigh5xxRate|NginxUpstreamErrors|FluentBitDroppedRecords|FluentBitBufferBacklog"
+          - alertname=~"HostDown|NginxVmDown|NginxHigh5xxRate|NginxUpstreamErrors|NginxUpstreamDown|NginxGatewayErrors|FluentBitDroppedRecords|FluentBitBufferBacklog"
     receivers:
       - name: blackhole
       - name: google_chat_drill
