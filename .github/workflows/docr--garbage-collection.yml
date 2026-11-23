@@ -123,7 +123,9 @@ jobs:
         if: always()
         uses: ./.github/actions/notify-chat
         with:
-          webhook: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          endpoint: ${{ secrets.DEVOPS_ALERTS_PROXY_URL }}
+          hmac_secret: ${{ secrets.DEVOPS_ALERTS_GITHUB_HMAC }}
+          notification_key: docr-garbage-collection-${{ github.run_id }}-${{ github.run_attempt }}
           status: ${{ job.status == 'cancelled' && 'warn' || job.status != 'success' && 'fail' || steps.preflight.outputs.clear == 'true' && 'ok' || 'warn' }}
           source: docr
           subject: garbage collection

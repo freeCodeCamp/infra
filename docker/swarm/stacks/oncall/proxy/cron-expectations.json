@@ -1,0 +1,34 @@
+[
+  {
+    "id": "dispatch-news-eng",
+    "label": "news deploy dispatch",
+    "service": "svc-dispatch-news-eng",
+    "schedule": "0 5 */3 * * *",
+    "source": "dispatch",
+    "subject": "freeCodeCamp/news deploy-eng.yml"
+  },
+  {
+    "id": "dispatch-housekeeping",
+    "label": "infra housekeeping dispatch",
+    "service": "svc-dispatch-housekeeping",
+    "schedule": "0 30 1 * * 3,6",
+    "source": "dispatch",
+    "subject": "freeCodeCamp/infra ansible--housekeeping.yml"
+  },
+  {
+    "id": "watchdog-news",
+    "label": "news feed watchdog",
+    "service": "svc-watchdog-news",
+    "schedule": "0 50 * * * *",
+    "source": "watchdog",
+    "subject": "news English"
+  },
+  {
+    "id": "gantry-hourly",
+    "label": "Gantry hourly update",
+    "service": "svc-update",
+    "schedule": "0 45 0/1 * * *",
+    "source": "gantry",
+    "subject": "hourly"
+  }
+]

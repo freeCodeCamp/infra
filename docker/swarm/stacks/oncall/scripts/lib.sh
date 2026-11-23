@@ -22,15 +22,16 @@ json_string() {
 }
 
 chat_post() {
-  if [ -z "${GOOGLE_CHAT_WEBHOOK:-}" ]; then
-    printf 'chat: GOOGLE_CHAT_WEBHOOK is empty, message not sent\n' >&2
+  chat_url=${CHAT_PROXY_URL:-${GOOGLE_CHAT_WEBHOOK:-}}
+  if [ -z "$chat_url" ]; then
+    printf 'chat: CHAT_PROXY_URL and GOOGLE_CHAT_WEBHOOK are empty, message not sent\n' >&2
     return 0
   fi
   chat_json="{\"text\":$(json_string "$1")}"
   if ! command -v curl >/dev/null 2>&1; then
     wget -q -O /dev/null -T 30 \
       --header 'Content-Type: application/json; charset=UTF-8' \
-      --post-data "$chat_json" "$GOOGLE_CHAT_WEBHOOK" 2>/dev/null ||
+      --post-data "$chat_json" "$chat_url" 2>/dev/null ||
       printf 'chat: Google Chat rejected the message (wget exit %s)\n' "$?" >&2
     return 0
   fi
@@ -38,7 +39,7 @@ chat_post() {
     -H 'Content-Type: application/json; charset=UTF-8' \
     --max-time 30 --retry 2 \
     -d "$chat_json" \
-    "$GOOGLE_CHAT_WEBHOOK" || true)
+    "$chat_url" || true)
   case "$chat_code" in
   2??) return 0 ;;
   esac
