@@ -195,7 +195,6 @@ alertmanager:
           receiver: blackhole
         - matchers:
             - drill="true"
-            - alertname=~"DRILL-.+"
           receiver: google_chat_drill
     inhibit_rules:
       - source_matchers:

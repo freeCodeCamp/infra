@@ -99,7 +99,9 @@ Each dashboard in the folders **freeCodeCamp**, **VictoriaMetrics** and **Hosts*
 
 ## Test the alert path
 
-This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"` and a name that starts with `DRILL-`. Alertmanager sends them to the receiver `google_chat_drill`, and calert posts them to the drill space, not to the alert space. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook` in the vault `Infra-IaC-ESO`. The test does not use the webhook of the alert space.
+This test proves that an alert goes through Alertmanager and calert to Google Chat. It does not prove that the rule expression is correct. The test alerts have the label `drill="true"` and a name that starts with `DRILL-`. Alertmanager sends each alert with the label `drill="true"` to the receiver `google_chat_drill`, and calert posts it to the drill space, not to the alert space.
+
+A new rule starts with the label `drill: "true"` (a string, in quotes), so its alerts go to the drill space only. To make it a production alert, remove the label in a PR. The webhook of the drill space is in the 1Password item `o11y-google-chat-drill-webhook` in the vault `Infra-IaC-ESO`. The test does not use the webhook of the alert space.
 
 1. Read the list of alerts that the test sends:
 
