@@ -1,0 +1,184 @@
+---
+- name: Test the Swarm wait in the reboot play
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars_files:
+    - ../vars/swarm.yml
+  vars:
+    swarm_wait_stubs:
+      active: printf 'active\n'
+      inactive: printf 'inactive\n'
+      docker_down: exit 1
+    swarm_wait_prefix_cases:
+      - host: prd-vm-api-1
+        prefix: prd-
+      - host: stg-vm-soc-2
+        prefix: stg-
+      - host: ops-vm-swarm-mgr-1
+        prefix: ""
+      - host: prd-vm-pxy-1
+        prefix: prd-
+  tasks:
+    - name: Run the membership read against a stub docker
+      block:
+        - name: Make the stub directory
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: swarmwait
+          check_mode: false
+          register: swarm_wait_tmp
+
+        - name: Make a stub directory for each case
+          ansible.builtin.file:
+            path: "{{ swarm_wait_tmp.path }}/{{ item.key }}"
+            state: directory
+            mode: "0755"
+          loop: "{{ swarm_wait_stubs | dict2items }}"
+          loop_control:
+            label: "{{ item.key }}"
+          check_mode: false
+
+        - name: Write the stub docker of each case
+          ansible.builtin.copy:
+            dest: "{{ swarm_wait_tmp.path }}/{{ item.key }}/docker"
+            mode: "0755"
+            content: |
+              #!/usr/bin/env bash
+              [ "$*" = "info --format {{ '{{' }} .Swarm.LocalNodeState {{ '}}' }}" ] || exit 2
+              {{ item.value }}
+          loop: "{{ swarm_wait_stubs | dict2items }}"
+          loop_control:
+            label: "{{ item.key }}"
+          check_mode: false
+
+        - name: Read the membership of an active Swarm node
+          ansible.builtin.include_tasks:
+            file: ../tasks/swarm-member.yml
+            apply:
+              environment:
+                PATH: "{{ swarm_wait_tmp.path }}/active:{{ lookup('ansible.builtin.env', 'PATH') }}"
+
+        - name: Assert an active Swarm node is a member
+          ansible.builtin.assert:
+            that:
+              - swarm_member | bool
+            fail_msg: "active: swarm_member is {{ swarm_member }}"
+
+        - name: Read the membership of a host outside the Swarm
+          ansible.builtin.include_tasks:
+            file: ../tasks/swarm-member.yml
+            apply:
+              environment:
+                PATH: "{{ swarm_wait_tmp.path }}/inactive:{{ lookup('ansible.builtin.env', 'PATH') }}"
+
+        - name: Assert a host outside the Swarm is not a member
+          ansible.builtin.assert:
+            that:
+              - not (swarm_member | bool)
+            fail_msg: "inactive: swarm_member is {{ swarm_member }}"
+
+        - name: Read the membership of a host whose Docker is down
+          ansible.builtin.include_tasks:
+            file: ../tasks/swarm-member.yml
+            apply:
+              environment:
+                PATH: "{{ swarm_wait_tmp.path }}/docker_down:{{ lookup('ansible.builtin.env', 'PATH') }}"
+
+        - name: Assert a host whose Docker is down is not a member
+          ansible.builtin.assert:
+            that:
+              - not (swarm_member | bool)
+            fail_msg: "docker_down: swarm_member is {{ swarm_member }}"
+
+      always:
+        - name: Remove the stub directory
+          ansible.builtin.file:
+            path: "{{ swarm_wait_tmp.path }}"
+            state: absent
+          when: swarm_wait_tmp.path is defined
+          check_mode: false
+
+    - name: Read the reboot play
+      ansible.builtin.set_fact:
+        swarm_wait_play: "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../play-any--reboot.yml') | from_yaml)[0] }}"
+
+    - name: Find the reboot block and the tasks before it
+      ansible.builtin.set_fact:
+        swarm_wait_top_text: "{{ swarm_wait_play.tasks | map('string') | list }}"
+        swarm_wait_block: "{{ swarm_wait_play.tasks | selectattr('block', 'defined') | first }}"
+
+    - name: List the task names of the reboot block
+      ansible.builtin.set_fact:
+        swarm_wait_block_names: "{{ swarm_wait_block.block | map(attribute='name') | list }}"
+        swarm_wait_node_check: []
+        swarm_wait_service_check: []
+
+    - name: Find the Swarm checks in the reboot block
+      vars:
+        include_target: "{{ item['ansible.builtin.include_tasks'] | default('') }}"
+        include_file: "{{ include_target.file | default('') if include_target is mapping else include_target }}"
+      ansible.builtin.set_fact:
+        swarm_wait_node_check: "{{ swarm_wait_node_check + ([item] if include_file == 'tasks/verify-swarm-node.yml' else []) }}"
+        swarm_wait_service_check: "{{ swarm_wait_service_check + ([item] if include_file == 'tasks/verify-swarm-services.yml' else []) }}"
+      loop: "{{ swarm_wait_block.block }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Assert the play loads the Swarm vars and stops on the first failed host
+      ansible.builtin.assert:
+        that:
+          - "'vars/swarm.yml' in (swarm_wait_play.vars_files | default([]))"
+          - swarm_wait_play.max_fail_percentage == 0
+        quiet: true
+
+    - name: Assert the membership read and the manager guard come before the reboot
+      vars:
+        member_at: "{{ swarm_wait_top_text.index(swarm_wait_top_text | select('search', 'tasks/swarm-member.yml') | first) }}"
+        guard_at: "{{ swarm_wait_top_text.index(swarm_wait_top_text | select('search', 'groups\\[variable_manager') | first) }}"
+        block_at: "{{ swarm_wait_play.tasks.index(swarm_wait_block) }}"
+      ansible.builtin.assert:
+        that:
+          - member_at | int < guard_at | int
+          - guard_at | int < block_at | int
+          - swarm_wait_top_text[guard_at | int] is search('swarm_member')
+        quiet: true
+
+    - name: Assert both Swarm checks run after the reachability wait, in order, on members only and not in a dry run
+      vars:
+        wait_at: "{{ swarm_wait_block_names.index('Wait for machine to become reachable again') }}"
+        node_at: "{{ swarm_wait_block_names.index(swarm_wait_node_check[0].name) }}"
+        service_at: "{{ swarm_wait_block_names.index(swarm_wait_service_check[0].name) }}"
+        gates: "{{ (swarm_wait_node_check[0].when | list) + (swarm_wait_service_check[0].when | list) }}"
+      ansible.builtin.assert:
+        that:
+          - swarm_wait_node_check | length == 1
+          - swarm_wait_service_check | length == 1
+          - wait_at | int < node_at | int
+          - node_at | int < service_at | int
+          - gates | select('equalto', 'swarm_member | default(false)') | list | length == 2
+          - gates | select('equalto', 'not ansible_check_mode') | list | length == 2
+          - swarm_wait_block.when == 'should_reboot'
+        quiet: true
+
+    - name: Assert the service check runs on the manager with the node's tier prefix
+      vars:
+        service_include: "{{ swarm_wait_service_check[0]['ansible.builtin.include_tasks'] }}"
+      ansible.builtin.assert:
+        that:
+          - service_include.apply.delegate_to is search("groups\[variable_manager \| default\('ops_swarm_mgr'\)\] \| first")
+          - swarm_wait_service_check[0].vars.variable_service_prefix is search('swarm_service_prefix')
+        quiet: true
+
+    - name: Assert the service prefix of each kind of host
+      vars:
+        swarm_hostname: "{{ item.host }}"
+      ansible.builtin.assert:
+        that:
+          - swarm_service_prefix == item.prefix
+        fail_msg: "{{ item.host }}: got '{{ swarm_service_prefix }}', want '{{ item.prefix }}'"
+        quiet: true
+      loop: "{{ swarm_wait_prefix_cases }}"
+      loop_control:
+        label: "{{ item.host }}"

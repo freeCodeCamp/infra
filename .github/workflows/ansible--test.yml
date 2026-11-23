@@ -108,3 +108,8 @@ jobs:
         run: |
           source .venv/bin/activate
           ansible-playbook --check tests/play-test--13-k3s-gate.yml
+
+      - name: Unit Test the Swarm Wait After a Reboot
+        run: |
+          source .venv/bin/activate
+          ansible-playbook --check tests/play-test--14-reboot-swarm-wait.yml

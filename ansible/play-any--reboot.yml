@@ -10,6 +10,8 @@
     - hardware
   become: true
   become_user: root
+  vars_files:
+    - vars/swarm.yml
   vars:
     # Set force_reboot to True to force a reboot — mind the quotes!
     force_reboot: "{{ variable_force_reboot | default(False) }}"
@@ -109,6 +111,19 @@
           restart it. Fix the config, then reboot by hand.
       when: reboot_held_back | default(false)
 
+    - name: Read whether this host is in the Swarm
+      ansible.builtin.include_tasks: tasks/swarm-member.yml
+      when: should_reboot
+
+    - name: Stop when no manager can check the Swarm services
+      ansible.builtin.assert:
+        that:
+          - groups[variable_manager | default('ops_swarm_mgr')] | default([]) | length > 0
+        fail_msg: "No manager in group {{ variable_manager | default('ops_swarm_mgr') }}. Set variable_manager to a group that holds the Swarm manager."
+      when:
+        - should_reboot
+        - swarm_member | default(false)
+
     - name: Conditionally Reboot
       block:
         - name: Reboot machine
@@ -125,6 +140,23 @@
         - name: Wait for machine to become reachable again
           ansible.builtin.wait_for_connection:
             timeout: 300
+
+        - name: Check this Swarm node after the reboot
+          ansible.builtin.include_tasks: tasks/verify-swarm-node.yml
+          when:
+            - swarm_member | default(false)
+            - not ansible_check_mode
+
+        - name: Check the Swarm services from the manager after the reboot
+          ansible.builtin.include_tasks:
+            file: tasks/verify-swarm-services.yml
+            apply:
+              delegate_to: "{{ groups[variable_manager | default('ops_swarm_mgr')] | first }}"
+          vars:
+            variable_service_prefix: "{{ swarm_service_prefix }}"
+          when:
+            - swarm_member | default(false)
+            - not ansible_check_mode
 
       when: should_reboot
       ignore_errors: "{{ ansible_check_mode }}"

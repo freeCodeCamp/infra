@@ -1,0 +1,12 @@
+---
+- name: Read the Swarm state of this host
+  ansible.builtin.command: docker info --format {% raw %}'{{ .Swarm.LocalNodeState }}'{% endraw %}
+  register: swarm_member_state
+  timeout: 60
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Note whether this host is a Swarm member
+  ansible.builtin.set_fact:
+    swarm_member: "{{ (swarm_member_state.rc | default(1)) == 0 and (swarm_member_state.stdout | default('') | trim) == 'active' }}"
