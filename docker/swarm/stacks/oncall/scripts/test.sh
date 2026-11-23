@@ -463,6 +463,7 @@ case "$*" in
     fi
     ;;
   "service ps"*) printf '%s\n' "${FAKE_TASKS:-}" ;;
+  "service inspect"*) printf '%s\n' "${FAKE_INSPECT:-}" ;;
 esac
 EOF
 chmod +x "$work/bin/docker"
@@ -552,6 +553,51 @@ check "old rejections are not a finding" "$status" 0
 run_swarm_check "" FAKE_DOCKER_FAIL=1
 check "unreadable swarm exits 2" "$status" 2
 check "unreadable swarm says so" "$(cat "$work/out")" "could not read the Swarm"
+
+run_swarm_check_next() {
+  : >"$log"
+  env -i PATH="$work/bin:/usr/bin:/bin" FAKE_LOG="$log" SWARM_CHECK_NOW=$THU_0605 "$@" \
+    sh "$here/swarm-check-next.sh" >"$work/out" 2>"$work/err"
+  status=$?
+}
+
+BELOW='a|replicated|1/3'
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|updating|$((THU_0605 - 14 * 60))"
+check "next: updating under 15 min is silent" "$status" 0
+check "next: updating under 15 min prints nothing" "$(cat "$work/out")" ""
+check "next: logs how many services it checked" "$(cat "$work/err")" \
+  "swarm-check-next: checked 1 services"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|rollback_started|$((THU_0605 - 60))"
+check "next: rollback under 15 min is silent" "$status" 0
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|updating|$((THU_0605 - 16 * 60))"
+check "next: updating over 15 min exits 1" "$status" 1
+check "next: updating over 15 min is named" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|paused|$((THU_0605 - 60))"
+check "next: paused update is reported" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|rollback_completed|$((THU_0605 - 60))"
+check "next: completed rollback is reported" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$BELOW" FAKE_INSPECT="u|a|"
+check "next: service never updated is reported" "$(cat "$work/out")" "below target: a 1/3"
+
+run_swarm_check_next FAKE_SERVICES="$HEALTHY" FAKE_INSPECT="u|stg-socrates_svc-redis|paused|$((THU_0605 - 60))"
+check "next: full replicas with a paused update is silent" "$status" 0
+check "next: full replicas are not inspected" "$(grep -c '^DOCKER service inspect' "$log")" 0
+
+run_swarm_check_next FAKE_SERVICES='a|replicated|1/3
+b|replicated|2/3' FAKE_INSPECT="u|a|updating|$((THU_0605 - 60))
+u|b|paused|$((THU_0605 - 60))"
+check "next: one service updating, one paused names only the paused one" \
+  "$(cat "$work/out")" "below target: b 2/3"
+check "next: inspects only services below target" \
+  "$(grep -c '^DOCKER service inspect .* a b$' "$log")" 1
+
+run_swarm_check_next FAKE_DOCKER_FAIL=1
+check "next: unreadable swarm exits 2" "$status" 2
 
 run_watchdog_swarm WATCHDOG_NOW=$SAT_0130 FAKE_SERVICES='a|replicated|1/3'
 check "swarm watchdog is quiet in the window" "$status" 0
