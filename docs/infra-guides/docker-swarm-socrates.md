@@ -48,6 +48,16 @@ Gantry updates the services with the manager credentials (`GANTRY_UPDATE_OPTIONS
 
 `SENTRY_ENVIRONMENT` is required. If it is not set, the deploy stops.
 
+`stack-socrates.yml` also reads optional variables for the published ports of `svc-socrates-alpha` and `svc-socrates-bravo`. `svc-redis` stays on host port 6379. The defaults are the host-mode ports. The routing mesh values are for each environment after its move to the mesh:
+
+| Variable                        | Default | Staging (mesh) | Production (mesh) |
+| ------------------------------- | ------- | -------------- | ----------------- |
+| `SOCRATES_PUBLISH_MODE`         | `host`  | `ingress`      | `ingress`         |
+| `SOCRATES_ALPHA_PUBLISHED_PORT` | `4010`  | `4110`         | `4210`            |
+| `SOCRATES_BRAVO_PUBLISHED_PORT` | `4011`  | `4111`         | `4211`            |
+
+Add these lines to `socrates-<env>.env.enc` only after the live move of that environment. A deploy with the lines set and the old live ports moves the port in one roll, and NGINX gets refused connections until the proxies change. After the live move, add the lines before the next deploy. A deploy without them publishes the old ports again.
+
 ## Node Labels
 
 `ansible/play-swarm--form.yml` sets the node labels `socrates.enabled` and `socrates.variant` (`dev` or `org`). See [Configure a Vultr Environment](ansible.md#configure-a-vultr-environment).
