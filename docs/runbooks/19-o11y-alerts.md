@@ -347,7 +347,7 @@ Check the R2 key for the bucket `ops-o11y-etcd` in the Cloudflare dashboard. The
 
 Fluent Bit on a Vultr host dropped log records or metrics in the last 15 minutes. The `name` label names the output: `http.*` sends logs to the log agent, `prometheus_remote_write.*` sends metrics to vmagent. The rule has no `for`: it fires at the first evaluation that sees a drop, and it stays on for 15 minutes after the last drop. One of two causes applies:
 
-- vmauth or the log agent refused the records with an HTTP 4xx status. Fluent Bit keeps a copy in `/var/lib/fluent-bit/storage/rejected`, up to 256M.
+- vmauth or the log agent refused the records with an HTTP 4xx status other than 429. Fluent Bit keeps a copy in `/var/lib/fluent-bit/storage/rejected`, up to 256M.
 - The buffer of an output became full, and Fluent Bit removed the oldest records. Those records are lost.
 
 1. Find the cause. Use the `instance` label of the alert:
@@ -384,6 +384,7 @@ An output of Fluent Bit on a Vultr host has used half of its buffer for 15 minut
    ```
 
 1. A connection error shows a fault in the VPC network or the node. An HTTP 5xx status shows a fault in vmauth or the log agent. Examine the vmauth log for the request: `kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y logs -l o11y.freecodecamp.org/component=vmauth --tail=100`. An HTTP 401 status on metrics shows a wrong sender token; see [Sender token](../infra-guides/ansible.md#sender-token).
+1. An HTTP 429 status shows that the senders use all their slots in vmauth: `max_concurrent_requests` of the VMUser `fluent-bit-sender` in `k3s/ops-o11y-vultr/cluster/victoria-logs/vmauth.yaml`, for each vmauth replica. Fluent Bit sends the records again later, so it loses no records while the buffer has space. This is normal for a short time after many hosts send their backlog. If the buffer does not become smaller, read the panel **Concurrent limit reached** of the dashboard **VictoriaMetrics - vmauth**, and increase the limit in a PR.
 
 ## LogStoreDown
 
