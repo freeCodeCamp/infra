@@ -73,8 +73,8 @@ The Google Chat webhooks are external Docker secrets, not variables. Create them
 
 | Secret               | Swarm name                     | Used by                       | Value                                                                             |
 | -------------------- | ------------------------------ | ----------------------------- | --------------------------------------------------------------------------------- |
-| `chat_webhook`       | `oncall_chat_webhook_v1`       | dispatchers, watchdogs, relay | Google Chat webhook URL. Same space as the housekeeping reports.                  |
-| `chat_webhook_drill` | `oncall_chat_webhook_drill_v1` | no service                    | Webhook URL of the drill space (1Password item `o11y-google-chat-drill-webhook`). |
+| `chat_webhook`       | `oncall_chat_webhook_v2`       | dispatchers, watchdogs, relay | Google Chat webhook URL. Same space as the housekeeping reports.                  |
+| `chat_webhook_drill` | `oncall_chat_webhook_drill_v2` | no service                    | Webhook URL of the drill space (1Password item `o11y-google-chat-drill-webhook`). |
 
 No service uses `chat_webhook_drill` now. To test a new watchdog beside the production one, give the test service this secret with the target `chat_webhook`, so that it posts to the drill space only.
 
@@ -191,21 +191,21 @@ All services log to the local Docker `json-file` driver, rotated per node:
    ```
 
 3. If you changed a config file, increase its version first. See [Swarm Config Names](#swarm-config-names).
-4. Create the Chat webhook secrets. From the repository root, run this block. It creates each secret only when it does not exist, so you can run it before each deploy. The values go from `sops` and `op` straight into `docker secret create`, and the block shows no value. `op` reads the drill webhook from the `freecodecamp.1password.com` account and asks you to approve the read in 1Password.
+4. Create the Chat webhook secrets. Do not run this block for a new secret name before `oncall.env.enc` and the 1Password item hold the new URL. The block does not replace a secret that exists. If a secret got an old URL, increase its suffix again (see [Rotate a Chat Webhook](#rotate-a-chat-webhook)). From the repository root, run this block. It creates each secret only when it does not exist, so you can run it before each deploy. The values go from `sops` and `op` straight into `docker secret create`, and the block shows no value. `op` reads the drill webhook from the `freecodecamp.1password.com` account and asks you to approve the read in 1Password.
 
    ```bash
    (
      set -euo pipefail
-     if ! docker --context vultr secret inspect oncall_chat_webhook_v1 >/dev/null 2>&1; then
+     if ! docker --context vultr secret inspect oncall_chat_webhook_v2 >/dev/null 2>&1; then
        sops decrypt --input-type dotenv --output-type dotenv \
          ../infra-secrets/docker/oldeworld/oncall.env.enc |
          sed -n 's/^GOOGLE_CHAT_WEBHOOK=//p' |
-         docker --context vultr secret create oncall_chat_webhook_v1 -
+         docker --context vultr secret create oncall_chat_webhook_v2 -
      fi
-     if ! docker --context vultr secret inspect oncall_chat_webhook_drill_v1 >/dev/null 2>&1; then
+     if ! docker --context vultr secret inspect oncall_chat_webhook_drill_v2 >/dev/null 2>&1; then
        op read --account freecodecamp.1password.com \
          op://Infra-IaC-ESO/o11y-google-chat-drill-webhook/credential |
-         docker --context vultr secret create oncall_chat_webhook_drill_v1 -
+         docker --context vultr secret create oncall_chat_webhook_drill_v2 -
      fi
    )
    ```
@@ -251,19 +251,34 @@ sudo chmod -R u+w /home/freecodecamp/.docker
 
 ### Rotate a Chat Webhook
 
-1. In the Google Chat space, add a new incoming webhook. Keep the old webhook until the last step.
-2. Put the new URL in each place that holds the old one:
-   - `chat_webhook`: `GOOGLE_CHAT_WEBHOOK` in `oncall.env.enc`, and the GitHub Actions secret `GOOGLE_CHAT_WEBHOOK` of this repository, which posts to the same space. The GitHub workflows stop posting when you delete the old webhook, so change the secret too: run `gh secret set GOOGLE_CHAT_WEBHOOK -R freeCodeCamp/infra` and paste the URL at its prompt.
-   - `chat_webhook_drill`: the 1Password item `o11y-google-chat-drill-webhook` (account `freecodecamp.1password.com`, vault `Infra-IaC-ESO`). calert also reads this item. External Secrets gets the new value within 1 hour; then restart calert, as in runbook 19.
-3. In `stack-oncall.yml`, increase the version suffix of the secret `name:` (for example `oncall_chat_webhook_v1` → `oncall_chat_webhook_v2`). Use the same name in the block of [Deployment](#deployment) step 4.
-4. Run steps 4 and 5 of [Deployment](#deployment).
-5. Remove the old secret:
+1. In each Google Chat space, add one new incoming webhook for each holder below, with a dated name (for example `oncall-2026-11`). The name shows in Chat which holder posts. Keep the old webhooks until the last step.
+2. Put each new URL in its holder. Copy the URL in Chat and paste it into an editor or a prompt, never into a command line:
+   - Oncall stack: `GOOGLE_CHAT_WEBHOOK` in `oncall.env.enc`. Run `sops edit --input-type dotenv --output-type dotenv ../infra-secrets/docker/oldeworld/oncall.env.enc`, then commit the file in `infra-secrets`. It becomes the secret `chat_webhook`.
+   - GitHub workflows: the GitHub Actions secret `GOOGLE_CHAT_WEBHOOK` of this repository. Run `gh secret set GOOGLE_CHAT_WEBHOOK -R freeCodeCamp/infra` and paste the URL at its prompt.
+   - Alertmanager: the 1Password item `o11y-google-chat-webhook` (account `freecodecamp.1password.com`, vault `Infra-IaC-ESO`). Edit it in the 1Password app. calert reads it as `endpoint`.
+   - Drill: the 1Password item `o11y-google-chat-drill-webhook` (same account and vault). Edit it in the 1Password app. calert reads it as `endpoint_drill`, and it becomes the secret `chat_webhook_drill`.
+3. Make External Secrets read the 1Password items now. Then restart calert, as in runbook 19. Do not restart calert before `refreshTime` shows a time after the `annotate` command:
 
    ```bash
-   docker --context vultr secret rm oncall_chat_webhook_v1
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y annotate externalsecret calert-google-chat force-sync="$(date +%s)" --overwrite
+   kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y get externalsecret calert-google-chat -o jsonpath='{.status.refreshTime}{"\n"}'
    ```
 
-6. In the Google Chat space, delete the old webhook. The old URL stops working.
+4. In `stack-oncall.yml`, increase the version suffix of both secret names (for example `oncall_chat_webhook_v2` → `oncall_chat_webhook_v3`). Use the same names in the block of [Deployment](#deployment) step 4.
+5. Run steps 4 and 5 of [Deployment](#deployment).
+6. Remove the secrets with the previous suffix, and make sure that only the new ones stay. For example, after a move from `_v1` to `_v2`:
+
+   ```bash
+   docker --context vultr secret rm oncall_chat_webhook_v1 oncall_chat_webhook_drill_v1
+   docker --context vultr secret ls --filter name=oncall_chat_webhook
+   ```
+
+7. Make each holder post under its new name:
+   - Drill: send the test alerts of runbook 19.
+   - Oncall stack: the chat relay posts after the next news rollout, every 3 hours.
+   - GitHub workflows: the next housekeeping report, Wed/Sat 01:30 UTC.
+   - Alertmanager: the next alert without the `drill` label.
+8. Delete the old webhooks in Google Chat. The old URLs stop working. After a leak, do not wait longer than the next housekeeping report.
 
 ## GHA Integration
 
