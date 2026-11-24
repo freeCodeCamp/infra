@@ -298,10 +298,10 @@ networks:
 
 secrets:
   chat_webhook:
-    name: oncall_chat_webhook_v1
+    name: oncall_chat_webhook_v2
     external: true
   chat_webhook_drill:
-    name: oncall_chat_webhook_drill_v1
+    name: oncall_chat_webhook_drill_v2
     external: true
 
 configs:
