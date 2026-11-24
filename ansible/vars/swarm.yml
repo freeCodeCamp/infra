@@ -10,3 +10,4 @@ swarm_legacy_labels: "{{ {
   swarm_legacy_role[swarm_node_role] ~ '.variant': swarm_legacy_variant[swarm_node_env],
   } if swarm_node_role in swarm_legacy_role and swarm_node_env in swarm_legacy_variant else {} }}"
 swarm_node_labels: "{{ {'env': swarm_node_env, 'role': swarm_node_role} | combine(swarm_legacy_labels) }}"
+swarm_service_prefix: "{{ swarm_node_env ~ '-' if swarm_node_env in swarm_legacy_variant else '' }}"
