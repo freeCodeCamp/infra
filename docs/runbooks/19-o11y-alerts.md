@@ -13,7 +13,7 @@ kubectl --kubeconfig k3s/ops-o11y-vultr/.kubeconfig.yaml -n o11y rollout restart
 The alerts have two layers. An Alertmanager inhibit rule (`inhibit_rules` in `k3s/ops-o11y-vultr/apps/victoria-metrics/charts/victoria-metrics-k8s-stack/values.yaml`) mutes part of the fleet layer while no Vultr host can send metrics:
 
 - o11y layer, never muted: `O11yPodRestarting`, `VultrMetricsPushDown`, `TargetDown`, `LogStoreDown`, `LogStoreStale`, `VlagentDroppedData`, `ScrapeConfigReloadFailed`, `VmalertExecutionErrors`, `O11yBackupStale`, `O11yBackupFailed`, `ArgoCDAppUnhealthy`, `EtcdSnapshotMissing`.
-- Fleet layer, muted while `VultrMetricsPushDown` fires: `HostDown`, `NginxVmDown`, `NginxHigh5xxRate`, `NginxUpstreamErrors`, `NginxUpstreamDown`, `NginxGatewayErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. Missing data can make these fire.
+- Fleet layer, muted while `VultrMetricsPushDown` fires: `HostDown`, `NginxVmDown`, `NginxHigh5xxRate`, `NginxUpstreamDown`, `NginxGatewayErrors`, `FluentBitDroppedRecords`, `FluentBitBufferBacklog`. Missing data can make these fire.
 - Never muted: `DiskSpaceLow`, `MemoryHigh` and `HousekeepingStale` (they fire only on data that arrives, and the first two also cover the o11y nodes), and `ProbeFailed` (it checks the public sites from outside the hosts).
 
 `O11yPodRestarting` mutes nothing: each o11y component has more than one replica, so one restarting container does not stop the data. While `VultrMetricsPushDown` fires, a real host fault does not notify. Fix o11y first. The muted alerts stay visible in Alertmanager with the state `suppressed`.
@@ -119,7 +119,7 @@ A new rule starts with the label `drill: "true"` (a string, in quotes), so its a
 1. Test the Watchdog. Add a silence with the matcher `alertname="Watchdog"` and an end time of 1 hour. The CronJob stops its check-ins, and Sentry reports a missed check-in. While the silence is on, each run of the CronJob fails with `Watchdog is not active; no check-in`, and the last 3 failed Jobs stay in the `o11y` namespace. This is correct.
 1. When Sentry reports it, expire the silence. Make sure that the Sentry monitor becomes OK at the next check-in.
 
-The test sends the metric alerts and the log alerts (`NginxHigh5xxRate`, `NginxUpstreamErrors`, `NginxUpstreamDown`, `NginxGatewayErrors`). To send the alerts of one rule file only, give the file after `--dry-run` or `--send`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
+The test sends the metric alerts and the log alerts (`NginxHigh5xxRate`, `NginxUpstreamDown`, `NginxGatewayErrors`). To send the alerts of one rule file only, give the file after `--dry-run` or `--send`. This test does not use `vmalert-vlogs`, so it does not prove the path from `vmalert-vlogs` to Alertmanager.
 
 ## HostDown
 
@@ -489,19 +489,6 @@ More than 5% of the requests to one `server_name` return a 5xx status for 5 minu
    ```
 
 1. Examine the service behind the upstream. Restart or roll back its last deploy.
-
-## NginxUpstreamErrors
-
-An NGINX VM logs more than 10 upstream errors in 5 minutes for 5 minutes. The alert does not count an error for an IPv6 upstream address. The Vultr VMs have no IPv6 route, so NGINX tries the IPv6 address of a CDN host, fails at once and uses IPv4.
-
-1. Read the errors in the VictoriaLogs UI. Use the `host` label of the alert:
-
-   ```text
-   _time:15m _stream:{level=~"error|crit|alert|emerg",host="<host>"} upstream
-     !~"upstream: \"https?://\\["
-   ```
-
-1. If one upstream fails, examine that service. If all upstreams fail, examine the network of the VM.
 
 ## NginxUpstreamDown
 

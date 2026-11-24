@@ -200,7 +200,7 @@ alertmanager:
       - source_matchers:
           - alertname="VultrMetricsPushDown"
         target_matchers:
-          - alertname=~"HostDown|NginxVmDown|NginxHigh5xxRate|NginxUpstreamErrors|NginxUpstreamDown|NginxGatewayErrors|FluentBitDroppedRecords|FluentBitBufferBacklog"
+          - alertname=~"HostDown|NginxVmDown|NginxHigh5xxRate|NginxUpstreamDown|NginxGatewayErrors|FluentBitDroppedRecords|FluentBitBufferBacklog"
     receivers:
       - name: blackhole
       - name: google_chat_drill

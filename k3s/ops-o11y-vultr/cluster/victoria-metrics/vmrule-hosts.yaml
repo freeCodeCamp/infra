@@ -63,7 +63,6 @@ spec:
           expr: time() - housekeeping_last_update_timestamp_seconds > 8 * 86400
           labels:
             severity: warning
-            drill: "true"
           annotations:
             summary: "{{ $labels.instance }} has had no housekeeping update for over 8 days."
             runbook_url:

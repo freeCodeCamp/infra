@@ -111,33 +111,6 @@ services:
       - source: scripts_lib
         target: /scripts/lib.sh
         mode: 0444
-      - source: scripts_swarm_check
-        target: /scripts/swarm-check.sh
-        mode: 0444
-      - source: scripts_watchdog_swarm
-        target: /scripts/watchdog-swarm.sh
-        mode: 0555
-    deploy:
-      <<: *job-deploy
-      labels:
-        - "swarm.cronjob.enable=true"
-        - "swarm.cronjob.replicas=1"
-        - "swarm.cronjob.schedule=0 */30 * * * *"
-        - "swarm.cronjob.skip-running=true"
-
-  svc-watchdog-swarm-next:
-    <<: *logging-config
-    image: docker:29.9.3
-    entrypoint: ["/scripts/watchdog-swarm.sh"]
-    secrets:
-      - source: chat_webhook_drill
-        target: chat_webhook
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    configs:
-      - source: scripts_lib
-        target: /scripts/lib.sh
-        mode: 0444
       - source: scripts_swarm_check_next
         target: /scripts/swarm-check.sh
         mode: 0444
@@ -347,9 +320,6 @@ configs:
   scripts_watchdog:
     name: oncall_scripts_watchdog_v1
     file: ./scripts/watchdog.sh
-  scripts_swarm_check:
-    name: oncall_scripts_swarm_check_v1
-    file: ./scripts/swarm-check.sh
   scripts_swarm_check_next:
     name: oncall_scripts_swarm_check_next_v1
     file: ./scripts/swarm-check-next.sh
