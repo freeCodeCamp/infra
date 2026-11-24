@@ -101,7 +101,7 @@ services:
 
   svc-watchdog-swarm:
     <<: *logging-config
-    image: docker:29.9.3
+    image: docker:29.10.0
     entrypoint: ["/scripts/watchdog-swarm.sh"]
     secrets:
       - source: chat_webhook
@@ -209,7 +209,7 @@ services:
 
   # Runs as a backup to Gantry's automatic cleanup
   svc-cleanup:
-    image: docker:29.9.3
+    image: docker:29.10.0
     command:
       - "docker"
       - "system"
