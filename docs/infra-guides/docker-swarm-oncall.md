@@ -20,7 +20,6 @@ The Oncall stack provides automated maintenance and monitoring services includin
 | **svc-dispatch-docr-gc**      | Starts the infra `docr--garbage-collection.yml` workflow Wed/Sat |
 | **svc-watchdog-news**         | Posts to Google Chat when the English news site is stale         |
 | **svc-watchdog-swarm**        | Posts to Google Chat when a service or a node is not healthy     |
-| **svc-watchdog-swarm-next**   | The next Swarm watchdog logic, posts to the drill space only     |
 | **svc-watchdog-vxlan**        | Posts to Google Chat when a node has a stray overlay device      |
 
 ## Architecture
@@ -75,9 +74,11 @@ The Google Chat webhooks are external Docker secrets, not variables. Create them
 | Secret               | Swarm name                     | Used by                       | Value                                                                             |
 | -------------------- | ------------------------------ | ----------------------------- | --------------------------------------------------------------------------------- |
 | `chat_webhook`       | `oncall_chat_webhook_v1`       | dispatchers, watchdogs, relay | Google Chat webhook URL. Same space as the housekeeping reports.                  |
-| `chat_webhook_drill` | `oncall_chat_webhook_drill_v1` | svc-watchdog-swarm-next       | Webhook URL of the drill space (1Password item `o11y-google-chat-drill-webhook`). |
+| `chat_webhook_drill` | `oncall_chat_webhook_drill_v1` | no service                    | Webhook URL of the drill space (1Password item `o11y-google-chat-drill-webhook`). |
 
-`scripts/lib.sh` reads the URL from `/run/secrets/chat_webhook`. If the file is missing or empty, the script logs `chat: no webhook in /run/secrets/chat_webhook, message not sent` and posts nothing. `curl` gets the URL on stdin. `svc-watchdog-swarm`, `svc-watchdog-swarm-next` and `svc-chat-relay` have no `curl`, so they post with `wget`, and the URL is a `wget` argument while it runs. Anyone who can see the processes on the manager can see it; such a person can also read the secret.
+No service uses `chat_webhook_drill` now. To test a new watchdog beside the production one, give the test service this secret with the target `chat_webhook`, so that it posts to the drill space only.
+
+`scripts/lib.sh` reads the URL from `/run/secrets/chat_webhook`. If the file is missing or empty, the script logs `chat: no webhook in /run/secrets/chat_webhook, message not sent` and posts nothing. `curl` gets the URL on stdin. `svc-watchdog-swarm` and `svc-chat-relay` have no `curl`, so they post with `wget`, and the URL is a `wget` argument while it runs. Anyone who can see the processes on the manager can see it; such a person can also read the secret.
 
 `docker service inspect` does not show a secret value. A service that had `GOOGLE_CHAT_WEBHOOK` before can still show the old value under `PreviousSpec` until its next update.
 
@@ -119,23 +120,20 @@ The workflow does not wait for `exam-platform` releases. That repo is private, a
 
 ### Swarm Watchdogs
 
-`svc-watchdog-swarm` runs on the manager every 30 minutes. It runs `scripts/swarm-check.sh`, reads again after 60 seconds, and posts each finding that stays.
+`svc-watchdog-swarm` runs on the manager every 30 minutes. It runs `scripts/swarm-check-next.sh`, mounted as `swarm-check.sh`, reads again after 60 seconds, and posts each finding that stays.
 
 - It finds services below their target, and nodes with 3 or more rejected tasks in the last 15 minutes.
-- It does not check cron services or jobs.
-- It posts on each run while the finding stays.
-- Quiet hours: Wed/Sat 00:00–06:00 UTC. Housekeeping restarts nodes in this window, and its [Swarm checks](ansible.md#housekeeping-workflow) report on the run.
-
-`svc-watchdog-vxlan` runs on each node at minutes 5 and 35, on the host network. It posts when the node has a [stray overlay device](docker-swarm.md#stray-overlay-device) on two reads, 5 seconds apart. A stray device on `ingress` does not reduce the task count, so `svc-watchdog-swarm` does not find it.
-
-`svc-watchdog-swarm-next` tests the next logic beside `svc-watchdog-swarm`. It runs the same `scripts/watchdog-swarm.sh` on the same schedule, with `scripts/swarm-check-next.sh` mounted as `swarm-check.sh`. It has only the drill secret, mounted as `chat_webhook`, so it posts to the drill space.
-
 - A service below its target is not a finding while its update or rollback is in progress (`updating` or `rollback_started`) and started less than 15 minutes ago. A rollout of a stack thus does not post.
 - A service below its target is a finding when its update is paused, rolled back or completed, when it was never updated, or when its update started 15 or more minutes ago.
 - A service at its target is not a finding, whatever its update state.
+- It does not check cron services or jobs.
+- It posts on each run while the finding stays.
 - Each run logs `swarm-check-next: checked <n> services`. See [Querying Logs](#querying-logs).
+- Quiet hours: Wed/Sat 00:00–06:00 UTC. Housekeeping restarts nodes in this window, and its [Swarm checks](ansible.md#housekeeping-workflow) report on the run.
 
-`ansible/play-swarm--verify.yml` and the housekeeping Swarm checks use `scripts/swarm-check.sh`, not the next logic.
+`ansible/play-swarm--verify.yml` and the housekeeping Swarm checks use `scripts/swarm-check.sh`. It finds each service below its target, also while its update is in progress.
+
+`svc-watchdog-vxlan` runs on each node at minutes 5 and 35, on the host network. It posts when the node has a [stray overlay device](docker-swarm.md#stray-overlay-device) on two reads, 5 seconds apart. A stray device on `ingress` does not reduce the task count, so `svc-watchdog-swarm` does not find it.
 
 ### Google Chat Notifications
 
@@ -234,7 +232,7 @@ All services log to the local Docker `json-file` driver, rotated per node:
    docker --context vultr service ls --filter name=oncall_
    ```
 
-7. Check the scheduler. Each scheduled service has an `Add cronjob` line: `svc-cleanup`, `svc-dispatch-docr-gc`, `svc-dispatch-housekeeping`, `svc-dispatch-news-eng`, `svc-update`, `svc-watchdog-news`, `svc-watchdog-swarm`, `svc-watchdog-swarm-next` and `svc-watchdog-vxlan`:
+7. Check the scheduler. Each scheduled service has an `Add cronjob` line: `svc-cleanup`, `svc-dispatch-docr-gc`, `svc-dispatch-housekeeping`, `svc-dispatch-news-eng`, `svc-update`, `svc-watchdog-news`, `svc-watchdog-swarm` and `svc-watchdog-vxlan`:
 
    ```bash
    docker --context vultr service logs --raw oncall_svc-cronjob
@@ -352,10 +350,9 @@ docker service logs --since 96h oncall_svc-dispatch-docr-gc
 docker service logs --since 2h oncall_svc-watchdog-news
 docker service logs --since 168h oncall_svc-cleanup
 docker service logs --since 2h oncall_svc-watchdog-swarm
-docker service logs --since 2h oncall_svc-watchdog-swarm-next
 ```
 
-The container logs of the manager are also in VictoriaLogs. For example, to see each run of `svc-watchdog-swarm-next`, run this query in the VictoriaLogs UI:
+The container logs of the manager are also in VictoriaLogs. For example, to see each run of `svc-watchdog-swarm`, run this query in the VictoriaLogs UI:
 
 ```text
 _time:24h host:ops-vm-swarm-mgr-1 "swarm-check-next: checked"
