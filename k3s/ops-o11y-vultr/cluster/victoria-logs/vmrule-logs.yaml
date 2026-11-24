@@ -27,20 +27,6 @@ spec:
             runbook_url:
               "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
               19-o11y-alerts.md#nginxhigh5xxrate"
-        - alert: NginxUpstreamErrors
-          expr: |
-            _time:5m _stream:{level=~"error|crit|alert|emerg"} upstream
-              !~"upstream: \"https?://\\["
-            | stats by (env, host) count() as errors
-            | filter errors:>10
-          for: 5m
-          labels:
-            severity: warning
-          annotations:
-            summary: "{{ $labels.env }} NGINX on {{ $labels.host }} logs upstream errors."
-            runbook_url:
-              "https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/\
-              19-o11y-alerts.md#nginxupstreamerrors"
         - alert: NginxUpstreamDown
           expr: |
             _time:5m role:pxy _stream:{level=~"error|crit|alert|emerg"} "connect() failed (111"
@@ -50,7 +36,6 @@ spec:
             | filter minutes:>=4
           labels:
             severity: warning
-            drill: "true"
           annotations:
             summary: "{{ $labels.env }} NGINX on {{ $labels.host }} cannot connect to {{ $labels.up }}."
             runbook_url:
@@ -63,7 +48,6 @@ spec:
             | filter errors:>=5
           labels:
             severity: critical
-            drill: "true"
           annotations:
             summary: "{{ $labels.env }} {{ $labels.server_name }} returns {{ $value }} 502, 503 or 504 responses in 5 minutes."
             runbook_url:
