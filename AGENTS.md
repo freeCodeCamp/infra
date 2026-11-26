@@ -1,6 +1,6 @@
 # AGENTS.md
 
-freeCodeCamp.org infrastructure as code: the Vultr fleet, the o11y cluster and the legacy DigitalOcean hosts. The docs index is `docs/README.md`.
+Docs index is `docs/README.md`.
 
 - When a change alters an operator step, update its runbook or guide in the same commit.
 - Run each command from the repo root, except Ansible commands: run those from `ansible/`.
